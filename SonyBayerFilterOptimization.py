@@ -25,6 +25,9 @@ import subprocess
 import platform
 import re
 
+print("All modules loaded.")
+sys.stdout.flush()
+
 def index_from_permittivity( permittivity_ ):
 """Checks all permittivity values are real and then takes square root to give index."""
 	assert np.all( np.imag( permittivity_ ) == 0 ), 'Not expecting complex index values right now!'
@@ -151,17 +154,51 @@ xy_names = ['x', 'y']
 #
 forward_sources = []
 
+def adjustGaussRefract(src_angle_incidence, src_hgt_Si, src_hgt_polymer, n_Si, n_polymer):
+#todo(ianfoo): edit this so that it takes n entries and not just two
+	r_offset = src_hgt_Si * np.tan(src_angle_incidence*np.pi/180)
+	sin_th_prime = n_polymer/n_Si * np.sin(src_angle_incidence*np.pi/180)
+	r_offset = r_offset + src_hgt_polymer*sin_th_prime/np.sqrt(1-sin_th_prime**2)
+	input_theta = src_angle_incidence#np.arcsin(sin_th_prime) * 180/np.pi
+
+	return [input_theta, r_offset]
+
 for xy_idx in range(0, 2):
-	forward_src = fdtd_hook.addtfsf()
-	forward_src['name'] = 'forward_src_' + xy_names[xy_idx]
-	forward_src['angle phi'] = xy_phi_rotations[xy_idx]
+	# forward_src = fdtd_hook.addtfsf()
+	# forward_src['name'] = 'forward_src_' + xy_names[xy_idx]
+	# forward_src['angle phi'] = xy_phi_rotations[xy_idx]
+	# forward_src['direction'] = 'Backward'
+	# forward_src['x span'] = lateral_aperture_um * 1e-6
+	# forward_src['y span'] = lateral_aperture_um * 1e-6
+	# forward_src['z max'] = src_maximum_vertical_um * 1e-6
+	# forward_src['z min'] = src_minimum_vertical_um * 1e-6
+	# forward_src['wavelength start'] = lambda_min_um * 1e-6
+	# forward_src['wavelength stop'] = lambda_max_um * 1e-6
+    
+    adjustedRIParams = adjustGaussRefract(src_angle_incidence, src_hgt_Si,
+													src_hgt_polymer, n_Si, n_polymer)
+
+	forward_src = fdtd_hook.addgaussian()
+	forward_src['name'] = 'forward_src_'+xy_names[xy_idx]
+	forward_src['injection axis'] = 'z-axis'
 	forward_src['direction'] = 'Backward'
-	forward_src['x span'] = lateral_aperture_um * 1e-6
-	forward_src['y span'] = lateral_aperture_um * 1e-6
-	forward_src['z max'] = src_maximum_vertical_um * 1e-6
-	forward_src['z min'] = src_minimum_vertical_um * 1e-6
+	forward_src['polarization angle'] = xy_pol_rotations[xy_idx]	# degrees
+	forward_src['angle theta'] = adjustedRIParams[0]  # degrees
+	forward_src['angle phi'] = src_phi_incidence    # degrees
+
+	forward_src['x'] = adjustedRIParams[1]*np.cos(src_phi_incidence*np.pi/180) * 1e-6
+	forward_src['x span'] = lateral_aperture_um * 1e-6 * (4/3)
+	forward_src['y'] = adjustedRIParams[1]*np.sin(src_phi_incidence*np.pi/180) * 1e-6
+	forward_src['y span'] = lateral_aperture_um * 1e-6 * (4/3)
+	forward_src['z'] = (src_maximum_vertical_um + src_hgt_Si) * 1e-6
 	forward_src['wavelength start'] = lambda_min_um * 1e-6
 	forward_src['wavelength stop'] = lambda_max_um * 1e-6
+
+	forward_src["frequency dependent profile"] = 1
+	forward_src["number of field profile samples"] = 150
+	forward_src['beam parameters'] = 'Beam size and divergence angle'
+	forward_src['divergence angle'] = 0.5*(lambda_min_um+lambda_max_um)*1e-6/(np.pi*src_beam_rad)*(180/np.pi)
+	forward_src['beam radius wz'] = src_beam_rad
 
 	forward_sources.append(forward_src)
 
@@ -270,6 +307,7 @@ design_import['y span'] = device_size_lateral_um * 1e-6
 design_import['z max'] = device_vertical_maximum_um * 1e-6
 design_import['z min'] = device_vertical_minimum_um * 1e-6
 
+# Left off here
 bayer_filter_size_voxels = np.array([device_voxels_lateral, device_voxels_lateral, device_voxels_vertical])
 bayer_filter = SonyBayerFilter.SonyBayerFilter(
 	bayer_filter_size_voxels,

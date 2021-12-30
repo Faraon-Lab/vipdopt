@@ -105,6 +105,16 @@ lateral_aperture_um = 1.1 * device_size_lateral_um
 src_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um * 2. / 3.
 src_minimum_vertical_um = -focal_length_um - 0.5 * vertical_gap_size_um
 
+src_beam_rad = device_size_lateral_um/2
+src_angle_incidence = 0 # degrees
+src_phi_incidence = 0 # degrees
+
+src_hgt_Si = 0
+src_hgt_polymer = 0
+n_Si = 3.43
+n_polymer = max_device_index
+
+
 
 weight_by_individual_wavelength = True
 
