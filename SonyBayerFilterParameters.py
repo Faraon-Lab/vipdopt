@@ -8,8 +8,8 @@ import numpy as np
 # Files
 #
 
-project_name_init = 'normal_sony_baseline_2p04x2p04x2p04um_f1p53um'
-project_name = 'normal_sony_baseline_2p04x2p04x2p04um_f1p53um'
+project_name_init = 'th0_phi0'
+project_name = 'sony_th0_phi0_test1'
 
 # project_name_init = 'normal_sony_baseline_1p989x1p989x2p04um_f1p53um'
 # project_name = 'normal_sony_baseline_1p989x1p989x2p04um_f1p53um'
