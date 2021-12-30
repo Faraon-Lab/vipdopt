@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 
+# Add filepath to default path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 from SonyBayerFilterParameters import *
@@ -9,9 +10,9 @@ import SonyBayerFilter
 
 from scipy import interpolate
 
+# Lumerical hook Python library API
 import imp
 imp.load_source( "lumapi", "/central/home/gdrobert/Develompent/lumerical/v212/api/python/lumapi.py")
-
 import lumapi
 
 import functools
@@ -20,14 +21,12 @@ import numpy as np
 import time
 
 import queue
-
 import subprocess
-
 import platform
-
 import re
 
 def index_from_permittivity( permittivity_ ):
+"""Checks all permittivity values are real and then takes square root to give index."""
 	assert np.all( np.imag( permittivity_ ) == 0 ), 'Not expecting complex index values right now!'
 
 	return np.sqrt( permittivity_ )
@@ -79,38 +78,46 @@ num_nodes_available = int( sys.argv[ 1 ] )
 num_cpus_per_node = 8
 cluster_hostnames = get_slurm_node_list()
 
+
 #
 # Create FDTD hook
 #
 fdtd_hook = lumapi.FDTD()
+
 
 #
 # Create project folder and save out the parameter file for documentation for this optimization
 #
 python_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
 
+# Initial Project File Directory
 projects_directory_location_init = "/central/groups/Faraon_Computing/sony" 
 projects_directory_location_init += "/" + project_name_init
 
+# Final Output Project File Directory
 projects_directory_location = "/central/groups/Faraon_Computing/sony" 
 projects_directory_location += "/" + project_name
 
 if not os.path.isdir(projects_directory_location):
 	os.mkdir(projects_directory_location)
 
+
 log_file = open( projects_directory_location + "/log.txt", 'w' )
 log_file.write( "Log\n" )
 log_file.close()
 
+# Create new file called optimization.fsp and save 
 fdtd_hook.newproject()
 fdtd_hook.save(projects_directory_location + "/optimization")
-
+# Copy Python code files to the output project directory
 shutil.copy2(python_src_directory + "/SonyBayerFilterParameters.py", projects_directory_location + "/SonyBayerFilterParameters.py")
 shutil.copy2(python_src_directory + "/SonyBayerFilter.py", projects_directory_location + "/SonyBayerFilter.py")
 shutil.copy2(python_src_directory + "/SonyBayerFilterOptimization.py", projects_directory_location + "/SonyBayerFilterOptimization.py")
 
+
 #
 # Set up the FDTD region and mesh
+# We are using dict-like access: see https://support.lumerical.com/hc/en-us/articles/360041873053-Session-management-Python-API
 #
 fdtd = fdtd_hook.addfdtd()
 fdtd['x span'] = fdtd_region_size_lateral_um * 1e-6
@@ -140,6 +147,7 @@ xy_names = ['x', 'y']
 
 #
 # Add a TFSF plane wave forward source at normal incidence
+# for both x- and y-polarization
 #
 forward_sources = []
 
@@ -179,7 +187,7 @@ for adj_src_idx in range(0, num_adjoint_sources):
 		adjoint_sources[adj_src_idx].append(adj_src)
 
 #
-# Set up the volumetric electric field monitor inside the design region.  We will need this compute
+# Set up the volumetric electric field monitor inside the design region.  We will need this to compute
 # the adjoint gradient
 #
 design_efield_monitor = fdtd_hook.addprofile()
