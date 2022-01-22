@@ -701,39 +701,45 @@ for epoch in range(start_epoch, num_epochs):
             figure_of_merit_per_focal_spot.append(compute_fom)
             transmission_per_quadrant.append(compute_transmission_fom)
 
+
+        process_fom_per_focal_spot = figure_of_merit_per_focal_spot.copy()
+        process_transmission_per_quadrant = transmission_per_quadrant.copy()
+        process_fom_by_wavelength = intensity_fom_by_wavelength.copy()
+        process_transmission_by_wavelength = transmission_by_wavelength.copy()
         if do_rejection:
             for idx in range(0, len(figure_of_merit_per_focal_spot)):
-                figure_of_merit_per_focal_spot[idx] = softplus(
+                process_fom_per_focal_spot[idx] = softplus(
                     figure_of_merit_per_focal_spot[idx])
             for idx in range(0, len(transmission_per_quadrant)):
-                transmission_per_quadrant[idx] = softplus(
+                process_transmission_per_quadrant[idx] = softplus(
                     transmission_per_quadrant[idx])
 
             for idx in range(0, len(intensity_fom_by_wavelength)):
-                intensity_fom_by_wavelength[idx] = softplus(
+                process_fom_by_wavelength[idx] = softplus(
                     intensity_fom_by_wavelength[idx])
             for idx in range(0, len(transmission_by_wavelength)):
-                transmission_by_wavelength[idx] = softplus(
+                process_transmission_by_wavelength[idx] = softplus(
                     transmission_by_wavelength[idx])
 
-        figure_of_merit_per_focal_spot = np.array(
-            figure_of_merit_per_focal_spot)
+        figure_of_merit_per_focal_spot = np.array(figure_of_merit_per_focal_spot)
         transmission_per_quadrant = np.array(transmission_per_quadrant)
+        process_fom_per_focal_spot = np.array(process_fom_per_focal_spot)
+        process_transmission_per_quadrant = np.array(process_transmission_per_quadrant)
 
         performance_weighting = (
-            2. / num_focal_spots) - figure_of_merit_per_focal_spot**2 / np.sum(figure_of_merit_per_focal_spot**2)
+            2. / num_focal_spots) - process_fom_per_focal_spot**2 / np.sum(process_fom_per_focal_spot**2)
         if weight_by_quadrant_transmission:
             performance_weighting = (
-                2. / num_focal_spots) - transmission_per_quadrant**2 / np.sum(transmission_per_quadrant**2)
+                2. / num_focal_spots) - process_transmission_per_quadrant**2 / np.sum(process_transmission_per_quadrant**2)
 
         if weight_by_individual_wavelength:
             performance_weighting = (2. / num_design_frequency_points) - \
-                intensity_fom_by_wavelength**2 / \
-                np.sum(intensity_fom_by_wavelength**2)
+                process_fom_by_wavelength**2 / \
+                np.sum(process_fom_by_wavelength**2)
             if weight_by_quadrant_transmission:
                 performance_weighting = (2. / num_design_frequency_points) - \
-                    transmission_by_wavelength**2 / \
-                    np.sum(transmission_by_wavelength**2)
+                    process_transmission_by_wavelength**2 / \
+                    np.sum(process_transmission_by_wavelength**2)
 
         if np.min(performance_weighting) < 0:
             performance_weighting -= np.min(performance_weighting)
@@ -820,7 +826,7 @@ for epoch in range(start_epoch, num_epochs):
                         spectral_indices[0]: spectral_indices[1]: 1]
 
                     total_weighting = max_intensity_weighting / \
-                        weight_focal_plane_map[focal_idx]
+                        weight_focal_plane_map[adj_src_idx]
 
                     #
                     # We need to properly account here for the current real and imaginary index
@@ -840,10 +846,10 @@ for epoch in range(start_epoch, num_epochs):
                             if do_rejection:
                                 if weight_by_quadrant_transmission:
                                     gradient_performance_weight *= softplus_prime(
-                                        transmission_by_wavelength[adj_src_idx])
+                                        transmission_by_wavelength[spectral_idx])
                                 else:
                                     gradient_performance_weight *= softplus_prime(
-                                        intensity_fom_by_wavelength[adj_src_idx])
+                                        intensity_fom_by_wavelength[spectral_idx])
 
                         if do_rejection:
                             gradient_performance_weight *= spectral_focal_plane_map_directional_weights[
