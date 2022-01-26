@@ -1,7 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-f = np.load("figure_of_merit.npy")
+from os.path import dirname, join
+current_dir = dirname(__file__)
+file_path = join(current_dir, "figure_of_merit.npy")
+
+f = np.load(file_path)
 lastEpochReached = False
 
 idx = []
@@ -33,4 +37,4 @@ plt.plot(trace)
 plt.vlines(0*numIter,0,upperRange,**vlinestyle)
 plt.vlines(numEpochs*numIter,0,upperRange,**vlinestyle)
 plt.title('Figure of Merit - Trace')
-
+plt.show()
