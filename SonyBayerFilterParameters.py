@@ -8,8 +8,8 @@ import numpy as np
 # Files
 #
 
-project_name_init = 'th30'
-project_name = 'angInc_sony_th30_phi0'
+project_name_init = 'th0_phi0'
+project_name = 'angInc_sony_th0_phi0'
 
 # project_name_init = 'normal_sony_baseline_1p989x1p989x2p04um_f1p53um'
 # project_name = 'normal_sony_baseline_1p989x1p989x2p04um_f1p53um'
@@ -106,7 +106,7 @@ src_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um * 2. / 
 src_minimum_vertical_um = -focal_length_um - 0.5 * vertical_gap_size_um
 
 src_beam_rad = device_size_lateral_um/2
-src_angle_incidence = 30 # degrees
+src_angle_incidence = 0 # degrees
 src_phi_incidence = 0 # degrees
 
 src_hgt_Si = 0

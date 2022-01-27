@@ -12,7 +12,7 @@ from scipy import interpolate
 
 # Lumerical hook Python library API
 import imp
-imp.load_source( "lumapi", "/central/home/gdrobert/Develompent/lumerical/v212/api/python/lumapi.py")
+imp.load_source( "lumapi", "/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py")
 import lumapi
 
 import functools
@@ -68,7 +68,7 @@ def get_slurm_node_list(slurm_job_env_variable=None):
         inside_brackets = re.findall(inner_bracket_pattern, cluster_node)[0]
         # Split at commas and iterate through results
         for group in inside_brackets.split(','):
-            # Split at hypen. Get first and last number. Create string in range
+            # Split at hyphen. Get first and last number. Create string in range
             # from first to last.
             node_clump_split = group.split('-')
             starting_number = int(node_clump_split[0])
@@ -159,9 +159,9 @@ xy_pol_rotations = [0, 90]
 xy_names = ['x', 'y']
 
 #
-# Add a TFSF plane wave forward source at normal incidence
-# for both x- and y-polarization
-#
+# (deprecated) Add a TFSF plane wave forward source at normal incidence for both x- and y-polarization
+# Add a Gaussian wave forward source at oblique (angled) incidence
+# 
 forward_sources = []
 
 
@@ -217,9 +217,12 @@ for xy_idx in range(0, 2):
     forward_src["frequency dependent profile"] = 1
     forward_src["number of field profile samples"] = 150
     forward_src['beam parameters'] = 'Beam size and divergence angle'
-    forward_src['divergence angle'] = 0.5 * \
-        (lambda_min_um+lambda_max_um)*1e-6/(np.pi*src_beam_rad)*(180/np.pi)
-    forward_src['beam radius wz'] = src_beam_rad
+    forward_src['beam radius wz'] = 100*1e-6
+    forward_src['divergence angle'] = 3.42365 # degrees
+    forward_src['beam radius wz'] = 15*1e-6
+    # forward_src['divergence angle'] = 0.5 * \
+    #     (lambda_min_um+lambda_max_um)*1e-6/(np.pi*src_beam_rad)*(180/np.pi)
+    # forward_src['beam radius wz'] = src_beam_rad
 
     forward_sources.append(forward_src)
 
@@ -363,10 +366,13 @@ gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um,
 gradient_region_z = 1e-6 * np.linspace(device_vertical_minimum_um,
                                        device_vertical_maximum_um, device_voxels_simulation_mesh_vertical)
 
+print("Lumerical environment setup complete.")
+sys.stdout.flush()
+
+
 #
 # Disable all sources in the simulation, so that we can selectively turn single sources on at a time
 #
-
 
 def disable_all_sources():
     lumapi.evalScript(fdtd_hook.handle, 'switchtolayout;')
@@ -560,6 +566,10 @@ for epoch in range(start_epoch, num_epochs):
         # that you can input a different index into each of those cubes.  Further note that the polymer slab needs to also change index when
         # the cube index changes.
         #
+        
+        print("Beginning Step 1: Forward Optimization")
+        sys.stdout.flush()
+        
         for dispersive_range_idx in range(0, num_dispersive_ranges):
             dispersive_max_permittivity = dispersion_model.average_permittivity(
                 dispersive_ranges_um[dispersive_range_idx])
@@ -606,10 +616,17 @@ for epoch in range(start_epoch, num_epochs):
                         job_name, jobs_queue)
 
         run_jobs(jobs_queue)
+        
+        print("Completed Step 1: Forward Optimization Jobs Completed.")
+        sys.stdout.flush()
 
         #
         # Step 2: Compute the figure of merit
         #
+        
+        print("Beginning Step 2: Computing Figure of Merit")
+        sys.stdout.flush()
+        
         for xy_idx in range(0, 2):
             focal_data[xy_names[xy_idx]] = [
                 None for idx in range(0, num_focal_spots)]
@@ -768,10 +785,20 @@ for epoch in range(start_epoch, num_epochs):
         np.save(projects_directory_location + "/intensity_fom_by_wavelength.npy",
                 intensity_fom_by_wavelength_evolution)
 
+        print("Figure of Merit:\n")
+        print(figure_of_merit_evolution)
+
+        print("Completed Step 2: Saved out figures of merit.")
+        sys.stdout.flush()
+
         #
         # Step 3: Run all the adjoint optimizations for both x- and y-polarized adjoint sources and use the results to compute the
         # gradients for x- and y-polarized forward sources.
         #
+        
+        print("Beginning Step 3: Adjoint Optimization Jobs")
+        sys.stdout.flush()
+        
         cur_permittivity_shape = cur_permittivity.shape
         field_shape = [device_voxels_simulation_mesh_lateral,
                        device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
@@ -805,6 +832,8 @@ for epoch in range(start_epoch, num_epochs):
                 #
                 fdtd_hook.load(
                     job_names[('adjoint', adj_src_idx, xy_idx, lookup_dispersive_range_idx)])
+                print('Loading .fsp file: '+job_names[('adjoint', adj_src_idx, xy_idx, lookup_dispersive_range_idx)])
+                sys.stdout.flush()
 
                 adjoint_e_fields.append(
                     get_efield(design_efield_monitor['name']))
@@ -869,10 +898,17 @@ for epoch in range(start_epoch, num_epochs):
                             delta_imag_permittivity * imag_part_gradient
 
                         xy_polarized_gradients[pol_name_to_idx] += get_grad_density
-
+        
+        print("Completed Step 3: Retrieved Adjoint Optimization results and calculated gradient.")
+        sys.stdout.flush()
+        
         #
         # Step 4: Step the design variable.
         #
+        
+        print("Beginning Step 4: Stepping Design Variable.")
+        sys.stdout.flush()
+        
         device_gradient = 2 * \
             (xy_polarized_gradients[0] + xy_polarized_gradients[1])
 
@@ -967,3 +1003,13 @@ for epoch in range(start_epoch, num_epochs):
         np.save(projects_directory_location + "/cur_design.npy", cur_design)
         np.save(projects_directory_location + "/cur_design_variable_epoch_" +
                 str(epoch) + ".npy", cur_design_variable)
+        
+        np.save(projects_directory_location_init +
+                "/cur_design_variable.npy", cur_design_variable)
+                
+
+        print("cur_design_variable:\n")
+        print(cur_design)
+        
+        print("Completed Step 4: Saved out cur_design_variable.npy and other files.")
+        sys.stdout.flush()
