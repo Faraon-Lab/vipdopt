@@ -1,0 +1,87 @@
+{
+ "params": {
+    "th": {
+      "var_name": "angle_theta",
+      "var_values":[0.0, 0.625, 1.25, 1.875, 2.5, 3.125, 3.75, 4.375, 5.0, 5.625, 6.25, 6.875, 7.5, 8.125, 8.75, 9.375, 10.0, 10.625, 11.25, 11.875, 12.5, 13.125, 13.75, 14.375, 15.0, 15.625, 16.25, 16.875, 17.5, 18.125, 18.75, 19.375, 20.0, 20.625, 21.25, 21.875, 22.5, 23.125, 23.75, 24.375, 25.0, 25.625, 26.25, 26.875, 27.5, 28.125, 28.75, 29.375, 30.0],
+      "peakInd":0,
+      "formatStr": "%.3f",
+      "iterating": true,
+      "short_form": "th"
+    },
+    "phi": {
+        "var_name": "angle_phi",
+        "var_values":[0, 90, 180, 270, 360],
+        "peakInd":0,
+        "formatStr": "%d",
+        "iterating": false,
+        "short_form": "phi"
+      },
+    "bRad": {
+      "var_name": "beam_radius_um",
+      "var_values":[15],
+      "peakInd":0,
+      "formatStr": "%d",
+      "iterating": false,
+      "short_form": "bRad"
+    },
+    "swTh": {
+      "var_name": "sidewall_thickness_um",
+      "var_values":[0.1, 0.3, 0.7],
+      "peakInd":0,
+      "formatStr": "%.2f",
+      "iterating": false,
+      "short_form": "swTh"
+    }
+  },
+
+  "monitors": [
+      {"name": "src_transmission_monitor",
+        "monitor type": "2D Z-normal",
+        "enabled": false,
+        "getFromFDTD": false,
+        "save": false
+      },
+      {"name": "incident_aperture_monitor",
+        "monitor type": "2D Z-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "exit_aperture_monitor",
+        "monitor type": "2D Z-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "side_monitor_0",
+        "monitor type": "2D X-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "side_monitor_1",
+        "monitor type": "2D Y-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "side_monitor_2",
+        "monitor type": "2D X-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "side_monitor_3",
+        "monitor type": "2D Y-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "spill_plane_monitor",
+        "monitor type": "2D Z-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      }
+  ]
+}
