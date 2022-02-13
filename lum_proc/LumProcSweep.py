@@ -53,11 +53,11 @@ def load_backup_vars():
     '''Restores session variables from a save_state file. Debug purposes.'''
     #! This will overwrite all current session variables!
     # except for the following:
-    do_not_overwrite = [running_on_local_machine,
-                        lumapi_filepath,
-                        start_from_step,
-                        projects_directory_location,
-                        projects_directory_location_init]
+    do_not_overwrite = ['running_on_local_machine',
+                        'lumapi_filepath',
+                        'start_from_step',
+                        'projects_directory_location',
+                        'projects_directory_location_init']
     
     global my_shelf
     my_shelf = shelve.open(shelf_fn, flag='r')
@@ -77,6 +77,13 @@ def load_backup_vars():
     
     print("Successfully loaded backup.")
     sys.stdout.flush()
+
+def isolate_filename(address):
+    return address.rsplit('/',1)[1]
+
+def convert_root_folder(address, root_folder_new):
+    new_address = root_folder_new + '/' + isolate_filename(address)
+    return new_address
       
 def get_slurm_node_list( slurm_job_env_variable=None ):
 	if slurm_job_env_variable is None:
@@ -491,6 +498,17 @@ def get_hfield(monitor_name):
 def get_efield(monitor_name):
     return get_afield(monitor_name, 'E')
 
+def get_efield_magnitude(monitor_name):
+    e_field = get_afield(monitor_name, 'E')
+    Enorm2 = np.square(np.abs(e_field[0,:,:,:,:]))
+    for idx in [1,2]:
+        Enorm2 += np.square(np.abs(e_field[idx,:,:,:,:]))
+    return np.sqrt(Enorm2)
+    
+def get_power_magnitude(monitor_name):
+    read_P = fdtd_hook.getresult(monitor_name, 'P')
+    return np.abs(read_P['P'])
+
 def get_transmission_magnitude(monitor_name):
     read_T = fdtd_hook.getresult(monitor_name, 'T')
     return np.abs(read_T['T'])
@@ -505,6 +523,8 @@ forward_e_fields = {}
 focal_data = {}
 quadrant_efield_data = {}
 quadrant_transmission_data = {}
+
+monitors_data = {}
 
 #
 # Set up queue for parallel jobs
@@ -570,7 +590,7 @@ def run_jobs_inner(queue_in):
         
 restart = False
 if restart:
-    current_job_creation_idx = (0,0,0)
+    current_job_idx = (0,0,0)
     
 #
 # Run the simulation
@@ -605,8 +625,8 @@ for epoch in range(start_epoch, num_epochs):
 
             for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
                 parameter_filename_string = create_parameter_filename_string(idx)
-                current_job_creation_idx = idx
-                print(f'Creating Job: Current parameter index is {current_job_creation_idx}')
+                current_job_idx = idx
+                print(f'Creating Job: Current parameter index is {current_job_idx}')
                 
                 for t_idx, p_idx in enumerate(idx):
                     
@@ -658,10 +678,48 @@ for epoch in range(start_epoch, num_epochs):
         if start_from_step == 0 or start_from_step == 2:
             if start_from_step == 2:
                 load_backup_vars()
-                from NTTArrParameters import *
                 
-            print("Beginning Step 2: Computing Figure of Merit")
+            print("Beginning Step 2: Extracting Fields, Gathering Function Data for Plots")
             sys.stdout.flush()
+            
+            jobs_data = {}
+            for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
+                current_job_idx = idx
+                print(f'Accessing Job: Current parameter index is {current_job_idx}')
+                
+                # Load each individual job
+                for xy_idx in range(0, 1): # range(0,2) if considering source with both polarizations
+                    if start_from_step == 0:
+                        fdtd_hook.load(
+                            job_names[('sweep', xy_idx, idx)])
+                    else:
+                        # Extract filename, directly declare current directory address
+                        fdtd_hook.load(
+                            convert_root_folder(job_names[('sweep',xy_idx,idx)],
+                                                projects_directory_location)
+                        )
+                        
+                    monitors_data = {}
+                    # Go through each individual monitor and extract data
+                    for monitor in monitors:
+                        monitor_data = {}
+                        monitor_data['name'] = monitor['name']
+                        monitor_data['save'] = monitor['save']
+                        
+                        if monitor['enabled'] and monitor['getFromFDTD']:
+                            monitor_data['E'] = get_efield_magnitude(monitor['name'])
+                            #monitor_data['E_alt'] = get_E
+                            monitor_data['P'] = get_power_magnitude(monitor['name'])
+                            monitor_data['T'] = get_transmission_magnitude(monitor['name'])
+                               
+                        monitors_data[monitor['name']] = monitor_data
+                    
+                    jobs_data[job_names[('sweep', xy_idx, idx)]] = monitors_data
+                        
+            shelf_fn = 'hold_field_data'
+            backup_all_vars()
+            
+            #* --------
             
             # Initialize shape and keys of dictionaries for later storage
             for xy_idx in range(0, 2):
@@ -680,8 +738,8 @@ for epoch in range(start_epoch, num_epochs):
                     else:
                         # Extract filename, directly declare current directory address
                         fdtd_hook.load(
-                            projects_directory_location + '/' + 
-                            job_names[('forward', xy_idx, dispersive_range_idx)].rsplit('/',1)[1]
+                            convert_root_folder(job_names[('sweep',xy_idx,idx)],
+                                                projects_directory_location)
                         )
 
                     fwd_e_fields = get_efield(transmission_monitor_focal['name'])

@@ -15,7 +15,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 0		# 0 if running entire file in one shot
+start_from_step = 2		# 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
