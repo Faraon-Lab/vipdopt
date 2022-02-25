@@ -15,7 +15,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 2		# 0 if running entire file in one shot
+start_from_step = 0		# 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -39,6 +39,8 @@ device_filename = 'optimization' # omit '.fsp'
 projects_directory_location_init += "/" + project_name_init
 # Final Output Project File Directory
 projects_directory_location += "/" + project_name
+# Final Output Project Plot Directory
+plot_directory_location = projects_directory_location + "/plots"
 
 sweep_settings = json.load(open('sweep_settings.json'))
 
@@ -56,16 +58,23 @@ def create_parameter_filename_string(idx):
     output_string = ''
     
     for t_idx, p_idx in enumerate(idx):
-        variable = list(sweep_parameters.values())[t_idx]
-        variable_name = variable['short_form']
-        variable_value = variable['var_values'][p_idx]
-        variable_format = variable['formatStr']
-        output_string += variable_name + '_' + variable_format%(variable_value) + '_'
+        try:
+            variable = list(sweep_parameters.values())[t_idx]
+            variable_name = variable['short_form']
+            if isinstance(p_idx, slice):
+                output_string += variable_name + '_swp_'
+            else:
+                variable_value = variable['var_values'][p_idx]
+                variable_format = variable['formatStr']
+                output_string += variable_name + '_' + variable_format%(variable_value) + '_'
+        except Exception as err:
+            pass
         
     return output_string[:-1]
 
 sweep_parameters = {}
 sweep_parameters_shape = []
+const_parameters = {}
 
 for key, val in sweep_settings['params'].items():
     # Initialize all sweepable parameters with their original value
@@ -75,6 +84,8 @@ for key, val in sweep_settings['params'].items():
     if val['iterating']:
         sweep_parameters[key] = val
         sweep_parameters_shape.append(len(val['var_values']))
+    else:
+        const_parameters[key] = val
 
 # Create N+1-dim array where the last dimension is of length N.
 sweep_parameter_value_array = np.zeros(sweep_parameters_shape + [len(sweep_parameters_shape)])
@@ -85,6 +96,12 @@ for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
         sweep_parameter_value_array[idx][t_idx] = (list(sweep_parameters.values())[t_idx])['var_values'][p_idx]
     #print(sweep_parameter_value_array[idx])
 
+
+#
+#* Plot Types
+#
+
+plots = sweep_settings['plots']
 
 
 #
@@ -190,7 +207,7 @@ vertical_gap_size_um = 15 # geometry_spacing_um * 15
 lateral_gap_size_um = 4 # geometry_spacing_um * 10
 
 fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
-fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + device_size_lateral_um
+fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 3 * device_size_lateral_um
 fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
 fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
 
@@ -203,14 +220,14 @@ fdtd_simulation_time_fs = 3000
 monitors = sweep_settings['monitors']
 
 disable_object_list = ['design_efield_monitor']
-
-
+#! DO NOT disable the transmission_monitors! There is no reliable way to partition the scatter_plane_monitor in order to retrieve power values. E-field yes, but power no.
+# The memory / runtime savings is not that much either.
 
 #
 #* Spectral
 #
-lambda_min_um = 0.400 #3.5
-lambda_max_um = 0.700 #5.5
+lambda_min_um = 3.5 #0.400 #3.5
+lambda_max_um = 5.5 #0.700 #5.5
 
 num_bands = 3
 num_points_per_band = 10
