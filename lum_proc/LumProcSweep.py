@@ -1930,9 +1930,7 @@ def plot_sorting_eff_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
                 }
         
         
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
+        y_plot_data = f_vectors[plot_idx]['var_values'][tuple(slice_coords)]
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
@@ -2997,36 +2995,36 @@ for epoch in range(start_epoch, num_epochs):
                 
                 for plot in plots:
                     if plot['enabled']:
-                        continue
-                        # if plot['name'] in ['sorting_efficiency']:
-                        #     plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                            
-                        # elif plot['name'] in ['Enorm_focal_plane_image']:
-                        #     plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
-                        #                 plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]])
-                        #                 # Second part gets the wavelengths of each spectra where sorting eff. peaks
-                        #     #continue
                         
-                        # elif plot['name'] in ['device_transmission']:
-                        #     plot_device_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        if plot['name'] in ['sorting_efficiency']:
+                            plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['device_reflection']:
-                        #     plot_overall_reflection_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                            
-                        # elif plot['name'] in ['side_scattering_power']:
-                        #     plot_side_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['Enorm_focal_plane_image']:
+                            plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
+                                        plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]])
+                                        # Second part gets the wavelengths of each spectra where sorting eff. peaks
+                            #continue
                         
-                        # elif plot['name'] in ['focal_region_power']:
-                        #     plot_focal_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['device_transmission']:
+                            plot_device_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['focal_scattering_power']:
-                        #     plot_scatter_plane_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['device_reflection']:
+                            plot_overall_reflection_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['exit_power_distribution']:
-                        #     plot_exit_power_distribution_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['side_scattering_power']:
+                            plot_side_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        
+                        elif plot['name'] in ['focal_region_power']:
+                            plot_focal_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['device_rta']:
-                        #     plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['focal_scattering_power']:
+                            plot_scatter_plane_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                            
+                        elif plot['name'] in ['exit_power_distribution']:
+                            plot_exit_power_distribution_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                            
+                        elif plot['name'] in ['device_rta']:
+                            plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                                 
                         
             #
@@ -3038,9 +3036,9 @@ for epoch in range(start_epoch, num_epochs):
                         
                     if plot['name'] in ['sorting_efficiency']:
                         # Here there is the most variability in what the user might wish to plot, so it will have to be hardcoded for the most part.
-                        # plot_function_sweep(plots_data['sweep_plots'][plot['name']], 'th', plot_sorting_eff_sweep_1d.__name__)
+                        plot_function_sweep(plots_data['sweep_plots'][plot['name']], 'th', plot_sorting_eff_sweep_1d.__name__)
                         # plot_sorting_eff_sweep(plots_data['sweep_plots'][plot['name']], 'phi')
-                        plot_sorting_eff_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
+                        # plot_sorting_eff_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
                         
                     elif plot['name'] in ['device_transmission']:
                         plot_device_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], plot_stdDev=False)

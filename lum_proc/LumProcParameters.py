@@ -24,14 +24,14 @@ shelf_fn = 'save_state'
 #* Files
 #
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v9] MWIRBBF_crosstalk - 20210915\Data Processing\Cu_450nm_th0\theta_swp"
-    projects_directory_location = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v9] MWIRBBF_crosstalk - 20210915\Data Processing\Cu_450nm_th0\theta_swp"  
+    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v10] MWIRBBF_higherangles - 20211013\Data Processing\th0_srcRad15"
+    projects_directory_location = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v10] MWIRBBF_higherangles - 20211013\Data Processing\th0_srcRad15"  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
 
-project_name_init = 'Cu_450nm_th0_theta_swp'
+project_name_init = 'th0_srcRad15'
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
@@ -184,7 +184,7 @@ device_vertical_minimum_um = 0
 silicon_thickness_um = 3.5
 
 
-num_sidewalls = 4
+num_sidewalls = 0
 sidewall_thickness_um = 0.45 if num_sidewalls != 0 else 0.05
 sidewall_material = 'Cu (Copper) - Palik' if num_sidewalls != 0 else 'etch'
 sidewall_extend_focalplane = False
