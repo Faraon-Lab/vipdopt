@@ -2,10 +2,10 @@
  "params": {
     "th": {
       "var_name": "angle_theta",
-      "var_values":[0.0, 0.625, 1.25, 1.875, 2.5],
+      "var_values":[0.0, 0.625, 1.25, 1.875, 2.5, 3.125, 3.75, 4.375, 5.0, 5.625, 6.25, 6.875, 7.5, 8.125, 8.75, 9.375, 10.0, 10.625, 11.25, 11.875, 12.5, 13.125, 13.75, 14.375, 15.0, 15.625, 16.25, 16.875, 17.5, 18.125, 18.75, 19.375, 20.0, 20.625, 21.25, 21.875, 22.5, 23.125, 23.75, 24.375, 25.0, 25.625, 26.25, 26.875, 27.5, 28.125, 28.75, 29.375, 30.0],
       "peakInd":0,
-      "formatStr": "%.3f",
-      "iterating": false,
+      "formatStr":  "%.3f",
+      "iterating": true,
       "short_form": "th"
     },
     "phi": {
@@ -26,10 +26,10 @@
     },
     "swTh": {
       "var_name": "sidewall_thickness_um",
-      "var_values":[0.088, 0.146, 0.215, 0.298, 0.397, 0.517, 0.66, 0.832],
-      "peakInd":0,
+      "var_values":[0.088, 0.146, 0.215, 0.298, 0.397, 0.45, 0.517, 0.66, 0.7, 0.832, 1.038, 1.286, 1.583, 1.94, 2.368],
+      "peakInd":5,
       "formatStr": "%.3f",
-      "iterating": true,
+      "iterating": false,
       "short_form": "swTh"
     }
   },
@@ -38,25 +38,25 @@
       {"name": "transmission_monitor_0",
         "monitor type": "2D Z-normal",
         "enabled": true,
-        "getFromFDTD": false,
+        "getFromFDTD": true,
         "save": false
       },
       {"name": "transmission_monitor_1",
         "monitor type": "2D Z-normal",
         "enabled": true,
-        "getFromFDTD": false,
+        "getFromFDTD": true,
         "save": false
       },
       {"name": "transmission_monitor_2",
         "monitor type": "2D Z-normal",
         "enabled": true,
-        "getFromFDTD": false,
+        "getFromFDTD": true,
         "save": false
       },
       {"name": "transmission_monitor_3",
         "monitor type": "2D Z-normal",
         "enabled": true,
-        "getFromFDTD": false,
+        "getFromFDTD": true,
         "save": false
       },
       {"name": "transmission_focal_monitor_",

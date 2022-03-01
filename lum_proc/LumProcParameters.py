@@ -15,7 +15,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 0		# 0 if running entire file in one shot
+start_from_step = 4		# 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -24,14 +24,14 @@ shelf_fn = 'save_state'
 #* Files
 #
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\NTT Paper\[v0] Setup and Tutorials\dev\test"
-    projects_directory_location = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\NTT Paper\[v0] Setup and Tutorials\dev\test"  
+    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v9] MWIRBBF_crosstalk - 20210915\Data Processing\Cu_450nm_th0\theta_swp"
+    projects_directory_location = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v9] MWIRBBF_crosstalk - 20210915\Data Processing\Cu_450nm_th0\theta_swp"  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
 
-project_name_init = 'Cu_450nm_th0'
+project_name_init = 'Cu_450nm_th0_theta_swp'
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
@@ -183,9 +183,10 @@ device_vertical_minimum_um = 0
 
 silicon_thickness_um = 3.5
 
+
 num_sidewalls = 4
-sidewall_thickness_um = 0.45
-sidewall_material = 'Cu (Copper) - Palik'
+sidewall_thickness_um = 0.45 if num_sidewalls != 0 else 0.05
+sidewall_material = 'Cu (Copper) - Palik' if num_sidewalls != 0 else 'etch'
 sidewall_extend_focalplane = False
 sidewall_x_positions_um = [device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2, 0]
 sidewall_y_positions_um = [0, device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2]
@@ -207,7 +208,7 @@ vertical_gap_size_um = 15 # geometry_spacing_um * 15
 lateral_gap_size_um = 4 # geometry_spacing_um * 10
 
 fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
-fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 1.5 * device_size_lateral_um
+fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 2.0 * device_size_lateral_um
 fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
 fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
 
@@ -226,8 +227,11 @@ disable_object_list = ['design_efield_monitor']
 #
 #* Spectral
 #
-lambda_min_um = 3.5 #0.400 #3.5
-lambda_max_um = 5.5 #0.700 #5.5
+
+change_wavelength_range = True
+
+lambda_min_um = 3.0 #0.400 #3.5
+lambda_max_um = 6.0 #0.700 #5.5
 
 num_bands = 3
 num_points_per_band = 10
