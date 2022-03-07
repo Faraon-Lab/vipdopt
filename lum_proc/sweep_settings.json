@@ -26,7 +26,7 @@
     },
     "swTh": {
       "var_name": "sidewall_thickness_um",
-      "var_values":[0.088, 0.146, 0.215, 0.298, 0.397, 0.45, 0.517, 0.66, 0.7, 0.832, 1.038, 1.286, 1.583, 1.94, 2.368],
+      "var_values":[0.088, 0.146, 0.215, 0.298, 0.397, 0.45, 0.517, 0.66, 0.7, 0.832, 1.038, 1.286, 1.583, 1.94, 2.368, 2.881, 3.498, 4.237, 5.125],
       "peakInd":5,
       "formatStr": "%.3f",
       "iterating": false,
@@ -112,11 +112,39 @@
         "enabled": true,
         "getFromFDTD": true,
         "save": false
+      },
+      {"name": "vertical_scatter_monitor_0",
+        "monitor type": "2D X-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "vertical_scatter_monitor_1",
+        "monitor type": "2D Y-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "vertical_scatter_monitor_2",
+        "monitor type": "2D X-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
+      {"name": "vertical_scatter_monitor_3",
+        "monitor type": "2D Y-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
       }
   ],
 
   "plots": [
     {"name": "sorting_efficiency",
+      "enabled": true,
+      "generate_plot_per_job": true
+    },
+    {"name": "sorting_transmission",
       "enabled": true,
       "generate_plot_per_job": true
     },
@@ -141,6 +169,10 @@
       "generate_plot_per_job": true
     },
     {"name": "focal_scattering_power",
+      "enabled": true,
+      "generate_plot_per_job": true
+    },
+    {"name": "oblique_scattering_power",
       "enabled": true,
       "generate_plot_per_job": true
     },

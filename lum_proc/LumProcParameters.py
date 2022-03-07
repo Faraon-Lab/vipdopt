@@ -2,20 +2,29 @@
 # Parameter file for the Lumerical Processing Sweep
 #
 
+# This params file should be the exact one that was used for the optimization. Its variables can be replaced or redeclared without issue, 
+# and most of them will be replaced by values drawn directly from the .fsp file. But calling this will cover any bases that we have
+# potentially missed.
+importing_params_from_opt_file = True
+if importing_params_from_opt_file:
+    # from SonyBayerFilterParameters import *
+    from LayeredMWIRBridgesBayerFilterParameters import *
+
+from os import umask
 import numpy as np
 import json
 
 #
 #* Debug Options
 #
-running_on_local_machine = True	# False if running on slurm
+running_on_local_machine = False	# False if running on slurm
 if running_on_local_machine:	
     lumapi_filepath =  r"C:\Program Files\Lumerical\v212\api\python\lumapi.py"
 else:	
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 4		# 0 if running entire file in one shot
+start_from_step = 0 	# 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -24,14 +33,14 @@ shelf_fn = 'save_state'
 #* Files
 #
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v10] MWIRBBF_higherangles - 20211013\Data Processing\th0_srcRad15"
-    projects_directory_location = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v10] MWIRBBF_higherangles - 20211013\Data Processing\th0_srcRad15"  
+    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v9] MWIRBBF_crosstalk - 20210915\Data Processing\Cu_450nm_th0\theta_swp"
+    projects_directory_location = projects_directory_location_init          # Change if necessary to differentiate  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
 
-project_name_init = 'th0_srcRad15'
+project_name_init = 'Cu_450nm_th0_theta_swp'
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
@@ -96,130 +105,17 @@ for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
         sweep_parameter_value_array[idx][t_idx] = (list(sweep_parameters.values())[t_idx])['var_values'][p_idx]
     #print(sweep_parameter_value_array[idx])
 
-
 #
 #* Plot Types
 #
 
 plots = sweep_settings['plots']
 
-
-#
-#* Mesh
-#
-mesh_spacing_um = 0.017
-geometry_spacing_um = 0.051
-mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )
-
-# #
-# #* Optical
-# #
-# background_index = 1.5
-# min_device_index = 1.5
-# max_device_index = 2.4
-
-# #min_device_permittivity = min_device_index**2
-# #max_device_permittivity = max_device_index**2
-
-# #init_permittivity_0_1_scale = 0.5
-
-
-# focal_length_um = geometry_spacing_um * 30
-# focal_plane_center_lateral_um = 0
-# focal_plane_center_vertical_um = -focal_length_um
-
-# #
-# #* Device
-# #
-
-# num_vertical_layers = 40
-
-# vertical_layer_height_um = 0.051
-# #vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_um )
-
-# device_size_lateral_um = geometry_spacing_um * 40
-# device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
-
-# device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
-# device_voxels_vertical = int(device_size_vertical_um / geometry_spacing_um)
-
-# device_voxels_simulation_mesh_lateral = 1 + int(device_size_lateral_um / mesh_spacing_um)
-# # device_voxels_simulation_mesh_lateral = 2 + int(device_size_lateral_um / mesh_spacing_um)
-# device_voxels_simulation_mesh_vertical = 2 + int(device_size_vertical_um / mesh_spacing_um)
-
-# device_vertical_maximum_um = device_size_vertical_um
-# device_vertical_minimum_um = 0
-
-# ------------------------ LMBBF Params -------------------------------------------
-#
-#* Optical
-#
-background_index = 1.0
-min_device_index = 1.0
-max_device_index = 1.5
-
-min_device_permittivity = min_device_index**2
-max_device_permittivity = max_device_index**2
-
-init_permittivity_0_1_scale = 0.5
-
-focal_length_um = 30
-focal_plane_center_lateral_um = 0
-focal_plane_center_vertical_um = -focal_length_um
-
-#
-#* Device
-#
-mesh_spacing_um = 0.25
-
-device_size_lateral_um = 30#25
-device_size_vertical_um = 25
-
-device_voxels_lateral = 1 + int(device_size_lateral_um / mesh_spacing_um)
-device_voxels_vertical = 2 + int(device_size_vertical_um / mesh_spacing_um)
-
-device_vertical_maximum_um = device_size_vertical_um
-device_vertical_minimum_um = 0
-
-silicon_thickness_um = 3.5
-
-
-num_sidewalls = 0
-sidewall_thickness_um = 0.45 if num_sidewalls != 0 else 0.05
-sidewall_material = 'Cu (Copper) - Palik' if num_sidewalls != 0 else 'etch'
-sidewall_extend_focalplane = False
-sidewall_x_positions_um = [device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2, 0]
-sidewall_y_positions_um = [0, device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2]
-sidewall_xspan_positions_um = [sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2,
-                               sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2]
-sidewall_yspan_positions_um = [device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um, 
-                               device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um]
-
-# Structure the following list such that the last entry is the last medium above the device.
-objects_above_device = ['permittivity_layer_substrate',
-                        'silicon_substrate']
-
-#-----------------------------------------------------------------------------------------
-
-#
-#* FDTD
-#
-vertical_gap_size_um = 15 # geometry_spacing_um * 15
-lateral_gap_size_um = 4 # geometry_spacing_um * 10
-
-fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
-fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 2.0 * device_size_lateral_um
-fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
-fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
-
-fdtd_simulation_time_fs = 3000
-
 #
 #* Lumerical Monitor Setup
 #
 
 monitors = sweep_settings['monitors']
-
 disable_object_list = ['design_efield_monitor']
 #! DO NOT disable the transmission_monitors! There is no reliable way to partition the scatter_plane_monitor in order to retrieve power values. E-field yes, but power no.
 # The memory / runtime savings is not that much either.
@@ -229,39 +125,136 @@ disable_object_list = ['design_efield_monitor']
 #
 
 change_wavelength_range = True
+if change_wavelength_range:
+    d_lambda = (lambda_max_um - lambda_min_um)/5        # Just widening out the spectrum a little
+    lambda_min_um -= d_lambda
+    lambda_max_um += d_lambda
 
-lambda_min_um = 3.0 #0.400 #3.5
-lambda_max_um = 6.0 #0.700 #5.5
-
-num_bands = 3
-num_points_per_band = 10
-num_design_frequency_points = num_bands * num_points_per_band
+if not importing_params_from_opt_file:
+    num_bands = 3
+    num_points_per_band = 10
+    num_design_frequency_points = num_bands * num_points_per_band
 
 lambda_values_um = np.linspace(lambda_min_um, lambda_max_um, num_design_frequency_points)
-
 
 bandwidth_um = lambda_max_um - lambda_min_um
 num_dispersive_ranges = 1
 dispersive_range_size_um = bandwidth_um / num_dispersive_ranges
-
 dispersive_ranges_um = [
 	[ lambda_min_um, lambda_max_um ]
 ]
 
 #
+#* Mesh
+#
+
+if not importing_params_from_opt_file:
+    mesh_spacing_um = 0.017
+    geometry_spacing_um = 0.051
+    mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )
+
+
+#* Device
+#
+
+if not importing_params_from_opt_file:
+    num_vertical_layers = 40
+
+    vertical_layer_height_um = 0.051
+    vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_um )
+    
+    device_size_lateral_um = geometry_spacing_um * 40
+    device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
+
+    device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
+    device_voxels_vertical = int(device_size_vertical_um / geometry_spacing_um)
+
+if 'device_size_vertical_um' not in globals():
+    device_size_vertical_um = device_size_verical_um        # little typo that has to be declared for compatibility
+
+device_voxels_simulation_mesh_lateral = 1 + int(device_size_lateral_um / mesh_spacing_um)
+###### device_voxels_simulation_mesh_lateral = 2 + int(device_size_lateral_um / mesh_spacing_um)
+device_voxels_simulation_mesh_vertical = 2 + int(device_size_vertical_um / mesh_spacing_um)
+
+device_vertical_maximum_um = device_size_vertical_um
+device_vertical_minimum_um = 0
+
+# Structure the following list such that the last entry is the last medium above the device.
+objects_above_device = ['permittivity_layer_substrate',
+                        'silicon_substrate']
+
+#
+#* Optical
+#
+
+if not importing_params_from_opt_file:
+    background_index = 1.5
+    min_device_index = 1.5
+    max_device_index = 2.4
+
+    min_device_permittivity = min_device_index**2
+    max_device_permittivity = max_device_index**2
+
+    init_permittivity_0_1_scale = 0.5
+
+
+    focal_length_um = geometry_spacing_um * 30
+    focal_plane_center_lateral_um = 0
+    focal_plane_center_vertical_um = -focal_length_um
+
+src_beam_rad = device_size_lateral_um/2
+
+#
+
+#* Sidewall and Side Monitors
+num_sidewalls = 4
+if num_sidewalls == 0:
+    sidewall_thickness_um = 0.0
+    sidewall_material = 'etch'
+else:
+    if not importing_params_from_opt_file:
+        sidewall_thickness_um = 0.45
+        sidewall_material = 'Cu (Copper) - Palik'
+sidewall_extend_focalplane = False
+
+sidewall_x_positions_um = [device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2, 0]
+sidewall_y_positions_um = [0, device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2]
+sidewall_xspan_positions_um = [sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2,
+                               sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2]
+sidewall_yspan_positions_um = [device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um, 
+                               device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um]
+
+
+#
+#* FDTD
+#
+
+fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 2.0 * device_size_lateral_um
+
+if not importing_params_from_opt_file:
+    vertical_gap_size_um = 15 # geometry_spacing_um * 15
+    lateral_gap_size_um = 4 # geometry_spacing_um * 10
+
+    fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
+    fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 2.0 * device_size_lateral_um
+    fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
+    fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
+
+fdtd_simulation_time_fs = 3000
+
+
+
+#
 #* Adjoint sources
 #
+
+if not importing_params_from_opt_file:
+    num_focal_spots = 4
+
 adjoint_vertical_um = -focal_length_um
-num_focal_spots = 4
 num_adjoint_sources = num_focal_spots
 adjoint_x_positions_um = [device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4., device_size_lateral_um / 4.]
 adjoint_y_positions_um = [device_size_lateral_um / 4., device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4.]
-
-
-dispersive_range_to_adjoint_src_map = [
-	[ 0, 1, 2, 3 ]
-]
-
 
 
 #
