@@ -19,8 +19,9 @@ for i in range(len(f)):
 lastEpoch = len(idx)-1
 lastIter = idx[lastEpoch]
 
-with open('lastEpIter.txt','w') as outFile:
-    outFile.write("Last Epoch: %d, Last Iteration: %d" % (lastEpoch, lastIter))
+with open('lastEpIter.txt','a') as outFile:
+    outFile.write("\nLast Epoch: %d, Last Iteration: %d" % (lastEpoch, lastIter))
+    outFile.write("\nTime Elapsed:")
 print("Last Epoch: %d, Last Iteration: %d" % (lastEpoch, lastIter))
 
 # Plot FOM trace
@@ -32,7 +33,7 @@ vlinestyle = {'color': 'gray', 'linestyle': '--', 'linewidth': 1}
 for i in range(len(f)-1):
     trace = np.concatenate((trace,f[i]),axis=0)
     plt.vlines((i+1)*numIter,0,upperRange,**vlinestyle)
-# plt.plot(np.linspace(0,10,len(trace)),trace)
+plt.plot(np.linspace(0,10,len(trace)),trace)
 plt.plot(trace)
 plt.vlines(0*numIter,0,upperRange,**vlinestyle)
 plt.vlines(numEpochs*numIter,0,upperRange,**vlinestyle)
