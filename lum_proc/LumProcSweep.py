@@ -3,6 +3,7 @@ import shutil
 import sys
 import shelve
 from threading import activeCount
+from tkinter import FALSE
 
 # Add filepath to default path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
@@ -291,8 +292,8 @@ if start_from_step == 0:
     fdtd_region_minimum_vertical_um = fdtd_hook.getnamed('FDTD','z min') / 1e-6
     fdtd_region_size_vertical_um = fdtd_region_maximum_vertical_um + abs(fdtd_region_minimum_vertical_um)
     monitorbox_size_lateral_um = device_size_lateral_um + 2 * sidewall_thickness_um + (mesh_spacing_um)*5
-    monitorbox_vertical_maximum_um = device_vertical_maximum_um + (mesh_spacing_um*3)
-    monitorbox_vertical_minimum_um = device_vertical_minimum_um - (mesh_spacing_um*3)
+    monitorbox_vertical_maximum_um = device_vertical_maximum_um + (mesh_spacing_um*5)
+    monitorbox_vertical_minimum_um = device_vertical_minimum_um - (mesh_spacing_um*5)
     adjoint_vertical_um = fdtd_hook.getnamed('transmission_focal_monitor_', 'z') / 1e-6
     
     # These monitors are already created and need no editing, but need to be initialized so that code down below will run smoothly.
@@ -619,6 +620,7 @@ def change_sidewall_thickness(param_value):
             # fdtd_hook.addmesh(name=sidewall_mesh['name'])
             # pass
     
+    monitorbox_size_lateral_um = device_size_lateral_um + 2 * param_value + (mesh_spacing_um*5)
     
     fdtd_hook.setnamed('incident_aperture_monitor', 'x span', monitorbox_size_lateral_um * 1e-6)
     fdtd_hook.setnamed('incident_aperture_monitor', 'y span', monitorbox_size_lateral_um * 1e-6)
@@ -1336,6 +1338,8 @@ def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='me
     
     sourcepower = monitors_data['sourcepower']
     input_power = monitors_data['incident_aperture_monitor']['P'] # monitors_data['sourcepower']
+    input_power = sourcepower       # comment out later when you've implemented new reflection monitor
+                        # and then the absorbed power also includes the missed power
     
     R_power = np.reshape(1 - monitors_data['src_transmission_monitor']['T'],    (len(lambda_vector),1))
     R_power = R_power * monitors_data['sourcepower']
@@ -2231,7 +2235,7 @@ def plot_sorting_eff_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     
     plot_colors = ['blue', 'green', 'red', 'gray']
     plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
-    normalize_against_max = True
+    normalize_against_max = False
     
     for plot_idx in range(0, len(f_vectors)-0):
         line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
@@ -2251,7 +2255,8 @@ def plot_sorting_eff_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
         
         line_data['color'] = plot_colors[plot_idx]
         line_data['legend'] = plot_labels[plot_idx]
@@ -2271,7 +2276,8 @@ def plot_sorting_eff_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])
             
             colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             line_data_2['color'] = colors_so_far[-1]
@@ -2345,7 +2351,8 @@ def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = Tr
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
         
         line_data['color'] = plot_colors[plot_idx]
         line_data['legend'] = plot_labels[plot_idx]
@@ -2365,7 +2372,8 @@ def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = Tr
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])
             
             colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             line_data_2['color'] = colors_so_far[-1]
@@ -2439,7 +2447,8 @@ def plot_device_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = Tru
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
         
         line_data['legend'] = plot_labels[plot_idx]
         
@@ -2458,8 +2467,9 @@ def plot_device_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = Tru
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -2530,8 +2540,9 @@ def plot_overall_reflection_sweep_1d(plot_data, slice_coords, plot_stdDev = True
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+
         line_data['legend'] = plot_labels[plot_idx]
         
         plot_config['lines'].append(line_data)
@@ -2549,8 +2560,9 @@ def plot_overall_reflection_sweep_1d(plot_data, slice_coords, plot_stdDev = True
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -2620,8 +2632,9 @@ def plot_side_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+
         line_data['legend'] = plot_labels[plot_idx]
         
         plot_config['lines'].append(line_data)
@@ -2639,8 +2652,9 @@ def plot_side_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -2710,8 +2724,9 @@ def plot_focal_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+
         line_data['legend'] = plot_labels[plot_idx]
         
         plot_config['lines'].append(line_data)
@@ -2729,8 +2744,9 @@ def plot_focal_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -2799,8 +2815,9 @@ def plot_scatter_plane_power_sweep_1d(plot_data, slice_coords, plot_stdDev = Tru
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+
         line_data['legend'] = plot_labels[plot_idx]
         
         plot_config['lines'].append(line_data)
@@ -2818,8 +2835,9 @@ def plot_scatter_plane_power_sweep_1d(plot_data, slice_coords, plot_stdDev = Tru
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -2892,8 +2910,9 @@ def plot_oblique_scattering_sweep_1d(plot_data, slice_coords, plot_stdDev = True
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+
         line_data['legend'] = 'Oblique Scattering ' + plot_labels[plot_idx]
         
         plot_config['lines'].append(line_data)
@@ -2911,8 +2930,9 @@ def plot_oblique_scattering_sweep_1d(plot_data, slice_coords, plot_stdDev = True
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -2982,8 +3002,9 @@ def plot_exit_power_distribution_sweep_1d(plot_data, slice_coords, plot_stdDev =
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+
         line_data['legend'] = plot_labels[plot_idx]
         
         plot_config['lines'].append(line_data)
@@ -3001,8 +3022,9 @@ def plot_exit_power_distribution_sweep_1d(plot_data, slice_coords, plot_stdDev =
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -3073,8 +3095,9 @@ def plot_device_rta_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
         line_data['x_axis']['values'] = r_vectors['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+
         line_data['legend'] = plot_labels[plot_idx]
         
         plot_config['lines'].append(line_data)
@@ -3092,8 +3115,9 @@ def plot_device_rta_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         
             line_data_2['x_axis']['values'] = r_vectors['var_values']
             line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
+
             line_data_2['color'] = plot_colors[plot_idx]
             
             plot_config['lines'].append(line_data_2)
@@ -3379,11 +3403,11 @@ for epoch in range(start_epoch, num_epochs):
                             
                             if plot['name'] in ['sorting_efficiency']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
-                                    generate_sorting_eff_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
+                                    generate_sorting_eff_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=False)
                                     
                             elif plot['name'] in ['sorting_transmission']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
-                                    generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
+                                    generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=False)
                                     
                             elif plot['name'] in ['Enorm_focal_plane_image']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
@@ -3505,42 +3529,42 @@ for epoch in range(start_epoch, num_epochs):
                 
                 for plot in plots:
                     if plot['enabled']:
+                        continue
+                        # if plot['name'] in ['sorting_efficiency']:
+                        #     plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                            
+                        # elif plot['name'] in ['sorting_transmission']:
+                        #     plot_sorting_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                            
+                        # elif plot['name'] in ['Enorm_focal_plane_image']:
+                        #     plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
+                        #                 plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]])
+                        #                 # Second part gets the wavelengths of each spectra where sorting eff. peaks
+                        #     #continue
                         
-                        if plot['name'] in ['sorting_efficiency']:
-                            plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # elif plot['name'] in ['device_transmission']:
+                        #     plot_device_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        elif plot['name'] in ['sorting_transmission']:
-                            plot_sorting_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # elif plot['name'] in ['device_reflection']:
+                        #     plot_overall_reflection_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        elif plot['name'] in ['Enorm_focal_plane_image']:
-                            plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
-                                        plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]])
-                                        # Second part gets the wavelengths of each spectra where sorting eff. peaks
-                            #continue
+                        # elif plot['name'] in ['side_scattering_power']:
+                        #     plot_side_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                         
-                        elif plot['name'] in ['device_transmission']:
-                            plot_device_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # elif plot['name'] in ['oblique_scattering_power']:
+                        #     plot_oblique_scattering_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        elif plot['name'] in ['device_reflection']:
-                            plot_overall_reflection_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                            
-                        elif plot['name'] in ['side_scattering_power']:
-                            plot_side_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # elif plot['name'] in ['focal_region_power']:
+                        #     plot_focal_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                         
-                        elif plot['name'] in ['oblique_scattering_power']:
-                            plot_oblique_scattering_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # elif plot['name'] in ['focal_scattering_power']:
+                        #     plot_scatter_plane_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        elif plot['name'] in ['focal_region_power']:
-                            plot_focal_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                        
-                        elif plot['name'] in ['focal_scattering_power']:
-                            plot_scatter_plane_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # elif plot['name'] in ['exit_power_distribution']:
+                        #     plot_exit_power_distribution_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        elif plot['name'] in ['exit_power_distribution']:
-                            plot_exit_power_distribution_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                            
-                        elif plot['name'] in ['device_rta']:
-                            plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # elif plot['name'] in ['device_rta']:
+                        #     plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                                 
                         
             #
@@ -3552,9 +3576,9 @@ for epoch in range(start_epoch, num_epochs):
                         
                     if plot['name'] in ['sorting_efficiency']:
                         # Here there is the most variability in what the user might wish to plot, so it will have to be hardcoded for the most part.
-                        plot_function_sweep(plots_data['sweep_plots'][plot['name']], 'th', plot_sorting_eff_sweep_1d.__name__)
+                        # plot_function_sweep(plots_data['sweep_plots'][plot['name']], 'th', plot_sorting_eff_sweep_1d.__name__)
                         # plot_sorting_eff_sweep(plots_data['sweep_plots'][plot['name']], 'phi')
-                        # plot_sorting_eff_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
+                        plot_sorting_eff_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
                         
                     if plot['name'] in ['sorting_transmission']:
                         plot_sorting_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
