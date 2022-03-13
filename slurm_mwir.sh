@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --qos=normal
 #SBATCH --mem-per-cpu=8G
-#SBATCH --comment="SONY th0 case, Area FoM Test"
+#SBATCH --comment="SONY th0 case, Area FoM Test."
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=END
 
