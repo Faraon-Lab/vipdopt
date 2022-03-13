@@ -8,8 +8,9 @@ class Layering(filter.Filter):
     '''Takes a device and splits it into layers in the dimension requested. Gives the functionality to get the indices of each layer,
     and add spacers in between each layer.
     
-    Restricts optimization by averaging the calculated sensitivity in the vertical direction within each layer, such that voxels 
+    Restricts optimization by averaging the calculated sensitivity in the vertical direction within EACH layer, such that voxels 
     within each layer are governed by a shared 2D profile.
+    i.e. n layers, 1 layer has m voxels, all voxels have a shared 2D permittivity profile WITHIN the nth layer, but each layer differs from the rest in its 2D profile
     
     See OPTICA paper supplement Section IIC, https://doi.org/10.1364/OPTICA.384228,  for details.'''
 
@@ -63,6 +64,7 @@ class Layering(filter.Filter):
         return output
 
     def layer_averaging(self, variable, spacer_value):
+        '''Averages out all the voxels within one layer in the vertical direction, such that they all have the same 2D profile within that layer.'''
         variable_shape = variable.shape
         num_voxels_total = variable_shape[self.dim]
 
