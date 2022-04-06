@@ -7,8 +7,8 @@
 # potentially missed.
 importing_params_from_opt_file = True
 if importing_params_from_opt_file:
-    # from SonyBayerFilterParameters import *
-    from LayeredMWIRBridgesBayerFilterParameters import *
+    from SonyBayerFilterParameters import *
+    # from LayeredMWIRBridgesBayerFilterParameters import *
 
 from os import umask
 import numpy as np
@@ -17,14 +17,14 @@ import json
 #
 #* Debug Options
 #
-running_on_local_machine = False	# False if running on slurm
+running_on_local_machine = True	# False if running on slurm
 if running_on_local_machine:	
     lumapi_filepath =  r"C:\Program Files\Lumerical\v212\api\python\lumapi.py"
 else:	
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 0 	# 0 if running entire file in one shot
+start_from_step = 3    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -33,14 +33,14 @@ shelf_fn = 'save_state'
 #* Files
 #
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mid-IR Bayer\[v9] MWIRBBF_crosstalk - 20210915\Data Processing\Cu_450nm_th0\theta_swp"
+    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v0] basicopt_setup\Data Processing\v3_nodeviceandcrosssection"
     projects_directory_location = projects_directory_location_init          # Change if necessary to differentiate  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
 
-project_name_init = 'Cu_450nm_th0_theta_swp'
+project_name_init = 'sony_device_v3merge'
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
@@ -58,7 +58,7 @@ sweep_settings = json.load(open('sweep_settings.json'))
 #
 
 def generate_value_array(start,end,step):
-    return json.dumps(np.arange(start,start+end+step,step).tolist())
+    return json.dumps(np.arange(start,end+step,step).tolist())
 
 def create_parameter_filename_string(idx):
     ''' Input: tuple coordinate in the N-D array. Cross-matches against the sweep_parameters dictionary.
@@ -111,12 +111,14 @@ for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
 
 plots = sweep_settings['plots']
 
+cutoff_1d_sweep_offset = [1, 0]
 #
 #* Lumerical Monitor Setup
 #
 
 monitors = sweep_settings['monitors']
-disable_object_list = ['design_efield_monitor']
+disable_object_list = ['design_efield_monitor',
+                       'src_spill_monitor']
 #! DO NOT disable the transmission_monitors! There is no reliable way to partition the scatter_plane_monitor in order to retrieve power values. E-field yes, but power no.
 # The memory / runtime savings is not that much either.
 
@@ -151,7 +153,7 @@ dispersive_ranges_um = [
 if not importing_params_from_opt_file:
     mesh_spacing_um = 0.017
     geometry_spacing_um = 0.051
-    mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )
+mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )
 
 
 #* Device
@@ -162,15 +164,16 @@ if not importing_params_from_opt_file:
 
     vertical_layer_height_um = 0.051
     vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_um )
-    
-    device_size_lateral_um = geometry_spacing_um * 40
-    device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
 
-    device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
-    device_voxels_vertical = int(device_size_vertical_um / geometry_spacing_um)
+device_size_lateral_um = geometry_spacing_um * 40
+device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
+
+device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
+device_voxels_vertical = int(device_size_vertical_um / geometry_spacing_um)
 
 if 'device_size_vertical_um' not in globals():
     device_size_vertical_um = device_size_verical_um        # little typo that has to be declared for compatibility
+
 
 device_voxels_simulation_mesh_lateral = 1 + int(device_size_lateral_um / mesh_spacing_um)
 ###### device_voxels_simulation_mesh_lateral = 2 + int(device_size_lateral_um / mesh_spacing_um)
@@ -180,8 +183,8 @@ device_vertical_maximum_um = device_size_vertical_um
 device_vertical_minimum_um = 0
 
 # Structure the following list such that the last entry is the last medium above the device.
-objects_above_device = ['permittivity_layer_substrate',
-                        'silicon_substrate']
+objects_above_device = [] #['permittivity_layer_substrate',
+                        #'silicon_substrate']
 
 #
 #* Optical
@@ -207,7 +210,7 @@ src_beam_rad = device_size_lateral_um/2
 #
 
 #* Sidewall and Side Monitors
-num_sidewalls = 4
+num_sidewalls = 0
 if num_sidewalls == 0:
     sidewall_thickness_um = 0.0
     sidewall_material = 'etch'
@@ -240,7 +243,7 @@ if not importing_params_from_opt_file:
     fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
     fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
 
-fdtd_simulation_time_fs = 3000
+    fdtd_simulation_time_fs = 3000
 
 
 

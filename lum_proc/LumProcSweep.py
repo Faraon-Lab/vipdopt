@@ -3,7 +3,6 @@ import shutil
 import sys
 import shelve
 from threading import activeCount
-from tkinter import FALSE
 
 # Add filepath to default path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
@@ -33,6 +32,7 @@ import queue
 import subprocess
 import platform
 import re
+import gc
 
 print("All modules loaded.")
 sys.stdout.flush()
@@ -134,6 +134,10 @@ def create_dict_nx(dict_name):
             print(dict_name +' already exists in globals().')
     else:
         globals()[dict_name] = {}
+
+def recursive_get(d, *keys):
+    '''Accesses multi-level dictionaries of arbitrary depth.'''
+    return functools.reduce(lambda c, k: c.get(k, {}), keys, d)
         
 def get_slurm_node_list( slurm_job_env_variable=None ):
 	if slurm_job_env_variable is None:
@@ -318,6 +322,19 @@ if start_from_step == 0:
     src_transmission_monitor['frequency points'] = num_design_frequency_points
     fdtd_objects['src_transmission_monitor'] = src_transmission_monitor
     
+    # Monitor at top of device across FDTD to measure source power that misses the device
+    src_spill_monitor = {}
+    src_spill_monitor['x'] = 0 * 1e-6
+    src_spill_monitor['x span'] = fdtd_region_size_lateral_um * 1e-6
+    src_spill_monitor['y'] = 0 * 1e-6
+    src_spill_monitor['y span'] = fdtd_region_size_lateral_um * 1e-6
+    src_spill_monitor['z'] = monitorbox_vertical_maximum_um * 1e-6
+    src_spill_monitor['override global monitor settings'] = 1
+    src_spill_monitor['use wavelength spacing'] = 1
+    src_spill_monitor['use source limits'] = 1
+    src_spill_monitor['frequency points'] = num_design_frequency_points
+    fdtd_objects['src_spill_monitor'] = src_spill_monitor
+    
     # Monitor right above device to measure input power
     incident_aperture_monitor = {}
     incident_aperture_monitor['x'] = 0 * 1e-6
@@ -413,6 +430,35 @@ if start_from_step == 0:
         globals()['vertical_scatter_monitor_'+str(vsm_idx)] = vertical_scatter_monitor
         fdtd_objects['vertical_scatter_monitor_'+str(vsm_idx)] = vertical_scatter_monitor
     
+    # Device cross-section monitors that take the field inside the device, and extend all the way down to the focal plane. We have 6 slices, 2 sets of 3 for both x and y.
+    # Each direction-set has slices at x(y) = -device_size_lateral_um/4, 0, +device_size_lateral_um/4, i.e. intersecting where the focal spot is supposed to be.
+    # We also take care to output plots for both E_norm and Re(E), the latter of which captures the wave-like behaviour much more accurately.
+    device_xsection_monitors = []
+    dxm_pos = [-device_size_lateral_um/4, 0, device_size_lateral_um/4]
+    for dev_cross_idx in range(0,6):
+        device_cross_monitor = {}
+        device_cross_monitor['z max'] = device_vertical_maximum_um * 1e-6
+        device_cross_monitor['z min'] = adjoint_vertical_um * 1e-6
+        
+        if dev_cross_idx < 3:
+            device_cross_monitor['y'] = dxm_pos[dev_cross_idx] * 1e-6
+            device_cross_monitor['x max'] = (device_size_lateral_um / 2) * 1e-6
+            device_cross_monitor['x min'] = -(device_size_lateral_um / 2) * 1e-6
+        else:
+            device_cross_monitor['x'] = dxm_pos[dev_cross_idx-3] * 1e-6
+            device_cross_monitor['y max'] = (device_size_lateral_um / 2) * 1e-6
+            device_cross_monitor['y min'] = -(device_size_lateral_um / 2) * 1e-6
+        
+        device_cross_monitor['override global monitor settings'] = 1
+        device_cross_monitor['use wavelength spacing'] = 1
+        device_cross_monitor['use source limits'] = 1
+        device_cross_monitor['frequency points'] = num_design_frequency_points
+        
+        device_xsection_monitors.append(device_cross_monitor)
+        globals()['device_xsection_monitor_'+str(dev_cross_idx)] = device_cross_monitor
+        fdtd_objects['device_xsection_monitor_'+str(dev_cross_idx)] = device_cross_monitor
+        
+        
     # Create monitors and apply all of the above settings to each monitor
     for monitor in monitors:
         try:
@@ -620,7 +666,6 @@ def change_sidewall_thickness(param_value):
             # fdtd_hook.addmesh(name=sidewall_mesh['name'])
             # pass
     
-    monitorbox_size_lateral_um = device_size_lateral_um + 2 * param_value + (mesh_spacing_um*5)
     
     fdtd_hook.setnamed('incident_aperture_monitor', 'x span', monitorbox_size_lateral_um * 1e-6)
     fdtd_hook.setnamed('incident_aperture_monitor', 'y span', monitorbox_size_lateral_um * 1e-6)
@@ -640,10 +685,31 @@ def change_sidewall_thickness(param_value):
         fdtd_hook.setnamed(sm_name, 'y max', (sm_y_pos[sm_idx] + sm_yspan_pos[sm_idx]/2) * 1e-6)
         fdtd_hook.setnamed(sm_name, 'y min', (sm_y_pos[sm_idx] - sm_yspan_pos[sm_idx]/2) * 1e-6)
 
+def change_divergence_angle(param_value):
+    '''For a Gaussian beam source, changes the divergence angle while keeping beam radius constant.'''
+    xy_names = ['x', 'y']
+    
+    for xy_idx in range(0, 2):
+        fdtd_hook.select('forward_src_' + xy_names[xy_idx])
+        # fdtd_hook.set('beam radius wz', 100 * 1e-6)
+        # fdtd_hook.set('divergence angle', 3.42365) # degrees
+        # fdtd_hook.set('beam radius wz', 15 * 1e-6)
+        # # fdtd_hook.set('beam radius wz', param_value * 1e-6)
+        
+        
+        # Resets distance from waist to 0, fixing waist radius and beam radius properties
+        fdtd_hook.set('beam parameters', 'Waist size and position')
+        fdtd_hook.set('waist radius w0', src_beam_rad * 1e-6)
+        fdtd_hook.set('distance from waist', 0 * 1e-6)
+        # Change divergence angle
+        fdtd_hook.set('beam parameters', 'Beam size and divergence angle')
+        fdtd_hook.set('divergence angle', param_value) # degrees
+    
+    print(f'Source divergence angle set to {param_value}.')
 
 #! Step 2 Functions
 def get_sourcepower():
-    f = fdtd_hook.getresult('transmission_focal_monitor_','f')
+    f = fdtd_hook.getresult('focal_monitor_0','f')
     sp = fdtd_hook.sourcepower(f)
     return sp
 
@@ -753,6 +819,37 @@ def partition_scatter_plane_monitor(monitor_data, variable_indicator):
     
     return var_focal_plane, var_focal_monitor_arr
 
+def append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics, band_idxs=None):
+    '''Logs peak/mean values and corresponding indices of the f_vector values, for each quadrant, IN BAND.
+    This means that it takes the values within a defined spectral band and picks a statistical value for each band within that band.
+    Produces num_sweep_values * num_bands values, i.e. B->{B,G,R}, G->{B,G,R}, R->{B,G,R}  
+    where for e.g. RB is the transmission of R quadrant within the B spectral band
+    Statistics determine how the value for the sweep is drawn from the spectrum: peak|mean'''
+
+    if band_idxs is None:
+        # Then take the whole spectrum as one band
+        band_idxs = [np.array([0, len(f_vectors[0]['var_values'])-1])]
+    num_bands = len(band_idxs)
+    
+    for idx in range(0, num_sweep_values):
+        for inband_idx in range(0, num_bands):
+            if statistics in ['peak']:
+                sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])]), key=(lambda x: x[1]))
+                sweep_stdev = 0
+                
+            else:
+                sweep_val = np.average(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+                sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
+                sweep_stdev = np.std(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+        
+          
+            sweep_values.append({'value': float(sweep_val),
+                            'index': sweep_index,
+                            'std_dev': sweep_stdev,
+                            'statistics': statistics
+                            })
+    
+    return sweep_values
 
 def generate_sorting_eff_spectrum(monitors_data, produce_spectrum, statistics='peak', add_opp_polarizations = False):
     '''Generates sorting efficiency spectrum and logs peak/mean values and corresponding indices of each quadrant. 
@@ -811,20 +908,23 @@ def generate_sorting_eff_spectrum(monitors_data, produce_spectrum, statistics='p
 
     
     sweep_values = []
-    for idx in range(0, num_adjoint_sources if not add_opp_polarizations else num_bands):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
+    num_sweep_values = num_adjoint_sources if not add_opp_polarizations else num_bands
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
+    
+    # for idx in range(0, num_sweep_values):
+    #     if statistics in ['peak']:
+    #         sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
+    #         sweep_stdev = 0
+    #     else:
+    #         sweep_val = np.average(f_vectors[idx]['var_values'])
+    #         sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
+    #         sweep_stdev = np.std(f_vectors[idx]['var_values'])
             
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    #     sweep_values.append({'value': float(sweep_val),
+    #                     'index': sweep_index,
+    #                     'std_dev': sweep_stdev,
+    #                     'statistics': statistics
+    #                     })
     
     print('Picked peak efficiency points for each quadrant to pass to sorting efficiency variable sweep.')
     
@@ -832,6 +932,57 @@ def generate_sorting_eff_spectrum(monitors_data, produce_spectrum, statistics='p
 
 def generate_sorting_transmission_spectrum(monitors_data, produce_spectrum, statistics='peak', add_opp_polarizations = False):
     '''Generates sorting efficiency spectrum and logs peak/mean values and corresponding indices of each quadrant. 
+    Sorting efficiency of a quadrant is defined as overall power in that quadrant normalized against **sourcepower** (accounting for angle).
+    Statistics determine how the value for the sweep is drawn from the spectrum: peak|mean'''
+    output_plot = {}
+    r_vectors = []      # Variables
+    f_vectors = []      # Functions
+    
+    lambda_vector = monitors_data['wavelength']
+    r_vectors.append({'var_name': 'Wavelength',
+                      'var_values': lambda_vector
+                    })
+    
+    quadrant_names = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    for idx in range(0, num_adjoint_sources):
+        f_vectors.append({'var_name': quadrant_names[idx],
+                        'var_values': np.divide(monitors_data['transmission_monitor_'+str(idx)]['P'],
+                                                monitors_data['incident_aperture_monitor']['P'])
+                        })
+    
+    if add_opp_polarizations:
+        f_vectors[1]['var_name'] = 'Green'
+        f_vectors[1]['var_values'] = f_vectors[1]['var_values'] + f_vectors[3]['var_values']
+        f_vectors.pop(3)
+    
+    if produce_spectrum:
+        output_plot['r'] = r_vectors
+        output_plot['f'] = f_vectors
+        output_plot['title'] = 'Sorting Transmission Spectrum'
+        output_plot['const_params'] = const_parameters
+        
+        # ## Plotting code to test
+        # fig,ax = plt.subplots()
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[0]['var_values'], color='blue')
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[1]['var_values'], color='green')
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[2]['var_values'], color='red')
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[3]['var_values'], color='gray')
+        # plt.show(block=False)
+        # plt.show()
+        print('Generated sorting transmission spectrum.')
+  
+    sweep_values = []
+    num_sweep_values = num_adjoint_sources if not add_opp_polarizations else num_bands
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
+    
+    print('Picked peak transmission points for each quadrant to pass to sorting transmission variable sweep.')
+    
+    return output_plot, sweep_values
+
+def generate_inband_val_sweep(monitors_data, produce_spectrum, statistics='peak', add_opp_polarizations = False, band_idxs = None):
+    '''Generates sorting efficiency spectrum and logs peak/mean values and corresponding indices of each quadrant, IN BAND.
+    This means that it takes the values within a defined spectral band and picks a statistical value for each band within that band.
+    Produces num_bands**2 sweep_values, i.e. B->{B,G,R}, G->{B,G,R}, R->{B,G,R}  where for e.g. RB is the transmission of R quadrant within the B spectral band
     Sorting efficiency of a quadrant is defined as overall power in that quadrant normalized against **sourcepower** (accounting for angle).
     Statistics determine how the value for the sweep is drawn from the spectrum: peak|mean'''
     output_plot = {}
@@ -887,24 +1038,36 @@ def generate_sorting_transmission_spectrum(monitors_data, produce_spectrum, stat
   
   
     sweep_values = []
-    for idx in range(0, num_adjoint_sources if not add_opp_polarizations else num_bands):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = num_adjoint_sources if not add_opp_polarizations else num_bands
     
-    print('Picked peak transmission points for each quadrant to pass to sorting transmission variable sweep.')
+    # Splits entire spectrum into equal bands, gets indices of starts and ends
+    band_idxs = []
+    for inband_idx in range(0, num_sweep_values):
+        band_idxs.append((np.floor(len(r_vectors[0]['var_values'])/num_sweep_values) * 
+                            np.asarray([inband_idx, inband_idx+1]) - np.asarray([0, 1])).astype(int))
     
-    return output_plot, sweep_values
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics, band_idxs)
+    # for idx in range(0, num_sweep_values):
+    #     for inband_idx in range(0, num_sweep_values):
+    #         if statistics in ['peak']:
+    #             sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])]), key=(lambda x: x[1]))
+    #             sweep_stdev = 0
+                
+    #         else:
+    #             sweep_val = np.average(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+    #             sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
+    #             sweep_stdev = np.std(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+        
+          
+    #         sweep_values.append({'value': float(sweep_val),
+    #                         'index': sweep_index,
+    #                         'std_dev': sweep_stdev,
+    #                         'statistics': statistics
+    #                         })
+    
+    print('Picked mean transmission points, within band, for each quadrant to pass to sorting transmission variable sweep.')
+    
+    return sweep_values
         
 def generate_device_transmission_spectrum(monitors_data, produce_spectrum, statistics='mean'):
     '''Generates device transmission spectrum and logs peak/mean value and corresponding index. 
@@ -919,7 +1082,8 @@ def generate_device_transmission_spectrum(monitors_data, produce_spectrum, stati
                       'var_values': lambda_vector
                     })
     
-    P_in = monitors_data['incident_aperture_monitor']['P']
+    #P_in = monitors_data['incident_aperture_monitor']['P']
+    P_in = monitors_data['sourcepower']
     P_out = monitors_data['exit_aperture_monitor']['P']
     T_device = np.divide(P_out, P_in)
     f_vectors.append({'var_name': 'Device Transmission',
@@ -935,20 +1099,8 @@ def generate_device_transmission_spectrum(monitors_data, produce_spectrum, stati
         print('Generated transmission spectrum.')
     
     sweep_values = []
-    for idx in range(0, 1):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = 1
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked transmission point to pass to variable sweep.')
     
@@ -999,6 +1151,95 @@ def generate_Enorm_focal_plane(monitors_data, produce_spectrum):
     
     return output_plot, {}
 
+def generate_device_cross_section_spectrum(monitors_data, produce_spectrum):
+    '''Generates image slice at device cross-section. The output is over all wavelengths so a wavelength still needs to be selected.'''
+    
+    
+    output_plot = {}
+    r_vectors = []      # Variables
+    f_vectors = []      # Functions
+    lambda_vectors = [] # Wavelengths
+    
+    for device_cross_idx in range(0,6):
+        
+        monitor = monitors_data['device_xsection_monitor_' + str(device_cross_idx)]
+    
+        r_vectors.append({'var_name': 'x-axis',
+                        'var_values': monitor['coords']['x']
+                        })
+        r_vectors.append({'var_name': 'y-axis',
+                        'var_values': monitor['coords']['y']
+                        })
+        r_vectors.append({'var_name': 'z-axis',
+                        'var_values': monitor['coords']['z']
+                        })
+        
+        f_vectors.append({'var_name': 'E_norm',
+                        'var_values': np.squeeze(monitor['E'])
+                         })
+        f_vectors.append({'var_name': 'E_real',
+                        'var_values': np.squeeze(monitor['E_real'])
+                        })
+        
+        
+        lambda_vectors.append({'var_name': 'Wavelength',
+                            'var_values': monitors_data['wavelength']
+                            })
+    
+    output_plot['r'] = r_vectors
+    output_plot['f'] = f_vectors
+    output_plot['lambda'] = lambda_vectors 
+    output_plot['title'] = 'Device Cross-Section Image (Spectrum)'
+    output_plot['const_params'] = const_parameters
+    
+    print('Generated device cross section image plot.')
+    
+    # ## Plotting code to test
+    # fig, ax = plt.subplots()
+    # #plt.contour([np.squeeze(r_vectors[0]['var_values']), np.squeeze(r_vectors[2]['var_values'])], f_vectors[0]['var_values'][:,:,5])
+    # plt.imshow(f_vectors[0]['var_values'][:,:,5])
+    # plt.show(block=False)
+    # plt.show()
+    
+    return output_plot, {}
+
+def generate_source_spill_power_spectrum(monitors_data, produce_spectrum, statistics='mean'):
+    '''Generates power spectrum for the power from the source that does not go into the input aperture
+    and logs peak/mean value and corresponding index.'''
+    
+    output_plot = {}
+    r_vectors = []      # Variables
+    f_vectors = []      # Functions
+    
+    lambda_vector = monitors_data['wavelength']
+    r_vectors.append({'var_name': 'Wavelength',
+                      'var_values': lambda_vector
+                    })
+    
+    device_input_power = monitors_data['incident_aperture_monitor']['P']
+    spill_power = monitors_data['src_spill_monitor']['P']
+    source_power = monitors_data['sourcepower']
+    
+    f_vectors.append({'var_name': 'Source Spill Power',
+                      'var_values': (spill_power - device_input_power) / source_power
+                    })
+    
+    if produce_spectrum:
+        output_plot['r'] = r_vectors
+        output_plot['f'] = f_vectors
+        output_plot['title'] = 'Source Spill Power Spectrum'
+        output_plot['const_params'] = const_parameters
+        
+        print('Generated source spill power spectrum.')
+    
+    sweep_values = []
+    num_sweep_values = 1
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
+    
+    print('Picked source spill power point to pass to variable sweep.')
+    
+    return output_plot, sweep_values
+
 def generate_overall_reflection_spectrum(monitors_data, produce_spectrum, statistics='mean'):
     '''Generates overall FDTD reflection spectrum and logs peak/mean value and corresponding index. 
     Reflection is calculated directly from a transmission monitor directly between the source and device input interface, and is normalized against sourcepower.
@@ -1027,20 +1268,8 @@ def generate_overall_reflection_spectrum(monitors_data, produce_spectrum, statis
         print('Generated reflection spectrum.')
     
     sweep_values = []
-    for idx in range(0, 1):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = 1
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked reflection point to pass to variable sweep.')
     
@@ -1080,20 +1309,8 @@ def generate_side_power_spectrum(monitors_data, produce_spectrum, statistics='me
         print('Generated side scattering power spectrum.')
     
     sweep_values = []
-    for idx in range(0, 4):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = 4
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked side scattering power points for each quadrant to pass to variable sweep.')
     
@@ -1124,20 +1341,8 @@ def generate_focal_power_spectrum(monitors_data, produce_spectrum, statistics='m
         print('Generated focal region power spectrum.')
     
     sweep_values = []
-    for idx in range(0, 1):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = 1
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked focal region power point to pass to variable sweep.')
     
@@ -1183,20 +1388,8 @@ def generate_oblique_scattering_power_spectrum(monitors_data, produce_spectrum, 
         print('Generated oblique scattering power spectrum.')
     
     sweep_values = []
-    for idx in range(0, 4 + 1):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = 4+1
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked oblique scattering power points for each side, and the total, to pass to variable sweep.')
     
@@ -1233,20 +1426,8 @@ def generate_scatter_plane_power_spectrum(monitors_data, produce_spectrum, stati
         print('Generated scatter plane power spectrum.')
     
     sweep_values = []
-    for idx in range(0, 1):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = 1
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked scatter plane power point to pass to variable sweep.')
     
@@ -1296,20 +1477,8 @@ def generate_exit_power_distribution_spectrum(monitors_data, produce_spectrum, s
         print('Generated focal plane power distribution spectrum.')
     
     sweep_values = []
-    for idx in range(0, len(f_vectors)):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = len(f_vectors)
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked exit power distribution points to pass to variable sweep.')
     
@@ -1338,8 +1507,6 @@ def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='me
     
     sourcepower = monitors_data['sourcepower']
     input_power = monitors_data['incident_aperture_monitor']['P'] # monitors_data['sourcepower']
-    input_power = sourcepower       # comment out later when you've implemented new reflection monitor
-                        # and then the absorbed power also includes the missed power
     
     R_power = np.reshape(1 - monitors_data['src_transmission_monitor']['T'],    (len(lambda_vector),1))
     R_power = R_power * monitors_data['sourcepower']
@@ -1399,20 +1566,8 @@ def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='me
         print('Generated device RTA power spectrum.')
     
     sweep_values = []
-    for idx in range(0, len(f_vectors)):
-        if statistics in ['peak']:
-            sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
-            sweep_stdev = 0
-        else:
-            sweep_val = np.average(f_vectors[idx]['var_values'])
-            sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-            sweep_stdev = np.std(f_vectors[idx]['var_values'])
-            
-        sweep_values.append({'value': float(sweep_val),
-                        'index': sweep_index,
-                        'std_dev': sweep_stdev,
-                        'statistics': statistics
-                        })
+    num_sweep_values = len(f_vectors)
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked device RTA points to pass to variable sweep.')
     
@@ -1500,134 +1655,297 @@ def enter_plot_data_1d(plot_config, fig=None, ax=None):
     
     return fig, ax
 
+class BasicPlot():
+    def __init__(self, plot_data):
+        '''Initializes the plot_config variable of this class object and also the Plot object.'''
+        self.r_vectors = plot_data['r']
+        self.f_vectors = plot_data['f']
+        
+        self.fig, self.ax = plt.subplots()
+        self.plot_config = {'title': None,
+                    'x_axis': {'label':'', 'limits':[]},
+                    'y_axis': {'label':'', 'limits':[]},
+                    'lines': []
+                    }
+    
+    def append_line_data(self, plot_colors=None, plot_labels=None):
+        '''Appends all line data stored in the f_vectors to the plot_config. Here we can assign colors and legend labels all at once.'''
+        
+        for plot_idx in range(0, len(self.f_vectors)):
+            line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+                        'cutoff': None,
+                        'color': None,
+                        'alpha': 1.0,
+                        'legend': None,
+                        'marker_style': marker_style
+                    }
+            
+            line_data['x_axis']['values'] = self.r_vectors[0]['var_values']
+            line_data['y_axis']['values'] = self.f_vectors[plot_idx]['var_values']
+            line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+            
+            if plot_colors is not None:
+                line_data['color'] = plot_colors[plot_idx]
+            if plot_labels is not None:
+                line_data['legend'] = plot_labels[plot_idx]
+            
+            self.plot_config['lines'].append(line_data)
+    
+    def alter_line_property(self, key, new_value, axis_str=None):
+        '''Alters a property throughout all of the line data.
+        If new_value is an array it will change all of the values index by index; otherwise it will blanket change everything.
+        The axis_str argument is to cover multiple-level dictionaries.'''
+        
+        for line_idx, line_data in enumerate(self.plot_config['lines']):
+            if axis_str is None:
+                if not isinstance(new_value, list):
+                    line_data[key] = new_value
+                else:
+                    line_data[key] = new_value[line_idx]
+            else:
+                if not isinstance(new_value, list):
+                    line_data[axis_str][key] = new_value
+                else:
+                    line_data[axis_str][key] = new_value[line_idx]
+    
+    def assign_title(self, title_string, job_idx):
+        '''Replaces title of plot.'''
+        
+        for sweep_param_value in list(sweep_parameters.values()):
+            current_value = sweep_param_value['var_values'][job_idx[2][0]]
+            optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
+            title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
+            
+        self.plot_config['title'] = title_string
+    
+    def assign_axis_labels(self, x_label_string, y_label_string):
+        '''Replaces axis labels of plot.'''
+        
+        self.plot_config['x_axis']['label'] = x_label_string
+        self.plot_config['y_axis']['label'] = y_label_string
+        
+    def export_plot_config(self, plot_subfolder_name, job_idx, close_plot=True):
+        '''Creates plot using the plot config, and then exports.'''
+        self.fig, self.ax = enter_plot_data_1d(self.plot_config, self.fig, self.ax)
+        
+        if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
+            os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
+        plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
+            + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
+            bbox_inches='tight')
+        
+        export_msg_string = (plot_subfolder_name.replace("_", " ")).title()
+        print('Exported: ' + export_msg_string)
+        sys.stdout.flush()
+        
+        if close_plot:
+            plt.close()
+
+
+class SpectrumPlot(BasicPlot):
+    def __init__(self, plot_data):
+        '''Initializes the plot_config variable of this class object and also the Plot object.'''
+        super(SpectrumPlot, self).__init__(plot_data)
+    
+    def append_line_data(self, plot_colors=None, plot_labels=None):
+        super(SpectrumPlot, self).append_line_data(plot_colors, plot_labels)
+        self.alter_line_property('factor', 1e6, axis_str='x_axis')
+    
+    
+class SweepPlot(BasicPlot):
+    def __init__(self, plot_data, slice_coords):
+        '''Initializes the plot_config variable of this class object and also the Plot object.'''
+        super(SweepPlot, self).__init__(plot_data)
+        
+        # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
+        r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
+        self.r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
+        #f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    
+    
+    def append_line_data(self, slice_coords, plot_stdDev, plot_colors=None, plot_labels=None, normalize_against_max=False):
+        '''Appends all line data stored in the f_vectors to the plot_config. Here we can assign colors and legend labels all at once.
+        Overwriting the method in BasePlot.'''
+        
+        for plot_idx in range(0, len(self.f_vectors)-0):
+            line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+                        'cutoff': None,
+                        'color': None,
+                        'alpha': 1.0,
+                        'legend': None,
+                        'marker_style': marker_style
+                    }
+        
+            y_plot_data = self.f_vectors[plot_idx]['var_values']
+            y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
+            y_plot_data = y_plot_data[tuple(slice_coords)]
+            
+            normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
+            line_data['y_axis']['values'] = y_plot_data / normalization_factor
+            line_data['x_axis']['values'] = self.r_vectors['var_values']
+            # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+            line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+            
+            line_data['color'] = plot_colors[plot_idx]
+            line_data['legend'] = plot_labels[plot_idx]
+            
+            self.plot_config['lines'].append(line_data)
+            
+            
+            if plot_stdDev and self.f_vectors[plot_idx]['statistics'] in ['mean']:
+                line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+                        'cutoff': None,
+                        'color': None,
+                        'alpha': 0.3,
+                        'legend': '_nolegend_',
+                        'marker_style': dict(linestyle='-', linewidth=1.0)
+                    }
+            
+                line_data_2['x_axis']['values'] = self.r_vectors['var_values']
+                line_data_2['y_axis']['values'] = (y_plot_data + self.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+                # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+                line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+                
+                colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+                line_data_2['color'] = colors_so_far[-1]
+                
+                self.plot_config['lines'].append(line_data_2)
+                
+                line_data_3 = copy.deepcopy(line_data_2)
+                line_data_3['y_axis']['values'] = (y_plot_data - self.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+                self.plot_config['lines'].append(line_data_3)
+        
+    def assign_title(self, title_string):
+        '''Replaces title of plot. 
+        Overwriting the method in BasePlot.'''
+        
+        for sweep_param_value in list(sweep_parameters.values()):
+            optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
+            title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
+        self.plot_config['title'] = title_string
+    
+    def assign_axis_labels(self, slice_coords, y_label_string):
+        '''Replaces axis labels of plot.
+        Overwriting the method in BasePlot.'''
+        
+        sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
+        self.plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
+        self.plot_config['y_axis']['label'] = y_label_string
+    
+    def export_plot_config(self, file_type_name, slice_coords, plot_subfolder_name='', close_plot=True):
+        '''Creates plot using the plot config, and then exports.
+        Overwriting the method in BasePlot.'''
+        
+        self.fig, self.ax = enter_plot_data_1d(self.plot_config, self.fig, self.ax)
+        
+        if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
+            os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
+        plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
+            + '/' + file_type_name + create_parameter_filename_string(slice_coords) + '.png',
+            bbox_inches='tight')
+        
+        export_msg_string = (file_type_name.replace("_", " ")).title()
+        print('Exported: ' + export_msg_string + create_parameter_filename_string(slice_coords))
+        sys.stdout.flush()
+        
+        if close_plot:
+            plt.close()
+    
 # -- Spectrum Plot Functions (Per Job)
 
 def plot_sorting_eff_spectrum(plot_data, job_idx):
     '''For the given job index, plots the sorting efficiency spectrum corresponding to that job.'''
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SpectrumPlot(plot_data)
     
     plot_colors = ['blue', 'green', 'red', 'gray']
     plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    sp.append_line_data(plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['color'] = plot_colors[plot_idx]
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
+    sp.assign_title('Spectrum in Each Quadrant', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Sorting Efficiency')
     
-    title_string = 'Spectrum in Each Quadrant'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Sorting Efficiency'
-    
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = 'sorting_efficiency_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Sorting Efficiency Spectrum')
-    
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('sorting_efficiency_spectra', job_idx)
 
-# TODO: Edit contents to match
+    # r_vectors = plot_data['r']
+    # f_vectors = plot_data['f']
+    
+    # fig, ax = plt.subplots()
+    # plot_config = {'title': None,
+    #                'x_axis': {'label':'', 'limits':[]},
+    #                'y_axis': {'label':'', 'limits':[]},
+    #                'lines': []
+    #             }
+    
+    # plot_colors = ['blue', 'green', 'red', 'gray']
+    # plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    
+    # for plot_idx in range(0, len(f_vectors)):
+    #     line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+    #                  'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+    #                  'cutoff': None,
+    #                  'color': None,
+    #                  'alpha': 1.0,
+    #                  'legend': None,
+    #                  'marker_style': marker_style
+    #             }
+        
+    #     line_data['x_axis']['values'] = r_vectors[0]['var_values']
+    #     line_data['x_axis']['factor'] = 1e6
+    #     line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
+    #     line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        
+    #     line_data['color'] = plot_colors[plot_idx]
+    #     line_data['legend'] = plot_labels[plot_idx]
+        
+    #     plot_config['lines'].append(line_data)
+        
+    
+    # title_string = 'Spectrum in Each Quadrant'
+    # for sweep_param_value in list(sweep_parameters.values()):
+    #     current_value = sweep_param_value['var_values'][job_idx[2][0]]
+    #     optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
+    #     title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
+    # plot_config['title'] = title_string
+    
+    # plot_config['x_axis']['label'] = 'Wavelength (um)'
+    # plot_config['y_axis']['label'] = 'Sorting Efficiency'
+    
+    
+    
+    # fig, ax = enter_plot_data_1d(plot_config, fig, ax)
+    
+    
+    # plot_subfolder_name = 'sorting_efficiency_spectra'
+    # if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
+    #     os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
+    # plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
+    #     + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
+    #     bbox_inches='tight')
+    # print('Exported: Sorting Efficiency Spectrum')
+    
+    # plt.close()
+    
+    # return fig, ax
+    return sp.fig, sp.ax
+
 def plot_sorting_transmission_spectrum(plot_data, job_idx):
     '''For the given job index, plots the sorting efficiency (transmission) spectrum corresponding to that job.'''
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SpectrumPlot(plot_data)
     
     plot_colors = ['blue', 'green', 'red', 'gray']
     plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    sp.append_line_data(plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['color'] = plot_colors[plot_idx]
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
+    sp.assign_title('Spectrum in Each Quadrant', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Sorting Transmission Efficiency')
     
-    title_string = 'Spectrum in Each Quadrant'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Sorting Transmission Efficiency'
-    
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = 'sorting_trans_efficiency_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Sorting Transmission Efficiency Spectrum')
-    
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('sorting_trans_efficiency_spectra', job_idx)
+    return sp.fig, sp.ax
 
 def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, plot_wavelengths = None, ignore_opp_polarization = True):
     '''For the given job index, plots the E-norm f.p. image at specific input spectra, corresponding to that job.
@@ -1640,8 +1958,8 @@ def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, plot_wavelengths =
     
     if plot_wavelengths is None:
         # plot_wavelengths = [lambda_min_um, lambda_values_um[int(len(lambda_values_um/2))]lambda_max_um]
-        spectral_band_midpoints = np.multiply(num_points_per_band, np.arange(0.5, num_bands + 0.5))         # This fails if num_points_per_band and num_bands are different than what was optimized
-        plot_wavelengths = lambda_vectors[[int(g) for g in spectral_band_midpoints]]
+        spectral_band_midpoints = np.multiply(num_points_per_band, np.arange(0.5, num_bands + 0.5)).astype(int)         # This fails if num_points_per_band and num_bands are different than what was optimized
+        plot_wavelengths = np.array(wl_vector)[spectral_band_midpoints].tolist()
         
     plot_colors = ['blue', 'green', 'red', 'yellow']
     
@@ -1700,263 +2018,244 @@ def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, plot_wavelengths =
     
     return fig, ax
 
-def plot_device_transmission_spectrum(plot_data, job_idx):
-    '''For the given job index, plots the device transmission spectrum corresponding to that job.'''
+def plot_device_cross_section_spectrum(plot_data, job_idx, plot_wavelengths = None, ignore_opp_polarization = True):
+    '''For the given job index, plots the device cross section image plots at specific input spectra, corresponding to that job.'''
+    
     r_vectors = plot_data['r']
     f_vectors = plot_data['f']
+    lambda_vectors = plot_data['lambda']
+    wl_vector = np.squeeze(lambda_vectors[0]['var_values']).tolist()
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
-    
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
+    if plot_wavelengths is None:
+        # plot_wavelengths = [lambda_min_um, lambda_values_um[int(len(lambda_values_um/2))]lambda_max_um]
+        spectral_band_midpoints = np.multiply(num_points_per_band, np.arange(0.5, num_bands + 0.5)).astype(int)         # This fails if num_points_per_band and num_bands are different than what was optimized
+        plot_wavelengths = np.array(wl_vector)[spectral_band_midpoints].tolist()
         
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+    plot_colors = ['blue', 'green', 'red', 'yellow']
+    
+    if ignore_opp_polarization:
+        plot_wavelengths = plot_wavelengths[:-1]
+    
+    for device_cross_idx in range(0,6):
         
-        line_data['legend'] = f_vectors[plot_idx]['var_name']
-        
-        plot_config['lines'].append(line_data)
-        
-    
-    title_string = 'Device Transmission'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Device Transmission'
-    
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
+        #* Create E-norm images
+        for plot_wl in plot_wavelengths:
+            plot_wl = float(plot_wl)
+            
+            fig, ax = plt.subplots()
+            
+            is_x_slice = False
+            y_grid = r_vectors[device_cross_idx * 3 + 2]['var_values']                   # Plot the z-axis as the vertical
+            x_grid = r_vectors[device_cross_idx * 3]['var_values']                       # Check if it's the x-axis or y-axis that is the slice; plot the non-slice as the horizontal of the image plot
+            slice_val = r_vectors[device_cross_idx * 3 + 1]['var_values']
+            slice_str = f'$y = '
+            if isinstance(x_grid, (int, float)):
+                is_x_slice = True
+                x_grid = r_vectors[device_cross_idx * 3 + 1]['var_values']
+                slice_val = r_vectors[device_cross_idx * 3]['var_values']
+                slice_str = f'$x = '
+            slice_str +=  f'{slice_val:.2e}$; '
+            
+                
+            
+            wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
+            # plt.contour([np.squeeze(r_vectors[0]['var_values']), np.squeeze(r_vectors[1]['var_values'])], 
+            #             f_vectors[0]['var_values'][:,:,wl_index])
+            # plt.imshow(f_vectors[0]['var_values'][:,:,wl_index])
+            Y_grid, X_grid = np.meshgrid(np.squeeze(y_grid)*1e6, np.squeeze(x_grid)*1e6)
+            c = ax.pcolormesh(X_grid, Y_grid, 
+                              f_vectors[device_cross_idx * 2]['var_values'][:,:,wl_index],
+                            cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
+            plt.axhline(0,color='black', linestyle='-',linewidth=2.2)
+            plt.gca().set_aspect('auto')
+            
+            wl_str = f'{plot_wl*1e9:.0f} nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f} um'
+            title_string = r'$E_{norm}$' + ', Device Cross-Section:\n' + slice_str + '$\lambda = $ ' + f'{wl_str}'
+            plt.title(title_string)
+            plt.xlabel('y (um)' if is_x_slice else 'x (um)')
+            plt.ylabel('z (um)')
+            
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.25)
+            fig.colorbar(c, cax=cax)
+            
+            fig_width = 8.0
+            fig_height = fig_width / np.shape(X_grid)[0] * np.shape(X_grid)[1]
+            l = ax.figure.subplotpars.left
+            r = ax.figure.subplotpars.right
+            t = ax.figure.subplotpars.top
+            b = ax.figure.subplotpars.bottom
+            figw = float(fig_width)/(r-l)
+            figh = float(fig_height)/(t-b)
+            ax.figure.set_size_inches(figw, figh, forward=True)
+            plt.tight_layout()
+            
+            #plt.show(block=False)
+            #plt.show()
+            
+            plot_subfolder_name = 'device_cross_section_spectra'
+            if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
+                os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
+                
+            plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
+                + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '')\
+                + '_Enorm_' + f'{device_cross_idx}' + '_' + f'{wl_str}' + '.png',
+                bbox_inches='tight')
+            print(f'Exported: Device Cross Section Enorm Image {device_cross_idx} at wavelength ' + wl_str)
 
+        #* Create real_E_x images
+        display_vector_labels = ['x','y','z']
+        display_vector_component = 0            # 0 for x, 1 for y, 2 for z
+        
+        for display_vector_component in range(0,3):     # range(0,3):
+            for plot_wl in plot_wavelengths:
+                plot_wl = float(plot_wl)
+                
+                fig, ax = plt.subplots()
+                
+                is_x_slice = False
+                y_grid = r_vectors[device_cross_idx * 3 + 2]['var_values']                   # Plot the z-axis as the vertical
+                x_grid = r_vectors[device_cross_idx * 3]['var_values']                       # Check if it's the x-axis or y-axis that is the slice; plot the non-slice as the horizontal of the image plot
+                slice_val = r_vectors[device_cross_idx * 3 + 1]['var_values']
+                slice_str = f'$y = '
+                if isinstance(x_grid, (int, float)):
+                    is_x_slice = True
+                    x_grid = r_vectors[device_cross_idx * 3 + 1]['var_values']
+                    slice_val = r_vectors[device_cross_idx * 3]['var_values']
+                    slice_str = f'$x = '
+                slice_str +=  f'{slice_val:.2e}$; '
+                    
+                
+                wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
+                # plt.contour([np.squeeze(r_vectors[0]['var_values']), np.squeeze(r_vectors[1]['var_values'])], 
+                #             f_vectors[0]['var_values'][:,:,wl_index])
+                # plt.imshow(f_vectors[0]['var_values'][:,:,wl_index])
+                Y_grid, X_grid = np.meshgrid(np.squeeze(y_grid)*1e6, np.squeeze(x_grid)*1e6)
+                c = ax.pcolormesh(X_grid, Y_grid, 
+                                  np.real(f_vectors[device_cross_idx * 2 + 1]['var_values'][display_vector_component][:,:,wl_index]),
+                                cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
+                plt.axhline(0,color='black', linestyle='-',linewidth=2.2)
+                plt.gca().set_aspect('auto')
+                
+                wl_str = f'{plot_wl*1e9:.0f} nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f} um'
+                title_string = r'$Re(E_x)$' + ', Device Cross-Section:\n' + slice_str + '$\lambda = $ ' + f'{wl_str}'
+                plt.title(title_string)
+                plt.xlabel('y (um)' if is_x_slice else 'x (um)')
+                plt.ylabel('z (um)')
+                
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.25)
+                fig.colorbar(c, cax=cax)
+                
+                fig_width = 8.0
+                fig_height = fig_width / np.shape(X_grid)[0] * np.shape(X_grid)[1]
+                l = ax.figure.subplotpars.left
+                r = ax.figure.subplotpars.right
+                t = ax.figure.subplotpars.top
+                b = ax.figure.subplotpars.bottom
+                figw = float(fig_width)/(r-l)
+                figh = float(fig_height)/(t-b)
+                ax.figure.set_size_inches(figw, figh, forward=True)
+                plt.tight_layout()
+                
+                #plt.show(block=False)
+                #plt.show()
+                
+                plot_subfolder_name = 'device_cross_section_spectra'
+                if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
+                    os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
+                    
+                plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
+                    + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '')\
+                    + '_realE' + f'{display_vector_labels[display_vector_component]}' + '_' + f'{device_cross_idx}' + '_' + f'{wl_str}' + '.png',
+                    bbox_inches='tight')
+                print(f'Exported: Device Cross Section E{display_vector_labels[display_vector_component]}_real Image {device_cross_idx} at wavelength ' + wl_str)
+        
+        plt.close()
     
-    plot_subfolder_name = 'device_transmission_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Device Transmission Spectrum')
-    
-    plt.close()
+    gc.collect()
     
     return fig, ax
+
+def plot_src_spill_power_spectrum(plot_data, job_idx):
+    '''For the given job index, plots the sourcepower that misses the device corresponding to that job.'''
+    
+    sp = SpectrumPlot(plot_data)
+
+    plot_labels = ['Source Spill Power']
+    sp.append_line_data(plot_labels=plot_labels)
+    
+    sp.assign_title('Source Spill Power', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Power')
+    
+    sp.export_plot_config('src_spill_power_spectra', job_idx)
+    return sp.fig, sp.ax
+
+def plot_device_transmission_spectrum(plot_data, job_idx):
+    '''For the given job index, plots the device transmission spectrum corresponding to that job.'''
+    
+    sp = SpectrumPlot(plot_data)
+
+    sp.append_line_data()
+    
+    sp.assign_title('Device Transmission', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Device Transmission')
+    
+    sp.export_plot_config('device_transmission_spectra', job_idx)
+    return sp.fig, sp.ax
 
 def plot_overall_reflection_spectrum(plot_data, job_idx):
     '''For the given job index, plots the overall reflection spectrum corresponding to that job.'''
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
-    
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['legend'] = f_vectors[plot_idx]['var_name']
-        
-        plot_config['lines'].append(line_data)
-        
-    
-    title_string = 'Overall Device Reflection'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Overall Reflection'
-    
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
+    sp = SpectrumPlot(plot_data)
 
+    sp.append_line_data()
     
-    plot_subfolder_name = 'overall_reflection_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Overall Reflection Spectrum')
+    sp.assign_title('Overall Device Reflection', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Overall Reflection')
     
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('overall_reflection_spectra', job_idx)
+    return sp.fig, sp.ax
 
 def plot_side_power_spectrum(plot_data, job_idx):
     '''For the given job index, plots the device side scattering corresponding to that job.'''
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
-    
-    plot_labels = ['Device Transmission']
-    
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['legend'] = f_vectors[plot_idx]['var_name']
-        
-        plot_config['lines'].append(line_data)
-        
-    
-    title_string = 'Device Side Scattering'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Side Scattering Power'
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
+    sp = SpectrumPlot(plot_data)
 
+    sp.append_line_data()
     
-    plot_subfolder_name = 'side_power_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Side Scattering Power Spectrum')
+    sp.assign_title('Device Side Scattering', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Side Scattering Power')
     
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('side_power_spectra', job_idx)
+    return sp.fig, sp.ax
 
 def plot_focal_power_spectrum(plot_data, job_idx):
     '''For the given job index, plots the power falling on the desired focal region corresponding to that job.'''
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SpectrumPlot(plot_data)
+
+    sp.append_line_data()
     
-    plot_labels = ['Device Transmission']
+    sp.assign_title('Focal Region Power', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Focal Region Power')
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['legend'] = f_vectors[plot_idx]['var_name']
-        
-        plot_config['lines'].append(line_data)
-        
-    
-    title_string = 'Focal Region Power'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Focal Region Power'
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = 'focal_region_power_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Focal Region Power Spectrum')
-    
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('focal_region_power_spectra', job_idx)
+    return sp.fig, sp.ax
 
 def plot_oblique_scattering_spectrum(plot_data, job_idx, only_total = False):
     '''For the given job index, plots the oblique scattering corresponding to that job.'''
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
-    
+    sp = SpectrumPlot(plot_data)
+
     plot_labels = ['E', 'N', 'W', 'S', 'Total']
+    #sp.append_line_data(plot_labels=plot_labels)
     
     if only_total:
-        start_index = len(f_vectors)-1
+        start_index = len(sp.f_vectors)-1
     else:
         start_index = 0
-    for plot_idx in range(start_index, len(f_vectors)):
+    for plot_idx in range(start_index, len(sp.f_vectors)):
         line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
                      'y_axis': {'values': None, 'factor': 1, 'offset': 0},
                      'cutoff': None,
@@ -1966,225 +2265,62 @@ def plot_oblique_scattering_spectrum(plot_data, job_idx, only_total = False):
                      'marker_style': marker_style
                 }
         
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
+        line_data['x_axis']['values'] = sp.r_vectors[0]['var_values']
         line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
+        line_data['y_axis']['values'] = sp.f_vectors[plot_idx]['var_values']
         line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
         
         line_data['legend'] = 'Oblique Scattering ' + plot_labels[plot_idx]
         
-        plot_config['lines'].append(line_data)
-        
+        sp.plot_config['lines'].append(line_data)
     
-    title_string = 'Oblique Scattering'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Oblique Scattering', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Oblique Scattering Power')
     
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Oblique Scattering Power'
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-
-    
-    plot_subfolder_name = 'oblique_scatt_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Oblique Scattering Power Spectrum')
-    
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('oblique_scatt_spectra', job_idx)
+    return sp.fig, sp.ax
 
 def plot_scatter_plane_power_spectrum(plot_data, job_idx):
     '''For the given job index, plots the device transmission spectrum corresponding to that job.'''
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SpectrumPlot(plot_data)
+
+    sp.append_line_data()
     
-    plot_labels = ['Device Transmission']
+    sp.assign_title('Focal Scatter Plane Power', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Focal Scatter Plane Power')
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['legend'] = f_vectors[plot_idx]['var_name']
-        
-        plot_config['lines'].append(line_data)
-        
-    
-    title_string = 'Focal Scatter Plane Power'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Focal Scatter Plane Power'
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = 'scatter_plane_power'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Scatter Plane Power Spectrum')
-    
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('scatter_plane_power', job_idx)
+    return sp.fig, sp.ax
 
 def plot_exit_power_distribution_spectrum(plot_data, job_idx):
     '''For the given job index, plots the power spectrum for focal region power and oblique scattering power, corresponding to that job.
     The two are normalized against their sum.'''
     
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
-    
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
-    
-    plot_labels = ['Device Transmission']
-    
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['legend'] = f_vectors[plot_idx]['var_name']
-        
-        plot_config['lines'].append(line_data)
-        
-    
-    title_string = 'Power Distribution at Focal Plane'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Normalized Power'
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = 'exit_power_distribution_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Exit Power Distribution Spectrum')
-    
-    plt.close()
-    
-    return fig, ax
+    sp = SpectrumPlot(plot_data)
 
+    sp.append_line_data()
+    
+    sp.assign_title('Power Distribution at Focal Plane', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
+    
+    sp.export_plot_config('exit_power_distribution_spectra', job_idx)
+    return sp.fig, sp.ax
+        
 def plot_device_rta_spectrum(plot_data, job_idx):
     '''For the given job index, plots the device RTA and all power components in and out, corresponding to that job.
     The normalization factor is the power through the device input aperture.'''
     
-    r_vectors = plot_data['r']
-    f_vectors = plot_data['f']
+    sp = SpectrumPlot(plot_data)
+
+    sp.append_line_data()
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp.assign_title('Device RTA', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
     
-    plot_labels = ['Device Transmission']
-    
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
-        
-        line_data['x_axis']['values'] = r_vectors[0]['var_values']
-        line_data['x_axis']['factor'] = 1e6
-        line_data['y_axis']['values'] = f_vectors[plot_idx]['var_values']
-        line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        
-        line_data['legend'] = f_vectors[plot_idx]['var_name']
-        
-        plot_config['lines'].append(line_data)
-        
-    
-    title_string = 'Device RTA'
-    for sweep_param_value in list(sweep_parameters.values()):
-        current_value = sweep_param_value['var_values'][job_idx[2][0]]
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
-    plot_config['title'] = title_string
-    
-    plot_config['x_axis']['label'] = 'Wavelength (um)'
-    plot_config['y_axis']['label'] = 'Normalized Power'
-    
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = 'device_rta_spectra'
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + isolate_filename(job_names[job_idx]).replace('.fsp', '') + '.png',
-        bbox_inches='tight')
-    print('Exported: Device RTA Spectrum')
-    
-    plt.close()
-    
-    return fig, ax
+    sp.export_plot_config('device_rta_spectra', job_idx)
+    return sp.fig, sp.ax
+
 
 # -- Sweep Plot Functions (Overall)
 
@@ -2221,119 +2357,138 @@ def plot_sorting_eff_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D sorting efficiency plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
-    
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SweepPlot(plot_data, slice_coords)
     
     plot_colors = ['blue', 'green', 'red', 'gray']
     plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)-0):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 1.0,
-                     'legend': None,
-                     'marker_style': marker_style
-                }
+    # # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
+    # r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
+    # r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
+    # f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    
+    # fig, ax = plt.subplots()
+    # plot_config = {'title': None,
+    #                'x_axis': {'label':'', 'limits':[]},
+    #                'y_axis': {'label':'', 'limits':[]},
+    #                'lines': []
+    #             }
+    
+    # plot_colors = ['blue', 'green', 'red', 'gray']
+    # plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    # normalize_against_max = False
+    
+    # for plot_idx in range(0, len(f_vectors)-0):
+    #     line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+    #                  'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+    #                  'cutoff': None,
+    #                  'color': None,
+    #                  'alpha': 1.0,
+    #                  'legend': None,
+    #                  'marker_style': marker_style
+    #             }
         
         
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
+    #     y_plot_data = f_vectors[plot_idx]['var_values']
+    #     y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
+    #     y_plot_data = y_plot_data[tuple(slice_coords)]
         
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+    #     normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
+    #     line_data['y_axis']['values'] = y_plot_data / normalization_factor
+    #     line_data['x_axis']['values'] = r_vectors['var_values']
+    #     # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+    #     line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
         
-        line_data['color'] = plot_colors[plot_idx]
-        line_data['legend'] = plot_labels[plot_idx]
+    #     line_data['color'] = plot_colors[plot_idx]
+    #     line_data['legend'] = plot_labels[plot_idx]
         
-        plot_config['lines'].append(line_data)
+    #     plot_config['lines'].append(line_data)
         
         
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.3,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
+    #     if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
+    #         line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+    #                  'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+    #                  'cutoff': None,
+    #                  'color': None,
+    #                  'alpha': 0.3,
+    #                  'legend': '_nolegend_',
+    #                  'marker_style': dict(linestyle='-', linewidth=1.0)
+    #             }
         
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+    #         line_data_2['x_axis']['values'] = r_vectors['var_values']
+    #         line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+    #         # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+    #         line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])
             
-            colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-            line_data_2['color'] = colors_so_far[-1]
+    #         colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    #         line_data_2['color'] = colors_so_far[-1]
             
-            plot_config['lines'].append(line_data_2)
+    #         plot_config['lines'].append(line_data_2)
             
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Sorting Efficiency - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    #         line_data_3 = copy.deepcopy(line_data_2)
+    #         line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+    #         plot_config['lines'].append(line_data_3)
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Sorting Efficiency'
+    sp.assign_title('Sorting Efficiency - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Sorting Efficiency')
     
+    # title_string = 'Sorting Efficiency - Parameter Range:'
+    # for sweep_param_value in list(sweep_parameters.values()):
+    #     optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
+    #     title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
+    # plot_config['title'] = title_string
     
+    # sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
+    # plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
+    # plot_config['y_axis']['label'] = 'Sorting Efficiency'
     
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
+    sp.export_plot_config('sorting_eff_sweep_', slice_coords)
     
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'sorting_eff_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Sorting Efficiency Sweep: ' + create_parameter_filename_string(slice_coords))
+    # fig, ax = enter_plot_data_1d(plot_config, fig, ax)
     
-    return fig, ax
+    # plot_subfolder_name = ''
+    # if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
+    #     os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
+    # plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
+    #     + '/' + 'sorting_eff_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
+    #     bbox_inches='tight')
+    # print('Exported: Sorting Efficiency Sweep: ' + create_parameter_filename_string(slice_coords))
+    
+    return sp.fig, sp.ax
 
-# TODO: Edit contents to match
 def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D sorting (transmission) efficiency plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
-    
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SweepPlot(plot_data, slice_coords)
     
     plot_colors = ['blue', 'green', 'red', 'gray']
     plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
+    
+    sp.assign_title('Sorting Transmission Efficiency - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Sorting Transmission Efficiency')
+    
+    sp.export_plot_config('sorting_trans_eff_sweep_', slice_coords)
+    
+    return sp.fig, sp.ax
+
+def plot_sorting_meanband_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
+    '''Produces a 1D sorting (transmission) efficiency plot using given coordinates to slice the N-D array of data contained in plot_data.
+    Function is transmission averaged within the spectral band.
+    X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
+    
+    sp = SweepPlot(plot_data, slice_coords)
+    
+    plot_colors = ['blue', 'green', 'red', 'gray']
+    #plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    plot_labels = ['Blue', 'Green', 'Red']
     normalize_against_max = False
     
-    for plot_idx in range(0, len(f_vectors)-0):
+    # Here we have 9 f_vectors: B->{B,G,R}, G->{B,G,R}, R->{B,G,R}
+    # where for e.g. RB is the transmission of R quadrant within the B spectral band
+    for f_idx, plot_idx in enumerate([0, 4, 8]):  # Hard coded: corresponds to BB, GG, RR
         line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
                      'y_axis': {'values': None, 'factor': 1, 'offset': 0},
                      'cutoff': None,
@@ -2343,21 +2498,20 @@ def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = Tr
                      'marker_style': marker_style
                 }
         
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
+        y_plot_data = sp.f_vectors[plot_idx]['var_values']
         y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
         y_plot_data = y_plot_data[tuple(slice_coords)]
         
         normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
         line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
+        line_data['x_axis']['values'] = sp.r_vectors['var_values']
         # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
         line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+                
+        line_data['color'] = plot_colors[f_idx]
+        line_data['legend'] = plot_labels[f_idx]
         
-        line_data['color'] = plot_colors[plot_idx]
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
+        sp.plot_config['lines'].append(line_data)
         
         
         if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
@@ -2370,784 +2524,265 @@ def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = Tr
                      'marker_style': dict(linestyle='-', linewidth=1.0)
                 }
         
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+            line_data_2['x_axis']['values'] = sp.r_vectors['var_values']
+            line_data_2['y_axis']['values'] = (y_plot_data + sp.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
             # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
             line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])
             
             colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             line_data_2['color'] = colors_so_far[-1]
             
-            plot_config['lines'].append(line_data_2)
+            sp.plot_config['lines'].append(line_data_2)
             
             line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
+            line_data_3['y_axis']['values'] = (y_plot_data - sp.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+            sp.plot_config['lines'].append(line_data_3)
+    
+    
+    sp.assign_title('Sorting Transmission Efficiency (Mean In-Band) - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Sorting Transmission Efficiency')
+    
+    sp.export_plot_config('sorting_trans_eff_meanband_sweep_', slice_coords)
+    
+    return sp.fig, sp.ax
+
+def plot_sorting_contrastband_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = True, add_opp_polarizations=True):
+    '''Produces a 1D sorting (transmission) efficiency plot using given coordinates to slice the N-D array of data contained in plot_data.
+    Function is contrast i.e. average transmission within the corresponding spectral band, normalized against sum of noise i.e. other quadrants transmission within that same spectral band.
+    Mathematically, contrast_R = (T_good-T_bad)/(T_good+T_bad) where T_good = T_RR, T_bad = (T_RB+T_RG) ... where for e.g. RB is the transmission of R quadrant within the B spectral band
+    X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
+    
+    sp = SweepPlot(plot_data, slice_coords)
+    
+    plot_colors = ['blue', 'green', 'red', 'gray']
+    #plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    plot_labels = ['Blue', 'Green', 'Red']
+    normalize_against_max = False
+    
+    num_sweep_values = num_adjoint_sources if not add_opp_polarizations else num_bands
+    
+    # Here we have 9 f_vectors: B->{B,G,R}, G->{B,G,R}, R->{B,G,R}
+    # where for e.g. RB is the transmission of R quadrant within the B spectral band
+    for plot_idx in range(0, num_sweep_values):  
+        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+                     'cutoff': None,
+                     'color': None,
+                     'alpha': 1.0,
+                     'legend': None,
+                     'marker_style': marker_style
+                }
+        
+        # Get X_good, then X_bad is the sum of the other transmissions, then calculate contrast accordingly
+        f_idx = plot_idx*num_sweep_values + (plot_idx)
+        X_good = sp.f_vectors[f_idx]['var_values']
+        X_bad = -X_good
+        for bad_idx in range(plot_idx*num_sweep_values, (plot_idx+1)*num_sweep_values):
+            X_bad += sp.f_vectors[bad_idx]['var_values']
+        
+        y_plot_data = (X_good - X_bad)/(X_good + X_bad)
+        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
+        y_plot_data = y_plot_data[tuple(slice_coords)]
+        
+        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
+        line_data['y_axis']['values'] = y_plot_data / normalization_factor
+        line_data['x_axis']['values'] = sp.r_vectors['var_values']
+        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
+                
+        line_data['color'] = plot_colors[plot_idx]
+        line_data['legend'] = plot_labels[plot_idx]
+        
+        sp.plot_config['lines'].append(line_data)
+        
+        
+        if plot_stdDev and sp.f_vectors[plot_idx]['statistics'] in ['mean']:
+            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+                     'cutoff': None,
+                     'color': None,
+                     'alpha': 0.3,
+                     'legend': '_nolegend_',
+                     'marker_style': dict(linestyle='-', linewidth=1.0)
+                }
+        
+            line_data_2['x_axis']['values'] = sp.r_vectors['var_values']
+            line_data_2['y_axis']['values'] = (y_plot_data + sp.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])
             
-    title_string = 'Sorting Transmission Efficiency - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+            colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+            line_data_2['color'] = colors_so_far[-1]
+            
+            sp.plot_config['lines'].append(line_data_2)
+            
+            line_data_3 = copy.deepcopy(line_data_2)
+            line_data_3['y_axis']['values'] = (y_plot_data - sp.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+            sp.plot_config['lines'].append(line_data_3)
+            
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Sorting Transmission Efficiency'
+    sp.assign_title('Sorting Transmission Efficiency (Contrast) - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Sorting Trans.Eff. Contrast')
     
+    sp.export_plot_config('sorting_trans_eff_contrastband_sweep_', slice_coords)
     
+    return sp.fig, sp.ax
+
+def plot_src_spill_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
+    '''Produces a 1D source spill power plot using given coordinates to slice the N-D array of data contained in plot_data.
+    X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
+    sp = SweepPlot(plot_data, slice_coords)
     
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'sorting_trans_eff_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Sorting Transmission                        Efficiency Sweep: ' + create_parameter_filename_string(slice_coords))
+    plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    plot_labels = ['Source Spill Power']
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    return fig, ax
+    sp.assign_title('Source Spill Power - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Source Spill Power')
+    
+    sp.export_plot_config('src_spill_power_sweep_', slice_coords)
+    
+    return sp.fig, sp.ax
 
 def plot_device_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D device transmission plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
-    
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
-    
-    plot_labels = ['Device Transmission']
-    normalize_against_max = False
+    sp = SweepPlot(plot_data, slice_coords)
     
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    plot_labels = ['Device Transmission']
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-        
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Device Transmission - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Device Transmission - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Device Transmission')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Device Transmission'
+    sp.export_plot_config('dev_transmission_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'dev_transmission_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Device Transmission Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 def plot_overall_reflection_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D FDTD-region reflection plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
-    
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SweepPlot(plot_data, slice_coords)
     
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Overall Reflection']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Overall Device Reflection - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Overall Device Reflection - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Overall Reflection')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Overall Reflection'
+    sp.export_plot_config('overall_ref_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'overall_ref_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Overall Reflection Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 def plot_side_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D side scattering power plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    sp = SweepPlot(plot_data, slice_coords)
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Side Scattering E', 'Side Scattering N', 'Side Scattering W', 'Side Scattering S']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Side Scattering - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Side Scattering - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Side Scattering Power')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Side Scattering Power'
+    sp.export_plot_config('side_power_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'side_power_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Side Power Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 def plot_focal_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D focal region power plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
-    
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
+    sp = SweepPlot(plot_data, slice_coords)
     
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Focal Region Power']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Focal Region Power - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Focal Region Power - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Focal Region Power')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Focal Region Power'
+    sp.export_plot_config('focal_power_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'focal_power_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Focal Power Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 def plot_scatter_plane_power_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D scatter plane region power plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    sp = SweepPlot(plot_data, slice_coords)
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Scatter Plane Power']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Focal Plane Scattering Power - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Focal Plane Scattering Power - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Focal Plane Scattering Power')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Focal Plane Scattering Power'
+    sp.export_plot_config('focal_power_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'focal_power_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Focal Power Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 def plot_oblique_scattering_sweep_1d(plot_data, slice_coords, plot_stdDev = True, only_total = False):
     '''Produces a 1D oblique scattering power plot using given coordinates to slice the N-D array of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    sp = SweepPlot(plot_data, slice_coords)
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['E', 'N', 'W', 'S', 'Total']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    if only_total:
-        start_index = len(f_vectors)-1
-    else:
-        start_index = 0 
-    for plot_idx in range(start_index, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-
-        line_data['legend'] = 'Oblique Scattering ' + plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Oblique Scattering - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Oblique Scattering - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Oblique Scattering Power')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Oblique Scattering Power'
+    sp.export_plot_config('oblique_scatt_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'oblique_scatt_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Oblique Scattering Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 def plot_exit_power_distribution_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D power plot of focal plane power distribution using given coordinates to slice the N-D array 
     of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    sp = SweepPlot(plot_data, slice_coords)
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Focal Region Power', 'Oblique Scattering']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Power at Focal Plane - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Power at Focal Plane - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Normalized Focal Plane Power')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Normalized Focal Plane Power'
+    sp.export_plot_config('exit_power_dist_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'exit_power_dist_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Exit Power Distribution Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 def plot_device_rta_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     '''Produces a 1D power plot of device RTA using given coordinates to slice the N-D array 
     of data contained in plot_data.
     X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
     
-    # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
-    r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
-    r_vectors = list(plot_data['r'].values())[r_vector_value_idx]
-    f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    sp = SweepPlot(plot_data, slice_coords)
     
-    fig, ax = plt.subplots()
-    plot_config = {'title': None,
-                   'x_axis': {'label':'', 'limits':[]},
-                   'y_axis': {'label':'', 'limits':[]},
-                   'lines': []
-                }
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Device Reflection', 'Side Scattering E', 'Side Scattering N', 'Side Scattering W', 'Side Scattering S',
                    'Focal Region Power', 'Oblique Scattering Power', 'Absorbed Power']
-    normalize_against_max = False
+    sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
     
-    for plot_idx in range(0, len(f_vectors)):
-        line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                        'cutoff': None,
-                        'color': None,
-                        'alpha': 1.0,
-                        'legend': None,
-                        'marker_style': marker_style
-                }
-        
-        
-        y_plot_data = f_vectors[plot_idx]['var_values']
-        y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
-        y_plot_data = y_plot_data[tuple(slice_coords)]
-        
-        normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
-        line_data['y_axis']['values'] = y_plot_data / normalization_factor
-        line_data['x_axis']['values'] = r_vectors['var_values']
-        # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-        line_data['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + cutoff_1d_sweep_offset[1])
-
-        line_data['legend'] = plot_labels[plot_idx]
-        
-        plot_config['lines'].append(line_data)
-        
-        
-        if plot_stdDev and f_vectors[plot_idx]['statistics'] in ['mean']:
-            line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'y_axis': {'values': None, 'factor': 1, 'offset': 0},
-                     'cutoff': None,
-                     'color': None,
-                     'alpha': 0.1,
-                     'legend': '_nolegend_',
-                     'marker_style': dict(linestyle='-', linewidth=1.0)
-                }
-        
-            line_data_2['x_axis']['values'] = r_vectors['var_values']
-            line_data_2['y_axis']['values'] = (y_plot_data + f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
-            line_data_2['cutoff'] = slice(0 + cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + cutoff_1d_sweep_offset[1])        
-
-            line_data_2['color'] = plot_colors[plot_idx]
-            
-            plot_config['lines'].append(line_data_2)
-            
-            line_data_3 = copy.deepcopy(line_data_2)
-            line_data_3['y_axis']['values'] = (y_plot_data - f_vectors[plot_idx]['var_stdevs']) / normalization_factor
-            plot_config['lines'].append(line_data_3)
-            
-    title_string = 'Device RTA - Parameter Range:'
-    for sweep_param_value in list(sweep_parameters.values()):
-        optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-        title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
-    plot_config['title'] = title_string
+    sp.assign_title('Device RTA - Parameter Range:')
+    sp.assign_axis_labels(slice_coords, 'Normalized Power')
     
-    sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
-    plot_config['x_axis']['label'] = list(sweep_parameters.values())[sweep_variable_idx]['var_name']
-    plot_config['y_axis']['label'] = 'Normalized Power'
+    sp.export_plot_config('device_rta_sweep_', slice_coords)
     
-    
-    fig, ax = enter_plot_data_1d(plot_config, fig, ax)
-    
-    plot_subfolder_name = ''
-    if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
-        os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
-    plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
-        + '/' + 'device_rta_sweep_' + create_parameter_filename_string(slice_coords) + '.png',
-        bbox_inches='tight')
-    print('Exported: Device RTA Sweep: ' + create_parameter_filename_string(slice_coords))
-    
-    return fig, ax
+    return sp.fig, sp.ax
 
 # #
 # # Set up some numpy arrays to handle all the data we will pull out of the simulation.
@@ -3282,6 +2917,8 @@ for epoch in range(start_epoch, num_epochs):
                         change_source_beam_radius(variable_value)
                     elif variable_name in ['sidewall_thickness_um']:
                         change_sidewall_thickness(variable_value)
+                    elif variable_name in ['divergence_angle']:
+                        change_divergence_angle(variable_value)
                         
                     
                 for xy_idx in range(0, 1): # range(0,2) if considering source with both polarizations
@@ -3298,6 +2935,20 @@ for epoch in range(start_epoch, num_epochs):
                     print('Saved out ' + job_name)
                     job_names[('sweep', xy_idx, idx)
                                 ] = add_job(job_name, jobs_queue)
+                    
+                    # fdtd_hook.select('src_spill_monitor')
+                    # fdtd_hook.set('enabled', 1)
+                    # fdtd_hook.select('design_import')
+                    # fdtd_hook.set('enabled', 0)
+                    
+                    # job_name = 'sweep_job_nodev_' + \
+                    #     parameter_filename_string + '.fsp'
+                    # fdtd_hook.save(projects_directory_location +
+                    #                 "/optimization.fsp")
+                    # print('Saved out ' + job_name)
+                    # job_names[('nodev', xy_idx, idx)
+                    #             ] = add_job(job_name, jobs_queue)
+                    
 
                     
             run_jobs(jobs_queue)
@@ -3338,29 +2989,73 @@ for epoch in range(start_epoch, num_epochs):
                         
                     monitors_data = {}
                     # Add wavelength and sourcepower information, common to every monitor in a job
-                    monitors_data['wavelength'] = np.divide(3e8, fdtd_hook.getresult('transmission_focal_monitor_','f'))
+                    monitors_data['wavelength'] = np.divide(3e8, fdtd_hook.getresult('focal_monitor_0','f'))
                     monitors_data['sourcepower'] = get_sourcepower()
                     
                     # Go through each individual monitor and extract respective data
                     for monitor in monitors:
-                        monitor_data = {}
-                        monitor_data['name'] = monitor['name']
-                        monitor_data['save'] = monitor['save']
-                        
-                        if monitor['enabled'] and monitor['getFromFDTD']:
-                            monitor_data['E'] = get_efield_magnitude(monitor['name'])
-                            #monitor_data['E_alt'] = get_E
-                            monitor_data['P'] = get_overall_power(monitor['name'])
-                            monitor_data['T'] = get_transmission_magnitude(monitor['name'])
+                        if monitor['name'] not in ['src_spill_monitor']:
+                            monitor_data = {}
+                            monitor_data['name'] = monitor['name']
+                            monitor_data['save'] = monitor['save']
                             
-                            if monitor['name'] in ['spill_plane_monitor', 'scatter_plane_monitor',
-                                                   'transmission_monitor_0','transmission_monitor_1','transmission_monitor_2','transmission_monitor_3',
-                                                   'transmission_focal_monitor_']:
-                                monitor_data['coords'] = {'x': fdtd_hook.getresult(monitor['name'],'x'),
-                                                          'y': fdtd_hook.getresult(monitor['name'],'y'),
-                                                          'z': fdtd_hook.getresult(monitor['name'],'z')}
-                               
-                        monitors_data[monitor['name']] = monitor_data
+                            if monitor['enabled'] and monitor['getFromFDTD']:
+                                monitor_data['E'] = get_efield_magnitude(monitor['name'])
+                                #monitor_data['E_alt'] = get_E
+                                monitor_data['P'] = get_overall_power(monitor['name'])
+                                monitor_data['T'] = get_transmission_magnitude(monitor['name'])
+                                
+                                if monitor['name'] in ['spill_plane_monitor', 'scatter_plane_monitor',
+                                                    'transmission_monitor_0','transmission_monitor_1','transmission_monitor_2','transmission_monitor_3',
+                                                    'transmission_focal_monitor_',
+                                                    'device_xsection_monitor_0', 'device_xsection_monitor_1', 'device_xsection_monitor_2', 
+                                                    'device_xsection_monitor_3', 'device_xsection_monitor_4', 'device_xsection_monitor_5']:
+                                    monitor_data['coords'] = {'x': fdtd_hook.getresult(monitor['name'],'x'),
+                                                            'y': fdtd_hook.getresult(monitor['name'],'y'),
+                                                            'z': fdtd_hook.getresult(monitor['name'],'z')}
+                                
+                                if monitor['name'] in ['device_xsection_monitor_0', 'device_xsection_monitor_1', 'device_xsection_monitor_2', 
+                                                       'device_xsection_monitor_3', 'device_xsection_monitor_4', 'device_xsection_monitor_5']:
+                                    monitor_data['E_real'] = get_efield(monitor['name'])
+                                
+                            monitors_data[monitor['name']] = monitor_data
+                    
+                    # # Load also the corresponding job where the device is disabled, to measure spill power
+                    # if start_from_step == 0:
+                    #     fdtd_hook.load(
+                    #         job_names[('nodev', xy_idx, idx)])
+                    # else:
+                    #     # Extract filename, directly declare current directory address
+                    #     fdtd_hook.load(
+                    #         convert_root_folder(job_names[('nodev',xy_idx,idx)],
+                    #                             projects_directory_location)
+                    #     )
+                    
+                    # Go through each individual monitor and extract respective data
+                    for monitor in monitors:
+                        if monitor['name'] in ['src_spill_monitor']:
+                            monitor_data = {}
+                            monitor_data['name'] = monitor['name']
+                            monitor_data['save'] = monitor['save']
+                            
+                            if monitor['enabled'] and monitor['getFromFDTD']:
+                                monitor_data['E'] = get_efield_magnitude(monitor['name'])
+                                #monitor_data['E_alt'] = get_E
+                                monitor_data['P'] = get_overall_power(monitor['name'])
+                                monitor_data['T'] = get_transmission_magnitude(monitor['name'])
+                                
+                                if monitor['name'] in ['spill_plane_monitor', 'scatter_plane_monitor',
+                                                    'transmission_monitor_0','transmission_monitor_1','transmission_monitor_2','transmission_monitor_3',
+                                                    'transmission_focal_monitor_']:
+                                    monitor_data['coords'] = {'x': fdtd_hook.getresult(monitor['name'],'x'),
+                                                            'y': fdtd_hook.getresult(monitor['name'],'y'),
+                                                            'z': fdtd_hook.getresult(monitor['name'],'z')}
+                                
+                            monitors_data[monitor['name']] = monitor_data
+                    
+                    # Save out to a dictionary, using job_names as keys
+                    jobs_data[job_names[('sweep', xy_idx, idx)]] = monitors_data
+                    
                     
                     # Save out to a dictionary, using job_names as keys
                     jobs_data[job_names[('sweep', xy_idx, idx)]] = monitors_data
@@ -3403,15 +3098,28 @@ for epoch in range(start_epoch, num_epochs):
                             
                             if plot['name'] in ['sorting_efficiency']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
-                                    generate_sorting_eff_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=False)
+                                    generate_sorting_eff_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
                                     
                             elif plot['name'] in ['sorting_transmission']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
-                                    generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=False)
+                                    generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
+                                    
+                            elif plot['name'] in ['sorting_transmission_meanband', 'sorting_transmission_contrastband']:
+                                plot_data[plot['name']+'_sweep'] = \
+                                    generate_inband_val_sweep(monitors_data, plot['generate_plot_per_job'], 
+                                                                           statistics='mean', add_opp_polarizations=True)
                                     
                             elif plot['name'] in ['Enorm_focal_plane_image']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
                                     generate_Enorm_focal_plane(monitors_data, plot['generate_plot_per_job'])
+                                    
+                            elif plot['name'] in ['device_cross_section'] and sweep_parameter_value_array[idx][0] == angle_theta:
+                                plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+                                    generate_device_cross_section_spectrum(monitors_data, plot['generate_plot_per_job'])
+                            
+                            elif plot['name'] in ['src_spill_power']:
+                                plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+                                    generate_source_spill_power_spectrum(monitors_data, plot['generate_plot_per_job'])
                                 
                             elif plot['name'] in ['device_transmission']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
@@ -3442,6 +3150,7 @@ for epoch in range(start_epoch, num_epochs):
                                     generate_exit_power_distribution_spectrum(monitors_data, plot['generate_plot_per_job'])
                             
                             elif plot['name'] in ['device_rta']:
+                                print('ping')
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
                                     generate_device_rta_spectrum(monitors_data, plot['generate_plot_per_job'])
                                 
@@ -3450,17 +3159,18 @@ for epoch in range(start_epoch, num_epochs):
                         
             print("Completed Step 3: Processed and saved relevant plot data.")
             sys.stdout.flush()
-            
-            backup_all_vars()
-            
-            
-        #
-        # Step 4: Plot Sweeps across Jobs
-        #
         
-        if start_from_step == 0 or start_from_step == 4:
-            if start_from_step == 4:
-                load_backup_vars()
+        # TODO: Undo the link between Step 3 and 4
+        #     backup_all_vars()
+            
+            
+        # #
+        # # Step 4: Plot Sweeps across Jobs
+        # #
+        
+        # if start_from_step == 0 or start_from_step == 4:
+        #     if start_from_step == 4:
+        #         load_backup_vars()
             
             startTime = time.time()
             
@@ -3521,6 +3231,12 @@ for epoch in range(start_epoch, num_epochs):
             #
             # Step 4.1: Go through each job and export the spectra for that job
             #
+
+            # Purge the nodev job names
+            job_names_check = job_names.copy()
+            for job_idx, job_name in job_names_check.items():
+                if 'nodev' in job_name:
+                    job_names.pop(job_idx)
             
             for job_idx, job_name in job_names.items():
                 plot_data = plots_data[job_name]
@@ -3532,15 +3248,28 @@ for epoch in range(start_epoch, num_epochs):
                         continue
                         # if plot['name'] in ['sorting_efficiency']:
                         #     plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                            
+                        #     # continue
                         # elif plot['name'] in ['sorting_transmission']:
                         #     plot_sorting_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
                         # elif plot['name'] in ['Enorm_focal_plane_image']:
                         #     plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
-                        #                 plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]])
+                        #                 plot_wavelengths = None,
+                        #                 #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
+                        #                 ignore_opp_polarization=False)
                         #                 # Second part gets the wavelengths of each spectra where sorting eff. peaks
                         #     #continue
+                        
+                        # elif plot['name'] in ['device_cross_section']:
+                        #     plot_device_cross_section_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
+                        #                 plot_wavelengths = [4.6e-7,5.2e-7,6.1e-7],
+                        #                 #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
+                        #                 ignore_opp_polarization=False)
+                        #                 # Second part gets the wavelengths of each spectra where sorting eff. peaks
+                        #     #continue
+                        
+                        # elif plot['name'] in ['src_spill_power']:
+                        #     plot_src_spill_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                         
                         # elif plot['name'] in ['device_transmission']:
                         #     plot_device_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
@@ -3580,8 +3309,18 @@ for epoch in range(start_epoch, num_epochs):
                         # plot_sorting_eff_sweep(plots_data['sweep_plots'][plot['name']], 'phi')
                         plot_sorting_eff_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
                         
-                    if plot['name'] in ['sorting_transmission']:
+                    elif plot['name'] in ['sorting_transmission']:
                         plot_sorting_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
+                        
+                    elif plot['name'] in ['sorting_transmission_meanband']:
+                        plot_sorting_meanband_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], plot_stdDev=False)
+                    
+                    elif plot['name'] in ['sorting_transmission_contrastband']:
+                        plot_sorting_contrastband_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], 
+                                                                        add_opp_polarizations=True, plot_stdDev=False)
+                    
+                    elif plot['name'] in ['src_spill_power']:
+                        plot_src_spill_power_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], plot_stdDev=True)
                         
                     elif plot['name'] in ['device_transmission']:
                         plot_device_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], plot_stdDev=False)
