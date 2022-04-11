@@ -17,14 +17,14 @@ import json
 #
 #* Debug Options
 #
-running_on_local_machine = True	# False if running on slurm
+running_on_local_machine = False	# False if running on slurm
 if running_on_local_machine:	
     lumapi_filepath =  r"C:\Program Files\Lumerical\v212\api\python\lumapi.py"
 else:	
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 3    # 0 if running entire file in one shot
+start_from_step = 0    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -111,7 +111,7 @@ for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
 
 plots = sweep_settings['plots']
 
-cutoff_1d_sweep_offset = [1, 0]
+cutoff_1d_sweep_offset = [0, 0]
 #
 #* Lumerical Monitor Setup
 #

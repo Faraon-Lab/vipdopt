@@ -79,6 +79,12 @@
          "getFromFDTD": true,
          "save": false
        },
+       {"name": "src_spill_monitor",
+        "monitor type": "2D Z-normal",
+        "enabled": true,
+        "getFromFDTD": true,
+        "save": false
+      },
        {"name": "incident_aperture_monitor",
          "monitor type": "2D Z-normal",
          "enabled": true,
@@ -147,37 +153,37 @@
        },
        {"name": "device_xsection_monitor_0",
         "monitor type": "2D Y-normal",
-        "enabled": true,
+        "enabled": false,
         "getFromFDTD": true,
         "save": false
       },
        {"name": "device_xsection_monitor_1",
          "monitor type": "2D Y-normal",
-         "enabled": true,
+         "enabled": false,
          "getFromFDTD": true,
          "save": false
        },
        {"name": "device_xsection_monitor_2",
         "monitor type": "2D Y-normal",
-        "enabled": true,
+        "enabled": false,
         "getFromFDTD": true,
         "save": false
       },
       {"name": "device_xsection_monitor_3",
         "monitor type": "2D X-normal",
-        "enabled": true,
+        "enabled": false,
         "getFromFDTD": true,
         "save": false
       },
       {"name": "device_xsection_monitor_4",
         "monitor type": "2D X-normal",
-        "enabled": true,
+        "enabled": false,
         "getFromFDTD": true,
         "save": false
       },
       {"name": "device_xsection_monitor_5",
         "monitor type": "2D X-normal",
-        "enabled": true,
+        "enabled": false,
         "getFromFDTD": true,
         "save": false
       }
@@ -206,6 +212,10 @@
      },
      {"name": "device_cross_section",
        "enabled": false,
+       "generate_plot_per_job": true
+     },
+     {"name": "src_spill_power",
+       "enabled": true,
        "generate_plot_per_job": true
      },
      {"name": "device_transmission",

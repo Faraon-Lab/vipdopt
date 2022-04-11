@@ -778,6 +778,25 @@ def get_overall_power(monitor_name):
 
 #! Step 3 Functions
 
+def partition_bands(wavelength_vector, band_centers):
+    last_idx = len(wavelength_vector) - 1
+    
+    band_bounds = []
+    for b_idx in range(0, len(band_centers)-1):
+        band_bounds.append(np.average(np.array([band_centers[b_idx], band_centers[b_idx+1]])))
+    
+    band_idxs = []
+    for bound in band_bounds:
+        bound_idx = min(range(len(wavelength_vector)), key=lambda i: abs(wavelength_vector[i]-bound))
+        band_idxs.append(bound_idx)
+    
+    processed_band_idxs = [np.array([0, band_idxs[0]])]
+    for b_idx in range(0, len(band_idxs)-1):
+        processed_band_idxs.append(np.array([band_idxs[b_idx], band_idxs[b_idx + 1]]))
+    processed_band_idxs.append(np.array([band_idxs[-1], last_idx]))
+    
+    return processed_band_idxs
+
 def partition_scatter_plane_monitor(monitor_data, variable_indicator):
     '''The scatter plane monitor contains the overall focal plane monitor and its individual quadrants at the center. 
     This partitions off the data corresponding to the variable indicated, in the five squares, and returns them as output.'''
@@ -1041,29 +1060,36 @@ def generate_inband_val_sweep(monitors_data, produce_spectrum, statistics='peak'
     num_sweep_values = num_adjoint_sources if not add_opp_polarizations else num_bands
     
     # Splits entire spectrum into equal bands, gets indices of starts and ends
-    band_idxs = []
-    for inband_idx in range(0, num_sweep_values):
-        band_idxs.append((np.floor(len(r_vectors[0]['var_values'])/num_sweep_values) * 
-                            np.asarray([inband_idx, inband_idx+1]) - np.asarray([0, 1])).astype(int))
+    if band_idxs is None:
+        band_idxs = []
+        for inband_idx in range(0, num_sweep_values):
+            band_idxs.append((np.floor(len(r_vectors[0]['var_values'])/num_sweep_values) * 
+                                np.asarray([inband_idx, inband_idx+1]) - np.asarray([0, 1])).astype(int))
     
-    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics, band_idxs)
-    # for idx in range(0, num_sweep_values):
-    #     for inband_idx in range(0, num_sweep_values):
-    #         if statistics in ['peak']:
-    #             sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])]), key=(lambda x: x[1]))
-    #             sweep_stdev = 0
-                
-    #         else:
-    #             sweep_val = np.average(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
-    #             sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
-    #             sweep_stdev = np.std(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+    for idx in range(0, num_sweep_values):
         
+        # e.g. For B quadrant, get the peak in the B Spectral band
+        if statistics in ['peak']:
+                sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
+        
+        for inband_idx in range(0, num_sweep_values):
+            # e.g. For G quadrant, get the value at the peak in the B spectral band
+            if statistics in ['peak']:
+                # sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values'][slice(*band_idxs[idx])]), key=(lambda x: x[1]))
+                sweep_val = f_vectors[inband_idx]['var_values'][sweep_index]
+                sweep_stdev = 0
+                
+            else:
+                # TODO: Check that the mean is indeed taken in-band. Check band starts and band ends - a bit sus
+                sweep_val = np.average(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+                sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
+                sweep_stdev = np.std(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
           
-    #         sweep_values.append({'value': float(sweep_val),
-    #                         'index': sweep_index,
-    #                         'std_dev': sweep_stdev,
-    #                         'statistics': statistics
-    #                         })
+            sweep_values.append({'value': float(sweep_val),
+                            'index': sweep_index,
+                            'std_dev': sweep_stdev,
+                            'statistics': statistics
+                            })
     
     print('Picked mean transmission points, within band, for each quadrant to pass to sorting transmission variable sweep.')
     
@@ -1082,8 +1108,8 @@ def generate_device_transmission_spectrum(monitors_data, produce_spectrum, stati
                       'var_values': lambda_vector
                     })
     
-    #P_in = monitors_data['incident_aperture_monitor']['P']
-    P_in = monitors_data['sourcepower']
+    P_in = monitors_data['incident_aperture_monitor']['P']
+    # P_in = monitors_data['sourcepower'] - monitors_data['src_spill_monitor']['P']
     P_out = monitors_data['exit_aperture_monitor']['P']
     T_device = np.divide(P_out, P_in)
     f_vectors.append({'var_name': 'Device Transmission',
@@ -1217,11 +1243,11 @@ def generate_source_spill_power_spectrum(monitors_data, produce_spectrum, statis
                     })
     
     device_input_power = monitors_data['incident_aperture_monitor']['P']
-    spill_power = monitors_data['src_spill_monitor']['P']
+    spill_power = monitors_data['sourcepower'] - monitors_data['incident_aperture_monitor']['P']
     source_power = monitors_data['sourcepower']
     
     f_vectors.append({'var_name': 'Source Spill Power',
-                      'var_values': (spill_power - device_input_power) / source_power
+                      'var_values': spill_power / source_power
                     })
     
     if produce_spectrum:
@@ -1506,7 +1532,7 @@ def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='me
                     })
     
     sourcepower = monitors_data['sourcepower']
-    input_power = monitors_data['incident_aperture_monitor']['P'] # monitors_data['sourcepower']
+    input_power = monitors_data['incident_aperture_monitor']['P']
     
     R_power = np.reshape(1 - monitors_data['src_transmission_monitor']['T'],    (len(lambda_vector),1))
     R_power = R_power * monitors_data['sourcepower']
@@ -2580,6 +2606,16 @@ def plot_sorting_contrastband_transmission_sweep_1d(plot_data, slice_coords, plo
         for bad_idx in range(plot_idx*num_sweep_values, (plot_idx+1)*num_sweep_values):
             X_bad += sp.f_vectors[bad_idx]['var_values']
         
+        # Testing of contrast bug  
+        # t_idx = 34
+        # print(sweep_parameters['th']['var_values'][t_idx])
+        # print(f_vectors[6]['var_values'][t_idx])
+        # print(f_vectors[7]['var_values'][t_idx])
+        # print(f_vectors[8]['var_values'][t_idx])
+        # print(X_good[t_idx])
+        # print(X_bad[t_idx])
+        # print((X_good[t_idx]-X_bad[t_idx]) / (X_good[t_idx]+X_bad[t_idx]))
+        
         y_plot_data = (X_good - X_bad)/(X_good + X_bad)
         y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
         y_plot_data = y_plot_data[tuple(slice_coords)]
@@ -2924,6 +2960,8 @@ for epoch in range(start_epoch, num_epochs):
                 for xy_idx in range(0, 1): # range(0,2) if considering source with both polarizations
                     disable_all_sources()
                     disable_objects(disable_object_list)
+                    fdtd_hook.select('design_import')
+                    fdtd_hook.set('enabled', 1)
 
                     fdtd_hook.select(forward_sources[xy_idx]['name'])
                     fdtd_hook.set('enabled', 1)
@@ -2936,18 +2974,19 @@ for epoch in range(start_epoch, num_epochs):
                     job_names[('sweep', xy_idx, idx)
                                 ] = add_job(job_name, jobs_queue)
                     
-                    # fdtd_hook.select('src_spill_monitor')
-                    # fdtd_hook.set('enabled', 1)
-                    # fdtd_hook.select('design_import')
-                    # fdtd_hook.set('enabled', 0)
+                    # Disable design import and measure power that misses device
+                    fdtd_hook.select('src_spill_monitor')
+                    fdtd_hook.set('enabled', 1)
+                    fdtd_hook.select('design_import')
+                    fdtd_hook.set('enabled', 0)
                     
-                    # job_name = 'sweep_job_nodev_' + \
-                    #     parameter_filename_string + '.fsp'
-                    # fdtd_hook.save(projects_directory_location +
-                    #                 "/optimization.fsp")
-                    # print('Saved out ' + job_name)
-                    # job_names[('nodev', xy_idx, idx)
-                    #             ] = add_job(job_name, jobs_queue)
+                    job_name = 'sweep_job_nodev_' + \
+                        parameter_filename_string + '.fsp'
+                    fdtd_hook.save(projects_directory_location +
+                                    "/optimization.fsp")
+                    print('Saved out ' + job_name)
+                    job_names[('nodev', xy_idx, idx)
+                                ] = add_job(job_name, jobs_queue)
                     
 
                     
@@ -3015,25 +3054,26 @@ for epoch in range(start_epoch, num_epochs):
                                                             'z': fdtd_hook.getresult(monitor['name'],'z')}
                                 
                                 if monitor['name'] in ['device_xsection_monitor_0', 'device_xsection_monitor_1', 'device_xsection_monitor_2', 
-                                                       'device_xsection_monitor_3', 'device_xsection_monitor_4', 'device_xsection_monitor_5']:
+                                                        'device_xsection_monitor_3', 'device_xsection_monitor_4', 'device_xsection_monitor_5']:
                                     monitor_data['E_real'] = get_efield(monitor['name'])
                                 
                             monitors_data[monitor['name']] = monitor_data
                     
                     # # Load also the corresponding job where the device is disabled, to measure spill power
-                    # if start_from_step == 0:
-                    #     fdtd_hook.load(
-                    #         job_names[('nodev', xy_idx, idx)])
-                    # else:
-                    #     # Extract filename, directly declare current directory address
-                    #     fdtd_hook.load(
-                    #         convert_root_folder(job_names[('nodev',xy_idx,idx)],
-                    #                             projects_directory_location)
-                    #     )
+                    if start_from_step == 0:
+                        fdtd_hook.load(
+                            job_names[('nodev', xy_idx, idx)])
+                    else:
+                        # Extract filename, directly declare current directory address
+                        fdtd_hook.load(
+                            convert_root_folder(job_names[('nodev',xy_idx,idx)],
+                                                projects_directory_location)
+                        )
                     
                     # Go through each individual monitor and extract respective data
                     for monitor in monitors:
-                        if monitor['name'] in ['src_spill_monitor']:
+                        if monitor['name'] in ['incident_aperture_monitor',
+                                               'src_spill_monitor']:
                             monitor_data = {}
                             monitor_data['name'] = monitor['name']
                             monitor_data['save'] = monitor['save']
@@ -3052,9 +3092,6 @@ for epoch in range(start_epoch, num_epochs):
                                                             'z': fdtd_hook.getresult(monitor['name'],'z')}
                                 
                             monitors_data[monitor['name']] = monitor_data
-                    
-                    # Save out to a dictionary, using job_names as keys
-                    jobs_data[job_names[('sweep', xy_idx, idx)]] = monitors_data
                     
                     
                     # Save out to a dictionary, using job_names as keys
@@ -3105,9 +3142,12 @@ for epoch in range(start_epoch, num_epochs):
                                     generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
                                     
                             elif plot['name'] in ['sorting_transmission_meanband', 'sorting_transmission_contrastband']:
+                                band_idxs = partition_bands(monitors_data['wavelength'], [4.5e-7, 5.2e-7, 6.1e-7])
+                                
                                 plot_data[plot['name']+'_sweep'] = \
                                     generate_inband_val_sweep(monitors_data, plot['generate_plot_per_job'], 
-                                                                           statistics='mean', add_opp_polarizations=True)
+                                                                           statistics='mean', add_opp_polarizations=True,
+                                                                           band_idxs=band_idxs)
                                     
                             elif plot['name'] in ['Enorm_focal_plane_image']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
@@ -3150,7 +3190,6 @@ for epoch in range(start_epoch, num_epochs):
                                     generate_exit_power_distribution_spectrum(monitors_data, plot['generate_plot_per_job'])
                             
                             elif plot['name'] in ['device_rta']:
-                                print('ping')
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
                                     generate_device_rta_spectrum(monitors_data, plot['generate_plot_per_job'])
                                 
@@ -3235,7 +3274,7 @@ for epoch in range(start_epoch, num_epochs):
             # Purge the nodev job names
             job_names_check = job_names.copy()
             for job_idx, job_name in job_names_check.items():
-                if 'nodev' in job_name:
+                if 'nodev' in isolate_filename(job_name):
                     job_names.pop(job_idx)
             
             for job_idx, job_name in job_names.items():
@@ -3256,6 +3295,7 @@ for epoch in range(start_epoch, num_epochs):
                         #     plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
                         #                 plot_wavelengths = None,
                         #                 #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
+                        #                 #plot_wavelengths = [4.6e-7,5.2e-7, 6.1e-7]
                         #                 ignore_opp_polarization=False)
                         #                 # Second part gets the wavelengths of each spectra where sorting eff. peaks
                         #     #continue
