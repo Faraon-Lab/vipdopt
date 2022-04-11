@@ -67,10 +67,14 @@ def backup_all_vars(savefile_name=None, global_enabled=True):
         global my_shelf
         my_shelf = shelve.open(savefile_name,'n')
         for key in sorted(globals()):
-            if key not in ['my_shelf', 'forward_e_fields']:
+            if key not in ['my_shelf', 'forward_e_fields',
+                           'focal_e_data', 'focal_h_data',
+                           'mode_e_fields', 'mode_h_fields'
+                           'get_focal_e_data', 'get_focal_h_data',
+                           'get_mode_e_fields', 'get_mode_h_fields']:
                 try:
                     my_shelf[key] = globals()[key]
-                    print(key)
+                    #print(key)
                 except Exception as ex:
                     # __builtins__, my_shelf, and imported modules can not be shelved.
                     print('ERROR shelving: {0}'.format(key))
@@ -428,15 +432,35 @@ if start_from_step == 0:
     for adj_src_idx in range(0, num_adjoint_sources):
         adjoint_sources.append([])
         for xy_idx in range(0, 2):
-            adj_src = fdtd_hook.adddipole()
+            # adj_src = fdtd_hook.adddipole()
+            # adj_src['name'] = 'adj_src_' + str(adj_src_idx) + xy_names[xy_idx]
+            # adj_src['x'] = adjoint_x_positions_um[adj_src_idx] * 1e-6
+            # adj_src['y'] = adjoint_y_positions_um[adj_src_idx] * 1e-6
+            # adj_src['z'] = adjoint_vertical_um * 1e-6
+            # adj_src['theta'] = 90
+            # adj_src['phi'] = xy_pol_rotations[xy_idx]
+            # adj_src['wavelength start'] = lambda_min_um * 1e-6
+            # adj_src['wavelength stop'] = lambda_max_um * 1e-6
+            
+            adj_src = fdtd_hook.addgaussian()
             adj_src['name'] = 'adj_src_' + str(adj_src_idx) + xy_names[xy_idx]
+            adj_src['injection axis'] = 'z-axis'
+            adj_src['direction'] = 'Forward'
+            adj_src['polarization angle'] = xy_pol_rotations[xy_idx]  # degrees
+            adj_src['wavelength start'] = lambda_min_um * 1e-6
+            adj_src['wavelength stop'] = lambda_max_um * 1e-6
+            
             adj_src['x'] = adjoint_x_positions_um[adj_src_idx] * 1e-6
             adj_src['y'] = adjoint_y_positions_um[adj_src_idx] * 1e-6
             adj_src['z'] = adjoint_vertical_um * 1e-6
-            adj_src['theta'] = 90
-            adj_src['phi'] = xy_pol_rotations[xy_idx]
-            adj_src['wavelength start'] = lambda_min_um * 1e-6
-            adj_src['wavelength stop'] = lambda_max_um * 1e-6
+            adj_src['x span'] = 0.5 * device_size_lateral_um * 1e-6
+            adj_src['y span'] = 0.5 * device_size_lateral_um * 1e-6
+
+            adj_src["frequency dependent profile"] = 1
+            adj_src["number of field profile samples"] = 150
+            adj_src['beam parameters'] = 'Waist size and position'
+            adj_src['waist radius w0'] = adj_src_beam_rad * 1e-6
+            adj_src['distance from waist'] = 0
 
             adjoint_sources[adj_src_idx].append(adj_src)
     fdtd_objects['adjoint_sources'] = fdtd_simobject_to_dict(adjoint_sources)
@@ -568,7 +592,7 @@ if start_from_step == 0:
     print("Completed Step 0: Lumerical environment setup complete.")
     sys.stdout.flush()
     
-    backup_all_vars()
+    # backup_all_vars()
 
 
 #! Step 2 Functions 
@@ -672,13 +696,91 @@ def get_transmission_magnitude( monitor_name ):
     read_T = fdtd_hook.getresult( monitor_name, 'T' )
     return np.abs( read_T[ 'T' ] )
 
+def get_beamdata(src_name, field_indicator):
+    field_polarizations = [ field_indicator + 'x',
+                       field_indicator + 'y', field_indicator + 'z' ]
+    data_xfer_size_MB = 0
+    
+    def extract_lambda_matches(field_pol_old):
+        '''Wavelength matching - Getting the beam data in layout mode means that the wavelengths don't line up with what we've specified in params
+        e.g. Layout Mode vector has 150 λ values, new vector has 45 λ values'''
+        new_shape = list(field_pol_old.shape)[:-1] + [num_design_frequency_points]
+        field_pol_new = np.zeros(new_shape, dtype=np.complex)
+        
+        for j, wl in enumerate(lambda_values_um):
+            old_spectral_idx = min(range(len(field_dataset['lambda'])), 
+                                           key=lambda i: abs(field_dataset['lambda'][i] - lambda_values_um[j]*1e-6))
+            field_pol_new[:,:,:,j] = field_pol_old[:,:,:,old_spectral_idx]
+            
+        return field_pol_new
+    
+
+    start = time.time()
+    
+    field_dataset = fdtd_hook.getresult( src_name, 'fields' )        # dictionary with keys ['lambda', 'f', 'x', 'y', 'z', 'E', 'H', 'Lumerical_dataset']
+                                                                     # the 'E' item has shape (nx, ny, nz, nλ, 3)
+    field_pol_0 = field_dataset[field_indicator][:,:,:,:, 0]
+    field_pol_0 = extract_lambda_matches(field_pol_0)           # Correct wavelength mismatch 
+    data_xfer_size_MB += field_pol_0.nbytes / ( 1024. * 1024. )
+
+    total_field = np.zeros( [ len (field_polarizations ) ] + 
+                        list( field_pol_0.shape ), dtype=np.complex )
+    total_field[ 0 ] = field_pol_0
+
+    for pol_idx in range( 1, len( field_polarizations ) ):
+        field_pol = field_dataset[field_indicator][:,:,:,:, pol_idx]
+        field_pol = extract_lambda_matches(field_pol)
+        data_xfer_size_MB += field_pol.nbytes / ( 1024. * 1024. )
+
+        total_field[ pol_idx ] = field_pol
+
+    elapsed = time.time() - start
+
+    date_xfer_rate_MB_sec = data_xfer_size_MB / elapsed
+    log_file = open( projects_directory_location + "/log.txt", 'a' )
+    log_file.write( "Transferred " + str( data_xfer_size_MB ) + " MB\n" )
+    log_file.write( "Data rate = " + str( date_xfer_rate_MB_sec ) + " MB/sec\n\n" )
+    log_file.close()
+    
+    return total_field
+
+def get_hfield_mode(src_name):
+    return get_beamdata( src_name, 'H' )
+
+def get_efield_mode(src_name):
+    return get_beamdata( src_name, 'E' )
+
+
+def poynting_flux(E, H, total_surface_area, real_e_h = True, dot_dS = True, pauseDebug=False):
+    '''Calculates the expression \int (E x H).dS which, for E: Electric field; H: Magnetic field, is the Poynting flux.
+    Assumes a regular and uniform mesh size throughout.'''
+    
+    # E, H should have shape (3, nx, ny, nz, nλ）
+    
+    if pauseDebug:
+        print('3')
+    
+    # Get the cross product of E and H along the axis that defines the last axis of the cross product
+    integral = np.cross(E, H, axis=0)            # shape: (3, nx, ny, nz)
+    if real_e_h:
+        integral = np.real(integral)
+    # Do the dot product, i.e. take the z (normal)-component; 
+    if dot_dS:
+        integral = integral[2]                       # shape: (nx, ny, nz)
+    # then integrate by summing everything and multiplying by S
+    integral = np.sum(integral, (0,1,2)) * total_surface_area
+    
+    return integral
 
 #
 #* Set up some numpy arrays to handle all the data we will pull out of the simulation.
 #
 forward_e_fields = {}                       # Records E-fields throughout device volume
-focal_data = {}                             # Records E-fields at focal plane spots (locations of adjoint sources)
+focal_e_data = {}                           # Records E-fields at focal plane quadrants (locations of adjoint sources) for forward source
+focal_h_data = {}                           # Records H-fields at focal plane quadrants (locations of adjoint sources) for forward source
 quadrant_transmission_data = {}             # Records transmission through each quadrant
+mode_e_fields = {}                          # Records E-field profiles at focal plane quadrants 
+mode_h_fields = {}                          # Records H-field profiles at focal plane quadrants 
 
 # Stores various types of information for each epoch and iteration:
 figure_of_merit_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
@@ -691,6 +793,7 @@ max_design_variable_change_evolution = np.zeros((num_epochs, num_iterations_per_
 transmission_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4))
 transmission_by_wl_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
 intensity_fom_by_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
+mode_overlap_fom_by_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
 
 step_size_start = 1.
 
@@ -791,6 +894,7 @@ else:
         
     if start_from_step != 0:
         load_backup_vars()
+        #pass
 
     #
     #* Run the optimization
@@ -824,7 +928,7 @@ else:
             #
 
             if start_from_step == 0 or start_from_step == 1:
-                if start_from_step == 1:
+                if start_from_step != 0:
                     load_backup_vars()
             
                 print("Beginning Step 1: Forward and Adjoint Optimizations")
@@ -853,18 +957,45 @@ else:
                                 str( xy_idx ) + "_" + str( dispersive_range_idx ) + '.fsp'
                         fdtd_hook.save( projects_directory_location + "/optimization.fsp" )
                         job_names[ ('forward', xy_idx, dispersive_range_idx)] = add_job( job_name, jobs_queue )
-
-
+                    
+                    for xy_idx in range(0,2):
+                        # Easier to initialize in a separate loop
+                        mode_e_fields[xy_names[xy_idx]] = [
+                            None for idx in range( 0, num_focal_spots ) ]
+                        mode_h_fields[xy_names[xy_idx]] = [
+                            None for idx in range( 0, num_focal_spots ) ]
+                    
                     for adj_src_idx in range(0, num_adjoint_sources):
                         for xy_idx in range(0, 2):
                             disable_all_sources()
 
-                            fdtd_hook.select( adjoint_sources[adj_src_idx][xy_idx]['name'] )
-                            fdtd_hook.set( 'enabled', 1 )
+                            for not_adj_src_idx in range(0, num_adjoint_sources):
+                                if not_adj_src_idx != adj_src_idx:
+                                    fdtd_hook.select( adjoint_sources[not_adj_src_idx][xy_idx]['name'] )
+                                    fdtd_hook.set( 'enabled', 1 )
+                                    
+                                    # Aim down and push above focal plane a bit
+                                    fdtd_hook.set('z', -focal_length_um + mesh_spacing_um*5)
+                                    fdtd_hook.set('direction', 'Backward')
 
                             job_name = 'adjoint_job_' + str( adj_src_idx ) + '_' + str( xy_idx ) + '_' + str( dispersive_range_idx ) + '.fsp'
                             fdtd_hook.save( projects_directory_location + "/optimization.fsp" )
                             job_names[ ( 'adjoint', adj_src_idx, xy_idx, dispersive_range_idx ) ] = add_job( job_name, jobs_queue )
+                            
+                            # Pull out adjoint source, user-defined mode data: Em, Hm
+                            mode_e_fields[xy_names[xy_idx]][adj_src_idx] = get_efield_mode(adjoint_sources[adj_src_idx][xy_idx]['name'])
+                            print(f'Accessed mode E-field data over focal quadrant {adj_src_idx}.')
+                            
+                            mode_h_fields[xy_names[xy_idx]][adj_src_idx] = get_hfield_mode(adjoint_sources[adj_src_idx][xy_idx]['name'])
+                            print(f'Accessed mode E-field data over focal quadrant {adj_src_idx}.')
+                            
+                            # Set direction back to upwards, restore z position to focal plane
+                            for not_adj_src_idx in range(0, num_adjoint_sources):
+                                if not_adj_src_idx != adj_src_idx:
+                                    fdtd_hook.select( adjoint_sources[not_adj_src_idx][xy_idx]['name'] )
+                                    fdtd_hook.set('z', adjoint_vertical_um)
+                                    fdtd_hook.set('direction', 'Forward')
+                            
 
 
                 run_jobs( jobs_queue )
@@ -879,16 +1010,23 @@ else:
             #
 
             if start_from_step == 0 or start_from_step == 2:
-                if start_from_step == 2:
+                if start_from_step != 0:
                     load_backup_vars()
             
                 print("Beginning Step 2: Computing Figure of Merit")
                 sys.stdout.flush()
+                starttime=time.time()
                 
                 for xy_idx in range(0, 2):
-                    focal_data[xy_names[xy_idx]] = [
+                    focal_e_data[xy_names[xy_idx]] = [
+                            None for idx in range( 0, num_focal_spots ) ]
+                    focal_h_data[xy_names[xy_idx]] = [
                             None for idx in range( 0, num_focal_spots ) ]
                     quadrant_transmission_data[xy_names[xy_idx]] = [ 
+                            None for idx in range( 0, num_focal_spots ) ]
+                    mode_e_fields[xy_names[xy_idx]] = [
+                            None for idx in range( 0, num_focal_spots ) ]
+                    mode_h_fields[xy_names[xy_idx]] = [
                             None for idx in range( 0, num_focal_spots ) ]
 
                 for dispersive_range_idx in range( 0, num_dispersive_ranges ):
@@ -920,13 +1058,38 @@ else:
                                     # fwd_e_fields has shape (3, nx, ny, nz, nλ)
                                     forward_e_fields[xy_names[xy_idx]][ :, :, :, :, spectral_idx ] = fwd_e_fields[ :, :, :, :, spectral_idx ]
 
-                        # Populate arrays with adjoint source E-field and quadrant transmission info
+                        # Populate arrays with adjoint source E-field, adjoint source H-field and quadrant transmission info
                         for adj_src_idx in dispersive_range_to_adjoint_src_map[ dispersive_range_idx ]:					
-                            focal_data[xy_names[xy_idx]][ adj_src_idx ] = get_efield(focal_monitors[adj_src_idx]['name'])
-                            print(f'Accessed adjoint E-field data at focal spot {adj_src_idx}.')
+                            focal_e_data[xy_names[xy_idx]][ adj_src_idx ] = get_efield(transmission_monitors[adj_src_idx]['name'])
+                            print(f'Accessed adjoint E-field data over focal quadrant {adj_src_idx}.')
+                            
+                            # NOTE: If you want focal_h_data['x'] to be an ndarray, it must be initialized as np.empty above.
+                            focal_h_data[xy_names[xy_idx]][ adj_src_idx ] = get_hfield(transmission_monitors[adj_src_idx]['name'])
+                            print(f'Accessed adjoint H-field data over focal quadrant {adj_src_idx}.')
 
                             quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = get_transmission_magnitude(transmission_monitors[adj_src_idx]['name'])
                             print(f'Accessed transmission data for quadrant {adj_src_idx}.')
+
+                            # # * OLD METHOD: Accessing source mode data by extracting from completed adjoint simulations
+                            # # for adj_src_idx in range(0, num_adjoint_sources):
+                            # lookup_dispersive_range_idx = adjoint_src_to_dispersive_range_map[ adj_src_idx ]
+                            # actual_filepath = convert_root_folder(job_names[ ( 'adjoint', adj_src_idx, xy_idx, lookup_dispersive_range_idx ) ], actual_directory)
+                            # #fdtd_hook.load( job_names[ ( 'forward', xy_idx, dispersive_range_idx ) ] )
+                            # print(f'Loading: {isolate_filename(actual_filepath)}')
+                            # fdtd_hook.load(actual_filepath)
+                            # #fdtd_hook.load( job_names[ ( 'adjoint', adj_src_idx, xy_idx, lookup_dispersive_range_idx ) ] )
+                            # #print('Loading .fsp file: '+job_names[('adjoint', adj_src_idx, xy_idx, lookup_dispersive_range_idx)])
+                            # #sys.stdout.flush()
+                            
+                            
+                            # mode_e_fields[xy_names[xy_idx]][adj_src_idx] = get_efield(transmission_monitors[adj_src_idx]['name'])
+                            # print(f'Accessed mode E-field data over focal quadrant {adj_src_idx}.')
+                            
+                            # mode_h_fields[xy_names[xy_idx]][adj_src_idx] = get_hfield(transmission_monitors[adj_src_idx]['name'])
+                            # print(f'Accessed mode E-field data over focal quadrant {adj_src_idx}.')
+                            
+                endtime=time.time()
+                print(f'Loading data took: {(endtime-starttime)/60} min.')               
 
 
                 # These arrays record intensity and transmission FoMs for all focal spots
@@ -935,6 +1098,7 @@ else:
                 # These arrays record the same, but for each wavelength
                 transmission_by_wavelength = np.zeros(num_design_frequency_points)
                 intensity_fom_by_wavelength = np.zeros(num_design_frequency_points)
+                mode_overlap_fom_by_wavelength = np.zeros(num_design_frequency_points)
 
                 for focal_idx in range(0, num_focal_spots):             # For each focal spot:
                     compute_fom = 0
@@ -943,8 +1107,11 @@ else:
                     polarizations = polarizations_focal_plane_map[focal_idx]    # choose which polarization(s) are directed to this focal spot
 
                     for polarization_idx in range(0, len(polarizations)):
-                        get_focal_data = focal_data[polarizations[polarization_idx]]                                    # shape: (#focalspots, 3, nx, ny, nz, nλ)
+                        get_focal_e_data = focal_e_data[polarizations[polarization_idx]]                                # shape: (#focalspots, 3, nx, ny, nz, nλ)
+                        get_focal_h_data = focal_h_data[polarizations[polarization_idx]]                                # shape: (#focalspots, 3, nx, ny, nz, nλ)
                         get_quad_transmission_data = quadrant_transmission_data[polarizations[polarization_idx]]        # shape: (#focalspots, nλ)
+                        get_mode_e_fields = mode_e_fields[polarizations[polarization_idx]]                              # shape: (#focalspots, 3, nx, ny, nz, nλ)
+                        get_mode_h_fields = mode_h_fields[polarizations[polarization_idx]]                              # shape: (#focalspots, 3, nx, ny, nz, nλ)
 
                         max_intensity_weighting = max_intensity_by_wavelength[spectral_focal_plane_map[focal_idx][0] : spectral_focal_plane_map[focal_idx][1] : 1]
                         # Use the max_intensity_weighting to renormalize the intensity distribution used to calculate the FoM
@@ -965,21 +1132,45 @@ else:
                                         get_quad_transmission_data[focal_idx][spectral_focal_plane_map[focal_idx][0] + spectral_idx] / \
                                                 one_over_weight_focal_plane_map_performance_weighting
                             
-                            #* Intensity FoM Calculation: FoM = |E(x_0)|^2                 
-                            # \text{FoM}_{\text{intensity}} = \sum_i^{} \left{ \sum_\lambda^{} w_{\text{rejection}}(\lambda) w_{f_i}
-                            # \frac{\left|E_{f_i}(\lambda)\right|^2}{I_{\text{norm, Airy}}}
-                            # https://i.imgur.com/5jcN01k.png
+                            # # Intensity FoM Calculation: FoM = |E(x_0)|^2                 
+                            # # \text{FoM}_{\text{intensity}} = \sum_i^{} \left{ \sum_\lambda^{} w_{\text{rejection}}(\lambda) w_{f_i}
+                            # # \frac{\left|E_{f_i}(\lambda)\right|^2}{I_{\text{norm, Airy}}}
+                            # # https://i.imgur.com/5jcN01k.png
+                            # compute_fom += weight_spectral_rejection * np.sum(
+                            #     (
+                            #         np.abs(get_focal_e_data[focal_idx][:, 0, 0, 0, spectral_focal_plane_map[focal_idx][0] + spectral_idx])**2 /
+                            #         total_weighting[spectral_idx]
+                            #     )
+                            # )
+                            
+                            #* Mode Overlap FoM Calculation:                 
+                            # \text{FoM}_{\text{m.o.}} = \sum_i^{} \left{ \sum_\lambda^{} w_{\text{rejection}}(\lambda) w_{f_i} 
+                            # \frac{1/8}{I_{\text{norm, Airy}}} 
+                            # \frac{\left| \int \textbf{E} \times\overline{\textbf{H}_m} \cdot d\textbf{S} + \int \overline{\textbf{E}_m} \times \textbf{H} \cdot d\textbf{S} \right|^2}
+                            # {\int Re\left( \textbf{E}_m \times\overline{\textbf{H}_m} \right)\cdot d\textbf{S}}
+                            # https://i.imgur.com/fCI56r1.png
+                            
+                            
+                            
+                            fom_integral_1 = poynting_flux(get_focal_e_data[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
+                                                  np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
+                                                  (0.5*device_size_lateral_um)**2)
+                            fom_integral_2 = poynting_flux(np.conj(get_mode_e_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
+                                                  get_focal_h_data[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
+                                                  (0.5*device_size_lateral_um)**2)
+                            fom_integral_3 = poynting_flux(get_mode_e_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
+                                                  np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
+                                                  (0.5*device_size_lateral_um)**2, real_e_h = True)
+                            
                             compute_fom += weight_spectral_rejection * np.sum(
-                                (
-                                    np.abs(get_focal_data[focal_idx][:, 0, 0, 0, spectral_focal_plane_map[focal_idx][0] + spectral_idx])**2 /
-                                    total_weighting[spectral_idx]
-                                )
+                                    1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / fom_integral_3
+                                           ) / total_weighting[spectral_idx]
                             )
 
                             # Records intensity FOM per wavelength
                             intensity_fom_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * np.sum(
                                 (
-                                    np.abs(get_focal_data[focal_idx][:, 0, 0, 0, spectral_focal_plane_map[focal_idx][0] + spectral_idx])**2 /
+                                    np.abs(get_focal_e_data[focal_idx][:, 0, 0, 0, spectral_focal_plane_map[focal_idx][0] + spectral_idx])**2 /
                                     total_weighting[spectral_idx]
                                 )
                             )
@@ -987,6 +1178,12 @@ else:
                             transmission_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * \
                                     get_quad_transmission_data[focal_idx][spectral_focal_plane_map[focal_idx][0] + spectral_idx] / \
                                         one_over_weight_focal_plane_map_performance_weighting
+                            
+                            # Records mode overlap FOM per wavelength
+                            mode_overlap_fom_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * np.sum(
+                                    1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / fom_integral_3
+                                           ) / total_weighting[spectral_idx]
+                            )
 
                     figure_of_merit_per_focal_spot.append(compute_fom)
                     transmission_per_quadrant.append(compute_transmission_fom)
@@ -998,7 +1195,8 @@ else:
                 # Copy everything so as not to disturb the original data
                 process_fom_per_focal_spot = figure_of_merit_per_focal_spot.copy()
                 process_transmission_per_quadrant = transmission_per_quadrant.copy()
-                process_fom_by_wavelength = intensity_fom_by_wavelength.copy()
+                # process_fom_by_wavelength = intensity_fom_by_wavelength.copy()
+                process_fom_by_wavelength = mode_overlap_fom_by_wavelength.copy()
                 process_transmission_by_wavelength = transmission_by_wavelength.copy()
                 if do_rejection:        # softplus each array
                     for idx in range( 0, len( figure_of_merit_per_focal_spot ) ):
@@ -1033,6 +1231,7 @@ else:
                 transmission_by_focal_spot_evolution[epoch, iteration] = transmission_per_quadrant
                 transmission_by_wl_evolution[epoch, iteration] = transmission_by_wavelength
                 intensity_fom_by_wavelength_evolution[epoch, iteration] = intensity_fom_by_wavelength
+                mode_overlap_fom_by_wavelength_evolution[epoch, iteration] = mode_overlap_fom_by_wavelength
 
                 np.save(projects_directory_location + "/figure_of_merit.npy", figure_of_merit_evolution)
                 np.save(projects_directory_location + "/figure_of_merit_by_wl.npy", figure_of_merit_by_wl_evolution)
@@ -1046,24 +1245,39 @@ else:
                 print("Completed Step 2: Saved out figures of merit.")
                 sys.stdout.flush()
                 
-                gc.collect()
-                np.save(projects_directory_location + '/fwd_e_x.npy', forward_e_fields['x'])
-                np.save(projects_directory_location + '/fwd_e_y.npy', forward_e_fields['y'])
-                gc.collect()
-                backup_all_vars()
-                gc.collect()
+                # starttime=time.time()
+                # gc.collect()
+                # np.save(projects_directory_location + '/fwd_e_x.npy', forward_e_fields['x'])
+                # np.save(projects_directory_location + '/fwd_e_y.npy', forward_e_fields['y'])
+                # np.save(projects_directory_location + '/focal_e_x.npy', focal_e_data['x'])
+                # np.save(projects_directory_location + '/focal_e_x.npy', focal_e_data['y'])
+                # np.save(projects_directory_location + '/focal_h_x.npy', focal_h_data['x'])
+                # np.save(projects_directory_location + '/focal_h_x.npy', focal_h_data['y'])
+                # endtime=time.time()
+                # print(f'Saving data took: {(endtime-starttime)/60} min.')    
+                # gc.collect()
+                # backup_all_vars()
+                # gc.collect()
+                # endtime=time.time()
+                # print(f'Saving data took: {(endtime-starttime)/60} min.')    
                 
             #
             # Step 3: Run all the adjoint optimizations for both x- and y-polarized adjoint sources and use the results to compute the
             # gradients for x- and y-polarized forward sources.
             #
             
-            if start_from_step == 0 or start_from_step == 3:
-                if start_from_step == 3:
-                    load_backup_vars()
-                    forward_e_fields = {}
-                    forward_e_fields['x'] = np.load(projects_directory_location + '/fwd_e_x.npy')
-                    forward_e_fields['y'] = np.load(projects_directory_location + '/fwd_e_y.npy')
+            if True:# start_from_step == 0 or start_from_step == 3:
+                # if start_from_step != 0:
+                #     load_backup_vars()
+                #     forward_e_fields = {}
+                #     forward_e_fields['x'] = np.load(projects_directory_location + '/fwd_e_x.npy')
+                #     forward_e_fields['y'] = np.load(projects_directory_location + '/fwd_e_y.npy')
+                #     focal_e_data = {}
+                #     focal_e_data['x'] = np.load(projects_directory_location + '/focal_e_x.npy')
+                #     focal_e_data['y'] = np.load(projects_directory_location + '/focal_e_y.npy')
+                #     focal_h_data = {}
+                #     focal_h_data['x'] = np.load(projects_directory_location + '/focal_h_x.npy')
+                #     focal_h_data['y'] = np.load(projects_directory_location + '/focal_h_y.npy')
             
                 print("Beginning Step 3: Adjoint Optimization Jobs")
                 sys.stdout.flush()
@@ -1094,6 +1308,7 @@ else:
 
                     # Store the design E-field for the adjoint simulations
                     adjoint_e_fields = []
+                    starttime = time.time()
                     for xy_idx in range(0, 2):
                         #
                         # This is ok because we are only going to be using the spectral idx corresponding to this range in the summation below
@@ -1109,17 +1324,52 @@ else:
 
                         adjoint_e_fields.append(
                             get_efield(design_efield_monitor['name']))
-
+                    endtime=time.time()
+                    print(f'Loading data took: {(endtime-starttime)/60} min.')
+                    
                     for pol_idx in range(0, len(polarizations)):
                         pol_name = polarizations[pol_idx]
-                        get_focal_data = focal_data[pol_name]                           # Get E-field at adjoint source for each polarization
+                        get_focal_e_data = focal_e_data[pol_name]                           # Get E-field at adjoint source for each polarization
+                        get_focal_h_data = focal_h_data[pol_name]                           # Get H-field at adjoint source for each polarization
+                        get_mode_e_fields = mode_e_fields[pol_name]                         # Get E-field at device for each polarization, given adjoint source
+                        get_mode_h_fields = mode_h_fields[pol_name]                         # Get H-field at device for each polarization, given adjoint source
                         pol_name_to_idx = polarization_name_to_idx[pol_name]
 
                         for xy_idx in range(0, 2):
                             #* Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with direction along the polarization
                             # This is going to be the amplitude of the dipole-adjoint source driven at the focal plane
-                            source_weight = np.squeeze(np.conj(
-                                get_focal_data[adj_src_idx][xy_idx, 0, 0, 0, spectral_indices[0] : spectral_indices[1] : 1]))
+                            
+                            # Create a normal z-vector
+                            # normal_vector = [0,0,1]     #NOTE: This is fine, this works in np.cross()
+                            #normal_vector = np.ones(np.shape(get_focal_h_data[adj_src_idx]))
+                            normal_vector = np.zeros(np.shape(get_focal_h_data[adj_src_idx]))
+                            normal_vector[2] = np.ones(np.shape(normal_vector[2]))
+                            mu_0 = 1.25663706 * 1e-6
+                            
+                            adjoint_integral_1 = poynting_flux(get_focal_e_data[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
+                                                               np.conj(get_mode_h_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
+                                                               (0.5*device_size_lateral_um)**2)
+                            adjoint_integral_2 = poynting_flux(np.conj(get_mode_e_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
+                                                               get_focal_h_data[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
+                                                               (0.5*device_size_lateral_um)**2)
+                            adjoint_integral_3 = poynting_flux(get_mode_e_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
+                                                               np.conj(get_mode_h_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
+                                                               (0.5*device_size_lateral_um)**2, real_e_h=True)
+                            # TODO: 
+                            adjoint_A_factor = 1/4 * np.conj(adjoint_integral_1 + adjoint_integral_2) / (adjoint_integral_3)
+                            print("Calculated adjoint A factor.")
+                            sys.stdout.flush()
+                                        
+                            
+                            source_weight =  np.squeeze(adjoint_A_factor) 
+                                # * (
+                                # poynting_flux(np.conj(get_focal_h_data[adj_src_idx][:, :,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
+                                #               normal_vector[:, :,:,:, spectral_indices[0] : spectral_indices[1] : 1], 
+                                #               (0.5*device_size_lateral_um)**2, dot_dS = False, pauseDebug=False) - 
+                                # poynting_flux(normal_vector[:, :,:,:, spectral_indices[0] : spectral_indices[1] : 1],
+                                #               np.conj(get_focal_e_data[adj_src_idx][:, :,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
+                                #               (0.5*device_size_lateral_um)**2, dot_dS = False, pauseDebug=False) / mu_0
+                                # ))
 
 
                             #
@@ -1155,12 +1405,14 @@ else:
                                     gradient_performance_weight *= spectral_focal_plane_map_directional_weights[ adj_src_idx ][ spectral_idx ]
 
                                 # See Eqs. (5), (6) of Lalau-Keraly et al: https://doi.org/10.1364/OE.21.021693
+                                print(f'Spectral idx is: {spectral_idx}')
+                                sys.stdout.flush()
                                 gradient_component = np.sum(
                                     (source_weight[spectral_idx] *                                                      # Amplitude of electric dipole at x_0
                                      gradient_performance_weight / total_weighting[spectral_idx]) *                     # Performance weighting, Manual override weighting, and intensity normalization factors
                                     adjoint_e_fields[xy_idx][:, :, :, :, spectral_indices[0] + spectral_idx] *          # E-field induced at x from electric dipole at x_0
                                     forward_e_fields[pol_name][:, :, :, :, spectral_indices[0] + spectral_idx],         # E_old(x)
-                                    axis=0)                                                                             # Sum across λ 
+                                    axis=0)                                                                             # Dot product
 
                                 # Permittivity factor in amplitude of electric dipole at x_0
                                 # Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)
@@ -1173,16 +1425,16 @@ else:
                 print("Completed Step 3: Retrieved Adjoint Optimization results and calculated gradient.")
                 sys.stdout.flush()
                 
-                backup_all_vars()
+                # backup_all_vars()
                 
                 
             #
             # Step 4: Step the design variable.
             #
 
-            if start_from_step == 0 or start_from_step == 4:
-                if start_from_step == 4:
-                    load_backup_vars()
+            # if start_from_step == 0 or start_from_step == 4:
+            #     if start_from_step != 0:
+            #         load_backup_vars()
             
                 print("Beginning Step 4: Stepping Design Variable.")
                 sys.stdout.flush()
@@ -1235,6 +1487,7 @@ else:
                         # Divides step size by 2 until the difference in the design variable is within the ranges set.
                         
                         proposed_design_variable = cur_design_variable + step_size * design_gradient
+                        # proposed_design_variable = cur_design_variable - step_size * design_gradient
                         proposed_design_variable = np.maximum(                                  # Makes sure that it's between 0 and 1
                                                     np.minimum(
                                                         proposed_design_variable,
@@ -1270,6 +1523,7 @@ else:
                 # Feed proposed design variable into bayer filter, run it through filters and update permittivity
                 # -device gradient because the step() function has a - sign instead of a +
                 bayer_filter.step(-device_gradient, step_size)
+                # bayer_filter.step(+device_gradient, step_size)
                 cur_design_variable = bayer_filter.get_design_variable()
                 cur_design = bayer_filter.get_permittivity()
 

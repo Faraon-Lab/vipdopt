@@ -14,7 +14,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 1 	# 0 if running entire file in one shot
+start_from_step = 0 	# 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -29,7 +29,7 @@ else:
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/sony"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/sony"
     
-project_name_init = 'test_fom_dev'
+project_name_init = 'test_fom_th0'
 project_name = 'angInc_sony_' + project_name_init
 
 # project_name_init = 'normal_sony_baseline_2p091x2p091x2p04um_40layer_feature_p051um_f1p53um'
@@ -127,8 +127,8 @@ dispersive_ranges_um = [
 #
 #* FDTD
 #
-vertical_gap_size_um = geometry_spacing_um * 15
-lateral_gap_size_um = geometry_spacing_um * 10
+vertical_gap_size_um = geometry_spacing_um * 6 #15
+lateral_gap_size_um = geometry_spacing_um * 4 #10
 
 fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
 fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + device_size_lateral_um
@@ -145,7 +145,7 @@ lateral_aperture_um = 1.1 * device_size_lateral_um
 src_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um * 2. / 3.
 src_minimum_vertical_um = -focal_length_um - 0.5 * vertical_gap_size_um
 
-src_beam_rad = device_size_lateral_um/2
+src_beam_rad = 0.5 * device_size_lateral_um
 src_angle_incidence = 0 # degrees
 src_phi_incidence = 0 # degrees
 
@@ -165,6 +165,8 @@ num_focal_spots = 4
 num_adjoint_sources = num_focal_spots
 adjoint_x_positions_um = [device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4., device_size_lateral_um / 4.]
 adjoint_y_positions_um = [device_size_lateral_um / 4., device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4.]
+
+adj_src_beam_rad = 0.5 * (0.5*device_size_lateral_um)
 
 # An array of dispersive ranges, that maps each dispersive range to one or more adjoint sources. 
 dispersive_range_to_adjoint_src_map = [
