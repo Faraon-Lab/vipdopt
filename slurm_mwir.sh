@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --time=167:00:00
+#SBATCH --time=72:00:00
 #SBATCH --nodes=10
 #SBATCH --ntasks-per-node=8
 #SBATCH --qos=normal
 #SBATCH --mem-per-cpu=8G
-#SBATCH --comment="SONY th0 case, Area FoM Test."
+#SBATCH --comment="SONY divAng13, th0 - v2"
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=END
 

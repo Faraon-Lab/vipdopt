@@ -70,14 +70,14 @@ def backup_all_vars(savefile_name=None, global_enabled=True):
             if key not in ['my_shelf', 'forward_e_fields']:
                 try:
                     my_shelf[key] = globals()[key]
-                    print(key)
+                    #print(key)
                 except Exception as ex:
                     # __builtins__, my_shelf, and imported modules can not be shelved.
-                    print('ERROR shelving: {0}'.format(key))
-                    template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-                    message = template.format(type(ex).__name__, ex.args)
-                    print(message)
-                    #pass
+                    #print('ERROR shelving: {0}'.format(key))
+                    #template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+                    #message = template.format(type(ex).__name__, ex.args)
+                    #print(message)
+                    pass
         my_shelf.close()
         
         
@@ -110,9 +110,9 @@ def load_backup_vars(loadfile_name = None):
             try:
                 globals()[key]=my_shelf[key]
             except Exception as ex:
-                print('ERROR retrieving shelf: {0}'.format(key))
-                print("An exception of type {0} occurred. Arguments:\n{1!r}".format(type(ex).__name__, ex.args))
-                #pass
+                #print('ERROR retrieving shelf: {0}'.format(key))
+                #print("An exception of type {0} occurred. Arguments:\n{1!r}".format(type(ex).__name__, ex.args))
+                pass
     my_shelf.close()
     
     # Restore lumapi SimObjects as dictionaries
@@ -406,15 +406,16 @@ if start_from_step == 0:
         forward_src["frequency dependent profile"] = 1
         forward_src["number of field profile samples"] = 150
         forward_src['beam parameters'] = 'Waist size and position'
-        forward_src['waist radius w0'] = src_beam_rad * 1e-6
-        forward_src['distance from waist'] = 0
+        forward_src['waist radius w0'] = 3e8/np.mean(3e8/np.array([lambda_min_um, lambda_max_um])) / (np.pi*background_index*np.radians(src_div_angle)) * 1e-6
+        forward_src['distance from waist'] = -(src_maximum_vertical_um - device_size_vertical_um) * 1e-6
         # forward_src['beam parameters'] = 'Beam size and divergence angle'
-        # forward_src['beam radius wz'] = 100*1e-6
-        # forward_src['divergence angle'] = 3.42365 # degrees
-        # forward_src['beam radius wz'] = src_beam_rad*1e-6
-        # forward_src['divergence angle'] = 0.5 * \
-        #     (lambda_min_um+lambda_max_um)*1e-6/(np.pi*src_beam_rad)*(180/np.pi)
-        # forward_src['beam radius wz'] = src_beam_rad
+        # forward_src['divergence angle'] = src_div_angle # degrees
+        
+        # # Adjust Gaussian source height such that the beam waist is directly on device surface
+        # forward_src['z'] = device_size_vertical_um*1e-6 + fdtd_hook.getnamed(forward_src['name'], 'distance from waist')
+        # # Adjust FDTD region to encompass source
+        # fdtd_region_maximum_vertical_um = forward_src['z']/1e-6 + vertical_gap_size_um
+        # fdtd['z max'] = fdtd_region_maximum_vertical_um * 1e-6
 
         forward_sources.append(forward_src)
     fdtd_objects['forward_sources'] = fdtd_simobject_to_dict(forward_sources)
@@ -894,7 +895,9 @@ else:
                 for dispersive_range_idx in range( 0, num_dispersive_ranges ):
                     for xy_idx in range(0, 2):
                         # TODO: Undo this bit when no longer build-testing
-                        actual_directory = r'C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mode Overlap FoM\fom_dev\angInc_sony_test_fom_dev'
+                        if running_on_local_machine:
+                            actual_directory = os.path.join(projects_directory_location_init, '/test_dev')
+                        else:   actual_directory = projects_directory_location
                         actual_filepath = convert_root_folder(job_names[ ( 'forward', xy_idx, dispersive_range_idx )], actual_directory)
                         #fdtd_hook.load( job_names[ ( 'forward', xy_idx, dispersive_range_idx ) ] )
                         print(f'Loading: {isolate_filename(actual_filepath)}')

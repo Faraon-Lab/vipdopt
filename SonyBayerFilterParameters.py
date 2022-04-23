@@ -7,14 +7,14 @@ import numpy as np
 #
 #* Debug Options
 #
-running_on_local_machine = True	# False if running on slurm
+running_on_local_machine = False	# False if running on slurm
 if running_on_local_machine:	
     lumapi_filepath =  r"C:\Program Files\Lumerical\v212\api\python\lumapi.py"
 else:	
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 1 	# 0 if running entire file in one shot
+start_from_step = 0 	# 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -22,14 +22,14 @@ shelf_fn = 'save_state'
 #* Files
 #
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mode Overlap FoM\fom_dev"
+    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v1] gaussian_params\dev\divAng13_th0"
     projects_directory_location = projects_directory_location_init          # Change if necessary to differentiate  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/sony"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/sony"
     
-project_name_init = 'test_fom_dev'
+project_name_init = 'divAng13_v2_th0'
 project_name = 'angInc_sony_' + project_name_init
 
 # project_name_init = 'normal_sony_baseline_2p091x2p091x2p04um_40layer_feature_p051um_f1p53um'
@@ -148,6 +148,7 @@ src_minimum_vertical_um = -focal_length_um - 0.5 * vertical_gap_size_um
 src_beam_rad = device_size_lateral_um/2
 src_angle_incidence = 0 # degrees
 src_phi_incidence = 0 # degrees
+src_div_angle = 13.13 # degrees
 
 src_hgt_Si = 0
 src_hgt_polymer = 0
@@ -188,8 +189,8 @@ if enforce_xy_gradient_symmetry:
     assert ( int( device_size_lateral_um / geometry_spacing_um ) % 2 ) == 1, "We should have an odd number of deisgn voxels across for this operation"
 
 
-num_epochs = 1 #10
-num_iterations_per_epoch = 1 #30
+num_epochs = 10
+num_iterations_per_epoch = 30
 
 use_fixed_step_size = False
 fixed_step_size = 2.0
