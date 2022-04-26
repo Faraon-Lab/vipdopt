@@ -7,7 +7,7 @@ import numpy as np
 #
 #* Debug Options
 #
-running_on_local_machine = False	# False if running on slurm
+running_on_local_machine = True	# False if running on slurm
 if running_on_local_machine:	
     lumapi_filepath =  r"C:\Program Files\Lumerical\v212\api\python\lumapi.py"
 else:	
@@ -76,7 +76,7 @@ num_vertical_layers = 40
 vertical_layer_height_um = 0.051
 vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_um )
 
-device_size_lateral_um = geometry_spacing_um * 41
+device_size_lateral_um = geometry_spacing_um * 40 #41
 device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
 
 device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
@@ -102,7 +102,7 @@ lambda_max_um = 0.725
 bandwidth_um = lambda_max_um - lambda_min_um
 
 num_bands = 3
-num_points_per_band = 15
+num_points_per_band = 30
 num_design_frequency_points = num_bands * num_points_per_band
 lambda_values_um = np.linspace(lambda_min_um, lambda_max_um, num_design_frequency_points)
 
@@ -185,7 +185,7 @@ adjoint_src_to_dispersive_range_map = [
 #* Optimization
 #
 
-enforce_xy_gradient_symmetry = True
+enforce_xy_gradient_symmetry = False
 if enforce_xy_gradient_symmetry:
     assert ( int( device_size_lateral_um / geometry_spacing_um ) % 2 ) == 1, "We should have an odd number of deisgn voxels across for this operation"
 

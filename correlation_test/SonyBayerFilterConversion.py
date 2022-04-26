@@ -459,8 +459,8 @@ if start_from_step == 0:
             adj_src['x'] = adjoint_x_positions_um[adj_src_idx] * 1e-6
             adj_src['y'] = adjoint_y_positions_um[adj_src_idx] * 1e-6
             adj_src['z'] = adjoint_vertical_um * 1e-6
-            adj_src['x span'] = 0.5*geometry_spacing_um*40*1e-6 # 0.5 * device_size_lateral_um * 1e-6
-            adj_src['y span'] = 0.5*geometry_spacing_um*40*1e-6 # 0.5 * device_size_lateral_um * 1e-6
+            adj_src['x span'] = 1.5*geometry_spacing_um*40*1e-6 # 0.5 * device_size_lateral_um * 1e-6
+            adj_src['y span'] = 1.5*geometry_spacing_um*40*1e-6 # 0.5 * device_size_lateral_um * 1e-6
 
             adj_src["frequency dependent profile"] = 1
             adj_src["number of field profile samples"] = 150
@@ -718,11 +718,12 @@ def get_beamdata(src_name, field_indicator):
     
     def extract_lambda_matches(field_pol_old):
         '''Wavelength matching - Getting the beam data in layout mode means that the wavelengths don't line up with what we've specified in params
-        e.g. Layout Mode vector has 150 λ values, new vector has 45 λ values'''
+        e.g. Layout Mode vector has 150 equal frequency values, new vector has 45 equal λ values'''
         new_shape = list(field_pol_old.shape)[:-1] + [num_design_frequency_points]
         field_pol_new = np.zeros(new_shape, dtype=np.complex)
         
         for j, wl in enumerate(lambda_values_um):
+            # Matches wl to the closest value in field_dataset['lambda'] (which is c/field_dataset['f']) and finds the corresponding index.
             old_spectral_idx = min(range(len(field_dataset['lambda'])), 
                                            key=lambda i: abs(field_dataset['lambda'][i] - lambda_values_um[j]*1e-6))
             field_pol_new[:,:,:,j] = field_pol_old[:,:,:,old_spectral_idx]
@@ -760,11 +761,30 @@ def get_beamdata(src_name, field_indicator):
     return total_field
 
 def get_hfield_mode(src_name):
-    return get_beamdata( src_name, 'H' )
+    beam_field = get_beamdata(src_name, 'H')
+    return truncate_adj_src_field(beam_field, src_name)
 
 def get_efield_mode(src_name):
-    return get_beamdata( src_name, 'E' )
+    beam_field = get_beamdata(src_name, 'E')
+    return truncate_adj_src_field(beam_field, src_name)
 
+def truncate_adj_src_field(total_field, src_name):
+    '''The source must have span larger than the quadrant it belongs in in order to avoid cut-off errors in simulation. This will crop the field to the right dimensions.'''
+    # total_field has shape (3, nx, ny, nz, nλ)
+    
+    field_dataset = fdtd_hook.getresult( src_name, 'fields' )        # dictionary with keys ['lambda', 'f', 'x', 'y', 'z', 'E', 'H', 'Lumerical_dataset']
+                                                                     # the 'E' item has shape (nx, ny, nz, nλ, 3)
+    field_x = field_dataset['x']
+    field_y = field_dataset['y']
+    
+    x_min_idx = min(range(len(field_x)), key=lambda i: abs(field_x[i,0] - fdtd_hook.getnamed(transmission_monitor_focal['name'], 'x min')))
+    y_min_idx = min(range(len(field_y)), key=lambda i: abs(field_y[i,0] - fdtd_hook.getnamed(transmission_monitor_focal['name'], 'y min')))
+    x_max_idx = min(range(len(field_x)), key=lambda i: abs(field_x[i] - fdtd_hook.getnamed(transmission_monitor_focal['name'], 'x max')))
+    y_max_idx = min(range(len(field_y)), key=lambda i: abs(field_y[i] - fdtd_hook.getnamed(transmission_monitor_focal['name'], 'y max')))
+    #print(f'Src Name: {src_name}, X: {x_min_idx}, {x_max_idx}; Y: {y_min_idx}, {y_max_idx}')
+    
+    total_field_2 = total_field[:,x_min_idx:x_max_idx, y_min_idx:y_max_idx, :,:]
+    return total_field_2
 
 def poynting_flux(E, H, total_surface_area, real_e_h = True, dot_dS = True, pauseDebug=False):
     '''Calculates the expression \int (E x H).dS which, for E: Electric field; H: Magnetic field, is the Poynting flux.
@@ -778,16 +798,21 @@ def poynting_flux(E, H, total_surface_area, real_e_h = True, dot_dS = True, paus
     # Get the cross product of E and H along the axis that defines the last axis of the cross product
     print(f'E has shape: {np.shape(E)}')         # TODO: Here the shape is (3,61,61,1)
     print(f'H has shape: {np.shape(H)}')         # TODO: Here the shape is (3,63,63,1)
-    H = H[:,0:61,0:61,:]                         # TODO: Get rid of this / fix this! This is only a quick stopgap for back compatibility
+    e_max_len = max(np.shape(E))
+    h_max_len = max(np.shape(H))
+    if e_max_len < h_max_len:
+        H = H[:,0:e_max_len, 0:e_max_len,:]
+    else:
+        E = E[:,0:h_max_len, 0:h_max_len,:]         # TODO: Get rid of this / fix this! This is only a quick stopgap for back compatibility
     # TODO: Source of the problem is that device_size_lateral_um = geometry_spacing*41 but transmission monitors are geometry_spacing*40
-    print(f'H has shape: {np.shape(H)}')
+    print(f'Amended. E has shape: {np.shape(E)} and H has shape: {np.shape(H)}')
     
     integral = np.cross(E, H, axis=0)            # shape: (3, nx, ny, nz)
     if real_e_h:
         integral = np.real(integral)
-    # Do the dot product, i.e. take the z (normal)-component; 
+    # Do the dot product with dS = -z, i.e. take the z (normal)-component; 
     if dot_dS:
-        integral = integral[2]                       # shape: (nx, ny, nz)
+        integral = -integral[2]                       # shape: (nx, ny, nz)
     # then integrate by summing everything and multiplying by S
     integral = np.sum(integral, (0,1,2)) * total_surface_area
     
@@ -973,11 +998,17 @@ else:
 
                         fdtd_hook.select( forward_sources[xy_idx]['name'] )
                         fdtd_hook.set( 'enabled', 1 )
+                        
+                        for adj_src_idx in range(0, num_adjoint_sources):
+                            fdtd_hook.select( adjoint_sources[adj_src_idx][xy_idx]['name'] )
+                            fdtd_hook.set('z', (-focal_length_um + mesh_spacing_um*5)*1e-6)
+                            fdtd_hook.set('direction', 'Backward')
 
                         job_name = 'forward_job_' + \
                                 str( xy_idx ) + "_" + str( dispersive_range_idx ) + '.fsp'
                         fdtd_hook.save( projects_directory_location + "/optimization.fsp" )
                         job_names[ ('forward', xy_idx, dispersive_range_idx)] = add_job( job_name, jobs_queue )
+                        
                     
                     for xy_idx in range(0,2):
                         # Easier to initialize in a separate loop
@@ -989,29 +1020,45 @@ else:
                     for adj_src_idx in range(0, num_adjoint_sources):
                         for xy_idx in range(0, 2):
                             disable_all_sources()
+                            
+                            fdtd_hook.select( adjoint_sources[adj_src_idx][xy_idx]['name'] )
+                            fdtd_hook.set( 'enabled', 1 )
+                            fdtd_hook.set('z', (-focal_length_um + mesh_spacing_um*0)*1e-6)
+                            fdtd_hook.set('direction', 'Backward')       # Correct orientation
+                            # fdtd_hook.set('direction', 'Forward')        # Wrong, but all this does is add a minus sign and phase that should be 0 at the injection plane anyway
 
-                            for not_adj_src_idx in range(0, num_adjoint_sources):
-                                if not_adj_src_idx != adj_src_idx:
-                                    fdtd_hook.select( adjoint_sources[not_adj_src_idx][xy_idx]['name'] )
-                                    fdtd_hook.set( 'enabled', 1 )
-                                    
-                                    # Aim down and push above focal plane a bit
-                                    fdtd_hook.set('z', (-focal_length_um + mesh_spacing_um*5)*1e-6)
-                                    fdtd_hook.set('direction', 'Backward')
+                            # for not_adj_src_idx in range(0, num_adjoint_sources):
+                            # # if not_adj_src_idx != adj_src_idx:
+                            #     fdtd_hook.select( adjoint_sources[not_adj_src_idx][xy_idx]['name'] )
+                            #     fdtd_hook.set( 'enabled', 1 )
+                                
+                            #     # Aim down and push above focal plane a bit
+                            #     fdtd_hook.set('z', (-focal_length_um + mesh_spacing_um*5)*1e-6)
+                            #     fdtd_hook.set('direction', 'Backward')
                             
                             # Pull out adjoint source, user-defined mode data: Em, Hm
                             mode_e_fields[xy_names[xy_idx]][adj_src_idx] = get_efield_mode(adjoint_sources[adj_src_idx][xy_idx]['name'])
                             print(f'Accessed mode E-field data over focal quadrant {adj_src_idx} for polarization {xy_idx}.')
                             
+                            
                             mode_h_fields[xy_names[xy_idx]][adj_src_idx] = get_hfield_mode(adjoint_sources[adj_src_idx][xy_idx]['name'])
                             print(f'Accessed mode H-field data over focal quadrant {adj_src_idx} for polarization {xy_idx}.')
                             
                             # Set direction back to upwards, restore z position to focal plane
-                            for not_adj_src_idx in range(0, num_adjoint_sources):
-                                if not_adj_src_idx != adj_src_idx:
-                                    fdtd_hook.select( adjoint_sources[not_adj_src_idx][xy_idx]['name'] )
-                                    fdtd_hook.set('z', adjoint_vertical_um * 1e-6)
-                                    fdtd_hook.set('direction', 'Forward')
+                            # for not_adj_src_idx in range(0, num_adjoint_sources):
+                            #     if not_adj_src_idx != adj_src_idx:
+                            #         fdtd_hook.select( adjoint_sources[not_adj_src_idx][xy_idx]['name'] )
+                            #         fdtd_hook.set('z', adjoint_vertical_um * 1e-6)
+                            #         fdtd_hook.set('direction', 'Forward')
+                            
+                            fdtd_hook.select( adjoint_sources[adj_src_idx][xy_idx]['name'] )
+                            fdtd_hook.set('z', adjoint_vertical_um * 1e-6)
+                            fdtd_hook.set('direction', 'Forward')
+                            
+                            # Test the denominator of the FoM
+                            # a = mode_e_fields['x'][0]
+                            # b = mode_h_fields['x'][0]
+                            # c = poynting_flux(a,np.conj(b),1)
 
                             job_name = 'adjoint_job_' + str( adj_src_idx ) + '_' + str( xy_idx ) + '_' + str( dispersive_range_idx ) + '.fsp'
                             fdtd_hook.save( projects_directory_location + "/optimization.fsp" )
@@ -1038,9 +1085,9 @@ else:
                 
                 for xy_idx in range(0, 2):
                     focal_e_data[xy_names[xy_idx]] = [
-                            None for idx in range( 0, num_focal_spots ) ]
+                            None for idx in range( 0, num_focal_spots+1 ) ]
                     focal_h_data[xy_names[xy_idx]] = [
-                            None for idx in range( 0, num_focal_spots ) ]
+                            None for idx in range( 0, num_focal_spots+1 ) ]
                     quadrant_transmission_data[xy_names[xy_idx]] = [ 
                             None for idx in range( 0, num_focal_spots ) ]
                     # mode_e_fields[xy_names[xy_idx]] = [
@@ -1080,13 +1127,17 @@ else:
                                     forward_e_fields[xy_names[xy_idx]][ :, :, :, :, spectral_idx ] = fwd_e_fields[ :, :, :, :, spectral_idx ]
 
                         # Populate arrays with adjoint source E-field, adjoint source H-field and quadrant transmission info
-                        for adj_src_idx in dispersive_range_to_adjoint_src_map[ dispersive_range_idx ]:					
+                        for adj_src_idx in dispersive_range_to_adjoint_src_map[ dispersive_range_idx ]:	
                             focal_e_data[xy_names[xy_idx]][ adj_src_idx ] = get_efield(transmission_monitors[adj_src_idx]['name'])
+                            focal_e_data[xy_names[xy_idx]][-1] = get_efield(transmission_monitor_focal['name'])
                             print(f'Accessed adjoint E-field data over focal quadrant {adj_src_idx}.')
+                            print(f'Overall data is of shape {np.shape(focal_e_data[xy_names[xy_idx]][-1])}')
                             
                             # NOTE: If you want focal_h_data['x'] to be an ndarray, it must be initialized as np.empty above.
                             focal_h_data[xy_names[xy_idx]][ adj_src_idx ] = get_hfield(transmission_monitors[adj_src_idx]['name'])
+                            focal_h_data[xy_names[xy_idx]][-1] = get_hfield(transmission_monitor_focal['name'])
                             print(f'Accessed adjoint H-field data over focal quadrant {adj_src_idx}.')
+                            print(f'Overall data is of shape {np.shape(focal_h_data[xy_names[xy_idx]][-1])}')
 
                             quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = get_transmission_magnitude(transmission_monitors[adj_src_idx]['name'])
                             print(f'Accessed transmission data for quadrant {adj_src_idx}.')
@@ -1194,22 +1245,27 @@ else:
                             # https://i.imgur.com/fCI56r1.png
                             
                             
-                            print(f'First field has shape: {np.shape(get_focal_e_data[focal_idx])}')
+                            print(f'First field has shape: {np.shape(get_focal_e_data[-1])}')
                             print(f'Second field has shape: {np.shape(get_mode_h_fields[focal_idx])}')
                             # TODO: Maybe the dS here is not the quadrant corresponding to focal_idx, but the other 3 quadrants that are NOT focal_idx?
-                            fom_integral_1 = poynting_flux(get_focal_e_data[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
+                            fom_integral_1 = poynting_flux(get_focal_e_data[-1][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
                                                   np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
                                                   (0.5*device_size_lateral_um)**2)
                             fom_integral_2 = poynting_flux(np.conj(get_mode_e_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
-                                                  get_focal_h_data[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
+                                                  get_focal_h_data[-1][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
                                                   (0.5*device_size_lateral_um)**2)
                             fom_integral_3 = poynting_flux(get_mode_e_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
                                                   np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
                                                   (0.5*device_size_lateral_um)**2, real_e_h = True)
                             
+                            # Entire transmission focal monitor version:
+                            # fom_integral_1 = poynting_flux(get_focal_e_data[-1][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
+                            #                       np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
+                            #                       (0.5*device_size_lateral_um)**2)
+                            
                             compute_fom += weight_spectral_rejection * np.sum(
                                     1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / fom_integral_3
-                                           ) / total_weighting[spectral_idx]
+                                           ) / 1 # total_weighting[spectral_idx]
                             )
 
                             # Records intensity FOM per wavelength
@@ -1226,8 +1282,8 @@ else:
                             
                             # Records mode overlap FOM per wavelength
                             mode_overlap_fom_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * np.sum(
-                                    1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / fom_integral_3
-                                           ) / total_weighting[spectral_idx]
+                                    1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / np.abs(fom_integral_3)
+                                           ) / 1 # total_weighting[spectral_idx]
                             )
                             print(f'FoM integrals have shape: {np.shape(fom_integral_1)}')
                             try:
@@ -1237,8 +1293,11 @@ else:
                             try:
                                 print(f'Total weighting for index {spectral_idx} is {total_weighting[spectral_idx]}')
                             except Exception as ex: pass
+                            
 
                     figure_of_merit_per_focal_spot.append(compute_fom)
+                    print(f'Mode Overlap FoM overall is:')
+                    print(figure_of_merit_per_focal_spot)
                     transmission_per_quadrant.append(compute_transmission_fom)
 
 
