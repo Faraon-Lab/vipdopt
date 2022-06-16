@@ -2,7 +2,7 @@
   "params": {
      "th": {
        "var_name": "angle_theta",
-       "var_values":[0.0, 5.0, 10.0],
+       "var_values":[0.0],
        "peakInd":0,
        "formatStr":  "%.3f",
        "iterating": true,
@@ -26,8 +26,8 @@
      },
      "swTh": {
        "var_name": "sidewall_thickness_um",
-       "var_values":[0.088, 0.146, 0.215, 0.298, 0.397, 0.45, 0.517, 0.66, 0.7, 0.832, 1.038, 1.286, 1.583, 1.94, 2.368],
-       "peakInd":0,
+       "var_values":[0, 0.088, 0.1, 0.146, 0.215, 0.298, 0.397, 0.45, 0.517, 0.66, 0.7, 0.832, 1.038, 1.286, 1.583, 1.94, 2.368],
+       "peakInd":2,
        "formatStr": "%.3f",
        "iterating": false,
        "short_form": "swTh"
@@ -35,7 +35,7 @@
      "divAng": {
       "var_name": "divergence_angle",
       "var_values":[6.3,10,13.13,20,30],
-      "peakInd":0,
+      "peakInd":2,
       "formatStr":  "%.3f",
       "iterating": false,
       "short_form": "divAng"
@@ -229,6 +229,10 @@
      {"name": "side_scattering_power",
        "enabled": true,
        "generate_plot_per_job": true
+     },
+     {"name": "crosstalk_power",
+      "enabled": true,
+      "generate_plot_per_job": true
      },
      {"name": "focal_region_power",
        "enabled": true,

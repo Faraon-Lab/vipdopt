@@ -11,13 +11,21 @@ if importing_params_from_opt_file:
     # from LayeredMWIRBridgesBayerFilterParameters import *
 
 from os import umask
+import os
 import numpy as np
 import json
 
 #
 #* Debug Options
 #
-running_on_local_machine = False	# False if running on slurm
+
+running_on_local_machine = False
+if slurm_job_env_variable is None:
+    slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
+if slurm_job_env_variable is None:
+    running_on_local_machine = True
+
+# running_on_local_machine = False	# False if running on slurm
 if running_on_local_machine:	
     lumapi_filepath =  r"C:\Program Files\Lumerical\v212\api\python\lumapi.py"
 else:	
@@ -32,15 +40,19 @@ shelf_fn = 'save_state'
 #
 #* Files
 #
+
+python_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
+
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v0] basicopt_setup\Data Processing\v3_nodeviceandcrosssection"
+    # projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v0] basicopt_setup\Data Processing\v3_nodeviceandcrosssection"
+    projects_directory_location_init = python_src_directory
     projects_directory_location = projects_directory_location_init          # Change if necessary to differentiate  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
 
-project_name_init = 'sony_device_v3merge'
+project_name_init = 'sony_th0_Cu_100nm'
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
@@ -210,7 +222,7 @@ src_beam_rad = device_size_lateral_um/2
 #
 
 #* Sidewall and Side Monitors
-num_sidewalls = 0
+# num_sidewalls = 4
 if num_sidewalls == 0:
     sidewall_thickness_um = 0.0
     sidewall_material = 'etch'
@@ -232,7 +244,7 @@ sidewall_yspan_positions_um = [device_size_lateral_um + sidewall_thickness_um * 
 #* FDTD
 #
 
-fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 2.0 * device_size_lateral_um
+fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 3.0 * device_size_lateral_um
 
 if not importing_params_from_opt_file:
     vertical_gap_size_um = 15 # geometry_spacing_um * 15
