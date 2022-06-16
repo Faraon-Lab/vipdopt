@@ -786,7 +786,7 @@ def truncate_adj_src_field(total_field, src_name):
     total_field_2 = total_field[:,x_min_idx:x_max_idx, y_min_idx:y_max_idx, :,:]
     return total_field_2
 
-def poynting_flux(E, H, total_surface_area, real_e_h = True, dot_dS = True, pauseDebug=False):
+def poynting_flux(E, H, total_surface_area, real_e_h = False, dot_dS = True, pauseDebug=False):
     '''Calculates the expression \int (E x H).dS which, for E: Electric field; H: Magnetic field, is the Poynting flux.
     Assumes a regular and uniform mesh size throughout.'''
     
@@ -814,7 +814,9 @@ def poynting_flux(E, H, total_surface_area, real_e_h = True, dot_dS = True, paus
     if dot_dS:
         integral = -integral[2]                       # shape: (nx, ny, nz)
     # then integrate by summing everything and multiplying by S
+    # TODO: Check this summation bit
     integral = np.sum(integral, (0,1,2)) * total_surface_area
+    
     
     return integral
 
@@ -838,8 +840,11 @@ max_design_variable_change_evolution = np.zeros((num_epochs, num_iterations_per_
 
 transmission_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4))
 transmission_by_wl_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
+transmission_by_focal_spot_and_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4, num_design_frequency_points))
 intensity_fom_by_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
+mode_overlap_fom_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4))
 mode_overlap_fom_by_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
+mode_overlap_fom_by_focal_spot_and_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4, num_design_frequency_points))
 
 step_size_start = 1.
 
@@ -1188,11 +1193,16 @@ else:
 
                 # These arrays record intensity and transmission FoMs for all focal spots
                 figure_of_merit_per_focal_spot = []
+                figure_of_merit_per_focal_spot_per_wl = []
                 transmission_per_quadrant = []
+                transmission_per_quadrant_per_wl = []
+                mode_overlap_fom_per_quadrant = []
                 # These arrays record the same, but for each wavelength
                 transmission_by_wavelength = np.zeros(num_design_frequency_points)
+                transmission_by_quadrant_by_wl = np.zeros((num_focal_spots, num_design_frequency_points))
                 intensity_fom_by_wavelength = np.zeros(num_design_frequency_points)
                 mode_overlap_fom_by_wavelength = np.zeros(num_design_frequency_points)
+                mode_overlap_fom_by_quadrant_by_wl = np.zeros((num_focal_spots, num_design_frequency_points))
 
                 for focal_idx in range(0, num_focal_spots):             # For each focal spot:
                     compute_fom = 0
@@ -1279,6 +1289,7 @@ else:
                             transmission_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * \
                                     get_quad_transmission_data[focal_idx][spectral_focal_plane_map[focal_idx][0] + spectral_idx] / \
                                         one_over_weight_focal_plane_map_performance_weighting
+                                        
                             
                             # Records mode overlap FOM per wavelength
                             mode_overlap_fom_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * np.sum(
@@ -1294,15 +1305,42 @@ else:
                                 print(f'Total weighting for index {spectral_idx} is {total_weighting[spectral_idx]}')
                             except Exception as ex: pass
                             
+                        
+                        for spectral_idx in range(0, num_bands*num_points_per_band):
+                            
+                            transmission_by_quadrant_by_wl[focal_idx, spectral_idx] += weight_spectral_rejection * \
+                                    get_quad_transmission_data[focal_idx][spectral_idx] / \
+                                        one_over_weight_focal_plane_map_performance_weighting
+                            
+                            
+                            fom_integral_1 = poynting_flux(get_focal_e_data[-1][:,:,:,:,spectral_idx],
+                                                  np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_idx]),
+                                                  (0.5*device_size_lateral_um)**2)
+                            fom_integral_2 = poynting_flux(np.conj(get_mode_e_fields[focal_idx][:,:,:,:,spectral_idx]),
+                                                  get_focal_h_data[-1][:,:,:,:,spectral_idx],
+                                                  (0.5*device_size_lateral_um)**2)
+                            fom_integral_3 = poynting_flux(get_mode_e_fields[focal_idx][:,:,:,:,spectral_idx],
+                                                  np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_idx]),
+                                                  (0.5*device_size_lateral_um)**2, real_e_h = True)
+                            
+                            mode_overlap_fom_by_quadrant_by_wl[focal_idx, spectral_idx ] += weight_spectral_rejection * np.sum(
+                                    1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / np.abs(fom_integral_3)
+                                           ) / 1 # total_weighting[spectral_idx]
+                            )
+                            
 
                     figure_of_merit_per_focal_spot.append(compute_fom)
                     print(f'Mode Overlap FoM overall is:')
                     print(figure_of_merit_per_focal_spot)
+                    figure_of_merit_per_focal_spot_per_wl.append(mode_overlap_fom_by_wavelength)
                     transmission_per_quadrant.append(compute_transmission_fom)
+                    # transmission_per_quadrant_per_wl.append(transmission_by_quadrant_by_wl)
 
 
                 figure_of_merit_per_focal_spot = np.array(figure_of_merit_per_focal_spot)
+                figure_of_merit_per_focal_spot_per_wl = np.array(figure_of_merit_per_focal_spot_per_wl)
                 transmission_per_quadrant = np.array(transmission_per_quadrant)
+                transmission_per_quadrant_per_wl = np.array(transmission_per_quadrant_per_wl)
 
                 # Copy everything so as not to disturb the original data
                 process_fom_per_focal_spot = figure_of_merit_per_focal_spot.copy()
@@ -1342,15 +1380,20 @@ else:
 
                 transmission_by_focal_spot_evolution[epoch, iteration] = transmission_per_quadrant
                 transmission_by_wl_evolution[epoch, iteration] = transmission_by_wavelength
+                # transmission_by_focal_spot_and_wavelength_evolution[epoch, iteration] = transmission_per_quadrant_per_wl
+                transmission_by_focal_spot_and_wavelength_evolution[epoch, iteration] = transmission_by_quadrant_by_wl
                 intensity_fom_by_wavelength_evolution[epoch, iteration] = intensity_fom_by_wavelength
                 mode_overlap_fom_by_wavelength_evolution[epoch, iteration] = mode_overlap_fom_by_wavelength
+                mode_overlap_fom_by_focal_spot_and_wavelength_evolution[epoch, iteration] = mode_overlap_fom_by_quadrant_by_wl
 
                 np.save(projects_directory_location + "/figure_of_merit.npy", figure_of_merit_evolution)
                 np.save(projects_directory_location + "/figure_of_merit_by_wl.npy", figure_of_merit_by_wl_evolution)
                 np.save(projects_directory_location + "/transmission_by_focal_spot.npy", transmission_by_focal_spot_evolution)
                 np.save(projects_directory_location + "/transmission_by_wl.npy", transmission_by_wl_evolution)
+                np.save(projects_directory_location + "/transmission_by_focal_spot_by_wl.npy", transmission_by_focal_spot_and_wavelength_evolution)
                 np.save(projects_directory_location + "/intensity_fom_by_wavelength.npy", intensity_fom_by_wavelength_evolution)
                 np.save(projects_directory_location + "/mode_overlap_fom_by_wavelength.npy", mode_overlap_fom_by_wavelength_evolution)
+                np.save(projects_directory_location + "/mode_overlap_fom_by_focal_spot_by_wl.npy", mode_overlap_fom_by_focal_spot_and_wavelength_evolution)
                 
 
                 print("Figure of Merit So Far:")
