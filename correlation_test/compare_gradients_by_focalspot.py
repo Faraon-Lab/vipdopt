@@ -302,19 +302,38 @@ mode_overlap_fom_by_wavelength_evolution = np.load(
 
 transmission_by_focal_spot_and_wavelength_evolution = np.load(
              projects_directory_location + "/transmission_by_focal_spot_by_wl.npy")
+intensity_fom_by_focal_spot_and_wavelength_evolution = np.load(
+             projects_directory_location + "/intensity_fom_by_focal_spot_by_wl.npy")
 mode_overlap_fom_by_focal_spot_and_wavelength_evolution = np.load(
              projects_directory_location + "/mode_overlap_fom_by_focal_spot_by_wl.npy")
 
 #* First Test: Compare mode overlap FoM with transmission and intensity FoM: x-axis is wavelength
 
 def NormalizeData(data):
-    return (data - np.min(data)) / (np.max(data) - np.min(data))
+    
+    def normalize(values):
+        # Normalizes a 1D vector to between 0 and 1
+        return (values - np.min(values)) / (np.max(values) - np.min(values))
+    
+    # Either the entire section, or for each quadrant
+    if np.shape(data)[2] == 4:
+        norm_data = np.zeros(np.shape(data))            # Initialize
+        for section_idx in range(np.shape(data)[2]):
+            data_part = data[:,:,section_idx,:]
+            norm_data[:,:,section_idx,:] = (data_part - np.min(data_part)) / (np.max(data_part) - np.min(data_part))
+            if section_idx in [1,3]:
+                norm_data[:,:,section_idx,:] *= 0.5
+        return norm_data
+    else:
+        return normalize(data)
+    
 
 transmission_by_wl_evolution_norm = NormalizeData(transmission_by_wl_evolution)
 mode_overlap_fom_by_wavelength_evolution_norm = NormalizeData(mode_overlap_fom_by_wavelength_evolution)
 intensity_fom_by_wavelength_evolution_norm = NormalizeData(intensity_fom_by_wavelength_evolution)
 
 transmission_by_fswl_evolution_norm = NormalizeData(transmission_by_focal_spot_and_wavelength_evolution)
+intensity_fom_by_fswl_evolution_norm = NormalizeData(intensity_fom_by_focal_spot_and_wavelength_evolution)
 mode_overlap_fom_by_fswl_evolution_norm = NormalizeData(mode_overlap_fom_by_focal_spot_and_wavelength_evolution)
 # transmission_by_fswl_evolution_norm = transmission_by_focal_spot_and_wavelength_evolution
 # mode_overlap_fom_by_fswl_evolution_norm = mode_overlap_fom_by_focal_spot_and_wavelength_evolution
@@ -342,10 +361,14 @@ f_vectors = [#{'var_values': list(transmission_by_wl_evolution_norm[:] * 1)},
                 {'var_values': list((transmission_by_fswl_evolution_norm[:,:,1,:] + transmission_by_fswl_evolution_norm[:,:,3,:]) * 1)},
                 {'var_values': list(transmission_by_fswl_evolution_norm[:,:,2,:] * 1)},
                 # {'var_values': list(transmission_by_fswl_evolution_norm[:,:,3,:] * 1)},
+            #{'var_values': list(intensity_fom_by_wl_evolution_norm[:] * 1)},
+                {'var_values': list(intensity_fom_by_fswl_evolution_norm[:,:,0,:] * 1)},
+                {'var_values': list((intensity_fom_by_fswl_evolution_norm[:,:,1,:] + intensity_fom_by_fswl_evolution_norm[:,:,3,:]) * 1)},
+                {'var_values': list(intensity_fom_by_fswl_evolution_norm[:,:,2,:] * 1)},
              #{'var_values': list(mode_overlap_fom_by_wavelength_evolution_norm[:] * 1)},
-                {'var_values': list(mode_overlap_fom_by_fswl_evolution_norm[:,:,0,:] * 1)},
-                {'var_values': list((mode_overlap_fom_by_fswl_evolution_norm[:,:,1,:] + mode_overlap_fom_by_fswl_evolution_norm[:,:,3,:]) * 1)},
-                {'var_values': list(mode_overlap_fom_by_fswl_evolution_norm[:,:,2,:] * 1)}#,
+                # {'var_values': list(mode_overlap_fom_by_fswl_evolution_norm[:,:,0,:] * 1)},
+                # {'var_values': list((mode_overlap_fom_by_fswl_evolution_norm[:,:,1,:] + mode_overlap_fom_by_fswl_evolution_norm[:,:,3,:]) * 1)},
+                # {'var_values': list(mode_overlap_fom_by_fswl_evolution_norm[:,:,2,:] * 1)}#,
              #{'var_values': list(intensity_fom_by_wavelength_evolution_norm[:] * 1)}
              ]
 
@@ -364,9 +387,10 @@ plot_colors = [#'black',
                ]
 plot_labels = [#'Transmission', 
                'Transmission_0', 'Transmission_1+3', 'Transmission_2', 
+               #'Transmission', 
+               'Intensity FoM_0', 'Intensity FoM_1+3', 'Intensity FoM_2'
                #'Mode Overlap FoM',
-               'Mode Overlap FoM _ 0','Mode Overlap FoM _ 1+3','Mode Overlap FoM _ 2'#, 
-               #'Intensity FoM'
+            #    'Mode Overlap FoM _ 0','Mode Overlap FoM _ 1+3','Mode Overlap FoM _ 2'#,
                ]
 
 for plot_idx in range(0, len(f_vectors)):
@@ -391,7 +415,8 @@ for plot_idx in range(0, len(f_vectors)):
     plot_config['lines'].append(line_data)
     
 
-title_string = 'Correlation of Mode Overlap FoM to Transmission'
+title_string = 'Correlation of Intensity FoM to Transmission'
+# title_string = 'Correlation of Mode Overlap FoM to Transmission'
 plot_config['title'] = title_string
 
 plot_config['x_axis']['label'] = 'Wavelength (um)'
@@ -421,6 +446,14 @@ print('Correlation of Mode Overlap FoM with Transmission, Wavelength Bin 1+3, is
                     np.squeeze(transmission_by_fswl_evolution_norm[:,:,1,:] + transmission_by_fswl_evolution_norm[:,:,3,:]))))
 print('Correlation of Mode Overlap FoM with Transmission, Wavelength Bin 2, is:' +\
     str(np.corrcoef(np.squeeze(mode_overlap_fom_by_fswl_evolution_norm[:,:,2,:]), np.squeeze(transmission_by_fswl_evolution_norm[:,:,2,:]))))
+
+print('Correlation of Intensity FoM with Transmission, Wavelength Bin 0, is:' +\
+    str(np.corrcoef(np.squeeze(intensity_fom_by_fswl_evolution_norm[:,:,0,:]), np.squeeze(transmission_by_fswl_evolution_norm[:,:,0,:]))))
+print('Correlation of Intensity FoM with Transmission, Wavelength Bin 1+3, is:' +\
+    str(np.corrcoef(np.squeeze(intensity_fom_by_fswl_evolution_norm[:,:,1,:] + intensity_fom_by_fswl_evolution_norm[:,:,3,:]), 
+                    np.squeeze(transmission_by_fswl_evolution_norm[:,:,1,:] + transmission_by_fswl_evolution_norm[:,:,3,:]))))
+print('Correlation of Intensity FoM with Transmission, Wavelength Bin 2, is:' +\
+    str(np.corrcoef(np.squeeze(intensity_fom_by_fswl_evolution_norm[:,:,2,:]), np.squeeze(transmission_by_fswl_evolution_norm[:,:,2,:]))))
 
 print('Correlation of Intensity FoM with Transmission is:' +\
     str(np.corrcoef(np.squeeze(intensity_fom_by_wavelength_evolution_norm), np.squeeze(transmission_by_wl_evolution_norm))))

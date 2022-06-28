@@ -842,6 +842,7 @@ transmission_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_
 transmission_by_wl_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
 transmission_by_focal_spot_and_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4, num_design_frequency_points))
 intensity_fom_by_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
+intensity_fom_by_focal_spot_and_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4, num_design_frequency_points))
 mode_overlap_fom_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4))
 mode_overlap_fom_by_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
 mode_overlap_fom_by_focal_spot_and_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4, num_design_frequency_points))
@@ -1201,6 +1202,7 @@ else:
                 transmission_by_wavelength = np.zeros(num_design_frequency_points)
                 transmission_by_quadrant_by_wl = np.zeros((num_focal_spots, num_design_frequency_points))
                 intensity_fom_by_wavelength = np.zeros(num_design_frequency_points)
+                intensity_fom_by_quadrant_by_wl = np.zeros((num_focal_spots, num_design_frequency_points))
                 mode_overlap_fom_by_wavelength = np.zeros(num_design_frequency_points)
                 mode_overlap_fom_by_quadrant_by_wl = np.zeros((num_focal_spots, num_design_frequency_points))
 
@@ -1279,12 +1281,19 @@ else:
                             )
 
                             # Records intensity FOM per wavelength
+                            max_intensity_weighting = max_intensity_by_wavelength[:]
+                            # Use the max_intensity_weighting to renormalize the intensity distribution used to calculate the FoM
+                            # and insert the custom weighting schemes here as well.
+                            total_weighting = max_intensity_weighting / weight_focal_plane_map_performance_weighting[focal_idx]
+                            one_over_weight_focal_plane_map_performance_weighting = 1. / weight_focal_plane_map_performance_weighting[focal_idx]
+                            
                             intensity_fom_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * np.sum(
                                 (
-                                    np.abs(get_focal_e_data[focal_idx][:, 0, 0, 0, spectral_focal_plane_map[focal_idx][0] + spectral_idx])**2 /
+                                    np.abs(get_focal_e_data[focal_idx][:, 31, 31, 0, spectral_focal_plane_map[focal_idx][0] + spectral_idx])**2 /
                                     total_weighting[spectral_idx]
                                 )
                             )
+                            
                             # Records transmission FOM per wavelength
                             transmission_by_wavelength[ spectral_focal_plane_map[focal_idx][0] + spectral_idx ] += weight_spectral_rejection * \
                                     get_quad_transmission_data[focal_idx][spectral_focal_plane_map[focal_idx][0] + spectral_idx] / \
@@ -1312,6 +1321,12 @@ else:
                                     get_quad_transmission_data[focal_idx][spectral_idx] / \
                                         one_over_weight_focal_plane_map_performance_weighting
                             
+                            intensity_fom_by_quadrant_by_wl[focal_idx, spectral_idx] += weight_spectral_rejection * np.sum(
+                                (
+                                    np.abs(get_focal_e_data[focal_idx][:, 31, 31, 0, spectral_idx])**2 /
+                                    total_weighting[spectral_idx]
+                                )
+                            )
                             
                             fom_integral_1 = poynting_flux(get_focal_e_data[-1][:,:,:,:,spectral_idx],
                                                   np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_idx]),
@@ -1383,6 +1398,7 @@ else:
                 # transmission_by_focal_spot_and_wavelength_evolution[epoch, iteration] = transmission_per_quadrant_per_wl
                 transmission_by_focal_spot_and_wavelength_evolution[epoch, iteration] = transmission_by_quadrant_by_wl
                 intensity_fom_by_wavelength_evolution[epoch, iteration] = intensity_fom_by_wavelength
+                intensity_fom_by_focal_spot_and_wavelength_evolution[epoch, iteration] = intensity_fom_by_quadrant_by_wl
                 mode_overlap_fom_by_wavelength_evolution[epoch, iteration] = mode_overlap_fom_by_wavelength
                 mode_overlap_fom_by_focal_spot_and_wavelength_evolution[epoch, iteration] = mode_overlap_fom_by_quadrant_by_wl
 
@@ -1392,6 +1408,7 @@ else:
                 np.save(projects_directory_location + "/transmission_by_wl.npy", transmission_by_wl_evolution)
                 np.save(projects_directory_location + "/transmission_by_focal_spot_by_wl.npy", transmission_by_focal_spot_and_wavelength_evolution)
                 np.save(projects_directory_location + "/intensity_fom_by_wavelength.npy", intensity_fom_by_wavelength_evolution)
+                np.save(projects_directory_location + "/intensity_fom_by_focal_spot_by_wl.npy", intensity_fom_by_focal_spot_and_wavelength_evolution)
                 np.save(projects_directory_location + "/mode_overlap_fom_by_wavelength.npy", mode_overlap_fom_by_wavelength_evolution)
                 np.save(projects_directory_location + "/mode_overlap_fom_by_focal_spot_by_wl.npy", mode_overlap_fom_by_focal_spot_and_wavelength_evolution)
                 
