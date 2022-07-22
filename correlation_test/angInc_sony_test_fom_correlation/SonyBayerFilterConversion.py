@@ -596,9 +596,9 @@ if start_from_step == 0:
                         bayer_filter_region_x[ x_idx ], bayer_filter_region_y[ y_idx ], bayer_filter_region_z[ z_idx ] ]
 
     gradient_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 
-                                        0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
+                                        0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral-1)
     gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 
-                                        0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
+                                        0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral-1)
     gradient_region_z = 1e-6 * np.linspace(device_vertical_minimum_um, 
                                         device_vertical_maximum_um, device_voxels_simulation_mesh_vertical)
 
@@ -1069,6 +1069,7 @@ else:
                             job_name = 'adjoint_job_' + str( adj_src_idx ) + '_' + str( xy_idx ) + '_' + str( dispersive_range_idx ) + '.fsp'
                             fdtd_hook.save( projects_directory_location + "/optimization.fsp" )
                             job_names[ ( 'adjoint', adj_src_idx, xy_idx, dispersive_range_idx ) ] = add_job( job_name, jobs_queue )
+                    
 
                 run_jobs( jobs_queue )
                 
@@ -1440,9 +1441,9 @@ else:
             # gradients for x- and y-polarized forward sources.
             #
             
-            if True:# start_from_step == 0 or start_from_step == 3:
+            if start_from_step == 0 or start_from_step == 3:
                 # if start_from_step != 0:
-                #     load_backup_vars()
+                load_backup_vars()
                 #     forward_e_fields = {}
                 #     forward_e_fields['x'] = np.load(projects_directory_location + '/fwd_e_x.npy')
                 #     forward_e_fields['y'] = np.load(projects_directory_location + '/fwd_e_y.npy')
@@ -1460,6 +1461,8 @@ else:
                 cur_permittivity_shape = cur_permittivity.shape
                 # Get the device's dimensions in terms of (MESH) voxels
                 field_shape = [device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
+                #! Definition of device_voxels_simulation_mesh_lateral is 1 off
+                field_shape = [device_voxels_simulation_mesh_lateral-1, device_voxels_simulation_mesh_lateral-1, device_voxels_simulation_mesh_vertical]
 
                 # Initialize arrays to store the gradients of each polarization, each the shape of the voxel mesh
                 xy_polarized_gradients = [ np.zeros(field_shape, dtype=np.complex), np.zeros(field_shape, dtype=np.complex) ]
@@ -1580,6 +1583,7 @@ else:
 
                                 # See Eqs. (5), (6) of Lalau-Keraly et al: https://doi.org/10.1364/OE.21.021693
                                 print(f'Spectral idx is: {spectral_idx}')
+                                print(forward_e_fields.keys())
                                 sys.stdout.flush()
                                 gradient_component = np.sum(
                                     (source_weight[spectral_idx] *                                                      # Amplitude of electric dipole at x_0
@@ -1594,24 +1598,31 @@ else:
                                 imag_part_gradient = -np.imag( gradient_component )
                                 get_grad_density = delta_real_permittivity * real_part_gradient + delta_imag_permittivity * imag_part_gradient
 
+                                print(np.shape(xy_polarized_gradients[pol_name_to_idx]))
+                                print(np.shape(get_grad_density))
                                 xy_polarized_gradients[pol_name_to_idx] += get_grad_density
 
                 print("Completed Step 3: Retrieved Adjoint Optimization results and calculated gradient.")
                 sys.stdout.flush()
                 
-                # backup_all_vars()
+                backup_all_vars()
                 
                 
             #
             # Step 4: Step the design variable.
             #
 
-            # if start_from_step == 0 or start_from_step == 4:
-            #     if start_from_step != 0:
-            #         load_backup_vars()
+            if start_from_step == 0 or start_from_step == 4:
+                if start_from_step != 0:
+                    load_backup_vars()
             
                 print("Beginning Step 4: Stepping Design Variable.")
                 sys.stdout.flush()
+                
+                gradient_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 
+                                        0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral-1)
+                gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 
+                                                    0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral-1)
 
 
                 # Get the full device gradient by summing the x,y polarization components 
