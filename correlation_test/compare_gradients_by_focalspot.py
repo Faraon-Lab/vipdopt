@@ -307,6 +307,9 @@ intensity_fom_by_focal_spot_and_wavelength_evolution = np.load(
 mode_overlap_fom_by_focal_spot_and_wavelength_evolution = np.load(
              projects_directory_location + "/mode_overlap_fom_by_focal_spot_by_wl.npy")
 
+
+print(3)
+
 #* First Test: Compare mode overlap FoM with transmission and intensity FoM: x-axis is wavelength
 
 def NormalizeData(data):

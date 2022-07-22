@@ -2,7 +2,7 @@
   "params": {
      "th": {
        "var_name": "angle_theta",
-       "var_values":[0.0],
+       "var_values":[0.0, 20.0],
        "peakInd":0,
        "formatStr":  "%.3f",
        "iterating": false,
@@ -42,9 +42,9 @@
     },
     "coordPtb": {
       "var_name": "coord_perturbed",
-      "var_values":[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+      "var_values":[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
       "peakInd":0,
-      "formatStr":  "%.3f",
+      "formatStr":  "%.2f",
       "iterating": true,
       "short_form": "coordPtb"
     }
@@ -197,7 +197,7 @@
       },
       {"name": "design_efield_monitor",
         "monitor type": "3D",
-        "enabled": false,
+        "enabled": true,
         "getFromFDTD": true,
         "save": false
       }

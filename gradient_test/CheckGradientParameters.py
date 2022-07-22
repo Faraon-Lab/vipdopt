@@ -33,7 +33,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 3    # 0 if running entire file in one shot
+start_from_step = 4    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -71,7 +71,7 @@ sweep_settings = json.load(open('sweep_settings.json'))
 #
 
 def generate_value_array(start,end,step):
-    return json.dumps(np.arange(start,end+step,step).tolist())
+    return json.dumps(np.around(np.arange(start,end+step,step),3).tolist())
 
 def create_parameter_filename_string(idx):
     ''' Input: tuple coordinate in the N-D array. Cross-matches against the sweep_parameters dictionary.
