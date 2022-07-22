@@ -488,9 +488,9 @@ if start_from_step == 0:
         except Exception as err:
             sidewall_mesh['override x mesh'] = sidewall_mesh_override_x_mesh[sidewall_idx]
         if sidewall_mesh['override x mesh']:
-            fdtd_hook.setnamed(sidewall_mesh['name'], 'dx', fdtd_hook.getnamed('device_mesh','dx') / 8)
+            fdtd_hook.setnamed(sidewall_mesh['name'], 'dx', fdtd_hook.getnamed('device_mesh','dx') / 1.5)
         else:
-            fdtd_hook.setnamed(sidewall_mesh['name'], 'dy', fdtd_hook.getnamed('device_mesh','dy') / 8)
+            fdtd_hook.setnamed(sidewall_mesh['name'], 'dy', fdtd_hook.getnamed('device_mesh','dy') / 1.5)
         
         sidewall_meshes.append(sidewall_mesh)
         globals()[sidewall_mesh['name']] = sidewall_mesh
@@ -534,11 +534,61 @@ if start_from_step == 0:
         forward_src_x['wavelength start'] = lambda_min_um * 1e-6
         forward_src_x['wavelength stop'] = lambda_max_um * 1e-6
         forward_src_x['beam parameters'] = 'Waist size and position'
-        forward_src_x['waist radius w0'] = src_beam_rad * 1e-6
-        forward_src_x['distance from waist'] = 0 * 1e-6
+        forward_src_x['waist radius w0'] = 3e8/np.mean(3e8/np.array([lambda_min_um, lambda_max_um])) / (np.pi*background_index*np.radians(src_div_angle)) * 1e-6
+        forward_src_x['distance from waist'] = -(src_maximum_vertical_um - device_size_vertical_um) * 1e-6
         for key, val in globals()['forward_src_x'].items():
             fdtd_hook.setnamed('forward_src_x', key, val)
     
+    # Duplicate devices and set in an array
+    if device_array_num > 1:
+        create_dict_nx('device_mesh')
+        device_mesh['x span'] = fdtd_region_size_lateral_um * 1e-6
+        device_mesh['y span'] = fdtd_region_size_lateral_um * 1e-6
+        for key, val in globals()['device_mesh'].items():
+            fdtd_hook.setnamed('device_mesh', key, val)  
+
+        # sidewall_thickness_um = 0.4
+        device_arr_x_positions_um = (device_size_lateral_um + sidewall_thickness_um)*1e-6*np.array([1,1,0,-1,-1,-1,0,1])
+        device_arr_y_positions_um = (device_size_lateral_um + sidewall_thickness_um)*1e-6*np.array([0,1,1,1,0,-1,-1,-1])
+
+        for dev_arr_idx in range(0, device_array_num**2-1):
+            fdtd_hook.select('design_import')
+            fdtd_hook.copy(device_arr_x_positions_um[dev_arr_idx], device_arr_y_positions_um[dev_arr_idx])
+            fdtd_hook.set('name', 'design_import_' + str(dev_arr_idx))
+            
+            for idx in range(0, num_sidewalls):
+                sm_name = 'sidewall_' + str(idx)
+                sm_mesh_name = 'mesh_sidewall_' + str(idx)
+                
+                # Duplicate sidewalls
+                try:
+                    objExists = fdtd_hook.getnamed(sm_name, 'name')
+                    fdtd_hook.select(sm_name)
+                    fdtd_hook.copy(device_arr_x_positions_um[dev_arr_idx], device_arr_y_positions_um[dev_arr_idx])
+                    fdtd_hook.set('name', 'sidewall_misc')
+                
+                except Exception as ex:
+                    template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
+                    message = template.format(type(ex).__name__, ex.args)
+                    print(message+'FDTD Object Sidewall does not exist.')
+                    # fdtd_hook.addmesh(name=sidewall_mesh['name'])
+                    # pass
+                
+                # Duplicate sidewall meshes
+                try:
+                    objExists = fdtd_hook.getnamed(sm_mesh_name, 'name')
+                    fdtd_hook.select(sm_mesh_name)
+                    fdtd_hook.copy(device_arr_x_positions_um[dev_arr_idx], device_arr_y_positions_um[dev_arr_idx])
+                    fdtd_hook.set('name', 'mesh_sidewall_misc')
+                
+                except Exception as ex:
+                    template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
+                    message = template.format(type(ex).__name__, ex.args)
+                    print(message+'FDTD Object Sidewall Mesh does not exist.')
+                    # fdtd_hook.addmesh(name=sidewall_mesh['name'])
+                    # pass
+            print('2')
+        print('3')
 
     # Disable all sources and select monitors
     disable_all_sources
@@ -1166,6 +1216,21 @@ def generate_Enorm_focal_plane(monitors_data, produce_spectrum):
     output_plot['title'] = 'E-norm Image (Spectrum)'
     output_plot['const_params'] = const_parameters
     
+    # # Also generate crosstalk relative numbers
+    # E_vals = output_plot['f'][0]['var_values']
+    # l = np.array_split(E_vals,3,axis=0)
+    # split_E_vals = []
+    # for a in l:
+    #     l = np.array_split(a,3,axis=1)
+    #     split_E_vals += l
+    # split_E_vals = np.array(split_E_vals)
+    
+    # # split_E_vals has shape (9, nx/3, ny/3, nλ)
+    # split_power_vals = np.sum(np.square(split_E_vals),(1,2))
+    # sum_split_power_vals = np.sum(split_power_vals, 0)
+    # crosstalk_vals = np.divide(split_power_vals, sum_split_power_vals)
+    
+    
     print('Generated E-norm focal plane image plot.')
     
     # ## Plotting code to test
@@ -1298,6 +1363,99 @@ def generate_overall_reflection_spectrum(monitors_data, produce_spectrum, statis
     sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
     
     print('Picked reflection point to pass to variable sweep.')
+    
+    return output_plot, sweep_values
+
+def generate_crosstalk_power_spectrum(monitors_data, produce_spectrum, statistics='mean'):
+    '''Generates power spectrum for adjacent pixels at focal plane.'''
+    
+    output_plot = {}
+    r_vectors = []      # Variables
+    f_vectors = []      # Functions
+    
+    lambda_vector = monitors_data['wavelength']
+    r_vectors.append({'var_name': 'Wavelength',
+                      'var_values': lambda_vector
+                    })
+    
+    try:
+        monitor = monitors_data['scatter_plane_monitor']
+    except Exception as err:
+        monitor = monitors_data['spill_plane_monitor']
+    E_vals = np.squeeze(monitor['E'])
+    E_vals = E_vals
+    
+    # Generate crosstalk relative numbers
+    n_x = np.shape(E_vals)[0]
+    n_x = int(4*np.floor(n_x/4))
+    n_y = np.shape(E_vals)[0]
+    n_y = int(4*np.floor(n_x/4))
+    E_vals = E_vals[0:n_x, 0:n_y, :]        # First, make sure the array is split nicely into equal sections
+    
+    l = np.array_split(E_vals,4,axis=0)
+    split_E_vals = []
+    for a in l:
+        l = np.array_split(a,4,axis=1)
+        split_E_vals += l
+    split_E_vals = np.array(split_E_vals)
+    
+    # split_E_vals has shape (16, nx/4, ny/4, nλ)
+    split_power_vals = np.sum(np.square(split_E_vals),(1,2))
+    sum_split_power_vals = np.sum(split_power_vals, 0)
+    crosstalk_vals_mod = np.divide(split_power_vals, sum_split_power_vals)
+    # crosstalk_vals = np.divide(split_power_vals, sum_split_power_vals)
+    
+    crosstalk_vals = np.zeros((9,np.shape(crosstalk_vals_mod)[1]))
+    crosstalk_vals[0,:] = crosstalk_vals_mod[0,:]
+    crosstalk_vals[1,:] = crosstalk_vals_mod[1,:] + crosstalk_vals_mod[2,:]
+    crosstalk_vals[2,:] = crosstalk_vals_mod[3,:]
+    crosstalk_vals[3,:] = crosstalk_vals_mod[4,:] + crosstalk_vals_mod[8,:]
+    crosstalk_vals[4,:] = crosstalk_vals_mod[5,:] + crosstalk_vals_mod[6,:] + crosstalk_vals_mod[9,:] + crosstalk_vals_mod[10,:]
+    crosstalk_vals[5,:] = crosstalk_vals_mod[7,:] + crosstalk_vals_mod[11,:]
+    crosstalk_vals[6,:] = crosstalk_vals_mod[12,:]
+    crosstalk_vals[7,:] = crosstalk_vals_mod[13,:] + crosstalk_vals_mod[14,:]
+    crosstalk_vals[8,:] = crosstalk_vals_mod[15,:]
+    
+    for idx in range(0, 9):
+        f_vectors.append({'var_name': f'Crosstalk Power, Pixel {idx}',
+                        'var_values': crosstalk_vals[idx,:]
+                        })
+    
+    if produce_spectrum:
+        output_plot['r'] = r_vectors
+        output_plot['f'] = f_vectors
+        output_plot['title'] = 'Crosstalk Power Spectrum'
+        output_plot['const_params'] = const_parameters
+        
+        # ## Plotting code to test
+        # fig,ax = plt.subplots()
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[0]['var_values'], color='blue')
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[1]['var_values'], color='green')
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[2]['var_values'], color='red')
+        # plt.plot(r_vectors[0]['var_values'], f_vectors[3]['var_values'], color='gray')
+        # plt.show(block=False)
+        # plt.show()
+        print('Generated crosstalk power spectrum.')
+    
+    sweep_values = []
+    num_sweep_values = 9
+    sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
+    
+    print('Picked crosstalk power points for each Bayer pixel, to pass to variable sweep.')
+    
+    sweep_mean_vals = []
+    for swp_val in sweep_values:
+        sweep_mean_vals.append(swp_val['value'])
+    print(sweep_mean_vals)
+    
+    print('Generated adjacent pixel crosstalk power plot.')
+    
+    # ## Plotting code to test
+    # fig, ax = plt.subplots()
+    # #plt.contour([np.squeeze(r_vectors[0]['var_values']), np.squeeze(r_vectors[1]['var_values'])], f_vectors[0]['var_values'][:,:,5])
+    # plt.imshow(f_vectors[0]['var_values'][:,:,5])
+    # plt.show(block=False)
+    # plt.show()
     
     return output_plot, sweep_values
 
@@ -1994,7 +2152,7 @@ def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, plot_wavelengths =
     
     for plot_wl in plot_wavelengths:
         plot_wl = float(plot_wl)
-        
+         
         fig, ax = plt.subplots()
         
         wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
@@ -2243,6 +2401,21 @@ def plot_overall_reflection_spectrum(plot_data, job_idx):
     sp.export_plot_config('overall_reflection_spectra', job_idx)
     return sp.fig, sp.ax
 
+def plot_crosstalk_power_spectrum(plot_data, job_idx):
+    '''For the given job index, plots the crosstalk power corresponding to that job.'''
+    
+    sp = SpectrumPlot(plot_data)
+
+    plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    plot_labels = ['NW', 'N', 'NE', 'W', 'Center', 'E', 'SW', 'S', 'SE']
+    sp.append_line_data(plot_colors, plot_labels)
+    
+    sp.assign_title('Device Crosstalk Power', job_idx)
+    sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
+    
+    sp.export_plot_config('crosstalk_power_spectra', job_idx)
+    return sp.fig, sp.ax
+
 def plot_side_power_spectrum(plot_data, job_idx):
     '''For the given job index, plots the device side scattering corresponding to that job.'''
     
@@ -2325,7 +2498,12 @@ def plot_exit_power_distribution_spectrum(plot_data, job_idx):
     
     sp = SpectrumPlot(plot_data)
 
-    sp.append_line_data()
+    plot_colors = []
+    plot_labels = []
+    for f_vector in plot_data['f']:
+        plot_labels.append(f_vector['var_name'])
+    
+    sp.append_line_data(None, plot_labels)
     
     sp.assign_title('Power Distribution at Focal Plane', job_idx)
     sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
@@ -2339,7 +2517,10 @@ def plot_device_rta_spectrum(plot_data, job_idx):
     
     sp = SpectrumPlot(plot_data)
 
-    sp.append_line_data()
+    plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    plot_labels = ['Device Reflection', 'Side Scattering E', 'Side Scattering N', 'Side Scattering W', 'Side Scattering S',
+                   'Focal Region Power', 'Oblique Scattering Power', 'Absorbed Power']
+    sp.append_line_data(plot_colors, plot_labels)
     
     sp.assign_title('Device RTA', job_idx)
     sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
@@ -2808,6 +2989,15 @@ def plot_device_rta_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
     
     sp = SweepPlot(plot_data, slice_coords)
     
+    mean_vals = []
+    for f_vec in plot_data['f']:
+        var_value = f_vec['var_values'][0]
+        mean_vals.append(var_value)
+    print('Device RTA values are:')
+    print(mean_vals)
+    print('with total side scattering at:')
+    print(sum(mean_vals[1:5]))
+    
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Device Reflection', 'Side Scattering E', 'Side Scattering N', 'Side Scattering W', 'Side Scattering S',
                    'Focal Region Power', 'Oblique Scattering Power', 'Absorbed Power']
@@ -2858,6 +3048,7 @@ def run_jobs(queue_in):
                 small_queue.put(queue_in.get())
 
         run_jobs_inner(small_queue)
+        
 
 def run_jobs_inner(queue_in):
     processes = []
@@ -2980,6 +3171,28 @@ for epoch in range(start_epoch, num_epochs):
                     fdtd_hook.select('design_import')
                     fdtd_hook.set('enabled', 0)
                     
+                    if device_array_num > 1:
+                        for dev_arr_idx in range(0, device_array_num**2-1):
+                            fdtd_hook.select('design_import_'+str(dev_arr_idx))
+                            fdtd_hook.set('enabled', 0)
+                    
+                    for sw_idx in range(0, num_sidewalls):
+                        sm_name = 'sidewall_' + str(sw_idx)
+                        sm_mesh_name = 'mesh_sidewall_' + str(sw_idx)
+                        
+                        try:
+                            objExists = fdtd_hook.getnamed(sm_name, 'name')
+                            fdtd_hook.select(sm_name)
+                            fdtd_hook.set('enabled', 0)
+                        except Exception as ex:
+                            pass
+                        try:
+                            objExists = fdtd_hook.getnamed(sm_mesh_name, 'name')
+                            fdtd_hook.select(sm_mesh_name)
+                            fdtd_hook.set('enabled', 0)
+                        except Exception as ex:
+                            pass
+                    
                     job_name = 'sweep_job_nodev_' + \
                         parameter_filename_string + '.fsp'
                     fdtd_hook.save(projects_directory_location +
@@ -2989,7 +3202,7 @@ for epoch in range(start_epoch, num_epochs):
                                 ] = add_job(job_name, jobs_queue)
                     
 
-                    
+            backup_all_vars()        
             run_jobs(jobs_queue)
             
             print("Completed Step 1: Forward Optimization Jobs Completed.")
@@ -3021,10 +3234,20 @@ for epoch in range(start_epoch, num_epochs):
                             job_names[('sweep', xy_idx, idx)])
                     else:
                         # Extract filename, directly declare current directory address
-                        fdtd_hook.load(
-                            convert_root_folder(job_names[('sweep',xy_idx,idx)],
-                                                projects_directory_location)
-                        )
+                        
+                        # TODO: Undo this bit when no longer build-testing
+                        actual_directory = r'C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v3] crosstalk_initial\Data Processing\th0_PEC_60nm_ext\ares_sony_th0_PEC_60nm_ext_dev'
+                        actual_filepath = convert_root_folder(job_names[('sweep',xy_idx,idx)],
+                                                actual_directory)
+                        #fdtd_hook.load( job_names[ ( 'forward', xy_idx, dispersive_range_idx ) ] )
+                        print(f'Loading: {isolate_filename(actual_filepath)}')
+                        sys.stdout.flush()
+                        fdtd_hook.load(actual_filepath)
+                        
+                        # fdtd_hook.load(
+                        #     convert_root_folder(job_names[('sweep',xy_idx,idx)],
+                        #                         projects_directory_location)
+                        # )   
                         
                     monitors_data = {}
                     # Add wavelength and sourcepower information, common to every monitor in a job
@@ -3065,10 +3288,20 @@ for epoch in range(start_epoch, num_epochs):
                             job_names[('nodev', xy_idx, idx)])
                     else:
                         # Extract filename, directly declare current directory address
-                        fdtd_hook.load(
-                            convert_root_folder(job_names[('nodev',xy_idx,idx)],
-                                                projects_directory_location)
-                        )
+                        
+                        # TODO: Undo this bit when no longer build-testing
+                        actual_directory = r'C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v3] crosstalk_initial\Data Processing\th0_PEC_60nm_ext\ares_sony_th0_PEC_60nm_ext_dev'
+                        actual_filepath = convert_root_folder(job_names[('nodev',xy_idx,idx)],
+                                                actual_directory)
+                        #fdtd_hook.load( job_names[ ( 'forward', xy_idx, dispersive_range_idx ) ] )
+                        print(f'Loading: {isolate_filename(actual_filepath)}')
+                        sys.stdout.flush()
+                        fdtd_hook.load(actual_filepath)
+                        
+                        # fdtd_hook.load(
+                        #     convert_root_folder(job_names[('nodev',xy_idx,idx)],
+                        #                         projects_directory_location)
+                        # )
                     
                     # Go through each individual monitor and extract respective data
                     for monitor in monitors:
@@ -3168,7 +3401,11 @@ for epoch in range(start_epoch, num_epochs):
                             elif plot['name'] in ['device_reflection']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
                                     generate_overall_reflection_spectrum(monitors_data, plot['generate_plot_per_job'])
-                                    
+                            
+                            elif plot['name'] in ['crosstalk_power']:
+                                plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+                                    generate_crosstalk_power_spectrum(monitors_data, plot['generate_plot_per_job'])
+                            
                             elif plot['name'] in ['side_scattering_power']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
                                     generate_side_power_spectrum(monitors_data, plot['generate_plot_per_job'])
@@ -3284,56 +3521,59 @@ for epoch in range(start_epoch, num_epochs):
                 
                 for plot in plots:
                     if plot['enabled']:
-                        continue
-                        # if plot['name'] in ['sorting_efficiency']:
-                        #     plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                        #     # continue
-                        # elif plot['name'] in ['sorting_transmission']:
-                        #     plot_sorting_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        # continue
+                        if plot['name'] in ['sorting_efficiency']:
+                            plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                            # continue
+                        elif plot['name'] in ['sorting_transmission']:
+                            plot_sorting_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['Enorm_focal_plane_image']:
-                        #     plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
-                        #                 plot_wavelengths = None,
-                        #                 #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
-                        #                 #plot_wavelengths = [4.6e-7,5.2e-7, 6.1e-7]
-                        #                 ignore_opp_polarization=False)
-                        #                 # Second part gets the wavelengths of each spectra where sorting eff. peaks
-                        #     #continue
+                        elif plot['name'] in ['Enorm_focal_plane_image']:
+                            plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
+                                        plot_wavelengths = None,
+                                        #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
+                                        #plot_wavelengths = [4.6e-7,5.2e-7, 6.1e-7]
+                                        ignore_opp_polarization=False)
+                                        # Second part gets the wavelengths of each spectra where sorting eff. peaks
+                            #continue
                         
-                        # elif plot['name'] in ['device_cross_section']:
-                        #     plot_device_cross_section_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
-                        #                 plot_wavelengths = [4.6e-7,5.2e-7,6.1e-7],
-                        #                 #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
-                        #                 ignore_opp_polarization=False)
-                        #                 # Second part gets the wavelengths of each spectra where sorting eff. peaks
-                        #     #continue
+                        elif plot['name'] in ['device_cross_section']:
+                            plot_device_cross_section_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
+                                        plot_wavelengths = [4.6e-7,5.2e-7,6.1e-7],
+                                        #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
+                                        ignore_opp_polarization=False)
+                                        # Second part gets the wavelengths of each spectra where sorting eff. peaks
+                            #continue
                         
-                        # elif plot['name'] in ['src_spill_power']:
-                        #     plot_src_spill_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['src_spill_power']:
+                            plot_src_spill_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                         
-                        # elif plot['name'] in ['device_transmission']:
-                        #     plot_device_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['device_transmission']:
+                            plot_device_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['device_reflection']:
-                        #     plot_overall_reflection_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                            
-                        # elif plot['name'] in ['side_scattering_power']:
-                        #     plot_side_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['device_reflection']:
+                            plot_overall_reflection_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                         
-                        # elif plot['name'] in ['oblique_scattering_power']:
-                        #     plot_oblique_scattering_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
-                            
-                        # elif plot['name'] in ['focal_region_power']:
-                        #     plot_focal_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['crosstalk_power']:
+                            plot_crosstalk_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                         
-                        # elif plot['name'] in ['focal_scattering_power']:
-                        #     plot_scatter_plane_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['side_scattering_power']:
+                            plot_side_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        
+                        elif plot['name'] in ['oblique_scattering_power']:
+                            plot_oblique_scattering_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['exit_power_distribution']:
-                        #     plot_exit_power_distribution_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['focal_region_power']:
+                            plot_focal_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        
+                        elif plot['name'] in ['focal_scattering_power']:
+                            plot_scatter_plane_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                             
-                        # elif plot['name'] in ['device_rta']:
-                        #     plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                        elif plot['name'] in ['exit_power_distribution']:
+                            plot_exit_power_distribution_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+                            
+                        elif plot['name'] in ['device_rta']:
+                            plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
                                 
                         
             #
@@ -3367,7 +3607,7 @@ for epoch in range(start_epoch, num_epochs):
                         
                     elif plot['name'] in ['device_reflection']:
                         plot_overall_reflection_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], plot_stdDev=False)
-                        
+                    
                     elif plot['name'] in ['side_scattering_power']:
                         plot_side_power_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], plot_stdDev=False)
                     
