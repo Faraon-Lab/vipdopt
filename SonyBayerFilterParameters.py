@@ -3,11 +3,25 @@
 #
 
 import numpy as np
+from os import umask
+import os
+import numpy as np
+import json
 
 #
 #* Debug Options
 #
-running_on_local_machine = True	# False if running on slurm
+
+importing_params_from_opt_file = True
+if importing_params_from_opt_file:
+    from SonyBayerFilterParameters import *
+    # from LayeredMWIRBridgesBayerFilterParameters import *
+
+running_on_local_machine = False
+slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
+if slurm_job_env_variable is None:
+    running_on_local_machine = True
+    
 if running_on_local_machine:	
     lumapi_filepath =  r"C:\Program Files\Lumerical\v212\api\python\lumapi.py"
 else:	
@@ -22,21 +36,19 @@ shelf_fn = 'save_state'
 #* Files
 #
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mode Overlap FoM\fom_dev"
+    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Exploratory Quick Sims\NRL Grant 20220720 Schematic\dev"
+    
     projects_directory_location = projects_directory_location_init          # Change if necessary to differentiate  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/sony"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/sony"
     
-project_name_init = 'test_fom_th0'
-project_name = 'angInc_sony_' + project_name_init
-
-# project_name_init = 'normal_sony_baseline_2p091x2p091x2p04um_40layer_feature_p051um_f1p53um'
-# project_name = 'normal_sony_baseline_2p091x2p091x2p04um_40layer_feature_p051um_f1p53um'
+project_name_init = 'nrl_schematic_dev'
+project_name = 'ares_' + project_name_init
 
 # Initial Project File Directory
-projects_directory_location_init += "/" + project_name_init
+# projects_directory_location_init += "/" + project_name_init
 # Final Output Project File Directory
 projects_directory_location += "/" + project_name
 
@@ -76,7 +88,8 @@ num_vertical_layers = 40
 vertical_layer_height_um = 0.051
 vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_um )
 
-device_size_lateral_um = geometry_spacing_um * 41
+# TODO: Switch back to 41
+device_size_lateral_um = geometry_spacing_um * 40 #41
 device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
 
 device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
@@ -97,12 +110,12 @@ objects_above_device = [] #['permittivity_layer_substrate',
 #
 #* Spectral
 #
-lambda_min_um = 0.375
-lambda_max_um = 0.725
+lambda_min_um = 0.400
+lambda_max_um = 0.700
 bandwidth_um = lambda_max_um - lambda_min_um
 
 num_bands = 3
-num_points_per_band = 15
+num_points_per_band = 30
 num_design_frequency_points = num_bands * num_points_per_band
 lambda_values_um = np.linspace(lambda_min_um, lambda_max_um, num_design_frequency_points)
 
@@ -112,8 +125,8 @@ lambda_values_um = np.linspace(lambda_min_um, lambda_max_um, num_design_frequenc
 max_intensity_by_wavelength = (device_size_lateral_um**2)**2 / (focal_length_um**2 * lambda_values_um**2)
 
 
-lambda_min_eval_um = 0.375
-lambda_max_eval_um = 0.850
+lambda_min_eval_um = 0.400
+lambda_max_eval_um = 0.700
 num_eval_frequency_points = 6 * num_design_frequency_points
 
 num_dispersive_ranges = 1
@@ -185,7 +198,7 @@ adjoint_src_to_dispersive_range_map = [
 #* Optimization
 #
 
-enforce_xy_gradient_symmetry = True
+enforce_xy_gradient_symmetry = False
 if enforce_xy_gradient_symmetry:
     assert ( int( device_size_lateral_um / geometry_spacing_um ) % 2 ) == 1, "We should have an odd number of deisgn voxels across for this operation"
 
