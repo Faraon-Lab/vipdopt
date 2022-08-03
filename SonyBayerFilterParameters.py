@@ -35,16 +35,19 @@ shelf_fn = 'save_state'
 #
 #* Files
 #
+
+python_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
+
 if running_on_local_machine:
-    projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Exploratory Quick Sims\NRL Grant 20220720 Schematic\dev"
-    
+    # projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Exploratory Quick Sims\NRL Grant 20220720 Schematic\dev"
+    projects_directory_location_init = python_src_directory
     projects_directory_location = projects_directory_location_init          # Change if necessary to differentiate  
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/sony"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/sony"
     
-project_name_init = 'nrl_schematic_dev'
+project_name_init = 'fom_optimization_dev'
 project_name = 'ares_' + project_name_init
 
 # Initial Project File Directory

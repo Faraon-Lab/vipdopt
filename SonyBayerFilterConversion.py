@@ -240,7 +240,7 @@ except Exception as ex:
 
 # Create new file called optimization.fsp and save
 fdtd_hook.newproject()
-fdtd_hook.load(projects_directory_location + "/optimization")
+fdtd_hook.load(projects_directory_location_init + "/optimization")
 # Copy Python code files to the output project directory
 shutil.copy2(python_src_directory + "/SonyBayerFilterParameters.py",
              projects_directory_location + "/SonyBayerFilterParameters.py")
@@ -1081,7 +1081,8 @@ else:
                             job_name = 'adjoint_job_' + str( adj_src_idx ) + '_' + str( xy_idx ) + '_' + str( dispersive_range_idx ) + '.fsp'
                             fdtd_hook.save( projects_directory_location + "/optimization.fsp" )
                             job_names[ ( 'adjoint', adj_src_idx, xy_idx, dispersive_range_idx ) ] = add_job( job_name, jobs_queue )
-                    
+                
+                backup_all_vars()
                 run_jobs( jobs_queue )
                 
                 print("Completed Step 1: Forward and Adjoint Optimization Jobs Completed.")
@@ -1512,6 +1513,7 @@ else:
 
                         adjoint_e_fields.append(
                             get_efield(design_efield_monitor['name']))
+                        
                     endtime=time.time()
                     print(f'Loading data took: {(endtime-starttime)/60} min.')
                     
