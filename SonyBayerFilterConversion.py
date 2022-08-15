@@ -228,8 +228,14 @@ log_file.close()
 #
 # Create FDTD hook
 #
+print('Attempting to sign into Lumerical...')
+sys.stdout.flush()
+starttime = time.time()
+
 try:
     fdtd_hook = lumapi.FDTD()
+    print('Signed into Lumerical successfully.')
+    sys.stdout.flush()
 except Exception as ex:
     print('ERROR Accessing Lumerical')
     template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -237,10 +243,14 @@ except Exception as ex:
     print(message)
     sys.stdout.flush()
 
+endtime=time.time()
+print(f'Accessing Lumerical took: {(endtime-starttime)/60} min.')
+sys.stdout.flush()
+
 
 # Create new file called optimization.fsp and save
 fdtd_hook.newproject()
-fdtd_hook.load(projects_directory_location_init + "/optimization")
+fdtd_hook.load(python_src_directory + "/optimization")
 # Copy Python code files to the output project directory
 shutil.copy2(python_src_directory + "/SonyBayerFilterParameters.py",
              projects_directory_location + "/SonyBayerFilterParameters.py")
@@ -853,6 +863,7 @@ max_design_variable_change_evolution = np.zeros((num_epochs, num_iterations_per_
 transmission_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4))
 transmission_by_wl_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
 transmission_by_focal_spot_and_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4, num_design_frequency_points))
+intensity_fom_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4))
 intensity_fom_by_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, num_design_frequency_points))
 intensity_fom_by_focal_spot_and_wavelength_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4, num_design_frequency_points))
 mode_overlap_fom_by_focal_spot_evolution = np.zeros((num_epochs, num_iterations_per_epoch, 4))

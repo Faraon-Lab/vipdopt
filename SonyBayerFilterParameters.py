@@ -12,11 +12,6 @@ import json
 #* Debug Options
 #
 
-importing_params_from_opt_file = True
-if importing_params_from_opt_file:
-    from SonyBayerFilterParameters import *
-    # from LayeredMWIRBridgesBayerFilterParameters import *
-
 running_on_local_machine = False
 slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
 if slurm_job_env_variable is None:
