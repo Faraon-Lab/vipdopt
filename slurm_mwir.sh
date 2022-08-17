@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --time=72:00:00
+#SBATCH --time=167:00:00
 #SBATCH --nodes=10
 #SBATCH --ntasks-per-node=8
 #SBATCH --qos=normal
 #SBATCH --mem-per-cpu=8G
-#SBATCH --comment="SONY PEC 60nm, th0"
+#SBATCH --comment="SONY Mode Overlap Optimization, in-band"
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=END
 

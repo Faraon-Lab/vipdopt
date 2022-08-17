@@ -22,8 +22,9 @@ if running_on_local_machine:
 else:	
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
-    
-start_from_step = 0 	# 0 if running entire file in one shot
+
+convert_existing = True     # Are we converting a previous file that didn't have the mode overlap FoM?
+start_from_step = 0 	    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -42,7 +43,7 @@ else:
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/sony"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/sony"
     
-project_name_init = 'fom_optimization_dev'
+project_name_init = 'fom_0_modeoverlap_inband'
 project_name = 'ares_' + project_name_init
 
 # Initial Project File Directory
@@ -87,7 +88,7 @@ vertical_layer_height_um = 0.051
 vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_um )
 
 # TODO: Switch back to 41
-device_size_lateral_um = geometry_spacing_um * 40 #41
+device_size_lateral_um = geometry_spacing_um * 41
 device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
 
 device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
@@ -103,6 +104,19 @@ device_vertical_minimum_um = 0
 # Structure the following list such that the last entry is the last medium above the device.
 objects_above_device = [] #['permittivity_layer_substrate',
                         #'silicon_substrate']
+        
+num_sidewalls = 0
+sidewall_thickness_um = 0.24
+sidewall_material = 'Si (Silicon) - Palik'
+sidewall_extend_focalplane = False
+sidewall_x_positions_um = [device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2, 0]
+sidewall_y_positions_um = [0, device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2]
+sidewall_xspan_positions_um = [sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2,
+                               sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2]
+sidewall_yspan_positions_um = [device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um, 
+                               device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um]
+sidewall_vertical_minimum_um = -0.93
+# sidewall_vertical_minimum_um = device_vertical_minimum_um
 
 
 #
@@ -159,6 +173,7 @@ src_minimum_vertical_um = -focal_length_um - 0.5 * vertical_gap_size_um
 src_beam_rad = 0.5 * device_size_lateral_um
 src_angle_incidence = 0 # degrees
 src_phi_incidence = 0 # degrees
+src_div_angle = 13.13 # degrees
 
 src_hgt_Si = 0
 src_hgt_polymer = 0
@@ -201,8 +216,8 @@ if enforce_xy_gradient_symmetry:
     assert ( int( device_size_lateral_um / geometry_spacing_um ) % 2 ) == 1, "We should have an odd number of deisgn voxels across for this operation"
 
 
-num_epochs = 1 #10
-num_iterations_per_epoch = 1 #30
+num_epochs = 10
+num_iterations_per_epoch = 30
 
 use_fixed_step_size = False
 fixed_step_size = 2.0
