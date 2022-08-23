@@ -4,6 +4,7 @@ import shutil
 import sys
 import shelve
 import gc
+import tracemalloc
 
 # Add filepath to default path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
@@ -31,6 +32,7 @@ import re
 
 print("All modules loaded.")
 sys.stdout.flush()
+tracemalloc.start()
 
 #! Utility Functions
 def backup_var(variable_name, savefile_name=None):
@@ -101,7 +103,7 @@ def load_backup_vars(loadfile_name = None):
                         'start_from_step',
                         'projects_directory_location',
                         'projects_directory_location_init',
-                        'plot_directory_location',
+                        'plot_directory_location', 'actual_directory'
                         'start_epoch', 'num_epochs', 'start_iter', 
                         'num_iterations_per_epoch']
     
@@ -692,6 +694,8 @@ def add_job( job_name, queue_in ):
     fdtd_hook.save( full_name )
     queue_in.put( full_name )
 
+    
+    
     return full_name
 
 def run_jobs( queue_in ):
@@ -749,6 +753,7 @@ def get_afield( monitor_name, field_indicator ):
     start = time.time()
 
     field_pol_0 = fdtd_hook.getdata( monitor_name, field_polarizations[ 0 ] )
+        
     data_xfer_size_MB += field_pol_0.nbytes / ( 1024. * 1024. )
 
     total_field = np.zeros( [ len (field_polarizations ) ] + 
@@ -1038,6 +1043,8 @@ else:
         for iteration in range(start_iter, num_iterations_per_epoch):
             print("Working on epoch " + str(epoch) + " and iteration " + str(iteration))
             sys.stdout.flush()
+            
+            iter_starttime = time.time()
 
             job_names = {}
 
@@ -1177,7 +1184,7 @@ else:
                     for xy_idx in range(0, 2):
                         # TODO: Undo this bit when no longer build-testing
                         if running_on_local_machine:
-                            actual_directory = r'C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Mode Overlap FoM\fom_dev\fom_correlation_test\angInc_sony_test_fom_dev'
+                            actual_directory = r'D:\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v4] modeoverlap_optimization\dev\attempt0_modeoverlap_inband\ares_fom_optimization_inband_dev'
                         else: actual_directory = projects_directory_location
                         actual_filepath = convert_root_folder(job_names[ ( 'forward', xy_idx, dispersive_range_idx )], actual_directory)
                         #fdtd_hook.load( job_names[ ( 'forward', xy_idx, dispersive_range_idx ) ] )
@@ -1205,8 +1212,10 @@ else:
                                     forward_e_fields[xy_names[xy_idx]][ :, :, :, :, spectral_idx ] = fwd_e_fields[ :, :, :, :, spectral_idx ]
 
                         # Populate arrays with adjoint source E-field, adjoint source H-field and quadrant transmission info
-                        for adj_src_idx in dispersive_range_to_adjoint_src_map[ dispersive_range_idx ]:	
+                        for adj_src_idx in dispersive_range_to_adjoint_src_map[ dispersive_range_idx ]:
+                            # Get data over the transmission monitor for each quadrant
                             focal_e_data[xy_names[xy_idx]][ adj_src_idx ] = get_efield(transmission_monitors[adj_src_idx]['name'])
+                            # Get data for the overall transmission monitor at the focal plane, and store it in the same ndarray #! Might have to separate these out in the futurre
                             focal_e_data[xy_names[xy_idx]][-1] = get_efield(transmission_monitor_focal['name'])
                             print(f'Accessed adjoint E-field data over focal quadrant {adj_src_idx}.')
                             print(f'Overall data is of shape {np.shape(focal_e_data[xy_names[xy_idx]][-1])}')
@@ -1295,17 +1304,18 @@ else:
                     one_over_weight_focal_plane_map_performance_weighting = 1. / weight_focal_plane_map_performance_weighting[focal_idx]
                     
                     for polarization_idx in range(0, len(polarizations)):
-                        get_focal_e_data = focal_e_data[polarizations[polarization_idx]]                                # shape: (#focalspots, 3, nx, ny, nz, nλ)
-                        get_focal_h_data = focal_h_data[polarizations[polarization_idx]]                                # shape: (#focalspots, 3, nx, ny, nz, nλ)
-                        get_quad_transmission_data = quadrant_transmission_data[polarizations[polarization_idx]]        # shape: (#focalspots, nλ)
-                        get_mode_e_fields = mode_e_fields[polarizations[polarization_idx]]                              # shape: (#focalspots, 3, nx, ny, nz, nλ)
-                        get_mode_h_fields = mode_h_fields[polarizations[polarization_idx]]                              # shape: (#focalspots, 3, nx, ny, nz, nλ)
+                        pol_name = polarizations[polarization_idx]
+                        get_focal_e_data = focal_e_data[pol_name]                                # shape: (#focalspots, 3, nx, ny, nz, nλ)
+                        get_focal_h_data = focal_h_data[pol_name]                                # shape: (#focalspots, 3, nx, ny, nz, nλ)
+                        get_quad_transmission_data = quadrant_transmission_data[pol_name]        # shape: (#focalspots, nλ)
+                        get_mode_e_fields = mode_e_fields[pol_name]                              # shape: (#focalspots, 3, nx, ny, nz, nλ)
+                        get_mode_h_fields = mode_h_fields[pol_name]                              # shape: (#focalspots, 3, nx, ny, nz, nλ)
                         
 
                         for spectral_idx in range(0, total_weighting.shape[0]):
                             
                             quadrant_midpoint = 31 # in numbers of mesh cells(?)
-                            print(np.shape(get_focal_e_data))
+                            #print(np.shape(get_focal_e_data))
 
                             weight_spectral_rejection = 1.0
                             if do_rejection:
@@ -1355,13 +1365,13 @@ else:
                             # TODO: Maybe the dS here is not the quadrant corresponding to focal_idx, but the other 3 quadrants that are NOT focal_idx?
                             fom_integral_1 = poynting_flux(get_focal_e_data[-1][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
                                                     np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
-                                                    (0.5*device_size_lateral_um)**2)
+                                                    (1.0*device_size_lateral_um)**2)
                             fom_integral_2 = poynting_flux(np.conj(get_mode_e_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
                                                     get_focal_h_data[-1][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
-                                                    (0.5*device_size_lateral_um)**2)
+                                                    (1.0*device_size_lateral_um)**2)
                             fom_integral_3 = poynting_flux(get_mode_e_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx],
                                                     np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_focal_plane_map[focal_idx][0] + spectral_idx]),
-                                                    (0.5*device_size_lateral_um)**2, real_e_h = True)
+                                                    (1.0*device_size_lateral_um)**2, real_e_h = True)
                             
                             compute_fom += weight_spectral_rejection * np.sum(
                                     1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / fom_integral_3
@@ -1386,32 +1396,39 @@ else:
                             
                         # Get detailed FoM information by quadrant and wavelength - for correlation studies (if needed)
                         # Note on how parts of the array sum together: https://i.imgur.com/pEvitcm.jpg
+                        
+                        # Intensity (by wavelength) normalization for intensity-based FoM
+                        # Use the max_intensity_weighting to renormalize the intensity distribution used to calculate the FoM
+                        # and insert the custom weighting schemes here as well.
+                        total_overall_weighting = max_intensity_by_wavelength / weight_focal_plane_map_performance_weighting[focal_idx]
+                        
                         for spectral_idx in range(0, num_bands*num_points_per_band):
                             
                             transmission_per_quadrant_per_wl[focal_idx, spectral_idx] += weight_spectral_rejection * \
                                     get_quad_transmission_data[focal_idx][spectral_idx] / \
                                         one_over_weight_focal_plane_map_performance_weighting
                             
+                            print(f'Total_weighting has shape {np.shape(total_weighting)} and Spectral index is {spectral_idx}')
                             intensity_fom_per_quadrant_per_wl[focal_idx, spectral_idx] += weight_spectral_rejection * np.sum(
                                 (
                                     np.abs(get_focal_e_data[focal_idx][:, quadrant_midpoint, quadrant_midpoint, 0, spectral_idx])**2 /
-                                    total_weighting[spectral_idx]
+                                    total_overall_weighting[spectral_idx]
                                 )
                             )
                             
                             fom_integral_1 = poynting_flux(get_focal_e_data[-1][:,:,:,:,spectral_idx],
                                                     np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_idx]),
-                                                    (0.5*device_size_lateral_um)**2)
+                                                    (1.0*device_size_lateral_um)**2) 
                             fom_integral_2 = poynting_flux(np.conj(get_mode_e_fields[focal_idx][:,:,:,:,spectral_idx]),
                                                     get_focal_h_data[-1][:,:,:,:,spectral_idx],
-                                                    (0.5*device_size_lateral_um)**2)
+                                                    (1.0*device_size_lateral_um)**2)
                             fom_integral_3 = poynting_flux(get_mode_e_fields[focal_idx][:,:,:,:,spectral_idx],
                                                     np.conj(get_mode_h_fields[focal_idx][:,:,:,:,spectral_idx]),
-                                                    (0.5*device_size_lateral_um)**2, real_e_h = True)
+                                                    (1.0*device_size_lateral_um)**2, real_e_h = True)
                             
                             mode_overlap_fom_per_quadrant_per_wl[focal_idx, spectral_idx ] += weight_spectral_rejection * np.sum(
                                     1/8 * (np.abs(fom_integral_1 + fom_integral_2)**2 / np.abs(fom_integral_3)
-                                            ) / 1 # total_weighting[spectral_idx]
+                                            ) / 1 # total_overall_weighting[spectral_idx]
                             )
                             
 
@@ -1436,8 +1453,7 @@ else:
                 transmission_per_quadrant_per_wl = np.array(transmission_per_quadrant_per_wl)
                 intensity_fom_per_quadrant_per_wl = np.array(intensity_fom_per_quadrant_per_wl)
                 mode_overlap_fom_per_quadrant_per_wl = np.array(mode_overlap_fom_per_quadrant_per_wl)
-                
-                # TODO: STOPPED HERE
+            
                 # Copy everything so as not to disturb the original data
                 process_fom_per_focal_spot = figure_of_merit_per_focal_spot.copy()
                 process_transmission_per_quadrant = transmission_per_quadrant.copy()
@@ -1453,7 +1469,7 @@ else:
                     for idx in range( 0, len( transmission_per_wavelength ) ):
                         process_transmission_by_wavelength[ idx ] = softplus( transmission_per_wavelength[ idx ] )
 
-                # TODO: Why this metric?
+                # TODO: The following metric is used to ensure all weights sum to 1. See Eq.(2), https://doi.org/10.1038/s41598-021-88785-5
                 performance_weighting = (2. / num_focal_spots) - process_fom_per_focal_spot**2 / np.sum(process_fom_per_focal_spot**2)
                 if weight_by_quadrant_transmission:
                     performance_weighting = (2. / num_focal_spots) - process_transmission_per_quadrant**2 / np.sum(process_transmission_per_quadrant**2)
@@ -1519,6 +1535,7 @@ else:
             # gradients for x- and y-polarized forward sources.
             #
             
+            #if True: # start_from_step == 0 or start_from_step == 3: #! Disabling debugging step for now
             if start_from_step == 0 or start_from_step == 3:
                 # if start_from_step != 0:
                 load_backup_vars()
@@ -1539,8 +1556,8 @@ else:
                 cur_permittivity_shape = cur_permittivity.shape
                 # Get the device's dimensions in terms of (MESH) voxels
                 field_shape = [device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
-                #! Definition of device_voxels_simulation_mesh_lateral is 1 off
-                field_shape = [device_voxels_simulation_mesh_lateral-1, device_voxels_simulation_mesh_lateral-1, device_voxels_simulation_mesh_vertical]
+                #! Definition of device_voxels_simulation_mesh_lateral is 1 off if device_size_lateral_um is 40 and not 41
+                # field_shape = [device_voxels_simulation_mesh_lateral-1, device_voxels_simulation_mesh_lateral-1, device_voxels_simulation_mesh_vertical]
 
                 # Initialize arrays to store the gradients of each polarization, each the shape of the voxel mesh
                 xy_polarized_gradients = [ np.zeros(field_shape, dtype=np.complex), np.zeros(field_shape, dtype=np.complex) ]
@@ -1568,7 +1585,9 @@ else:
                         #
                         # This is ok because we are only going to be using the spectral idx corresponding to this range in the summation below
                         #
-                        
+                        if running_on_local_machine:
+                            actual_directory = r'D:\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v4] modeoverlap_optimization\dev\attempt0_modeoverlap_inband\ares_fom_optimization_inband_dev'
+                        else: actual_directory = projects_directory_location
                         actual_filepath = convert_root_folder(job_names[ ( 'adjoint', adj_src_idx, xy_idx, lookup_dispersive_range_idx ) ], actual_directory)
                         #fdtd_hook.load( job_names[ ( 'forward', xy_idx, dispersive_range_idx ) ] )
                         print(f'Loading: {isolate_filename(actual_filepath)}')
@@ -1606,22 +1625,24 @@ else:
                             normal_vector[2] = np.ones(np.shape(normal_vector[2]))
                             mu_0 = 1.25663706 * 1e-6
                             
-                            adjoint_integral_1 = poynting_flux(get_focal_e_data[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
+                            print(f'Adjoint source index: {adj_src_idx}; Polarization is: {xy_idx}')
+                            
+                            adjoint_integral_1 = poynting_flux(get_focal_e_data[-1][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
                                                                np.conj(get_mode_h_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
-                                                               (0.5*device_size_lateral_um)**2)
+                                                               (1.0*device_size_lateral_um)**2)
                             adjoint_integral_2 = poynting_flux(np.conj(get_mode_e_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
-                                                               get_focal_h_data[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
-                                                               (0.5*device_size_lateral_um)**2)
+                                                               get_focal_h_data[-1][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
+                                                               (1.0*device_size_lateral_um)**2)
                             adjoint_integral_3 = poynting_flux(get_mode_e_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1],
                                                                np.conj(get_mode_h_fields[adj_src_idx][:,:,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
-                                                               (0.5*device_size_lateral_um)**2, real_e_h=True)
-                            # TODO: 
+                                                               (1.0*device_size_lateral_um)**2, real_e_h=True)
+                            
                             adjoint_A_factor = 1/4 * np.conj(adjoint_integral_1 + adjoint_integral_2) / (adjoint_integral_3)
                             print("Calculated adjoint A factor.")
                             sys.stdout.flush()
                                         
                             
-                            source_weight =  np.squeeze(adjoint_A_factor) 
+                            source_weight = np.squeeze(adjoint_A_factor) 
                                 # * (
                                 # poynting_flux(np.conj(get_focal_h_data[adj_src_idx][:, :,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
                                 #               normal_vector[:, :,:,:, spectral_indices[0] : spectral_indices[1] : 1], 
@@ -1630,6 +1651,7 @@ else:
                                 #               np.conj(get_focal_e_data[adj_src_idx][:, :,:,:, spectral_indices[0] : spectral_indices[1] : 1]),
                                 #               (0.5*device_size_lateral_um)**2, dot_dS = False, pauseDebug=False) / mu_0
                                 # ))
+                            print(f'Source weight has shape: {np.shape(source_weight)}')
 
 
                             #
@@ -1669,7 +1691,7 @@ else:
                                 sys.stdout.flush()
                                 gradient_component = np.sum(
                                     (source_weight[spectral_idx] *                                                      # Amplitude of electric dipole at x_0
-                                     gradient_performance_weight / total_weighting[spectral_idx]) *                     # Performance weighting, Manual override weighting, and intensity normalization factors
+                                     gradient_performance_weight / 1.0) * # total_weighting[spectral_idx]) *            # Performance weighting, Manual override weighting, and intensity normalization factors
                                     adjoint_e_fields[xy_idx][:, :, :, :, spectral_indices[0] + spectral_idx] *          # E-field induced at x from electric dipole at x_0
                                     forward_e_fields[pol_name][:, :, :, :, spectral_indices[0] + spectral_idx],         # E_old(x)
                                     axis=0)                                                                             # Dot product
@@ -1680,8 +1702,8 @@ else:
                                 imag_part_gradient = -np.imag( gradient_component )
                                 get_grad_density = delta_real_permittivity * real_part_gradient + delta_imag_permittivity * imag_part_gradient
 
-                                # print(np.shape(xy_polarized_gradients[pol_name_to_idx]))
-                                # print(np.shape(get_grad_density))
+                                print(np.shape(xy_polarized_gradients[pol_name_to_idx]))
+                                print(np.shape(get_grad_density))
                                 xy_polarized_gradients[pol_name_to_idx] += get_grad_density
 
                 print("Completed Step 3: Retrieved Adjoint Optimization results and calculated gradient.")
@@ -1703,9 +1725,9 @@ else:
                 
                 # TODO: Take out once device_voxels_simulation_mesh goes back to 41
                 gradient_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 
-                                        0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral-1)
+                                        0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
                 gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 
-                                                    0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral-1)
+                                                    0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
 
 
                 # Get the full device gradient by summing the x,y polarization components 
@@ -1810,13 +1832,14 @@ else:
                 np.save(projects_directory_location + "/cur_design_variable.npy", cur_design_variable)
                 np.save(projects_directory_location + "/cur_design.npy", cur_design)
                 np.save(projects_directory_location + "/cur_design_variable_epoch_" + str( epoch ) + ".npy", cur_design_variable)
-                # np.save(projects_directory_location_init +
-                    # "/cur_design_variable.npy", cur_design_variable)
                 
                 print("Completed Step 4: Saved out cur_design_variable.npy and other files.")
                 sys.stdout.flush()
                 
                 backup_all_vars()
+                
+                iter_endtime=time.time()
+                print(f'Epoch {epoch}, Iteration {iteration} took: {(iter_endtime-iter_starttime)/60} min.')
                 
 
 

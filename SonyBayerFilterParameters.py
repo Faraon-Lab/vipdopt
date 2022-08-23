@@ -23,8 +23,8 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
 
-convert_existing = True     # Are we converting a previous file that didn't have the mode overlap FoM?
-start_from_step = 0 	    # 0 if running entire file in one shot
+convert_existing = False     # Are we converting a previous file that didn't have the mode overlap FoM?
+start_from_step = 4 	    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -216,8 +216,8 @@ if enforce_xy_gradient_symmetry:
     assert ( int( device_size_lateral_um / geometry_spacing_um ) % 2 ) == 1, "We should have an odd number of deisgn voxels across for this operation"
 
 
-num_epochs = 10
-num_iterations_per_epoch = 30
+num_epochs = 1#10
+num_iterations_per_epoch = 1#30
 
 use_fixed_step_size = False
 fixed_step_size = 2.0
