@@ -20,8 +20,7 @@ import json
 #
 
 running_on_local_machine = False
-if slurm_job_env_variable is None:
-    slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
+slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
 if slurm_job_env_variable is None:
     running_on_local_machine = True
 
@@ -32,7 +31,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 0    # 0 if running entire file in one shot
+start_from_step = 3    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -52,7 +51,8 @@ else:
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
 
-project_name_init = 'sony_th0_Cu_100nm'
+# project_name_init = 'sony_th0_air1a_outPD_dep0.765'
+project_name_init = os.path.basename(python_src_directory)
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
@@ -138,7 +138,7 @@ disable_object_list = ['design_efield_monitor',
 #* Spectral
 #
 
-change_wavelength_range = True
+change_wavelength_range = False
 if change_wavelength_range:
     d_lambda = (lambda_max_um - lambda_min_um)/5        # Just widening out the spectrum a little
     lambda_min_um -= d_lambda
@@ -197,6 +197,8 @@ device_vertical_minimum_um = 0
 # Structure the following list such that the last entry is the last medium above the device.
 objects_above_device = [] #['permittivity_layer_substrate',
                         #'silicon_substrate']
+                        
+device_array_num = 1
 
 #
 #* Optical
@@ -230,14 +232,16 @@ else:
     if not importing_params_from_opt_file:
         sidewall_thickness_um = 0.45
         sidewall_material = 'Cu (Copper) - Palik'
-sidewall_extend_focalplane = False
+# sidewall_extend_focalplane = False
 
-sidewall_x_positions_um = [device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2, 0]
-sidewall_y_positions_um = [0, device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2]
-sidewall_xspan_positions_um = [sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2,
-                               sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2]
-sidewall_yspan_positions_um = [device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um, 
-                               device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um]
+# sidewall_x_positions_um = [device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2, 0]
+# sidewall_y_positions_um = [0, device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2]
+# sidewall_xspan_positions_um = [sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2,
+#                                sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2]
+# sidewall_yspan_positions_um = [device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um, 
+#                                device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um]
+# sidewall_vertical_minimum_um = -0.93
+# # sidewall_vertical_minimum_um = device_vertical_minimum_um
 
 
 #
