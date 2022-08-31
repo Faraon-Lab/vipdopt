@@ -37,6 +37,32 @@ import gc
 print("All modules loaded.")
 sys.stdout.flush()
 
+#
+# Create project folder and save out the parameter file for documentation (stdout) for this optimization
+#
+python_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
+if not os.path.isdir(projects_directory_location):
+	os.mkdir(projects_directory_location)
+                
+class Logger(object):
+    def __init__(self):
+        self.terminal = sys.stdout
+        self.log = open(os.path.join(projects_directory_location,"logfile.txt"), "a")
+        
+        self.log.write( "---Log for Lumerical Processing Sweep---\n" )
+   
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)  
+
+    def flush(self):
+        # this flush method is needed for python 3 compatibility.
+        # this handles the flush command by doing nothing.
+        # you might want to specify some extra behavior here.
+        pass    
+sys.stdout = Logger()
+
+
 def backup_var(variable_name, savefile_name=None):
     '''Performs the equivalent of MATLAB's save(), albeit with some workarounds. Lumapi SimObjects cannot be saved this way.'''
     
@@ -115,8 +141,9 @@ def load_backup_vars(loadfile_name = None):
     my_shelf.close()
     
     # Restore lumapi SimObjects as dictionaries
-    for key,val in fdtd_objects.items():
-        globals()[key]=val
+    # if fdtd_objects in globals():
+    #     for key,val in fdtd_objects.items():
+    #         globals()[key]=val
     
     print("Successfully loaded backup.")
     sys.stdout.flush()
@@ -177,18 +204,6 @@ if not running_on_local_machine:
     cluster_hostnames = get_slurm_node_list()
     print(f'There are {len(cluster_hostnames)} nodes available.')
     sys.stdout.flush()
-
-#
-# Create project folder and save out the parameter file for documentation for this optimization
-#
-python_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
-
-if not os.path.isdir(projects_directory_location):
-	os.mkdir(projects_directory_location)
-
-log_file = open( projects_directory_location + "/log.txt", 'w' )
-log_file.write( "---Log for Lumerical Processing Sweep---\n" )
-log_file.close()
 
 #
 # Create FDTD hook
@@ -538,6 +553,37 @@ if start_from_step == 0:
         forward_src_x['distance from waist'] = -(src_maximum_vertical_um - device_size_vertical_um) * 1e-6
         for key, val in globals()['forward_src_x'].items():
             fdtd_hook.setnamed('forward_src_x', key, val)
+    
+    # Install Aperture
+    source_block = fdtd_hook.addrect()
+    source_block['name'] = 'PEC_screen'
+    source_block['x'] = 0 * 1e-6
+    source_block['x span'] = 1.1*4/3*1.2 * device_size_lateral_um * 1e-6
+    source_block['y'] = 0 * 1e-6
+    source_block['y span'] = 1.1*4/3*1.2 * monitorbox_size_lateral_um * 1e-6
+    source_block['z'] = monitorbox_vertical_maximum_um * 1e-6
+    source_block['z span'] = 3 * mesh_spacing_um * 1e-6
+    source_block['material'] = 'PEC (Perfect Electrical Conductor)'
+    fdtd_objects['source_block'] = source_block
+    
+    source_aperture = fdtd_hook.addrect()
+    source_aperture['name'] = 'source_aperture'
+    source_aperture['x'] = 0 * 1e-6
+    source_aperture['x span'] = monitorbox_size_lateral_um * 1e-6
+    source_aperture['y'] = 0 * 1e-6
+    source_aperture['y span'] = monitorbox_size_lateral_um * 1e-6
+    source_aperture['z'] = monitorbox_vertical_maximum_um * 1e-6
+    source_aperture['z span'] = 3 * mesh_spacing_um * 1e-6
+    source_aperture['material'] = 'etch'
+    fdtd_objects['source_aperture'] = source_aperture
+    
+    # Readjust sidewall bottoms
+    # #! Remove for future
+    # for idx in range(0, num_sidewalls):
+    #     sm_name = 'sidewall_' + str(idx)
+    #     fdtd_hook.select(sm_name)
+    #     fdtd_hook.setnamed(sm_name, 'z min', sidewall_vertical_minimum_um * 1e-6)
+    #     fdtd_hook.setnamed(sm_name, 'material', 'Si (Silicon) - Palik')
     
     # Duplicate devices and set in an array
     if device_array_num > 1:
@@ -1023,6 +1069,21 @@ def generate_sorting_transmission_spectrum(monitors_data, produce_spectrum, stat
         f_vectors[1]['var_name'] = 'Green'
         f_vectors[1]['var_values'] = f_vectors[1]['var_values'] + f_vectors[3]['var_values']
         f_vectors.pop(3)
+        
+    #! Remove - rescaling
+    def rescale_vector(vec, amin, amax):
+        vec = (vec - np.min(vec))/(np.max(vec) - np.min(vec))
+        vec = amin + (amax-amin)*vec
+        return vec
+    
+    #! Remove rescale
+    # for f_vector in f_vectors:
+    #     f_vector['var_values'] = f_vector['var_values']*0.65/0.48
+    # f_vectors[0]['var_values'] = f_vectors[0]['var_values'] * 0.85
+    
+    # f_vectors[0]['var_values'] = rescale_vector(f_vectors[0]['var_values'], 0.05, 0.67)
+    # f_vectors[1]['var_values'] = rescale_vector(f_vectors[1]['var_values'], 0.08, 0.63)
+    # f_vectors[2]['var_values'] = rescale_vector(f_vectors[2]['var_values'], 0.03, 0.6)
     
     if produce_spectrum:
         output_plot['r'] = r_vectors
@@ -1387,39 +1448,50 @@ def generate_crosstalk_power_spectrum(monitors_data, produce_spectrum, statistic
     
     # Generate crosstalk relative numbers
     n_x = np.shape(E_vals)[0]
-    n_x = int(4*np.floor(n_x/4))
-    n_y = np.shape(E_vals)[0]
-    n_y = int(4*np.floor(n_x/4))
+    n_x = int(3*np.floor(n_x/3))
+    n_y = np.shape(E_vals)[1]
+    n_y = int(3*np.floor(n_y/3))
     E_vals = E_vals[0:n_x, 0:n_y, :]        # First, make sure the array is split nicely into equal sections
     
-    l = np.array_split(E_vals,4,axis=0)
+    l = np.array_split(E_vals,3,axis=0)
     split_E_vals = []
     for a in l:
-        l = np.array_split(a,4,axis=1)
+        l = np.array_split(a,3,axis=1)
         split_E_vals += l
     split_E_vals = np.array(split_E_vals)
     
     # split_E_vals has shape (16, nx/4, ny/4, nλ)
     split_power_vals = np.sum(np.square(split_E_vals),(1,2))
+    
+    #! Remove - rescaling
+    def rescale_vector(vec, amin, amax):
+        vec = (vec - np.min(vec))/(np.max(vec) - np.min(vec))
+        vec = amin + (amax-amin)*vec
+        return vec
+    # split_power_vals[4] = rescale_vector(split_power_vals[4], np.max(split_power_vals[4])*0.9, np.max(split_power_vals[4]))
+    # split_power_vals[4] = 3 * split_power_vals[4]
+    
     sum_split_power_vals = np.sum(split_power_vals, 0)
     crosstalk_vals_mod = np.divide(split_power_vals, sum_split_power_vals)
-    # crosstalk_vals = np.divide(split_power_vals, sum_split_power_vals)
+    crosstalk_vals = np.divide(split_power_vals, sum_split_power_vals)
     
-    crosstalk_vals = np.zeros((9,np.shape(crosstalk_vals_mod)[1]))
-    crosstalk_vals[0,:] = crosstalk_vals_mod[0,:]
-    crosstalk_vals[1,:] = crosstalk_vals_mod[1,:] + crosstalk_vals_mod[2,:]
-    crosstalk_vals[2,:] = crosstalk_vals_mod[3,:]
-    crosstalk_vals[3,:] = crosstalk_vals_mod[4,:] + crosstalk_vals_mod[8,:]
-    crosstalk_vals[4,:] = crosstalk_vals_mod[5,:] + crosstalk_vals_mod[6,:] + crosstalk_vals_mod[9,:] + crosstalk_vals_mod[10,:]
-    crosstalk_vals[5,:] = crosstalk_vals_mod[7,:] + crosstalk_vals_mod[11,:]
-    crosstalk_vals[6,:] = crosstalk_vals_mod[12,:]
-    crosstalk_vals[7,:] = crosstalk_vals_mod[13,:] + crosstalk_vals_mod[14,:]
-    crosstalk_vals[8,:] = crosstalk_vals_mod[15,:]
+    # crosstalk_vals = np.zeros((9,np.shape(crosstalk_vals_mod)[1]))
+    # crosstalk_vals[0,:] = crosstalk_vals_mod[0,:]
+    # crosstalk_vals[1,:] = crosstalk_vals_mod[1,:] + crosstalk_vals_mod[2,:]
+    # crosstalk_vals[2,:] = crosstalk_vals_mod[3,:]
+    # crosstalk_vals[3,:] = crosstalk_vals_mod[4,:] + crosstalk_vals_mod[8,:]
+    # crosstalk_vals[4,:] = crosstalk_vals_mod[5,:] + crosstalk_vals_mod[6,:] + crosstalk_vals_mod[9,:] + crosstalk_vals_mod[10,:]
+    # crosstalk_vals[5,:] = crosstalk_vals_mod[7,:] + crosstalk_vals_mod[11,:]
+    # crosstalk_vals[6,:] = crosstalk_vals_mod[12,:]
+    # crosstalk_vals[7,:] = crosstalk_vals_mod[13,:] + crosstalk_vals_mod[14,:]
+    # crosstalk_vals[8,:] = crosstalk_vals_mod[15,:]
     
     for idx in range(0, 9):
         f_vectors.append({'var_name': f'Crosstalk Power, Pixel {idx}',
                         'var_values': crosstalk_vals[idx,:]
                         })
+    
+    print(np.mean(crosstalk_vals,1))
     
     if produce_spectrum:
         output_plot['r'] = r_vectors
@@ -1446,7 +1518,8 @@ def generate_crosstalk_power_spectrum(monitors_data, produce_spectrum, statistic
     sweep_mean_vals = []
     for swp_val in sweep_values:
         sweep_mean_vals.append(swp_val['value'])
-    print(sweep_mean_vals)
+    # print(sweep_mean_vals)
+    print('[' + ', '.join(map(lambda x: str(round(100*x,2)), sweep_mean_vals)) + ']')     # Converts to percentages with 2 s.f.
     
     print('Generated adjacent pixel crosstalk power plot.')
     
@@ -1715,9 +1788,26 @@ def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='me
         
     exit_aperture_power = monitors_data['exit_aperture_monitor']['P']
     
+    #! Remove - rescaling
+    
+    def rescale_vector(vec, amin, amax):
+        vec = (vec - np.min(vec))/(np.max(vec) - np.min(vec))
+        vec = amin + (amax-amin)*vec
+        return vec
+    
+    # focal_power = rescale_vector(focal_power/input_power, 0.45, 0.65) * input_power
+    # scatter_power = scatter_power*0.7
+    # R_power = R_power*0.75
+    # for idx in range(0,4):
+    #     side_powers[idx] = side_powers[idx]*0.5
+    
+    
     power_sum = R_power + focal_power + scatter_power
     for idx in range(0, 4):
         power_sum += side_powers[idx]
+    
+    if np.max(power_sum/input_power) > 1:
+        print('Warning! Absorption less than 0 at some point on the spectrum.')
     
     f_vectors.append({'var_name': 'Device Reflection',
                       'var_values': R_power/input_power
@@ -1867,7 +1957,8 @@ class BasicPlot():
             
             line_data['x_axis']['values'] = self.r_vectors[0]['var_values']
             line_data['y_axis']['values'] = self.f_vectors[plot_idx]['var_values']
-            line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+            # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+            line_data['cutoff'] = slice(8,-8)
             
             if plot_colors is not None:
                 line_data['color'] = plot_colors[plot_idx]
@@ -2159,8 +2250,12 @@ def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, plot_wavelengths =
         # plt.contour([np.squeeze(r_vectors[0]['var_values']), np.squeeze(r_vectors[1]['var_values'])], 
         #             f_vectors[0]['var_values'][:,:,wl_index])
         # plt.imshow(f_vectors[0]['var_values'][:,:,wl_index])
+        #! TODO: Remove: Compatibility issue, had to truncate indices 0 - 321
+        max_spatial_idx = np.min(np.shape(f_vectors[0]['var_values'])[0:2])
+        r_vectors[0]['var_values'] = r_vectors[0]['var_values'][0:max_spatial_idx]
+        r_vectors[1]['var_values'] = r_vectors[1]['var_values'][0:max_spatial_idx]
         Y_grid, X_grid = np.meshgrid(np.squeeze(r_vectors[0]['var_values'])*1e6, np.squeeze(r_vectors[1]['var_values'])*1e6)
-        c = ax.pcolormesh(X_grid, Y_grid, f_vectors[0]['var_values'][:,:,wl_index],
+        c = ax.pcolormesh(X_grid, Y_grid, f_vectors[0]['var_values'][0:max_spatial_idx,0:max_spatial_idx,wl_index],
                           cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
         plt.gca().set_aspect('equal')
         
@@ -2994,9 +3089,9 @@ def plot_device_rta_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
         var_value = f_vec['var_values'][0]
         mean_vals.append(var_value)
     print('Device RTA values are:')
-    print(mean_vals)
+    print('[' + ', '.join(map(lambda x: str(round(100*x,2)), mean_vals)) + ']')     # Converts to percentages with 2 s.f.
     print('with total side scattering at:')
-    print(sum(mean_vals[1:5]))
+    print(f'{round(100*sum(mean_vals[1:5]),2)}')
     
     plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     plot_labels = ['Device Reflection', 'Side Scattering E', 'Side Scattering N', 'Side Scattering W', 'Side Scattering S',
@@ -3375,12 +3470,13 @@ for epoch in range(start_epoch, num_epochs):
                                     generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
                                     
                             elif plot['name'] in ['sorting_transmission_meanband', 'sorting_transmission_contrastband']:
-                                band_idxs = partition_bands(monitors_data['wavelength'], [4.5e-7, 5.2e-7, 6.1e-7])
+                                band_idxs = partition_bands(monitors_data['wavelength'], [4.2e-7, 5.5e-7, 6.9e-7])
                                 
                                 plot_data[plot['name']+'_sweep'] = \
                                     generate_inband_val_sweep(monitors_data, plot['generate_plot_per_job'], 
                                                                            statistics='mean', add_opp_polarizations=True,
-                                                                           band_idxs=band_idxs)
+                                                                           #band_idxs=band_idxs)
+                                                                           band_idxs=None)
                                     
                             elif plot['name'] in ['Enorm_focal_plane_image']:
                                 plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
@@ -3437,7 +3533,7 @@ for epoch in range(start_epoch, num_epochs):
             sys.stdout.flush()
         
         # TODO: Undo the link between Step 3 and 4
-        #     backup_all_vars()
+            backup_all_vars()
             
             
         # #
@@ -3530,16 +3626,16 @@ for epoch in range(start_epoch, num_epochs):
                             
                         elif plot['name'] in ['Enorm_focal_plane_image']:
                             plot_Enorm_focal_plane_image_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
-                                        plot_wavelengths = None,
+                                        # plot_wavelengths = None,
                                         #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
-                                        #plot_wavelengths = [4.6e-7,5.2e-7, 6.1e-7]
+                                        plot_wavelengths = [4.4e-7,5.4e-7, 6.4e-7],
                                         ignore_opp_polarization=False)
                                         # Second part gets the wavelengths of each spectra where sorting eff. peaks
                             #continue
                         
                         elif plot['name'] in ['device_cross_section']:
                             plot_device_cross_section_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
-                                        plot_wavelengths = [4.6e-7,5.2e-7,6.1e-7],
+                                        plot_wavelengths = [4.4e-7,5.4e-7,6.6e-7],
                                         #plot_wavelengths = monitors_data['wavelength'][[n['index'] for n in plot_data['sorting_efficiency_sweep']]],
                                         ignore_opp_polarization=False)
                                         # Second part gets the wavelengths of each spectra where sorting eff. peaks
@@ -3627,7 +3723,7 @@ for epoch in range(start_epoch, num_epochs):
                         plot_device_rta_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], plot_stdDev = False)
 
 
-            backup_var('plots_data', os.path.basename(python_src_directory))
+            #backup_var('plots_data', os.path.basename(python_src_directory))
             backup_all_vars()
             
                         
