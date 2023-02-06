@@ -33,7 +33,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 4    # 0 if running entire file in one shot
+start_from_step = 0    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -54,6 +54,7 @@ else:
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
 
 project_name_init = 'mode_overlap_fom_check_gradient'
+project_name_init = os.path.basename(python_src_directory)
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
