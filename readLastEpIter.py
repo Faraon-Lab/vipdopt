@@ -10,18 +10,18 @@ lastEpochReached = False
 
 idx = []
 for i in range(len(f)):
-    if f[i][1] == 0:
-        lastEpochReached = True
-        break
-    else:
-        idx.append(np.max(np.nonzero(f[i])))
+	if f[i][1] == 0:
+		lastEpochReached = True
+		break
+	else:
+		idx.append(np.max(np.nonzero(f[i])))
 
 lastEpoch = len(idx)-1
 lastIter = idx[lastEpoch]
 
 with open('lastEpIter.txt','a') as outFile:
-    outFile.write("\nLast Epoch: %d, Last Iteration: %d" % (lastEpoch, lastIter))
-    outFile.write("\nTime Elapsed:")
+	outFile.write("\nLast Epoch: %d, Last Iteration: %d" % (lastEpoch, lastIter))
+	outFile.write("\nTime Elapsed:")
 print("Last Epoch: %d, Last Iteration: %d" % (lastEpoch, lastIter))
 
 # Plot FOM trace
@@ -31,10 +31,10 @@ upperRange = np.ceil(np.max(f))
 plt.figure
 vlinestyle = {'color': 'gray', 'linestyle': '--', 'linewidth': 1}
 for i in range(len(f)-1):
-    trace = np.concatenate((trace,f[i]),axis=0)
-    plt.vlines((i+1)*numIter,0,upperRange,**vlinestyle)
-plt.plot(np.linspace(0,10,len(trace)),trace)
-plt.plot(trace)
+	trace = np.concatenate((trace,f[i]),axis=0)
+	plt.vlines((i+1)*numIter,0,upperRange,**vlinestyle)
+# plt.plot(np.linspace(0,10,len(trace)),trace)
+plt.plot(trace, '.-', color='orange')
 plt.vlines(0*numIter,0,upperRange,**vlinestyle)
 plt.vlines(numEpochs*numIter,0,upperRange,**vlinestyle)
 plt.title('Figure of Merit - Trace')
