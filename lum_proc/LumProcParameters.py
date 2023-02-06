@@ -31,7 +31,7 @@ else:
     #! do not include spaces in filepaths passed to linux
     lumapi_filepath = r"/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
     
-start_from_step = 3    # 0 if running entire file in one shot
+start_from_step = 0    # 0 if running entire file in one shot
     
 shelf_fn = 'save_state'
 
@@ -46,13 +46,14 @@ if running_on_local_machine:
     # projects_directory_location_init = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Sony Bayer\[v0] basicopt_setup\Data Processing\v3_nodeviceandcrosssection"
     projects_directory_location_init = python_src_directory
     projects_directory_location = projects_directory_location_init          # Change if necessary to differentiate  
+    project_name_init = 'savefiles'
 else:
     #! do not include spaces in filepaths passed to linux
     projects_directory_location_init = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
     projects_directory_location = "/central/groups/Faraon_Computing/ian/data_processing/lum_proc"
+    project_name_init = os.path.basename(python_src_directory)
 
-# project_name_init = 'sony_th0_air1a_outPD_dep0.765'
-project_name_init = os.path.basename(python_src_directory)
+
 project_name = 'ares_' + project_name_init
 device_filename = 'optimization' # omit '.fsp'
 
@@ -165,7 +166,7 @@ dispersive_ranges_um = [
 if not importing_params_from_opt_file:
     mesh_spacing_um = 0.017
     geometry_spacing_um = 0.051
-mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )
+mesh_to_geometry_factor = int( ( geometry_spacing_lateral_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )
 
 
 #* Device
@@ -177,11 +178,11 @@ if not importing_params_from_opt_file:
     vertical_layer_height_um = 0.051
     vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_um )
 
-device_size_lateral_um = geometry_spacing_um * 40
+# device_size_lateral_um = geometry_spacing_um * 40
 device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
 
-device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
-device_voxels_vertical = int(device_size_vertical_um / geometry_spacing_um)
+# device_voxels_lateral = int(device_size_lateral_um / geometry_spacing_um)
+# device_voxels_vertical = int(device_size_vertical_um / geometry_spacing_um)
 
 if 'device_size_vertical_um' not in globals():
     device_size_vertical_um = device_size_verical_um        # little typo that has to be declared for compatibility
@@ -224,7 +225,7 @@ src_beam_rad = device_size_lateral_um/2
 #
 
 #* Sidewall and Side Monitors
-# num_sidewalls = 4
+num_sidewalls = 0
 if num_sidewalls == 0:
     sidewall_thickness_um = 0.0
     sidewall_material = 'etch'

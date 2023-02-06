@@ -2,8 +2,8 @@
   "params": {
      "th": {
        "var_name": "angle_theta",
-       "var_values":[0.0],
-       "peakInd":0,
+       "var_values":[25.0, 27.5, 30.0, 32.5, 35.0, 37.5, 40.0, 42.5, 45.0, 47.5, 50.0, 52.5, 55.0],
+       "peakInd":6,
        "formatStr":  "%.3f",
        "iterating": true,
        "short_form": "th"
@@ -203,6 +203,10 @@
        "generate_plot_per_job": true
      },
      {"name": "sorting_transmission_contrastband",
+       "enabled": true,
+       "generate_plot_per_job": true
+     },
+     {"name": "crosstalk_adj_quadrants",
        "enabled": true,
        "generate_plot_per_job": true
      },
