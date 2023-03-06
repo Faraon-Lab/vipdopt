@@ -1,6 +1,6 @@
 {
-  "params": {
-     "th": {
+  "params": [
+     {
        "var_name": "angle_theta",
        "var_values":[25.0, 27.5, 30.0, 32.5, 35.0, 37.5, 40.0, 42.5, 45.0, 47.5, 50.0, 52.5, 55.0],
        "peakInd":6,
@@ -8,7 +8,7 @@
        "iterating": true,
        "short_form": "th"
      },
-     "phi": {
+     {
          "var_name": "angle_phi",
          "var_values":[0, 90, 180, 270, 360],
          "peakInd":0,
@@ -16,7 +16,7 @@
          "iterating": false,
          "short_form": "phi"
        },
-     "bRad": {
+     {
        "var_name": "beam_radius_um",
        "var_values":[15],
        "peakInd":0,
@@ -24,7 +24,7 @@
        "iterating": false,
        "short_form": "bRad"
      },
-     "swTh": {
+     {
        "var_name": "sidewall_thickness_um",
        "var_values":[0, 0.06, 0.088, 0.1, 0.146, 0.215, 0.298, 0.397, 0.45, 0.517, 0.66, 0.7, 0.832, 1.038, 1.286, 1.583, 1.94, 2.368],
        "peakInd":1,
@@ -32,7 +32,7 @@
        "iterating": false,
        "short_form": "swTh"
      },
-     "divAng": {
+     {
       "var_name": "divergence_angle",
       "var_values":[6.3,10,13.13,20,30],
       "peakInd":2,
@@ -40,7 +40,7 @@
       "iterating": false,
       "short_form": "divAng"
     }
-   },
+   ],
  
    "monitors": [
        {"name": "transmission_monitor_0",

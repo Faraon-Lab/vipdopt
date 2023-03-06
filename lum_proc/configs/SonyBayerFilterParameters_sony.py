@@ -3,11 +3,19 @@
 #
 
 import numpy as np
+from os import umask
 import os
+import numpy as np
+import json
 
 #
 #* Debug Options
 #
+
+importing_params_from_opt_file = True
+if importing_params_from_opt_file:
+    from SonyBayerFilterParameters import *
+    # from LayeredMWIRBridgesBayerFilterParameters import *
 
 running_on_local_machine = False
 slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
@@ -26,7 +34,7 @@ start_from_step = 0 	    # 0 if running entire file in one shot
 shelf_fn = 'save_state'
 
 #
-# Files
+#* Files
 #
 
 # project_name_init = 'normal_sony_baseline_2p04x2p04x2p04um_f1p53um'
@@ -120,9 +128,11 @@ shelf_fn = 'save_state'
 lookup_additional_vertical_mesh_cells = {}
 lookup_additional_vertical_mesh_cells[ 1 ] = 3
 lookup_additional_vertical_mesh_cells[ 2 ] = 3
+lookup_additional_vertical_mesh_cells[ 3 ] = 2
 lookup_additional_vertical_mesh_cells[ 4 ] = 3
 lookup_additional_vertical_mesh_cells[ 5 ] = 2
 lookup_additional_vertical_mesh_cells[ 6 ] = 2
+lookup_additional_vertical_mesh_cells[ 8 ] = 3
 lookup_additional_vertical_mesh_cells[ 10 ] = 2
 lookup_additional_vertical_mesh_cells[ 15 ] = 2
 lookup_additional_vertical_mesh_cells[ 20 ] = 2
@@ -318,22 +328,109 @@ projects_directory_location += "/" + project_name
 # YEAR 2 BASELINE opt END
 #
 
+#
+# YEAR 2 BAND CENTERING opt START
+#
+
+# project_name_init = 'sony_year2_v2_gaussian_no_gb_band_centers_10layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v2_gaussian_no_gb_band_centers_10layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v2_gaussian_no_gb_band_centers_8layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v2_gaussian_no_gb_band_centers_8layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v2_gaussian_no_gb_band_centers_5layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v2_gaussian_no_gb_band_centers_5layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v2_gaussian_no_gb_band_centers_3layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v2_gaussian_no_gb_band_centers_3layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v3_gaussian_no_gb_band_centers_10layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v3_gaussian_no_gb_band_centers_10layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+
+# project_name_init = 'sony_year2_v4_gaussian_no_gb_band_centers_10layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_no_gb_band_centers_10layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v4_gaussian_no_gb_band_centers_8layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_no_gb_band_centers_8layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+
+# project_name_init = 'sony_year2_v4_gaussian_no_gb_band_centers_5layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_no_gb_band_centers_5layer_p085um_rgb_2p04x2p04x2p04um_f1p53um'
 
 
 #
-# Mesh
+# YEAR 2 BAND CENTERING opt END
+#
+
+
+#
+# YEAR 2 FEATURE BLUR START
+#
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_10layer_p085um_rgb_feat_blur_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_10layer_p085um_rgb_feat_blur_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_10layer_p085um_rgb_feat_blur_recenter_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_10layer_p085um_rgb_feat_blur_recenter_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_5layer_p085um_rgb_feat_blur_recenter_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_5layer_p085um_rgb_feat_blur_recenter_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_3layer_p085um_rgb_feat_blur_recenter_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_3layer_p085um_rgb_feat_blur_recenter_2p04x2p04x2p04um_f1p53um'
+
+
+#
+# YEAR 2 FEATURE BLUR END
+#
+
+#
+# YEAR 2 EXPLORE 85nm START
+#
+
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_10layer_f_number_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_10layer_f_number_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_5layer_f_number_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_5layer_f_number_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_3layer_f_number_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_3layer_f_number_p085um_rgb_2p04x2p04x2p04um_f1p53um'
+
+
+# project_name_init = 'sony_year2_v4_gaussian_band_centers_10layer_f_number_p085um_rgb_shuffle_green_2p04x2p04x2p04um_f1p53um'
+# project_name = 'sony_year2_v4_gaussian_band_centers_10layer_f_number_p085um_rgb_shuffle_green_2p04x2p04x2p04um_f1p53um'
+
+
+#
+# YEAR 2 EXPLORE 85nm END
+#
+
+
+#
+#* Mesh
 #
 mesh_spacing_um = 0.017
-geometry_spacing_minimum_um = 0.051
+geometry_spacing_minimum_um = 0.051#0.017#0.051
 geometry_spacing_lateral_um = 0.085#0.051#0.085#0.051#0.085#0.051#0.102#0.085#0.068#0.051#0.102#0.068#0.102#0.085#0.068#0.051
 # mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )
 
+device_scale_um = 0.051
+
+use_smooth_blur = False#True
+min_feature_size_um = 0.085
+min_feature_size_voxels = min_feature_size_um / geometry_spacing_lateral_um
+blur_half_width_voxels = int( np.ceil( ( min_feature_size_voxels - 1 ) / 2. ) )
+
+
 #
-# Optical
+#* Optical
 #
-background_index = 1.5
+background_index = 1.5		# TiO2
 min_device_index = 1.5
-max_device_index = 2.4
+max_device_index = 2.4		# SiO2
 
 min_device_permittivity = min_device_index**2
 max_device_permittivity = max_device_index**2
@@ -341,34 +438,13 @@ max_device_permittivity = max_device_index**2
 init_permittivity_0_1_scale = 0.5
 
 
-focal_length_um = geometry_spacing_minimum_um * 30#40#10#20#40#50#30
+# focal_length_um = geometry_spacing_minimum_um * 30
+focal_length_um = device_scale_um * 30#40#10#20#40#50#30
 focal_plane_center_lateral_um = 0
 focal_plane_center_vertical_um = -focal_length_um
 
 #
-# Input Sources
-#
-
-#
-# todo: add frequency dependent profile
-#
-use_gaussian_sources = True
-gaussian_waist_radius_um = 0.5 * ( 0.5 * 2.04 )
-
-#
-# take f number = 2.2, check index calc
-#
-gaussian_waist_radius_um = 0.84 * 0.55 * 2.2 / 1.5
-
-source_angle_theta_vacuum_deg = 63
-source_angle_theta_rad = np.arcsin( np.sin( source_angle_theta_vacuum_deg * np.pi / 180. ) * 1.0 / background_index )
-source_angle_theta_deg = source_angle_theta_rad * 180. / np.pi
-
-source_angle_phi_deg = 0
-
-
-#
-# Device
+#* Device
 #
 
 num_vertical_layers = 10#40#10#40#20#40#10#1#2#6#4#10#2#1#10#40#10#40#15#15#30#40#15#30#10#20#30#15#5#10#20#40
@@ -376,13 +452,15 @@ num_vertical_layers = 10#40#10#40#20#40#10#1#2#6#4#10#2#1#10#40#10#40#15#15#30#4
 vertical_layer_height_um = 0.051 * 4# * 4# * 2# * 8#0.051 * 4# * 8# * 8
 # vertical_layer_height_um = 0.017 * 8
 
-vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_minimum_um )
+# vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_minimum_um )
+vertical_layer_height_voxels = int( vertical_layer_height_um / device_scale_um )
 
 device_size_lateral_um = 2.04#2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
 device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
 
 device_voxels_lateral = int(np.round( device_size_lateral_um / geometry_spacing_lateral_um))
-device_voxels_vertical = int(np.round( device_size_vertical_um / geometry_spacing_minimum_um))
+# device_voxels_vertical = int(np.round( device_size_vertical_um / geometry_spacing_minimum_um))
+device_voxels_vertical = int(np.round( device_size_vertical_um / device_scale_um))
 
 device_voxels_simulation_mesh_lateral = 1 + int(device_size_lateral_um / mesh_spacing_um)
 # device_voxels_simulation_mesh_lateral = 2 + int(device_size_lateral_um / mesh_spacing_um)
@@ -394,7 +472,7 @@ device_vertical_minimum_um = 0
 
 
 #
-# Spectral
+#* Spectral
 #
 add_infrared = False#True
 
@@ -416,7 +494,7 @@ if add_infrared:
 bandwidth_um = lambda_max_um - lambda_min_um
 
 num_bands = 3
-num_points_per_band = 15
+num_points_per_band = 20#15
 num_design_frequency_points = num_bands * num_points_per_band
 num_eval_frequency_points = 6 * num_design_frequency_points
 
@@ -458,12 +536,17 @@ pdaf_max_intensity_by_wavelength = (device_size_lateral_um**2)**2 / (focal_lengt
 
 
 #
-# FDTD
+#* FDTD
 #
-vertical_gap_size_um = geometry_spacing_minimum_um * 15
-lateral_gap_size_um = geometry_spacing_minimum_um * 10#25
-# lateral_gap_size_um = geometry_spacing_minimum_um * 25
-# lateral_gap_size_um = geometry_spacing_minimum_um * 50
+vertical_gap_size_um = device_scale_um * 15
+lateral_gap_size_um = device_scale_um * 10#25
+# lateral_gap_size_um = device_scale_um * 25
+# lateral_gap_size_um = device_scale_um * 50
+
+# vertical_gap_size_um = geometry_spacing_minimum_um * 15
+# lateral_gap_size_um = geometry_spacing_minimum_um * 10#25
+# # lateral_gap_size_um = geometry_spacing_minimum_um * 25
+# # lateral_gap_size_um = geometry_spacing_minimum_um * 50
 
 fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
 fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + device_size_lateral_um
@@ -473,7 +556,7 @@ fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
 fdtd_simulation_time_fs = 600#3000
 
 #
-# Forward Source
+#* Forward Source
 #
 lateral_aperture_um = 1.1 * device_size_lateral_um
 src_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um * 2. / 3.
@@ -483,7 +566,92 @@ src_minimum_vertical_um = -focal_length_um - 0.5 * vertical_gap_size_um
 weight_by_individual_wavelength = True
 
 #
-# Spectral and polarization selectivity information
+#* Input Sources
+#
+
+#
+# todo: add frequency dependent profile
+#
+use_gaussian_sources = True
+gaussian_waist_radius_um = 0.5 * ( 0.5 * 2.04 )
+
+#
+# take f number = 2.2, check index calc
+#
+use_airy_approximation = True
+f_number = 2.2
+airy_correction_factor = 0.84
+mid_lambda_um = 0.55		# todo: make this depend on config rather than hardcoding it
+# gaussian_waist_radius_um = airy_correction_factor * mid_lambda_um / ( np.pi * ( 1. / ( 2 * f_number ) ) )
+
+if use_airy_approximation:
+	gaussian_waist_radius_um = airy_correction_factor * mid_lambda_um * f_number
+else:
+	gaussian_waist_radius_um = mid_lambda_um / ( np.pi * ( 1. / ( 2 * f_number ) ) )
+
+gaussian_waist_radius_um = 0.84 * 0.55 * 2.2 / 1.5
+
+source_angle_theta_vacuum_deg = 0 #63
+source_angle_theta_rad = np.arcsin( np.sin( source_angle_theta_vacuum_deg * np.pi / 180. ) * 1.0 / background_index )
+source_angle_theta_deg = source_angle_theta_rad * 180. / np.pi
+
+source_angle_phi_deg = 0
+
+
+#
+#* Adjoint sources
+#
+adjoint_vertical_um = -focal_length_um
+num_focal_spots = 4
+num_adjoint_sources = num_focal_spots
+adjoint_x_positions_um = [device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4., device_size_lateral_um / 4.]
+adjoint_y_positions_um = [device_size_lateral_um / 4., device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4.]
+
+
+dispersive_range_to_adjoint_src_map = [
+	[ 0, 1, 2, 3 ]
+]
+
+adjoint_src_to_dispersive_range_map = [
+	0,
+	0,
+	0,
+	0
+]
+
+#
+#* Optimization
+#
+
+enforce_xy_gradient_symmetry = False#True#False#True
+if enforce_xy_gradient_symmetry:
+	assert ( int( np.round( device_size_lateral_um / geometry_spacing_lateral_um ) ) % 2 ) == 1, "We should have an odd number of design voxels across for this operation"
+
+assert not enforce_xy_gradient_symmetry, "This feature seems to be making things worse - I think there is a small inherent symmetry in the simulation/import/monitors"
+
+#
+# Alternative is to weight by focal intensity - need to check max intensity weighting thing
+#
+weight_by_quadrant_transmission = True
+
+num_epochs = 10
+num_iterations_per_epoch = 30
+
+use_fixed_step_size = False
+fixed_step_size = 2.0
+
+
+epoch_start_design_change_max = 0.15
+epoch_end_design_change_max = 0.05
+epoch_range_design_change_max = epoch_start_design_change_max - epoch_end_design_change_max
+
+epoch_start_design_change_min = 0.05
+epoch_end_design_change_min = 0
+epoch_range_design_change_min = epoch_start_design_change_min - epoch_end_design_change_min
+
+
+#
+#* Spectral and polarization selectivity information
 #
 polarizations_focal_plane_map = [ ['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y'] ]
 
@@ -499,9 +667,81 @@ if weight_by_individual_wavelength:
 
 do_green_balance = False#True
 
+polarization_name_to_idx = { 'x':0, 'y':1, 'z':2 }
+spectral_focal_plane_map = [
+	[0, num_points_per_band],
+	[num_points_per_band, 2 * num_points_per_band],
+	[2 * num_points_per_band, 3 * num_points_per_band],
+	[num_points_per_band, 2 * num_points_per_band]
+]
+
 
 
 # desired_peaks_per_band_um = [ 0.46, 0.52, 0.61 ]
+desired_peaks_per_band_um = [ 0.48, 0.52, 0.59 ]
+# desired_peaks_per_band_um = [ 0.46, 0.52, 0.59 ]
+desired_peak_location_per_band = [ np.argmin( ( lambda_values_um - desired_peaks_per_band_um[ idx ] )**2 ) for idx in range( 0, len( desired_peaks_per_band_um ) ) ]
+
+print( desired_peak_location_per_band )
+
+explicit_band_centering = True
+shuffle_green = False#True#False#True#False
+
+if explicit_band_centering:
+	spectral_focal_plane_map = [
+		[0, num_design_frequency_points],
+		[0, num_design_frequency_points],
+		[0, num_design_frequency_points],
+		[0, num_design_frequency_points]
+	]
+
+
+	bandwidth_left_by_quad = [ 
+		( desired_peak_location_per_band[ 1 ] - desired_peak_location_per_band[ 0 ] ) // 2,
+		( desired_peak_location_per_band[ 1 ] - desired_peak_location_per_band[ 0 ] ) // 2,
+		( desired_peak_location_per_band[ 2 ] - desired_peak_location_per_band[ 1 ] ) // 2,
+		( desired_peak_location_per_band[ 1 ] - desired_peak_location_per_band[ 0 ] ) // 2
+	]
+
+	bandwidth_right_by_quad = [ 
+		( desired_peak_location_per_band[ 1 ] - desired_peak_location_per_band[ 0 ] ) // 2,
+		( desired_peak_location_per_band[ 2 ] - desired_peak_location_per_band[ 1 ] ) // 2,
+		( desired_peak_location_per_band[ 2 ] - desired_peak_location_per_band[ 1 ] ) // 2,
+		( desired_peak_location_per_band[ 2 ] - desired_peak_location_per_band[ 1 ] ) // 2
+	]
+
+
+
+	bandwidth_left_by_quad = [ bandwidth_left_by_quad[ idx ] / 1.75 for idx in range( 0, 4 ) ]
+	bandwidth_right_by_quad = [ bandwidth_right_by_quad[ idx ] / 1.75 for idx in range( 0, 4 ) ]
+
+	quad_to_band = [ 0, 1, 2, 1 ]
+	if shuffle_green:
+		quad_to_band = [ 0, 1, 1, 2 ]
+
+	for quad_idx in range( 0, 4 ):
+		bandwidth_left = bandwidth_left_by_quad[ quad_to_band[ quad_idx ] ]
+		bandwidth_right = bandwidth_right_by_quad[ quad_to_band[ quad_idx ] ]
+
+		band_center = desired_peak_location_per_band[ quad_to_band[ quad_idx ] ]
+
+		for wl_idx in range( 0, num_design_frequency_points ):
+
+			choose_width = bandwidth_right
+			if wl_idx < band_center:
+				choose_width = bandwidth_left
+
+
+			scaling_exp = -1. / np.log( 0.5 )
+			weight_individual_wavelengths_by_quad[ quad_idx, wl_idx ] = np.exp( -( wl_idx - band_center )**2 / ( scaling_exp * choose_width**2 ) )
+
+
+	# import matplotlib.pyplot as plt
+	# colors = [ 'b', 'g', 'r', 'm' ]
+	# for quad_idx in range( 0, 4 ):
+
+	# 	plt.plot( lambda_values_um, weight_individual_wavelengths_by_quad[ quad_idx ], color=colors[ quad_idx ] )
+	# plt.show()
 
 # desired_peak_location_per_band = [ 0 for idx in range( 0, len( desired_peaks_per_band_um ) ) ]
 
@@ -529,13 +769,7 @@ do_green_balance = False#True
 # 	assert ( get_location + half_width + 1 ) <= num_design_frequency_points, "Not enough optimization room in long wavelength region!"
 
 
-polarization_name_to_idx = { 'x':0, 'y':1, 'z':2 }
-spectral_focal_plane_map = [
-	[0, num_points_per_band],
-	[num_points_per_band, 2 * num_points_per_band],
-	[2 * num_points_per_band, 3 * num_points_per_band],
-	[num_points_per_band, 2 * num_points_per_band]
-]
+
 
 if add_infrared:
 	infrared_center_um = 0.94
@@ -571,7 +805,6 @@ if add_infrared:
 # 	[ desired_peak_location_per_band[ 2 ] - ( num_points_per_band // 2 ), desired_peak_location_per_band[ 2 ] + 1 + ( num_points_per_band // 2 ) ],
 # 	[ desired_peak_location_per_band[ 1 ] - ( num_points_per_band // 2 ), desired_peak_location_per_band[ 1 ] + 1 + ( num_points_per_band // 2 ) ]
 # ]
-
 
 
 
@@ -681,54 +914,4 @@ if do_rejection:
 	# 	[ reject_weights[ 3 ] for idx in range( 2 * num_points_per_band, 2 * num_points_per_band + half_points ) ],
 	# ]
 
-#
-# Adjoint sources
-#
-adjoint_vertical_um = -focal_length_um
-num_focal_spots = 4
-num_adjoint_sources = num_focal_spots
-adjoint_x_positions_um = [device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4., device_size_lateral_um / 4.]
-adjoint_y_positions_um = [device_size_lateral_um / 4., device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4.]
-
-
-dispersive_range_to_adjoint_src_map = [
-	[ 0, 1, 2, 3 ]
-]
-
-adjoint_src_to_dispersive_range_map = [
-	0,
-	0,
-	0,
-	0
-]
-
-#
-# Optimization
-#
-
-enforce_xy_gradient_symmetry = False#True#False#True
-if enforce_xy_gradient_symmetry:
-	assert ( int( np.round( device_size_lateral_um / geometry_spacing_lateral_um ) ) % 2 ) == 1, "We should have an odd number of design voxels across for this operation"
-
-assert not enforce_xy_gradient_symmetry, "This feature seems to be making things worse - I think there is a small inherent symmetry in the simulation/import/monitors"
-
-#
-# Alternative is to weight by focal intensity - need to check max intensity weighting thing
-#
-weight_by_quadrant_transmission = True
-
-num_epochs = 10
-num_iterations_per_epoch = 30
-
-use_fixed_step_size = False
-fixed_step_size = 2.0
-
-
-epoch_start_design_change_max = 0.15
-epoch_end_design_change_max = 0.05
-epoch_range_design_change_max = epoch_start_design_change_max - epoch_end_design_change_max
-
-epoch_start_design_change_min = 0.05
-epoch_end_design_change_min = 0
-epoch_range_design_change_min = epoch_start_design_change_min - epoch_end_design_change_min
-
+print("Parameters file loaded successfully.")
