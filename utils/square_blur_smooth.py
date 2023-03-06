@@ -6,6 +6,8 @@ import numpy as np
 # Blurs can be more general.  We just need to specify a mask and maximum approximation function (and its derivative)
 #
 class SquareBlurSmooth(filter.Filter):
+    # TODO: Could combine square_blur.py and square_blur_smooth.py into the same file.
+    # TODO: Use <from scipy.ndimage import gaussian_filter> to do the smooth blurring.
 
 	def __init__(self, blur_half_width, variable_bounds=[0, 1]):
 		super(SquareBlurSmooth, self).__init__(variable_bounds)

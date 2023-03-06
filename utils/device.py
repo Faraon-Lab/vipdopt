@@ -73,10 +73,8 @@ class Device:
 		# minus sign here because it was fed the negative of the gradient so (-1)*(-1) = +1
 		proposed_design_variable = self.w[0] - np.multiply(step_size, gradient)
 		proposed_design_variable = np.maximum(                             # Has to be between minimum_design_value and maximum_design_value
-									np.minimum(
-										proposed_design_variable,
-										self.maximum_design_value),
-									self.minimum_design_value)
+												np.minimum(proposed_design_variable, self.maximum_design_value),
+												self.minimum_design_value)
 
 		return proposed_design_variable
 

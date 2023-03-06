@@ -1,25 +1,23 @@
-import device as device
-import layering as layering
-import scale as scale
-import sigmoid as sigmoid
-import square_blur as square_blur
-import square_blur_smooth as square_blur_smooth
-
-import skimage.morphology as skim
-import networkx as nx
-import skimage.draw
-
-from scipy import ndimage
-
-import scipy.optimize
-
-import numpy as np
-
+import os
+import sys
 import time
 
-import sys
+import numpy as np
+from scipy import ndimage
+import scipy.optimize
+import skimage.morphology as skim
+import skimage.draw
+import networkx as nx
 
-from SonyBayerFilterParameters import *
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(os.path.abspath(os.getcwd()))
+import device
+import layering
+import scale
+import sigmoid
+import square_blur
+import square_blur_smooth
+from configs import global_params as gp
 
 def compute_binarization( input_variable, set_point=0.5 ):
 	total_shape = np.product( input_variable.shape )
@@ -54,30 +52,23 @@ class SonyBayerFilter(device.Device):
 		self.update_permittivity()
 
 
-	#
-	# Random initialization
-	#
 	def set_random_init( self, mean, std_dev ):
+		'''Random initialization of permittivity.'''
 		self.w[0] = np.random.normal( mean, std_dev, self.w[0].shape )
 		self.w[0] = np.maximum( np.minimum( self.w[0], 1.0 ), 0.0 )
 		self.update_permittivity()
 
-	#
-	# Random initialization
-	#
 	def set_fixed_init( self, init_density ):
+		'''Uniform initialization of permittivity (all ones).'''
 		self.w[0] = init_density * np.ones( self.w[0].shape )
 		self.update_permittivity()
 
 
-	#
-	# Override the update_permittivity function so we can handle layer-dependent collapsing along either x- or y-dimensions
-	#
 	def update_permittivity(self):
+		'''Override the update_permittivity function so we can handle layer-dependent collapsing along either x- or y-dimensions.'''
 		var0 = self.w[ 0 ]
 
-		
-		if use_smooth_blur:
+		if gp.use_smooth_blur:
 			var1 = self.layering_z_0.forward( var0 )
 			self.w[ 1 ] = var1
 
@@ -104,12 +95,10 @@ class SonyBayerFilter(device.Device):
 			self.w[ 3 ] = var3
 
 
-	#
-	# Need to also override the backpropagation function
-	#
 	def backpropagate(self, gradient):
+		'''Override the backpropagation function of Device class, and multiplies input (per the chain rule) by gradients of all the filters.'''
 
-		if use_smooth_blur:
+		if gp.use_smooth_blur:
 			gradient = self.scale_4.chain_rule( gradient, self.w[ 5 ], self.w[ 4 ] )
 			gradient = self.sigmoid_3.chain_rule( gradient, self.w[ 4 ], self.w[ 3 ] )
 			gradient = self.max_blur_xy_2.chain_rule( gradient, self.w[ 3 ], self.w[ 2 ] )
@@ -133,18 +122,17 @@ class SonyBayerFilter(device.Device):
 
 		self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_4 ]
 
-		if use_smooth_blur:
+		if gp.use_smooth_blur:
 			self.filters = [ self.layering_z_0, self.sigmoid_1, self.max_blur_xy_2, self.sigmoid_3, self.scale_4 ]
 
 
 	def init_variables(self):
 		super(SonyBayerFilter, self).init_variables()
-
 		self.w[0] = np.multiply(self.init_permittivity, np.ones(self.size, dtype=np.complex))
 
 	def init_filters_and_variables(self):
 		self.num_filters = 3
-		if use_smooth_blur:
+		if gp.use_smooth_blur:
 			self.num_filters = 5
 		self.num_variables = 1 + self.num_filters
 
@@ -169,29 +157,24 @@ class SonyBayerFilter(device.Device):
 		self.scale_4 = scale.Scale([scale_min, scale_max])
 
 		
-		if use_smooth_blur:
+		if gp.use_smooth_blur:
 			self.max_blur_xy_2 = square_blur_smooth.SquareBlurSmooth(
-				[ blur_half_width_voxels, blur_half_width_voxels, 0 ] )
+				[ gp.blur_half_width_voxels, gp.blur_half_width_voxels, 0 ] )
 
 		# Initialize the filter chain
 		# self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_2 ]
 		self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_4 ]
 
-		if use_smooth_blur:
+		if gp.use_smooth_blur:
 			self.filters = [ self.layering_z_0, self.sigmoid_1, self.max_blur_xy_2, self.sigmoid_3, self.scale_4 ]
-
 
 		self.init_variables()
 	
 
-
-
 	# In the step function, we should update the permittivity with update_permittivity
 	def step(self, gradient, step_size):
 		self.w[0] = self.proposed_design_step(gradient, step_size)
-
 		self.update_permittivity()
-
 
 	def convert_to_binary_map(self, variable):
 		return np.greater(variable, self.mid_permittivity)

@@ -6,7 +6,7 @@ import numpy as np
 # Blurs can be more general.  We just need to specify a mask and maximum approximation function (and its derivative)
 #
 class SquareBlur(filter.Filter):
-
+# TODO: Could combine square_blur.py and square_blur_smooth.py into the same file.
 	#
 	# alpha: strength of blur
 	#
