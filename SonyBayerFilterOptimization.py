@@ -34,6 +34,8 @@ import subprocess
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 #! Gets all parameters from config file - explicitly calls it so that the variables pass into this module's globals()
 from configs.global_params import *
+globals().update(config_vars)
+globals().update(processed_vars)
 
 # Custom Classes and Imports
 from configs import *

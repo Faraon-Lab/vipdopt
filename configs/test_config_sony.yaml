@@ -1,6 +1,6 @@
 #* Debug
 
-start_from_step: 2          # 0 if running entire file in one shot
+start_from_step: 4          # 0 if running entire file in one shot
 shelf_fn: 'save_state'
 
 restart_epoch: 0            # Both 0 if not restarting

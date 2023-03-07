@@ -5,6 +5,7 @@ import logging
 import argparse
 import yaml
 import numpy as np
+from types import SimpleNamespace
 
 sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.getcwd())
@@ -51,19 +52,10 @@ if not os.path.isdir(projects_directory_location):
 	os.mkdir(projects_directory_location)
 
 
-# TODO: What should eventually be done is to separate SonyBayerFilterParameters into two parts. 
-# todo: One processes raw parameters from config, stored in a dictionary and in its globals().
-# todo: The other is a function that takes the config dictionary as input, does processing of those parameters, 
-# todo: and return its locals() as another dictionary.
-# todo: Then, this script can just call that function for all the processing that's done below.
-
 #
 #* Pull out variables from parameters directly
 # We pull raw parameters from config and store in globals() but also in its own dictionary.
 #
-
-# Record all the variables that are not pulled from the config
-not_config_keys = set(dir())
 
 def get_check_none(param_dict, variable_name):
 	variable = param_dict.get(variable_name)
@@ -71,100 +63,115 @@ def get_check_none(param_dict, variable_name):
 		logging.warning(f'variable {variable_name} not present in config file "{yaml_filename}".')
 	return variable
 
-# NOTE: Use configs/dict_to_globals_metacode.py to generate this next code block. This is the most Pythonic way to do it.
-# The if statement is just so the entire block can be collapsed for readability.
+def get_config_vars(param_dict):
+	'''Pulls raw config variables from the prescribed config YAML file. Uses dict.get() to make sure that there is a None assignment
+ 	in case the script asks for a variable not defined in the given config.'''
+	# NOTE: Use configs/dict_to_globals_metacode.py to generate this next code block. This is the most Pythonic way to do it.
+	
+	# Record all the variables that are not pulled from the config
+	not_config_keys = set(dir())
+	
+	start_from_step = get_check_none(param_dict, "start_from_step")
+	shelf_fn = get_check_none(param_dict, "shelf_fn")
+	restart_epoch = get_check_none(param_dict, "restart_epoch")
+	restart_iter = get_check_none(param_dict, "restart_iter")
+	lumapi_filepath_local = get_check_none(param_dict, "lumapi_filepath_local")
+	lumapi_filepath_hpc = get_check_none(param_dict, "lumapi_filepath_hpc")
+	convert_existing = get_check_none(param_dict, "convert_existing")
+	mesh_spacing_um = get_check_none(param_dict, "mesh_spacing_um")
+	geometry_spacing_lateral_um = get_check_none(param_dict, "geometry_spacing_lateral_um")
+	device_scale_um = get_check_none(param_dict, "device_scale_um")
+	use_smooth_blur = get_check_none(param_dict, "use_smooth_blur")
+	min_feature_size_um = get_check_none(param_dict, "min_feature_size_um")
+	background_index = get_check_none(param_dict, "background_index")
+	min_device_index = get_check_none(param_dict, "min_device_index")
+	max_device_index = get_check_none(param_dict, "max_device_index")
+	init_permittivity_0_1_scale = get_check_none(param_dict, "init_permittivity_0_1_scale")
+	focal_plane_center_lateral_um = get_check_none(param_dict, "focal_plane_center_lateral_um")
+	num_vertical_layers = get_check_none(param_dict, "num_vertical_layers")
+	vertical_layer_height_um = get_check_none(param_dict, "vertical_layer_height_um")
+	device_size_lateral_um = get_check_none(param_dict, "device_size_lateral_um")
+	device_vertical_minimum_um = get_check_none(param_dict, "device_vertical_minimum_um")
+	objects_above_device = get_check_none(param_dict, "objects_above_device")
+	num_sidewalls = get_check_none(param_dict, "num_sidewalls")
+	sidewall_thickness_um = get_check_none(param_dict, "sidewall_thickness_um")
+	sidewall_material = get_check_none(param_dict, "sidewall_material")
+	sidewall_extend_focalplane = get_check_none(param_dict, "sidewall_extend_focalplane")
+	sidewall_vertical_minimum_um = get_check_none(param_dict, "sidewall_vertical_minimum_um")
+	add_infrared = get_check_none(param_dict, "add_infrared")
+	lambda_min_um = get_check_none(param_dict, "lambda_min_um")
+	lambda_max_um = get_check_none(param_dict, "lambda_max_um")
+	lambda_min_eval_um = get_check_none(param_dict, "lambda_min_eval_um")
+	lambda_max_eval_um = get_check_none(param_dict, "lambda_max_eval_um")
+	num_bands = get_check_none(param_dict, "num_bands")
+	num_points_per_band = get_check_none(param_dict, "num_points_per_band")
+	num_dispersive_ranges = get_check_none(param_dict, "num_dispersive_ranges")
+	add_pdaf = get_check_none(param_dict, "add_pdaf")
+	pdaf_angle_phi_degrees = get_check_none(param_dict, "pdaf_angle_phi_degrees")
+	pdaf_angle_theta_degrees = get_check_none(param_dict, "pdaf_angle_theta_degrees")
+	pdaf_adj_src_idx = get_check_none(param_dict, "pdaf_adj_src_idx")
+	fdtd_simulation_time_fs = get_check_none(param_dict, "fdtd_simulation_time_fs")
+	weight_by_individual_wavelength = get_check_none(param_dict, "weight_by_individual_wavelength")
+	use_gaussian_sources = get_check_none(param_dict, "use_gaussian_sources")
+	use_airy_approximation = get_check_none(param_dict, "use_airy_approximation")
+	f_number = get_check_none(param_dict, "f_number")
+	airy_correction_factor = get_check_none(param_dict, "airy_correction_factor")
+	source_angle_theta_vacuum_deg = get_check_none(param_dict, "source_angle_theta_vacuum_deg")
+	source_angle_phi_deg = get_check_none(param_dict, "source_angle_phi_deg")
+	xy_phi_rotations = get_check_none(param_dict, "xy_phi_rotations")
+	xy_pol_rotations = get_check_none(param_dict, "xy_pol_rotations")
+	xy_names = get_check_none(param_dict, "xy_names")
+	num_focal_spots = get_check_none(param_dict, "num_focal_spots")
+	dispersive_range_to_adjoint_src_map = get_check_none(param_dict, "dispersive_range_to_adjoint_src_map")
+	adjoint_src_to_dispersive_range_map = get_check_none(param_dict, "adjoint_src_to_dispersive_range_map")
+	enforce_xy_gradient_symmetry = get_check_none(param_dict, "enforce_xy_gradient_symmetry")
+	weight_by_quadrant_transmission = get_check_none(param_dict, "weight_by_quadrant_transmission")
+	num_epochs = get_check_none(param_dict, "num_epochs")
+	num_iterations_per_epoch = get_check_none(param_dict, "num_iterations_per_epoch")
+	use_fixed_step_size = get_check_none(param_dict, "use_fixed_step_size")
+	fixed_step_size = get_check_none(param_dict, "fixed_step_size")
+	epoch_start_design_change_max = get_check_none(param_dict, "epoch_start_design_change_max")
+	epoch_end_design_change_max = get_check_none(param_dict, "epoch_end_design_change_max")
+	epoch_start_design_change_min = get_check_none(param_dict, "epoch_start_design_change_min")
+	epoch_end_design_change_min = get_check_none(param_dict, "epoch_end_design_change_min")
+	fom_types = get_check_none(param_dict, "fom_types")
+	optimization_fom = get_check_none(param_dict, "optimization_fom")
+	polarizations_focal_plane_map = get_check_none(param_dict, "polarizations_focal_plane_map")
+	weight_focal_plane_map_performance_weighting = get_check_none(param_dict, "weight_focal_plane_map_performance_weighting")
+	weight_focal_plane_map = get_check_none(param_dict, "weight_focal_plane_map")
+	do_green_balance = get_check_none(param_dict, "do_green_balance")
+	polarization_name_to_idx = get_check_none(param_dict, "polarization_name_to_idx")
+	desired_peaks_per_band_um = get_check_none(param_dict, "desired_peaks_per_band_um")
+	explicit_band_centering = get_check_none(param_dict, "explicit_band_centering")
+	shuffle_green = get_check_none(param_dict, "shuffle_green")
+	infrared_center_um = get_check_none(param_dict, "infrared_center_um")
+	do_rejection = get_check_none(param_dict, "do_rejection")
+	softplus_kappa = get_check_none(param_dict, "softplus_kappa")
 
-if True:
-	start_from_step = get_check_none(parameters, "start_from_step")
-	shelf_fn = get_check_none(parameters, "shelf_fn")
-	restart_epoch = get_check_none(parameters, "restart_epoch")
-	restart_iter = get_check_none(parameters, "restart_iter")
-	lumapi_filepath_local = get_check_none(parameters, "lumapi_filepath_local")
-	lumapi_filepath_hpc = get_check_none(parameters, "lumapi_filepath_hpc")
-	convert_existing = get_check_none(parameters, "convert_existing")
-	mesh_spacing_um = get_check_none(parameters, "mesh_spacing_um")
-	geometry_spacing_lateral_um = get_check_none(parameters, "geometry_spacing_lateral_um")
-	device_scale_um = get_check_none(parameters, "device_scale_um")
-	use_smooth_blur = get_check_none(parameters, "use_smooth_blur")
-	min_feature_size_um = get_check_none(parameters, "min_feature_size_um")
-	background_index = get_check_none(parameters, "background_index")
-	min_device_index = get_check_none(parameters, "min_device_index")
-	max_device_index = get_check_none(parameters, "max_device_index")
-	init_permittivity_0_1_scale = get_check_none(parameters, "init_permittivity_0_1_scale")
-	focal_plane_center_lateral_um = get_check_none(parameters, "focal_plane_center_lateral_um")
-	num_vertical_layers = get_check_none(parameters, "num_vertical_layers")
-	vertical_layer_height_um = get_check_none(parameters, "vertical_layer_height_um")
-	device_size_lateral_um = get_check_none(parameters, "device_size_lateral_um")
-	device_vertical_minimum_um = get_check_none(parameters, "device_vertical_minimum_um")
-	objects_above_device = get_check_none(parameters, "objects_above_device")
-	num_sidewalls = get_check_none(parameters, "num_sidewalls")
-	sidewall_thickness_um = get_check_none(parameters, "sidewall_thickness_um")
-	sidewall_material = get_check_none(parameters, "sidewall_material")
-	sidewall_extend_focalplane = get_check_none(parameters, "sidewall_extend_focalplane")
-	sidewall_vertical_minimum_um = get_check_none(parameters, "sidewall_vertical_minimum_um")
-	add_infrared = get_check_none(parameters, "add_infrared")
-	lambda_min_um = get_check_none(parameters, "lambda_min_um")
-	lambda_max_um = get_check_none(parameters, "lambda_max_um")
-	lambda_min_eval_um = get_check_none(parameters, "lambda_min_eval_um")
-	lambda_max_eval_um = get_check_none(parameters, "lambda_max_eval_um")
-	num_bands = get_check_none(parameters, "num_bands")
-	num_points_per_band = get_check_none(parameters, "num_points_per_band")
-	num_dispersive_ranges = get_check_none(parameters, "num_dispersive_ranges")
-	add_pdaf = get_check_none(parameters, "add_pdaf")
-	pdaf_angle_phi_degrees = get_check_none(parameters, "pdaf_angle_phi_degrees")
-	pdaf_angle_theta_degrees = get_check_none(parameters, "pdaf_angle_theta_degrees")
-	pdaf_adj_src_idx = get_check_none(parameters, "pdaf_adj_src_idx")
-	fdtd_simulation_time_fs = get_check_none(parameters, "fdtd_simulation_time_fs")
-	weight_by_individual_wavelength = get_check_none(parameters, "weight_by_individual_wavelength")
-	use_gaussian_sources = get_check_none(parameters, "use_gaussian_sources")
-	use_airy_approximation = get_check_none(parameters, "use_airy_approximation")
-	f_number = get_check_none(parameters, "f_number")
-	airy_correction_factor = get_check_none(parameters, "airy_correction_factor")
-	source_angle_theta_vacuum_deg = get_check_none(parameters, "source_angle_theta_vacuum_deg")
-	source_angle_phi_deg = get_check_none(parameters, "source_angle_phi_deg")
-	xy_phi_rotations = get_check_none(parameters, "xy_phi_rotations")
-	xy_pol_rotations = get_check_none(parameters, "xy_pol_rotations")
-	xy_names = get_check_none(parameters, "xy_names")
-	num_focal_spots = get_check_none(parameters, "num_focal_spots")
-	dispersive_range_to_adjoint_src_map = get_check_none(parameters, "dispersive_range_to_adjoint_src_map")
-	adjoint_src_to_dispersive_range_map = get_check_none(parameters, "adjoint_src_to_dispersive_range_map")
-	enforce_xy_gradient_symmetry = get_check_none(parameters, "enforce_xy_gradient_symmetry")
-	weight_by_quadrant_transmission = get_check_none(parameters, "weight_by_quadrant_transmission")
-	num_epochs = get_check_none(parameters, "num_epochs")
-	num_iterations_per_epoch = get_check_none(parameters, "num_iterations_per_epoch")
-	use_fixed_step_size = get_check_none(parameters, "use_fixed_step_size")
-	fixed_step_size = get_check_none(parameters, "fixed_step_size")
-	epoch_start_design_change_max = get_check_none(parameters, "epoch_start_design_change_max")
-	epoch_end_design_change_max = get_check_none(parameters, "epoch_end_design_change_max")
-	epoch_start_design_change_min = get_check_none(parameters, "epoch_start_design_change_min")
-	epoch_end_design_change_min = get_check_none(parameters, "epoch_end_design_change_min")
-	fom_types = get_check_none(parameters, "fom_types")
-	optimization_fom = get_check_none(parameters, "optimization_fom")
-	polarizations_focal_plane_map = get_check_none(parameters, "polarizations_focal_plane_map")
-	weight_focal_plane_map_performance_weighting = get_check_none(parameters, "weight_focal_plane_map_performance_weighting")
-	weight_focal_plane_map = get_check_none(parameters, "weight_focal_plane_map")
-	do_green_balance = get_check_none(parameters, "do_green_balance")
-	polarization_name_to_idx = get_check_none(parameters, "polarization_name_to_idx")
-	desired_peaks_per_band_um = get_check_none(parameters, "desired_peaks_per_band_um")
-	explicit_band_centering = get_check_none(parameters, "explicit_band_centering")
-	shuffle_green = get_check_none(parameters, "shuffle_green")
-	infrared_center_um = get_check_none(parameters, "infrared_center_um")
-	do_rejection = get_check_none(parameters, "do_rejection")
-	softplus_kappa = get_check_none(parameters, "softplus_kappa")
+	# # Non-Pythonic way:
+	# # But don't do this. For back-compatibility, we want there to be a None object if we call a variable that is not defined in raw config
+	# locals().update(**param_dict)
 
-# Grab all current variables and exclude the ones from before - set up a dictionary to use for post-processing
-config_keys = set(dir()) - not_config_keys
-config_vars = {}
-for key in config_keys:
-	if key not in ["not_config_keys"]:
-		config_vars[key] = eval(key)
+	# Grab all current variables and exclude the ones from before - set up a dictionary to use for post-processing
+	config_keys = set(dir()) - not_config_keys
+	config_vars = {}
+	for key in config_keys:
+		if key not in ["not_config_keys"]:
+			config_vars[key] = eval(key)
+   
+	return config_vars
+
+# Store all raw config variables in a dictionary.
+config_vars = get_config_vars(parameters)
+# Assign to a SimpleNamespace for easy code readability.
+cv = SimpleNamespace(**config_vars)
 
 #* Environment Variables
 if running_on_local_machine:	
-	lumapi_filepath =  lumapi_filepath_local
+	lumapi_filepath =  cv.lumapi_filepath_local
 else:	
 	#! do not include spaces in filepaths passed to linux
-	lumapi_filepath = lumapi_filepath_hpc
+	lumapi_filepath = cv.lumapi_filepath_hpc
 
 #* Process variables
 # Here we pass config_vars as a dictionary to a function that does all relevant post-processing.
@@ -172,9 +179,10 @@ else:
 # Most common use-case is for a plot-producing script that needs to regenerate the exact same variables -
 # Then we don't need to change the same code in two different files.
 
-def post_process_config_vars(**cd):		# cd: Config Dictionary
+def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	'''All post-processing of raw config variables should be performed here. This covers anything that cannot be defined in
 	a YAML file, such as calculations (e.g. degrees to radians).'''
+	cd = SimpleNamespace(**config_dict)
 
 	# Record all variables in locals() that are not yet post-processed, so as to filter them out later
 	not_output_keys = set(dir())
@@ -188,138 +196,141 @@ def post_process_config_vars(**cd):		# cd: Config Dictionary
 	# mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )	# TODO: Do we need this for back-compatibility?
 
 	# Meant for square_blur and square_blur_smooth (used when mesh cells and minimum feature cells don't match)
-	min_feature_size_voxels = min_feature_size_um / geometry_spacing_lateral_um
+	min_feature_size_voxels = cd.min_feature_size_um / cd.geometry_spacing_lateral_um
 	blur_half_width_voxels = int( np.ceil( ( min_feature_size_voxels - 1 ) / 2. ) )
 
 	# Optical
-	min_device_permittivity = min_device_index**2
-	max_device_permittivity = max_device_index**2
+	min_device_permittivity = cd.min_device_index**2
+	max_device_permittivity = cd.max_device_index**2
 
 	#! 20230220 - Empirically, keeping focal length at 3/4 of device length seems the most effective.
-	focal_length_um = device_scale_um * 30#40#10#20#40#50#30	
+	focal_length_um = cd.device_scale_um * 30#40#10#20#40#50#30	
 	focal_plane_center_vertical_um = -focal_length_um
 
 	# Device
 	# vertical_layer_height_voxels = int( vertical_layer_height_um / geometry_spacing_minimum_um )
-	vertical_layer_height_voxels = int( vertical_layer_height_um / device_scale_um )
-	device_size_vertical_um = vertical_layer_height_um * num_vertical_layers
+	vertical_layer_height_voxels = int( cd.vertical_layer_height_um / cd.device_scale_um )
+	device_size_vertical_um = cd.vertical_layer_height_um * cd.num_vertical_layers
 
-	device_voxels_lateral = int(np.round( device_size_lateral_um / geometry_spacing_lateral_um))
+	device_voxels_lateral = int(np.round( cd.device_size_lateral_um / cd.geometry_spacing_lateral_um))
 	# device_voxels_vertical = int(np.round( device_size_vertical_um / geometry_spacing_minimum_um))
-	device_voxels_vertical = int(np.round( device_size_vertical_um / device_scale_um))
+	device_voxels_vertical = int(np.round( device_size_vertical_um / cd.device_scale_um))
 
-	device_voxels_simulation_mesh_lateral = 1 + int(device_size_lateral_um / mesh_spacing_um)
+	device_voxels_simulation_mesh_lateral = 1 + int(cd.device_size_lateral_um / cd.mesh_spacing_um)
 	# device_voxels_simulation_mesh_lateral = 2 + int(device_size_lateral_um / mesh_spacing_um)
 	# device_voxels_simulation_mesh_vertical = 2 + int(device_size_vertical_um / mesh_spacing_um)
-	device_voxels_simulation_mesh_vertical = lookup_additional_vertical_mesh_cells[ num_vertical_layers ] + int(device_size_vertical_um / mesh_spacing_um)
+	device_voxels_simulation_mesh_vertical = lookup_additional_vertical_mesh_cells[ cd.num_vertical_layers ] + \
+	 													int(device_size_vertical_um / cd.mesh_spacing_um)
 
 	device_vertical_maximum_um = device_size_vertical_um	# NOTE: Unused
 
 	# Surrounding          
-	sidewall_x_positions_um = [device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2, 0]
-	sidewall_y_positions_um = [0, device_size_lateral_um / 2 + sidewall_thickness_um / 2, 0, -device_size_lateral_um / 2 - sidewall_thickness_um / 2]
-	sidewall_xspan_positions_um = [sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2,
-								sidewall_thickness_um, device_size_lateral_um + sidewall_thickness_um * 2]
-	sidewall_yspan_positions_um = [device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um, 
-								device_size_lateral_um + sidewall_thickness_um * 2, sidewall_thickness_um]
+	sidewall_x_positions_um = [cd.device_size_lateral_um / 2 + cd.sidewall_thickness_um / 2, 0, -cd.device_size_lateral_um / 2 - cd.sidewall_thickness_um / 2, 0]
+	sidewall_y_positions_um = [0, cd.device_size_lateral_um / 2 + cd.sidewall_thickness_um / 2, 0, -cd.device_size_lateral_um / 2 - cd.sidewall_thickness_um / 2]
+	sidewall_xspan_positions_um = [cd.sidewall_thickness_um, cd.device_size_lateral_um + cd.sidewall_thickness_um * 2,
+								cd.sidewall_thickness_um, cd.device_size_lateral_um + cd.sidewall_thickness_um * 2]
+	sidewall_yspan_positions_um = [cd.device_size_lateral_um + cd.sidewall_thickness_um * 2, cd.sidewall_thickness_um, 
+								cd.device_size_lateral_um + cd.sidewall_thickness_um * 2, cd.sidewall_thickness_um]
 	# sidewall_vertical_minimum_um = device_vertical_minimum_um
 
 	# Spectral
 
-	if add_infrared:
-		lambad_max_um = 1.0
-		lambda_max_eval_um = 1.0
-	bandwidth_um = lambda_max_um - lambda_min_um
+	if cd.add_infrared:
+		cd.lambda_max_um = 1.0
+		cd.lambda_max_eval_um = 1.0
+	bandwidth_um = cd.lambda_max_um - cd.lambda_min_um
 
-	num_design_frequency_points = num_bands * num_points_per_band
+	num_design_frequency_points = cd.num_bands * cd.num_points_per_band
 	num_eval_frequency_points = 6 * num_design_frequency_points
 
-	lambda_values_um = np.linspace(lambda_min_um, lambda_max_um, num_design_frequency_points)
+	lambda_values_um = np.linspace(cd.lambda_min_um, cd.lambda_max_um, num_design_frequency_points)
 	# Following derivation is a normalization factor for the intensity depending on frequency, so as to ensure equal weighting.
-	max_intensity_by_wavelength = (device_size_lateral_um**2)**2 / (focal_length_um**2 * lambda_values_um**2)
+	max_intensity_by_wavelength = (cd.device_size_lateral_um**2)**2 / (focal_length_um**2 * lambda_values_um**2)
 	# See https://en.wikipedia.org/wiki/Airy_disk#:~:text=at%20the%20center%20of%20the%20diffraction%20pattern
 
-	dispersive_range_size_um = bandwidth_um / num_dispersive_ranges
+	dispersive_range_size_um = bandwidth_um / cd.num_dispersive_ranges
 	dispersive_ranges_um = [
-						[ lambda_min_um, lambda_max_um ]
+						[ cd.lambda_min_um, cd.lambda_max_um ]
 					]
 
 	# PDAF Functionality
-	if add_pdaf:
-		assert device_voxels_lateral % 2 == 0, "Expected an even number here for PDAF implementation ease!"
-		assert ( not add_infrared ), "For now, we are just going to look at RGB designs!"
+	if cd.add_pdaf:
+		assert cd.device_voxels_lateral % 2 == 0, "Expected an even number here for PDAF implementation ease!"
+		assert ( not cd.add_infrared ), "For now, we are just going to look at RGB designs!"
 
-	pdaf_focal_spot_x_um = 0.25 * device_size_lateral_um
-	pdaf_focal_spot_y_um = 0.25 * device_size_lateral_um
+	pdaf_focal_spot_x_um = 0.25 * cd.device_size_lateral_um
+	pdaf_focal_spot_y_um = 0.25 * cd.device_size_lateral_um
 
-	pdaf_lambda_min_um = lambda_min_um
-	pdaf_lambda_max_um = lambda_min_um + bandwidth_um / 3.
+	pdaf_lambda_min_um = cd.lambda_min_um
+	pdaf_lambda_max_um = cd.lambda_min_um + bandwidth_um / 3.
 
 	pdaf_lambda_values_um = np.linspace(pdaf_lambda_min_um, pdaf_lambda_max_um, num_design_frequency_points)
-	pdaf_max_intensity_by_wavelength = (device_size_lateral_um**2)**2 / (focal_length_um**2 * pdaf_lambda_values_um**2)
+	pdaf_max_intensity_by_wavelength = (cd.device_size_lateral_um**2)**2 / (focal_length_um**2 * pdaf_lambda_values_um**2)
 
 	# FDTD
-	vertical_gap_size_um = geometry_spacing_lateral_um * 15
-	lateral_gap_size_um = device_scale_um * 10 #25#50
+	vertical_gap_size_um = cd.geometry_spacing_lateral_um * 15
+	lateral_gap_size_um = cd.device_scale_um * 10 #25#50
 	# vertical_gap_size_um = geometry_spacing_minimum_um * 15
 	# lateral_gap_size_um = geometry_spacing_minimum_um * 10#25#50
 
 	fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
-	fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + device_size_lateral_um
+	fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + cd.device_size_lateral_um
 	fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
 	fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
 
 	# Forward (Input) Source
-	lateral_aperture_um = 1.1 * device_size_lateral_um
+	lateral_aperture_um = 1.1 * cd.device_size_lateral_um
 	src_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um * 2. / 3.
 	src_minimum_vertical_um = -focal_length_um - 0.5 * vertical_gap_size_um
 
-	mid_lambda_um = (lambda_min_um + lambda_max_um)/2
+	mid_lambda_um = (cd.lambda_min_um + cd.lambda_max_um)/2
 
 	gaussian_waist_radius_um = 0.5 * ( 0.5 * 2.04 )		# half a quadrant width
 	# take f number = 2.2, check index calc
 	# # gaussian_waist_radius_um = airy_correction_factor * mid_lambda_um / ( np.pi * ( 1. / ( 2 * f_number ) ) ) 
 	# 							 = 0.84 * 0.55 * 2.2 / (np.pi/2)
-	if use_airy_approximation:
-		gaussian_waist_radius_um = airy_correction_factor * mid_lambda_um * f_number
+	if cd.use_airy_approximation:
+		gaussian_waist_radius_um = cd.airy_correction_factor * mid_lambda_um * cd.f_number
 	else:
-		gaussian_waist_radius_um = mid_lambda_um / ( np.pi * ( 1. / ( 2 * f_number ) ) )
+		gaussian_waist_radius_um = mid_lambda_um / ( np.pi * ( 1. / ( 2 * cd.f_number ) ) )
 	# TODO: Check which one we decided on in the end - Airy disk of Gaussian on input aperture, or f-number determining divergence half-angle?
 	# TODO: Add frequency dependent profile?
 
-	source_angle_theta_rad = np.arcsin( np.sin( source_angle_theta_vacuum_deg * np.pi / 180. ) * 1.0 / background_index )
+	source_angle_theta_rad = np.arcsin( np.sin( cd.source_angle_theta_vacuum_deg * np.pi / 180. ) * 1.0 / cd.background_index )
 	source_angle_theta_deg = source_angle_theta_rad * 180. / np.pi
 
 	# Adjoint Sources
 	adjoint_vertical_um = -focal_length_um
-	num_adjoint_sources = num_focal_spots
-	adjoint_x_positions_um = [device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4., device_size_lateral_um / 4.]
-	adjoint_y_positions_um = [device_size_lateral_um / 4., device_size_lateral_um / 4., -device_size_lateral_um / 4., -device_size_lateral_um / 4.]
+	num_adjoint_sources = cd.num_focal_spots
+	adjoint_x_positions_um = [cd.device_size_lateral_um / 4., -cd.device_size_lateral_um / 4., -cd.device_size_lateral_um / 4., cd.device_size_lateral_um / 4.]
+	adjoint_y_positions_um = [cd.device_size_lateral_um / 4., cd.device_size_lateral_um / 4., -cd.device_size_lateral_um / 4., -cd.device_size_lateral_um / 4.]
 
 	# Optimization
-	if enforce_xy_gradient_symmetry:
-		assert ( int( np.round( device_size_lateral_um / geometry_spacing_lateral_um ) ) % 2 ) == 1, "We should have an odd number of design voxels across for this operation."
-	assert not enforce_xy_gradient_symmetry, "20230220 Greg - This feature seems to be making things worse - I think there is a small inherent symmetry in the simulation/import/monitors"
+	if cd.enforce_xy_gradient_symmetry:
+		assert ( int( np.round( cd.device_size_lateral_um / cd.geometry_spacing_lateral_um ) ) % 2 ) == 1, "We should have an odd number of design voxels across for this operation."
+	assert not cd.enforce_xy_gradient_symmetry, "20230220 Greg - This feature seems to be making things worse - I think there is a small inherent symmetry in the simulation/import/monitors"
 
-	epoch_range_design_change_max = epoch_start_design_change_max - epoch_end_design_change_max
-	epoch_range_design_change_min = epoch_start_design_change_min - epoch_end_design_change_min
+	epoch_range_design_change_max = cd.epoch_start_design_change_max - cd.epoch_end_design_change_max
+	epoch_range_design_change_min = cd.epoch_start_design_change_min - cd.epoch_end_design_change_min
 
 	# Spectral and polarization selectivity information
-	if weight_by_individual_wavelength:
+	if cd.weight_by_individual_wavelength:
 		weight_focal_plane_map_performance_weighting = [ 1.0, 1.0, 1.0, 1.0 ]
 		weight_focal_plane_map = [ 1.0, 1.0, 1.0, 1.0 ]
 		weight_individual_wavelengths = np.ones( len( lambda_values_um ) )
 	
 	# Determine the wavelengths that will be directed to each focal area
 	spectral_focal_plane_map = [
-		[0, num_points_per_band],
-		[num_points_per_band, 2 * num_points_per_band],
-		[2 * num_points_per_band, 3 * num_points_per_band],
-		[num_points_per_band, 2 * num_points_per_band]
+		[0, cd.num_points_per_band],
+		[cd.num_points_per_band, 2 * cd.num_points_per_band],
+		[2 * cd.num_points_per_band, 3 * cd.num_points_per_band],
+		[cd.num_points_per_band, 2 * cd.num_points_per_band]
 	]
 
 	# Find indices of desired peak locations in lambda_values_um
-	desired_peak_location_per_band = [ np.argmin( ( lambda_values_um - desired_peaks_per_band_um[ idx ] )**2 ) for idx in range( 0, len( desired_peaks_per_band_um ) ) ]
+	desired_peak_location_per_band = [ np.argmin( ( lambda_values_um - cd.desired_peaks_per_band_um[ idx ] )**2 ) 
+										for idx in range( 0, len( cd.desired_peaks_per_band_um ) ) 
+									]
 	# logging.info(f'Desired peak locations per band are: {desired_peak_location_per_band}')
 
 	# for idx in range( 0, len( desired_peak_location_per_band ) ):
@@ -336,7 +347,7 @@ def post_process_config_vars(**cd):		# cd: Config Dictionary
 	# ]
 
 
-	if explicit_band_centering:
+	if cd.explicit_band_centering:
 		# Determine the wavelengths that will be directed to each focal area
 		spectral_focal_plane_map = [
 			[0, num_design_frequency_points],
@@ -364,7 +375,7 @@ def post_process_config_vars(**cd):		# cd: Config Dictionary
 		bandwidth_right_by_quad = [ bandwidth_right_by_quad[ idx ] / 1.75 for idx in range( 0, 4 ) ]
 
 		quad_to_band = [ 0, 1, 2, 1 ]
-		if shuffle_green:
+		if cd.shuffle_green:
 			quad_to_band = [ 0, 1, 1, 2 ]
 
 		weight_individual_wavelengths_by_quad = np.zeros((4,num_design_frequency_points))
@@ -393,7 +404,7 @@ def post_process_config_vars(**cd):		# cd: Config Dictionary
 		# plt.show()
 
 
-	if add_infrared:
+	if cd.add_infrared:
 		wl_idx_ir_start = 0
 		for wl_idx in range( 0, len( lambda_values_um ) ):
 			if lambda_values_um[ wl_idx ] > infrared_center_um:
@@ -418,7 +429,7 @@ def post_process_config_vars(**cd):		# cd: Config Dictionary
 				weight_individual_wavelengths[ wl_idx ] = ir_band_equalization_weights[ band_idx ]
 
 
-	if do_rejection:
+	if cd.do_rejection:
 
 		# def weight_accept( transmission ):
 		# 	return transmission
@@ -529,12 +540,9 @@ def post_process_config_vars(**cd):		# cd: Config Dictionary
 		if key not in ["not_output_keys"]:
 			output_vars[key] = eval(key)
 	
-	return output_vars
+	return output_vars, vars(cd)
 
-
-# processed_config_vars = post_process_config_vars(**config_vars)
-# TODO: Kind of sort of need to re-export this AND config_vars into globals() again
-# todo Think it would be best to do that in the main optimization code
-globals().update(post_process_config_vars(**config_vars))
+# Store all processed config variables in a dictionary, update raw config variables.
+processed_vars, config_vars = post_process_config_vars(**config_vars)
 
 logging.info('Config imported and processed.')

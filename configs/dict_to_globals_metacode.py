@@ -9,7 +9,7 @@ yaml_filename = 'configs/test_config_sony.yaml'
 with open( yaml_filename, 'rb' ) as yaml_file:
 	parameters = yaml.safe_load( yaml_file )
 
-dict_name = 'parameters'
+dict_name = 'param_dict'
 output_txt = ''
 for key in list(parameters.keys()):
     # output_txt += f'{key} = {dict_name}.get("{key}")\n' # DEPRECATED
