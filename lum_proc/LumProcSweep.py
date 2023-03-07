@@ -21,7 +21,7 @@ from scipy import interpolate
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
-                               AutoMinorLocator)
+							   AutoMinorLocator)
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import queue
@@ -146,8 +146,24 @@ def create_dict_nx(dict_name):
 #* Create FDTD hook
 #
 fdtd_hook = lumapi.FDTD()
-fdtd_hook.load(os.path.abspath(os.path.join(projects_directory_location, device_filename)))
+# Load saved session from adjoint optimization
+fdtd_hook.newproject()
+fdtd_hook.load(os.path.abspath(os.path.join(python_src_directory, device_filename)))
 fdtd_hook.save(os.path.abspath(os.path.join(projects_directory_location, device_filename)))
+
+# Grab positions and dimensions from the .fsp itself. Replaces values from LumProcParameters.py
+#! No checks are done to see if there are discrepancies.
+device_size_lateral_um = fdtd_hook.getnamed('design_import','x span') / 1e-6
+device_vertical_maximum_um = fdtd_hook.getnamed('design_import','z max') / 1e-6
+device_vertical_minimum_um = fdtd_hook.getnamed('design_import','z min') / 1e-6
+# fdtd_region_size_lateral_um = fdtd_hook.getnamed('FDTD','x span') / 1e-6
+fdtd_region_maximum_vertical_um = fdtd_hook.getnamed('FDTD','z max') / 1e-6
+fdtd_region_minimum_vertical_um = fdtd_hook.getnamed('FDTD','z min') / 1e-6
+fdtd_region_size_vertical_um = fdtd_region_maximum_vertical_um + abs(fdtd_region_minimum_vertical_um)
+monitorbox_size_lateral_um = device_size_lateral_um + 2 * sidewall_thickness_um + (mesh_spacing_um)*5
+monitorbox_vertical_maximum_um = device_vertical_maximum_um + (mesh_spacing_um*5)
+monitorbox_vertical_minimum_um = device_vertical_minimum_um - (mesh_spacing_um*5)
+adjoint_vertical_um = fdtd_hook.getnamed('transmission_focal_monitor_', 'z') / 1e-6
 
 # TODO: Think we need to wrap this part in a function or class or another module honestly --------------------------------------------------------------------------------------------
 #*---- ADD TO FDTD ENVIRONMENT AND OBJECTS ----
@@ -225,16 +241,18 @@ def fdtd_update_object( fdtd_hook_, simDict, create_object=False ):
 			logging.error(message + f' FDTD Object {simDict["name"]}: does not exist.')
 			return 0
 	
-	for key, val in simDict.items():
-		# Update every single property in the FDTD object to sync up with the dictionary.
-		if key not in ['name', 'type', 'power_monitor']:	#NOTE: These either should never be updated, or don't exist in FDTD as properties.
-			# logging.debug(f'Monitor: {monitor["name"]}, Key: {key}, and Value: {val}')
-			try:
-				fdtd_hook_.setnamed(simDict['name'], key, val)
-			except Exception as ex:
-				template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
-				message = template.format(type(ex).__name__, ex.args)
-				logging.debug(message + f' Property {key} in FDTD Object {simDict["name"]} is inactive / cannot be changed.')
+	for i in range(2):	# Repeat the following twice because the order that the properties are changed matters. 
+						# (Sometimes certain properties are grayed out depending on the value of others)
+		for key, val in simDict.items():
+			# Update every single property in the FDTD object to sync up with the dictionary.
+			if key not in ['name', 'type', 'power_monitor']:	#NOTE: These either should never be updated, or don't exist in FDTD as properties.
+				# logging.debug(f'Monitor: {monitor["name"]}, Key: {key}, and Value: {val}')
+				try:
+					fdtd_hook_.setnamed(simDict['name'], key, val)
+				except Exception as ex:
+					template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
+					message = template.format(type(ex).__name__, ex.args)
+					logging.debug(message + f' Property {key} in FDTD Object {simDict["name"]} is inactive / cannot be changed.')
 	
 	# Update the record of the dictionary in globals()
 	updated_simobject = fdtd_get_simobject( fdtd_hook_, simDict['name'] )
@@ -287,10 +305,218 @@ def disable_all_sources():
 # Also any other necessary editing of the Lumerical environment and objects.
 #
 
+if start_from_step == 0:
+	logging.info("Beginning Step 0: Monitor Setup")
+
+	# Create dictionary to duplicate FDTD SimObjects as dictionaries for saving out
+	# This dictionary captures the states of all FDTD objects in the simulation, and has the advantage that it can be saved out or exported.
+	# The dictionary will be our master record, and is continually updated for every change in FDTD.
+	fdtd_objects = {}
+	for simObj in fdtd_get_all_simobjects(fdtd_hook):
+		fdtd_objects[simObj['name']] = fdtd_simobject_to_dict(simObj)
+
+	#
+	# Set up the FDTD monitors that weren't present during adjoint optimization
+	# We are using dict-like access: see https://support.lumerical.com/hc/en-us/articles/360041873053-Session-management-Python-API
+	# The line fdtd_objects['FDTD'] = fdtd means that both sides of the equation point to the same object.
+	# See https://stackoverflow.com/a/10205681 and https://nedbatchelder.com/text/names.html
+
+	# Monitor right below source to measure overall transmission / reflection
+	src_transmission_monitor = {}
+	src_transmission_monitor['name'] = 'src_transmission_monitor'
+	src_transmission_monitor['type'] = 'DFTMonitor'
+	src_transmission_monitor['power_monitor'] = True
+	src_transmission_monitor.update(monitors_keyed[src_transmission_monitor['name']])
+	src_transmission_monitor['x'] = 0 * 1e-6
+	src_transmission_monitor['x span'] = (monitorbox_size_lateral_um*1.1) * 1e-6
+	# src_transmission_monitor['x span'] = ((fdtd_hook.getnamed('transmission_focal_monitor_','x span') /2 * 6) / 1e-6) * 1e-6  
+	src_transmission_monitor['y'] = 0 * 1e-6
+	src_transmission_monitor['y span'] = (monitorbox_size_lateral_um*1.1) * 1e-6
+	# src_transmission_monitor['y span'] = ((fdtd_hook.getnamed('transmission_focal_monitor_','x span') /2 * 6) / 1e-6) * 1e-6
+	src_transmission_monitor['z'] = monitorbox_vertical_maximum_um * 1e-6 #fdtd_hook.getnamed('forward_src_x','z') - (mesh_spacing_um*5)*1e-6
+	src_transmission_monitor['override global monitor settings'] = 1
+	src_transmission_monitor['use wavelength spacing'] = 1
+	src_transmission_monitor['use source limits'] = 1
+	src_transmission_monitor['frequency points'] = num_design_frequency_points
+	src_transmission_monitor = fdtd_update_object(fdtd_hook, src_transmission_monitor, create_object=True)
+	fdtd_objects['src_transmission_monitor'] = src_transmission_monitor
+
+	# Monitor at top of device across FDTD to measure source power that misses the device
+	src_spill_monitor = {}
+	src_spill_monitor['name'] = 'src_spill_monitor'
+	src_spill_monitor['type'] = 'DFTMonitor'
+	src_spill_monitor['power_monitor'] = True
+	src_spill_monitor.update(monitors_keyed[src_spill_monitor['name']])
+	src_spill_monitor['x'] = 0 * 1e-6
+	src_spill_monitor['x span'] = fdtd_region_size_lateral_um * 1e-6
+	src_spill_monitor['y'] = 0 * 1e-6
+	src_spill_monitor['y span'] = fdtd_region_size_lateral_um * 1e-6
+	src_spill_monitor['z'] = monitorbox_vertical_maximum_um * 1e-6
+	src_spill_monitor['override global monitor settings'] = 1
+	src_spill_monitor['use wavelength spacing'] = 1
+	src_spill_monitor['use source limits'] = 1
+	src_spill_monitor['frequency points'] = num_design_frequency_points
+	src_spill_monitor = fdtd_update_object(fdtd_hook, src_spill_monitor, create_object=True)
+	fdtd_objects['src_spill_monitor'] = src_spill_monitor
+
+	# Monitor right above device to measure input power
+	incident_aperture_monitor = {}
+	incident_aperture_monitor['name'] = 'incident_aperture_monitor'
+	incident_aperture_monitor['type'] = 'DFTMonitor'
+	incident_aperture_monitor['power_monitor'] = True
+	incident_aperture_monitor.update(monitors_keyed[incident_aperture_monitor['name']])
+	incident_aperture_monitor['x'] = 0 * 1e-6
+	incident_aperture_monitor['x span'] = monitorbox_size_lateral_um * 1e-6
+	incident_aperture_monitor['y'] = 0 * 1e-6
+	incident_aperture_monitor['y span'] = monitorbox_size_lateral_um * 1e-6
+	incident_aperture_monitor['z'] = monitorbox_vertical_maximum_um * 1e-6
+	incident_aperture_monitor['override global monitor settings'] = 1
+	incident_aperture_monitor['use wavelength spacing'] = 1
+	incident_aperture_monitor['use source limits'] = 1
+	incident_aperture_monitor['frequency points'] = num_design_frequency_points
+	incident_aperture_monitor = fdtd_update_object(fdtd_hook, incident_aperture_monitor, create_object=True)
+	fdtd_objects['incident_aperture_monitor'] = incident_aperture_monitor
+
+	# Monitor right below device to measure exit aperture power
+	exit_aperture_monitor = {}
+	exit_aperture_monitor['name'] = 'exit_aperture_monitor'
+	exit_aperture_monitor['type'] = 'DFTMonitor'
+	exit_aperture_monitor['power_monitor'] = True
+	exit_aperture_monitor.update(monitors_keyed[exit_aperture_monitor['name']])
+	exit_aperture_monitor['x'] = 0 * 1e-6
+	exit_aperture_monitor['x span'] = monitorbox_size_lateral_um * 1e-6
+	exit_aperture_monitor['y'] = 0 * 1e-6
+	exit_aperture_monitor['y span'] = monitorbox_size_lateral_um * 1e-6
+	exit_aperture_monitor['z'] = monitorbox_vertical_minimum_um * 1e-6
+	exit_aperture_monitor['override global monitor settings'] = 1
+	exit_aperture_monitor['use wavelength spacing'] = 1
+	exit_aperture_monitor['use source limits'] = 1
+	exit_aperture_monitor['frequency points'] = num_design_frequency_points
+	exit_aperture_monitor = fdtd_update_object(fdtd_hook, exit_aperture_monitor, create_object=True)
+	fdtd_objects['exit_aperture_monitor'] = exit_aperture_monitor
+	
+	# Sidewall monitors closing off the monitor box around the splitter cube device, to measure side scattering
+	side_monitors = []
+	sm_x_pos = [monitorbox_size_lateral_um/2, 0, -monitorbox_size_lateral_um/2, 0]
+	sm_y_pos = [0, monitorbox_size_lateral_um/2, 0, -monitorbox_size_lateral_um/2]
+	sm_xspan_pos = [0, monitorbox_size_lateral_um, 0, monitorbox_size_lateral_um]
+	sm_yspan_pos = [monitorbox_size_lateral_um, 0, monitorbox_size_lateral_um, 0]
+	# sm_monitor_type = ['2D X-normal', '2D Y-normal', '2D X-normal', '2D Y-normal']
+	
+	for sm_idx in range(0, 4):      # We are not using num_sidewalls because these monitors MUST be created
+		side_monitor = {}
+		side_monitor['name'] = 'side_monitor_' + str(sm_idx)
+		side_monitor['type'] = 'DFTMonitor'
+		side_monitor['power_monitor'] = True
+		side_monitor.update(monitors_keyed[side_monitor['name']])
+		#side_monitor['x'] = sm_x_pos[sm_idx] * 1e-6
+		side_monitor['x max'] =  (sm_x_pos[sm_idx] + sm_xspan_pos[sm_idx]/2) * 1e-6   # must bypass setting 'x span' because this property is invalid if the monitor is X-normal
+		side_monitor['x min'] =  (sm_x_pos[sm_idx] - sm_xspan_pos[sm_idx]/2) * 1e-6
+		#side_monitor['y'] = sm_y_pos[sm_idx] * 1e-6
+		side_monitor['y max'] =  (sm_y_pos[sm_idx] + sm_yspan_pos[sm_idx]/2) * 1e-6   # must bypass setting 'y span' because this property is invalid if the monitor is Y-normal
+		side_monitor['y min'] =  (sm_y_pos[sm_idx] - sm_yspan_pos[sm_idx]/2) * 1e-6
+		side_monitor['z max'] = monitorbox_vertical_maximum_um * 1e-6
+		side_monitor['z min'] = monitorbox_vertical_minimum_um * 1e-6
+		side_monitor['override global monitor settings'] = 1
+		side_monitor['use wavelength spacing'] = 1
+		side_monitor['use source limits'] = 1
+		side_monitor['frequency points'] = num_design_frequency_points
+		side_monitor = fdtd_update_object(fdtd_hook, side_monitor, create_object=True)
+		side_monitors.append(side_monitor)
+	fdtd_objects['side_monitors'] = side_monitors
+
+	scatter_plane_monitor = {}
+	scatter_plane_monitor['name'] = 'scatter_plane_monitor'
+	scatter_plane_monitor['type'] = 'DFTMonitor'
+	scatter_plane_monitor['power_monitor'] = True
+	scatter_plane_monitor.update(monitors_keyed[scatter_plane_monitor['name']])
+	scatter_plane_monitor['x'] = 0 * 1e-6
+	# Need to consider: if the scatter plane monitor only includes one quadrant from the adjacent corner focal-plane-quadrants, 
+	# the average power captured by the scatter plane monitor is only 83% of the power coming from the exit aperture.
+	# It will also miss anything that falls outside of the boundary which is very probable.
+	# At the same time the time to run FDTD sim will also go up by a factor squared.
+	scatter_plane_monitor['x span'] = ((fdtd_hook.getnamed('transmission_focal_monitor_','x span') /2 * 6) / 1e-6) * 1e-6
+	scatter_plane_monitor['y'] = 0 * 1e-6
+	scatter_plane_monitor['y span'] = ((fdtd_hook.getnamed('transmission_focal_monitor_','y span') /2 * 6) / 1e-6) * 1e-6
+	scatter_plane_monitor['z'] = adjoint_vertical_um * 1e-6
+	scatter_plane_monitor['override global monitor settings'] = 1
+	scatter_plane_monitor['use wavelength spacing'] = 1
+	scatter_plane_monitor['use source limits'] = 1
+	scatter_plane_monitor['frequency points'] = num_design_frequency_points
+	scatter_plane_monitor = fdtd_update_object(fdtd_hook, scatter_plane_monitor, create_object=True)
+	fdtd_objects['scatter_plane_monitor'] = scatter_plane_monitor
+
+	# Side monitors enclosing the space between the device's exit aperture and the focal plane.
+	# Purpose is to capture the sum power of oblique scattering.
+	vertical_scatter_monitors = []
+	vsm_x_pos = [device_size_lateral_um/2, 0, -device_size_lateral_um/2, 0]
+	vsm_y_pos = [0, device_size_lateral_um/2, 0, -device_size_lateral_um/2]
+	vsm_xspan_pos = [0, device_size_lateral_um, 0, device_size_lateral_um]
+	vsm_yspan_pos = [device_size_lateral_um, 0, device_size_lateral_um, 0]
+	
+	for vsm_idx in range(0, 4):      # We are not using num_sidewalls because these monitors MUST be created
+		vertical_scatter_monitor = {}
+		vertical_scatter_monitor['name'] = 'vertical_scatter_monitor_'  + str(vsm_idx)
+		vertical_scatter_monitor['type'] = 'DFTMonitor'
+		vertical_scatter_monitor['power_monitor'] = True
+		vertical_scatter_monitor.update(monitors_keyed[vertical_scatter_monitor['name']])
+		#vertical_scatter_monitor['x'] = vsm_x_pos[vsm_idx] * 1e-6
+		vertical_scatter_monitor['x max'] =  (vsm_x_pos[vsm_idx] + vsm_xspan_pos[vsm_idx]/2) * 1e-6   # must bypass setting 'x span' because this property is invalid if the monitor is X-normal
+		vertical_scatter_monitor['x min'] =  (vsm_x_pos[vsm_idx] - vsm_xspan_pos[vsm_idx]/2) * 1e-6
+		#vertical_scatter_monitor['y'] = vsm_y_pos[vsm_idx] * 1e-6
+		vertical_scatter_monitor['y max'] =  (vsm_y_pos[vsm_idx] + vsm_yspan_pos[vsm_idx]/2) * 1e-6   # must bypass setting 'y span' because this property is invalid if the monitor is Y-normal
+		vertical_scatter_monitor['y min'] =  (vsm_y_pos[vsm_idx] - vsm_yspan_pos[vsm_idx]/2) * 1e-6
+		vertical_scatter_monitor['z max'] = device_vertical_minimum_um * 1e-6
+		vertical_scatter_monitor['z min'] = adjoint_vertical_um * 1e-6
+		vertical_scatter_monitor['override global monitor settings'] = 1
+		vertical_scatter_monitor['use wavelength spacing'] = 1
+		vertical_scatter_monitor['use source limits'] = 1
+		vertical_scatter_monitor['frequency points'] = num_design_frequency_points
+		vertical_scatter_monitor = fdtd_update_object(fdtd_hook, vertical_scatter_monitor, create_object=True)
+		vertical_scatter_monitors.append(vertical_scatter_monitor)
+	fdtd_objects['vertical_scatter_monitors'] = vertical_scatter_monitors
+
+	# Device cross-section monitors that take the field inside the device, and extend all the way down to the focal plane. We have 6 slices, 2 sets of 3 for both x and y.
+	# Each direction-set has slices at x(y) = -device_size_lateral_um/4, 0, +device_size_lateral_um/4, i.e. intersecting where the focal spot is supposed to be.
+	# We also take care to output plots for both E_norm and Re(E), the latter of which captures the wave-like behaviour much more accurately.
+	device_xsection_monitors = []
+	dxm_pos = [-device_size_lateral_um/4, 0, device_size_lateral_um/4]
+ 
+	for dev_cross_idx in range(0,6):
+		device_cross_monitor = {}
+		device_cross_monitor['name'] = 'device_xsection_monitor_' + str(dev_cross_idx)
+		device_cross_monitor['type'] = 'DFTMonitor'
+		device_cross_monitor['power_monitor'] = True
+		device_cross_monitor.update(monitors_keyed[device_cross_monitor['name']])
+		device_cross_monitor['z max'] = device_vertical_maximum_um * 1e-6
+		device_cross_monitor['z min'] = adjoint_vertical_um * 1e-6
+		
+		if dev_cross_idx < 3:
+			device_cross_monitor['y'] = dxm_pos[dev_cross_idx] * 1e-6
+			device_cross_monitor['x max'] = (device_size_lateral_um / 2) * 1e-6
+			device_cross_monitor['x min'] = -(device_size_lateral_um / 2) * 1e-6
+		else:
+			device_cross_monitor['x'] = dxm_pos[dev_cross_idx-3] * 1e-6
+			device_cross_monitor['y max'] = (device_size_lateral_um / 2) * 1e-6
+			device_cross_monitor['y min'] = -(device_size_lateral_um / 2) * 1e-6
+		
+		device_cross_monitor['override global monitor settings'] = 1
+		device_cross_monitor['use wavelength spacing'] = 1
+		device_cross_monitor['use source limits'] = 1
+		device_cross_monitor['frequency points'] = num_design_frequency_points
+		
+		device_xsection_monitor = fdtd_update_object(fdtd_hook, device_cross_monitor, create_object=True)
+		device_xsection_monitors.append(device_cross_monitor)
+	fdtd_objects['device_xsection_monitors'] = device_xsection_monitors
+	
+ 
+	# TODO: Finer sidewall mesh
+
 # TODO: Region stuff
 # TODO: --------------------------------------------------------------------------------------------------------------------------
 
-
+   
+		
 
 
 
