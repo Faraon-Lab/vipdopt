@@ -916,7 +916,7 @@ num_defocus_points = 7
 pdaf_defocus_amounts_um = np.linspace( -pdaf_gaussian_defocus_um, pdaf_gaussian_defocus_um, num_defocus_points )
 pdaf_angular = True
 pdaf_angular_range = -14
-assert ( not( pdaf_defocus_gaussian and pdaf_angular ) ), 'These options are mututally exclusive for the pdaf scan!'
+assert ( not( pdaf_defocus_gaussian and pdaf_angular ) ), 'These options are mutually exclusive for the pdaf scan!'
 
 # Control Parameters
 restart = False                 #!! Set to true if restarting from a particular iteration - be sure to change start_epoch and start_iter
@@ -1591,7 +1591,7 @@ else:		# optimization
 					load_backup_vars(shelf_fn)
 			
 				logging.info("Beginning Step 4: Stepping Design Variable.")
-				# TODO: Rewrite this part to use optimizers / NLOpt.
+				# TODO: Rewrite this part to use optimizers / NLOpt. -----------------------------------
 	
 				# Get the full device gradient by summing the x,y polarization components 
 				device_gradient = 2 * ( xy_polarized_gradients[0] + xy_polarized_gradients[1] )
@@ -1631,18 +1631,15 @@ else:		# optimization
 				if enforce_xy_gradient_symmetry:
 					device_gradient_interpolated = 0.5 * ( device_gradient_interpolated + np.swapaxes( device_gradient_interpolated, 0, 1 ) )
 				device_gradient = device_gradient_interpolated.copy()
-	
-				# Backpropagate the design_gradient through the various filters so it is applied to the (0-1) scaled permittivity
+    
+				# Backpropagate the design_gradient through the various filters to pick up (per the chain rule) gradients from each filter
+				# so the final product can be applied to the (0-1) scaled permittivity
 				design_gradient = bayer_filter.backpropagate( device_gradient )
 
 				#
 				#* Begin scaling of step size so that the design change stays within epoch_design_change limits in config
 				#
-
-				# Backpropagate the design_gradient through the various filters to pick up (per the chain rule) gradients from each filter
-				# so the final product can be applied to the (0-1) scaled permittivity
-				design_gradient = bayer_filter.backpropagate( device_gradient )
-	
+    
 				# Control the maximum that the design is allowed to change per epoch. This will increase according to the limits set, for each iteration
 				max_change_design = epoch_start_design_change_max
 				min_change_design = epoch_start_design_change_min
