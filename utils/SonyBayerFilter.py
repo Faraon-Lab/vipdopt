@@ -68,7 +68,7 @@ class SonyBayerFilter(device.Device):
 		'''Override the update_permittivity function so we can handle layer-dependent collapsing along either x- or y-dimensions.'''
 		var0 = self.w[ 0 ]
 
-		if gp.use_smooth_blur:
+		if gp.cv.use_smooth_blur:
 			var1 = self.layering_z_0.forward( var0 )
 			self.w[ 1 ] = var1
 
@@ -98,7 +98,7 @@ class SonyBayerFilter(device.Device):
 	def backpropagate(self, gradient):
 		'''Override the backpropagation function of Device class, and multiplies input (per the chain rule) by gradients of all the filters.'''
 
-		if gp.use_smooth_blur:
+		if gp.cv.use_smooth_blur:
 			gradient = self.scale_4.chain_rule( gradient, self.w[ 5 ], self.w[ 4 ] )
 			gradient = self.sigmoid_3.chain_rule( gradient, self.w[ 4 ], self.w[ 3 ] )
 			gradient = self.max_blur_xy_2.chain_rule( gradient, self.w[ 3 ], self.w[ 2 ] )
@@ -122,7 +122,7 @@ class SonyBayerFilter(device.Device):
 
 		self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_4 ]
 
-		if gp.use_smooth_blur:
+		if gp.cv.use_smooth_blur:
 			self.filters = [ self.layering_z_0, self.sigmoid_1, self.max_blur_xy_2, self.sigmoid_3, self.scale_4 ]
 
 
@@ -132,7 +132,7 @@ class SonyBayerFilter(device.Device):
 
 	def init_filters_and_variables(self):
 		self.num_filters = 3
-		if gp.use_smooth_blur:
+		if gp.cv.use_smooth_blur:
 			self.num_filters = 5
 		self.num_variables = 1 + self.num_filters
 
@@ -157,7 +157,7 @@ class SonyBayerFilter(device.Device):
 		self.scale_4 = scale.Scale([scale_min, scale_max])
 
 		
-		if gp.use_smooth_blur:
+		if gp.cv.use_smooth_blur:
 			self.max_blur_xy_2 = square_blur_smooth.SquareBlurSmooth(
 				[ gp.blur_half_width_voxels, gp.blur_half_width_voxels, 0 ] )
 
@@ -165,7 +165,7 @@ class SonyBayerFilter(device.Device):
 		# self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_2 ]
 		self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_4 ]
 
-		if gp.use_smooth_blur:
+		if gp.cv.use_smooth_blur:
 			self.filters = [ self.layering_z_0, self.sigmoid_1, self.max_blur_xy_2, self.sigmoid_3, self.scale_4 ]
 
 		self.init_variables()

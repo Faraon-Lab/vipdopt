@@ -98,17 +98,17 @@ if not os.path.isdir( OPTIMIZATION_PLOTS_FOLDER ):
 
 shutil.copy2( python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
 shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
-             os.path.join(SAVED_SCRIPTS_FOLDER, os.path.basename(yaml_filename)) )
+			 os.path.join(SAVED_SCRIPTS_FOLDER, os.path.basename(yaml_filename)) )
 shutil.copy2( python_src_directory + "/configs/SonyBayerFilterParameters.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterParameters.py" )
 # TODO: et cetera... might have to save out various scripts from each folder
 
 #  Create convenient folder for evaluation code
 if os.path.exists(EVALUATION_CONFIG_FOLDER):
-    shutil.rmtree(EVALUATION_CONFIG_FOLDER)
+	shutil.rmtree(EVALUATION_CONFIG_FOLDER)
 shutil.copytree(os.path.join(python_src_directory, "configs"), EVALUATION_CONFIG_FOLDER)
 
 if os.path.exists(EVALUATION_UTILS_FOLDER):
-    shutil.rmtree(EVALUATION_UTILS_FOLDER)
+	shutil.rmtree(EVALUATION_UTILS_FOLDER)
 shutil.copytree(os.path.join(python_src_directory, "utils"), EVALUATION_UTILS_FOLDER)
 
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/LumProcSweep.py"), EVALUATION_FOLDER + "/LumProcSweep.py" )
@@ -354,21 +354,15 @@ def disable_all_sources():
 
 	object_list = []
 
-	for xy_idx in range(0, 2):
-		# object_list.append( forward_sources[xy_idx]['name'] )
-		object_list.append(['forward_sources', xy_idx])
-
-	for adj_src_idx in range(0, num_adjoint_sources):
-		for xy_idx in range(0, 2):
-			# object_list.append( adjoint_sources[adj_src_idx][xy_idx]['name'] )
-			object_list.append(['adjoint_sources', adj_src_idx, xy_idx])
-   
-	if add_pdaf:
-		for xy_idx in range(0, 2):
-			object_list.append(['pdaf_sources', xy_idx])
-
-		for xy_idx in range(0, 2):
-			object_list.append(['pdaf_adjoint_sources', xy_idx])
+	for key, val in fdtd_objects.items():
+		if isinstance(val, list):
+			# type_string = val[0]['type'].lower()
+			pass
+		else:
+			type_string = val['type'].lower()
+  
+			if any(ele.lower() in type_string for ele in ['GaussianSource', 'TFSFSource', 'DipoleSource']):
+				object_list.append([val['name']])
 
 	disable_objects(object_list)
 
@@ -501,6 +495,7 @@ if start_from_step == 0:
 	
 		forward_src = fdtd_update_object(fdtd_hook, forward_src, create_object=True)
 		forward_sources.append(forward_src)
+		fdtd_objects[forward_src['name']] = forward_src
 	fdtd_objects['forward_sources'] = forward_sources
 
 	# Place dipole adjoint sources at the focal plane that can ring in both
@@ -521,6 +516,7 @@ if start_from_step == 0:
 			adj_src['wavelength start'] = lambda_min_um * 1e-6
 			adj_src['wavelength stop'] = lambda_max_um * 1e-6
 			adj_src = fdtd_update_object(fdtd_hook, adj_src, create_object=True)
+			fdtd_objects[adj_src['name']] = adj_src
 			adjoint_sources[adj_src_idx].append(adj_src)
 	fdtd_objects['adjoint_sources'] = adjoint_sources
 
@@ -552,6 +548,7 @@ if start_from_step == 0:
 			pdaf_source['wavelength start'] = pdaf_lambda_min_um * 1e-6
 			pdaf_source['wavelength stop'] = pdaf_lambda_max_um * 1e-6
 			pdaf_source = fdtd_update_object(fdtd_hook, pdaf_source, create_object=True)
+			fdtd_objects[pdaf_source['name']] = pdaf_source
 			pdaf_sources.append(pdaf_source)
 
 		for xy_idx in range(0, 2):
@@ -566,10 +563,11 @@ if start_from_step == 0:
 			pdaf_adjoint_source['wavelength start'] = pdaf_lambda_min_um * 1e-6
 			pdaf_adjoint_source['wavelength stop'] = pdaf_lambda_max_um * 1e-6
 			pdaf_adjoint_source = fdtd_update_object(fdtd_hook, pdaf_adjoint_source, create_object=True)
+			fdtd_objects[pdaf_adjoint_source['name']] = pdaf_adjoint_source
 			pdaf_adjoint_sources.append( pdaf_adjoint_source )
 
-		fdtd_objects[pdaf_source] = pdaf_source
-		fdtd_objects[pdaf_adjoint_source] = pdaf_adjoint_source
+		fdtd_objects[pdaf_sources] = pdaf_sources
+		fdtd_objects[pdaf_adjoint_sources] = pdaf_adjoint_sources
 
 
 	# Set up the volumetric electric field monitor inside the design region.  We will need this to compute
@@ -612,6 +610,7 @@ if start_from_step == 0:
 		focal_monitor['use source limits'] = 1
 		focal_monitor['frequency points'] = num_design_frequency_points
 		focal_monitor = fdtd_update_object(fdtd_hook, focal_monitor, create_object=True)
+		fdtd_objects[focal_monitor['name']] = focal_monitor
 		focal_monitors.append(focal_monitor)
 	fdtd_objects['focal_monitors'] = focal_monitors
 
@@ -633,6 +632,7 @@ if start_from_step == 0:
 		transmission_monitor['use source limits'] = 1
 		transmission_monitor['frequency points'] = num_design_frequency_points
 		transmission_monitor = fdtd_update_object(fdtd_hook, transmission_monitor, create_object=True)
+		fdtd_objects[transmission_monitor['name']] = transmission_monitor
 		transmission_monitors.append(transmission_monitor)
 	fdtd_objects['transmission_monitors'] = transmission_monitors
 
@@ -682,6 +682,7 @@ if start_from_step == 0:
 		device_sidewall['z max'] = device_vertical_maximum_um * 1e-6
 		device_sidewall['material'] = sidewall_material
 		device_sidewall = fdtd_update_object(fdtd_hook, device_sidewall, create_object=True)
+		fdtd_objects[device_sidewall['name']] = device_sidewall
 		device_sidewalls.append(device_sidewall)
 	fdtd_objects['device_sidewalls'] = device_sidewalls
 
@@ -706,6 +707,7 @@ if start_from_step == 0:
 			device_sidewall_mesh['override y mesh'] = 1
 			device_sidewall_mesh['dy'] = mesh_spacing_um * 1e-6 #(sidewall_thickness_um / 5) * 1e-6
 		device_sidewall_mesh = fdtd_update_object(fdtd_hook, device_sidewall_mesh, create_object=True)
+		fdtd_objects[device_sidewall_mesh['name']] = device_sidewall_mesh
 		device_sidewall_meshes.append(device_sidewall_mesh)
 	fdtd_objects['device_sidewall_meshes'] = device_sidewall_meshes
 
@@ -948,14 +950,14 @@ if restart or evaluate:
 
 
 if evaluate:
-    
-    # Set sigmoid strength to most recent epoch and get (filtered) permittivity
+	
+	# Set sigmoid strength to most recent epoch and get (filtered) permittivity
 	bayer_filter.update_filters( num_epochs - 1 )
 	bayer_filter.update_permittivity()
 	cur_density = bayer_filter.get_permittivity()
 
 	fdtd_hook.switchtolayout()
-    
+	
 	# TODO: Evaluate block
  
  
@@ -1298,7 +1300,7 @@ else:		# optimization
 				# and values being numpy arrays of shape (epochs, iterations, focal_areas, polarizations, wavelengths)
 				figure_of_merit = np.sum(fom_evolution[optimization_fom][epoch, iteration])
 				figure_of_merit_evolution[epoch, iteration] = figure_of_merit
-    
+	
 				# Save out variables that need saving for restart and debug purposes
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/figure_of_merit.npy"), np.sum(fom_evolution[optimization_fom], (2,3,4)))
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/fom_by_focal_pol_wavelength.npy"), fom_evolution[optimization_fom])
