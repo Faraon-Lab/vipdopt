@@ -163,4 +163,3 @@ shuffle_green: False #True#False#True#False
 infrared_center_um: 0.94
 do_rejection: False
 softplus_kappa:  2
-

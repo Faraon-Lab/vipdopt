@@ -163,7 +163,7 @@ if not accept_params_from_opt_file:
 
 # Sidewall and Side Monitors
 
-cv.num_sidewalls = 0                   #! Remember to turn this off if the optimization actually was done with sidewalls
+cv.num_sidewalls = 0                   #! Remember to turn this on if the optimization actually was done with sidewalls
 
 if cv.num_sidewalls == 0:
     cv.sidewall_thickness_um = 0.0
@@ -199,7 +199,7 @@ objects_above_device = [] #['permittivity_layer_substrate',
 
 # Devices in Array
 
-device_array_shape = (1)    # A tuple describing dimension sizes such as (2,3)
+device_array_shape = (1) #(3,3)    # A tuple describing dimension sizes such as (2,3)
 
 # FDTD
 

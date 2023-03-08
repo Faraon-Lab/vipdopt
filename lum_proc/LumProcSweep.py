@@ -282,22 +282,17 @@ def disable_all_sources():
 
 	object_list = []
 
-	for xy_idx in range(0, 2):
-		# object_list.append( forward_sources[xy_idx]['name'] )
-		object_list.append(['forward_sources', xy_idx])
-
-	for adj_src_idx in range(0, num_adjoint_sources):
-		for xy_idx in range(0, 2):
-			# object_list.append( adjoint_sources[adj_src_idx][xy_idx]['name'] )
-			object_list.append(['adjoint_sources', adj_src_idx, xy_idx])
-   
-	if add_pdaf:
-		for xy_idx in range(0, 2):
-			object_list.append(['pdaf_sources', xy_idx])
-
-		for xy_idx in range(0, 2):
-			object_list.append(['pdaf_adjoint_sources', xy_idx])
-
+	for key, val in fdtd_objects.items():
+		if isinstance(val, list):
+			# type_string = val[0]['type'].lower()
+			# We'll skip the lists since they are self-referring to things in the dictionary anyway.
+			pass
+		else:
+			type_string = val['type'].lower()
+  
+			if any(ele.lower() in type_string for ele in ['GaussianSource', 'TFSFSource', 'DipoleSource']):
+				object_list.append([val['name']])	# Remember to wrap the name string in a list for compatibility.
+	
 	disable_objects(object_list)
 
 #
@@ -509,14 +504,194 @@ if start_from_step == 0:
 		device_xsection_monitors.append(device_cross_monitor)
 	fdtd_objects['device_xsection_monitors'] = device_xsection_monitors
 	
+	# TODO: Wrap this into a function in a LumericalPlotter.py somewhere - since the exact same code is called,-----------------------------------
+ 	# todo: both in SonyBayerFilterOptimization.py and this module.   ----------------------------------------------------------------------------
+	try:
+		objExists = fdtd_hook.getnamed('sidewall_0', 'name')
+	except Exception as ex:
+		logging.warning('FDTD Object sidewall_0 does not exist - but should. Creating...')
+ 	
+		# Set up sidewalls on the side to try and attenuate crosstalk
+		device_sidewalls = []
+
+		for dev_sidewall_idx in range(0, num_sidewalls):
+			device_sidewall = {}
+			device_sidewall['name'] = 'sidewall_' + str(dev_sidewall_idx)
+			device_sidewall['type'] = 'Rectangle'
+			device_sidewall['x'] = sidewall_x_positions_um[dev_sidewall_idx] * 1e-6
+			device_sidewall['x span'] = sidewall_xspan_positions_um[dev_sidewall_idx] * 1e-6
+			device_sidewall['y'] = sidewall_y_positions_um[dev_sidewall_idx] * 1e-6
+			device_sidewall['y span'] = sidewall_yspan_positions_um[dev_sidewall_idx] * 1e-6
+			if sidewall_extend_focalplane:
+				device_sidewall['z min'] = adjoint_vertical_um * 1e-6
+			else:   
+				device_sidewall['z min'] = sidewall_vertical_minimum_um * 1e-6
+			device_sidewall['z max'] = device_vertical_maximum_um * 1e-6
+			device_sidewall['material'] = sidewall_material
+			device_sidewall = fdtd_update_object(fdtd_hook, device_sidewall, create_object=True)
+			device_sidewalls.append(device_sidewall)
+		fdtd_objects['device_sidewalls'] = device_sidewalls
+
+
+		# Apply finer mesh regions restricted to sidewalls
+		device_sidewall_meshes = []
+
+		for dev_sidewall_idx in range(0, num_sidewalls):
+			device_sidewall_mesh = {}
+			device_sidewall_mesh['name'] = 'mesh_sidewall_' + str(dev_sidewall_idx)
+			device_sidewall_mesh['type'] = 'Mesh'
+			device_sidewall_mesh['set maximum mesh step'] = 1
+			device_sidewall_mesh['override x mesh'] = 0
+			device_sidewall_mesh['override y mesh'] = 0
+			device_sidewall_mesh['override z mesh'] = 0
+			device_sidewall_mesh['based on a structure'] = 1
+			device_sidewall_mesh['structure'] = device_sidewalls[dev_sidewall_idx]['name']
+			if device_sidewalls[dev_sidewall_idx]['x span'] < device_sidewalls[dev_sidewall_idx]['y span']:
+				device_sidewall_mesh['override x mesh'] = 1
+				device_sidewall_mesh['dx'] = mesh_spacing_um * 1e-6 #(sidewall_thickness_um / 5) * 1e-6
+			else:
+				device_sidewall_mesh['override y mesh'] = 1
+				device_sidewall_mesh['dy'] = mesh_spacing_um * 1e-6 #(sidewall_thickness_um / 5) * 1e-6
+			device_sidewall_mesh = fdtd_update_object(fdtd_hook, device_sidewall_mesh, create_object=True)
+			device_sidewall_meshes.append(device_sidewall_mesh)
+		fdtd_objects['device_sidewall_meshes'] = device_sidewall_meshes
+	# todo: ------------------------------------------------------------------------------------------------------------------------------------
  
-	# TODO: Finer sidewall mesh
+	# Implement finer sidewall mesh
+	# Sidewalls may not match index with sidewall monitors...
+	sidewall_meshes = []
+	sidewall_mesh_override_x_mesh = [1,0,1,0]
 
-# TODO: Region stuff
-# TODO: --------------------------------------------------------------------------------------------------------------------------
+	for sidewall_idx in range(0, num_sidewalls):
+		sidewall_mesh = {}
+		sidewall_mesh['name'] = 'mesh_sidewall_' + str(sidewall_idx)
+		sidewall_mesh['type'] = 'Mesh'
+		try:
+			sidewall_mesh['override x mesh'] = fdtd_hook.getnamed(sidewall_mesh['name'], 'override x mesh')
+		except Exception as err:
+			sidewall_mesh['override x mesh'] = sidewall_mesh_override_x_mesh[sidewall_idx]
+			
+		if sidewall_mesh['override x mesh']:
+			sidewall_mesh['dx'] = fdtd_hook.getnamed('device_mesh','dx') / 1.5
+		else:	# then override y mesh is active
+			sidewall_mesh['dy'] = fdtd_hook.getnamed('device_mesh','dy') / 1.5
+		sidewall_mesh = fdtd_update_object(fdtd_hook, sidewall_mesh, create_object=True)
+		sidewall_meshes.append(sidewall_mesh)
+	fdtd_objects['sidewall_meshes'] = sidewall_meshes
+ 
+	# Adjust lateral region size of FDTD region and device mesh
+	fdtd = fdtd_objects['FDTD']
+	fdtd['x span'] = fdtd_region_size_lateral_um * 1e-6
+	fdtd['y span'] = fdtd_region_size_lateral_um * 1e-6
+	fdtd = fdtd_update_object(fdtd_hook, fdtd)
 
-   
+	# TODO: Change this to adjust wavelength ranges for every single monitor, and not just sources
+	if change_wavelength_range:
+		forward_src_x = fdtd_objects['forward_src_x']
+		forward_src_x['wavelength start'] = lambda_min_um * 1e-6
+		forward_src_x['wavelength stop'] = lambda_max_um * 1e-6
+		# TODO: This bit should be put under if use_gaussian == True
+		forward_src_x['beam parameters'] = 'Waist size and position'
+		forward_src_x['waist radius w0'] = 3e8/np.mean(3e8/np.array([lambda_min_um, lambda_max_um])) / (np.pi*background_index*np.radians(src_div_angle)) * 1e-6
+		forward_src_x['distance from waist'] = -(src_maximum_vertical_um - device_size_vertical_um) * 1e-6
+		forward_src_x = fdtd_update_object(fdtd_hook, forward_src_x)
+
+	# Install Aperture that blocks off source
+	source_block = {}
+	source_block['name'] = 'PEC_screen'
+	source_block['type'] = 'Rectangle'
+	source_block['x'] = 0 * 1e-6
+	source_block['x span'] = 1.1*4/3*1.2 * device_size_lateral_um * 1e-6
+	source_block['y'] = 0 * 1e-6
+	source_block['y span'] = 1.1*4/3*1.2 * monitorbox_size_lateral_um * 1e-6
+	source_block['z min'] = (monitorbox_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
+	source_block['z max'] = (monitorbox_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
+	source_block['material'] = 'PEC (Perfect Electrical Conductor)'
+	# TODO: set enable true or false?
+	source_block = fdtd_update_object(fdtd_hook, source_block, create_object=True)
+	fdtd_objects['source_block'] = source_block
+	
+	source_aperture = {}
+	source_aperture['name'] = 'source_aperture'
+	source_aperture['type'] = 'Rectangle'
+	source_aperture['x'] = 0 * 1e-6
+	source_aperture['x span'] = monitorbox_size_lateral_um * 1e-6
+	source_aperture['y'] = 0 * 1e-6
+	source_aperture['y span'] = monitorbox_size_lateral_um * 1e-6
+	source_aperture['z min'] = (monitorbox_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
+	source_aperture['z max'] = (monitorbox_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
+	source_aperture['material'] = 'etch'
+	# TODO: set enable true or false?
+	source_aperture = fdtd_update_object(fdtd_hook, source_aperture, create_object=True)
+	fdtd_objects['source_aperture'] = source_aperture
+
+	# Duplicate devices and set in an array
+	if np.prod(device_array_shape) > 1:		
+		# Extend device mesh to cover the entire FDTD region
+		device_mesh = fdtd_objects['device_mesh']
+		device_mesh['x span'] = fdtd_region_size_lateral_um * 1e-6
+		device_mesh['y span'] = fdtd_region_size_lateral_um * 1e-6
+		device_mesh = fdtd_update_object(fdtd_hook, device_mesh)
+
+		# Set the central positions of each device in the array.
+		# TODO: This is for a device_array_num tuple (3,3). Change this to accommodate any size
+		device_arr_x_positions_um = (device_size_lateral_um + sidewall_thickness_um)*1e-6*np.array([1,1,0,-1,-1,-1,0,1])
+		device_arr_y_positions_um = (device_size_lateral_um + sidewall_thickness_um)*1e-6*np.array([0,1,1,1,0,-1,-1,-1])
+
+		# Copy the central design around in an array defined by device_array_shape.
+		design_copies = []
+		design_import = fdtd_objects['design_import']
+		for dev_arr_idx in range(0, np.prod(device_array_shape)-1):
+			fdtd_hook.select('design_import')
+			fdtd_hook.copy(device_arr_x_positions_um[dev_arr_idx], device_arr_y_positions_um[dev_arr_idx])
+			fdtd_hook.set('name', 'design_import_' + str(dev_arr_idx))
+			design_copy = fdtd_simobject_to_dict( fdtd_get_simobject(fdtd_hook, 'design_import_' + str(dev_arr_idx)) )
+			#! Doing it the below way does not also copy the internal (n,k) data. We would need to call importnk2 every time if so.
+				# design_copy = copy.deepcopy(design_import)
+				# design_copy['name'] = 'design_import_' + str(dev_arr_idx)
+				# design_copy['x'] = device_arr_x_positions_um[dev_arr_idx]
+				# design_copy['y'] = device_arr_y_positions_um[dev_arr_idx]
+				# design_copy = fdtd_update_object(fdtd_hook, design_copy, create_object=True)
+			design_copies.append(design_copy)
+		fdtd_objects['design_copies'] = design_copies
+
+		# Duplicate sidewalls AND sidewall meshes.
+		for dev_arr_idx in range(0, np.prod(device_array_shape)-1):
+			for idx in range(0, num_sidewalls):
+					sm_name = 'sidewall_' + str(idx)
+					sm_mesh_name = 'mesh_sidewall_' + str(idx)
+					
+					# Sidewalls
+					try:
+						objExists = fdtd_hook.getnamed(sm_name, 'name')
+						fdtd_hook.select(sm_name)
+						fdtd_hook.copy(device_arr_x_positions_um[dev_arr_idx], device_arr_y_positions_um[dev_arr_idx])
+						fdtd_hook.set('name', 'sidewall_misc')
+						# We are not going to bother copying the sidewall_misc into fdtd_objects memory, but we can do this later if necessary.
+					
+					except Exception as ex:
+						template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
+						message = template.format(type(ex).__name__, ex.args)
+						logging.warning(message+'FDTD Object Sidewall does not exist.')
 		
+					# Sidewall meshes
+					try:
+						objExists = fdtd_hook.getnamed(sm_mesh_name, 'name')
+						fdtd_hook.select(sm_mesh_name)
+						fdtd_hook.copy(device_arr_x_positions_um[dev_arr_idx], device_arr_y_positions_um[dev_arr_idx])
+						fdtd_hook.set('name', 'mesh_sidewall_misc')
+					except Exception as ex:
+						template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
+						message = template.format(type(ex).__name__, ex.args)
+						logging.warning(message+'FDTD Object Sidewall Mesh does not exist.')
+	
+	disable_all_sources()
+	disable_objects([[obj] for obj in disable_object_list])
+	fdtd_hook.save()
+ 
+	logging.info("Completed Step 0: Lumerical environment setup complete.")
+	# Save out all variables to save state file
+	backup_all_vars()		
 
 
 
