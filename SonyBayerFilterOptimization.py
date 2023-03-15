@@ -907,6 +907,8 @@ def calculate_performance_weighting(fom_list):
 step_size_start = 1.
 # Choose the dispersion model for this optimization
 dispersion_model = DevicePermittivityModel()
+# ADAM Optimizer Parameters
+adam_moments = np.zeros([2] + list(bayer_filter_size_voxels))
 
 # PDAF Settings
 pdaf_scan = False	#True
@@ -1631,7 +1633,7 @@ else:		# optimization
 				if enforce_xy_gradient_symmetry:
 					device_gradient_interpolated = 0.5 * ( device_gradient_interpolated + np.swapaxes( device_gradient_interpolated, 0, 1 ) )
 				device_gradient = device_gradient_interpolated.copy()
-    
+	
 				# Backpropagate the design_gradient through the various filters to pick up (per the chain rule) gradients from each filter
 				# so the final product can be applied to the (0-1) scaled permittivity
 				design_gradient = bayer_filter.backpropagate( device_gradient )
@@ -1639,7 +1641,7 @@ else:		# optimization
 				#
 				#* Begin scaling of step size so that the design change stays within epoch_design_change limits in config
 				#
-    
+	
 				# Control the maximum that the design is allowed to change per epoch. This will increase according to the limits set, for each iteration
 				max_change_design = epoch_start_design_change_max
 				min_change_design = epoch_start_design_change_min
@@ -1705,7 +1707,11 @@ else:		# optimization
 				# Feed proposed design gradient into bayer_filter, run it through filters and update permittivity
 				# negative of the device gradient because the step() function has a - sign instead of a +
 				# NOT the design gradient; we do not want to backpropagate twice!
-				bayer_filter.step(-device_gradient, step_size)
+				if optimizer_algorithm.lower() in ['adam']:
+					adam_moments = bayer_filter.step_adam(epoch*num_iterations_per_epoch+iteration, -device_gradient,
+													adam_moments, step_size, adam_betas)
+				else:
+					bayer_filter.step(-device_gradient, step_size)
 				cur_design_variable = bayer_filter.get_design_variable()
 				# Get permittivity after passing through all the filters of the device
 				cur_design = bayer_filter.get_permittivity()

@@ -176,6 +176,11 @@ class SonyBayerFilter(device.Device):
 		self.w[0] = self.proposed_design_step(gradient, step_size)
 		self.update_permittivity()
 
+	def step_adam(self, iteration, gradient, moments, step_size, betas=(0.9, 0.999), eps=1e-8):
+		self.w[0], moments = self.proposed_design_step_adam(iteration, gradient, moments, step_size, betas, eps)
+		self.update_permittivity()
+		return moments
+    
 	def convert_to_binary_map(self, variable):
 		return np.greater(variable, self.mid_permittivity)
 

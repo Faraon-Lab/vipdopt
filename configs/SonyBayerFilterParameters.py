@@ -128,6 +128,8 @@ def get_config_vars(param_dict):
 	weight_by_quadrant_transmission = get_check_none(param_dict, "weight_by_quadrant_transmission")
 	num_epochs = get_check_none(param_dict, "num_epochs")
 	num_iterations_per_epoch = get_check_none(param_dict, "num_iterations_per_epoch")
+	optimizer_algorithm = get_check_none(param_dict, "optimizer_algorithm")
+	adam_betas = get_check_none(param_dict, "adam_betas")
 	use_fixed_step_size = get_check_none(param_dict, "use_fixed_step_size")
 	fixed_step_size = get_check_none(param_dict, "fixed_step_size")
 	epoch_start_design_change_max = get_check_none(param_dict, "epoch_start_design_change_max")
@@ -147,6 +149,7 @@ def get_config_vars(param_dict):
 	infrared_center_um = get_check_none(param_dict, "infrared_center_um")
 	do_rejection = get_check_none(param_dict, "do_rejection")
 	softplus_kappa = get_check_none(param_dict, "softplus_kappa")
+
 
 	# # Non-Pythonic way:
 	# # But don't do this. For back-compatibility, we want there to be a None object if we call a variable that is not defined in raw config
@@ -312,6 +315,8 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 
 	epoch_range_design_change_max = cd.epoch_start_design_change_max - cd.epoch_end_design_change_max
 	epoch_range_design_change_min = cd.epoch_start_design_change_min - cd.epoch_end_design_change_min
+
+	adam_betas = tuple(cd.adam_betas)
 
 	# Spectral and polarization selectivity information
 	if cd.weight_by_individual_wavelength:

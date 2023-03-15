@@ -10,7 +10,7 @@ Further [best practices](https://neptune.ai/blog/how-to-organize-deep-learning-p
 
 - configs: in configs we define every single thing that can be configurable and can be changed in the future. Good examples are training hyperparameters, folder paths, the model architecture, metrics, flags.
 - evaluation: is a collection of code that aims to evaluate the performance and accuracy of our model.
-- executor `[`UNUSED`]`: ~~in this folder, we usually have all the functions and scripts that train the model or use it to predict something in different environments. And by different environments I mean: executors for GPUs, executors for distributed systems. This package is our connection with the outer world and it’s what our “main.py” will use.~~
+- executor `[`UNUSED`]`: in this folder, we have the functions and scripts that perform the optimization ~~i.e. train the model or predict something in different environments. And by different environments I mean: executors for GPUs, executors for distributed systems.~~ This package is our connection with the outer world and it’s what our “main.py” will use.
 - model `[`UNUSED`]`: ~~: contains the actual deep learning code (we talk about tensorflow, pytorch etc)~~
 - trials: contains past trials with all the save data necessary to reconstruct (permittivity data, config etc.)
 - utils: utilities functions that are used in more than one places and everything that don’t fall in on the above come here.
