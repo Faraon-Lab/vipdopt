@@ -10,6 +10,9 @@ import re
 sys.path.append(os.getcwd())
 #! Gets all parameters from config file - explicitly calls it so that the variables pass into this module's globals()
 from configs.LumProcParameters import *
+from utils import *
+from utils import lum_utils as lm
+from utils import plotter
 
 # Lumerical hook Python library API
 import imp
@@ -42,6 +45,11 @@ args = parser.parse_args()
 #* Output / Save Paths
 DATA_FOLDER = projects_directory_location
 PLOTS_FOLDER = os.path.join(projects_directory_location, 'plots')
+DEBUG_COMPLETED_JOBS_FOLDER = 'ares_test_dev'
+PULL_COMPLETED_JOBS_FOLDER = projects_directory_location
+if running_on_local_machine:
+	PULL_COMPLETED_JOBS_FOLDER = DEBUG_COMPLETED_JOBS_FOLDER
+
 
 #* SLURM Environment
 if not running_on_local_machine:
@@ -166,6 +174,7 @@ monitorbox_vertical_minimum_um = device_vertical_minimum_um - (mesh_spacing_um*5
 adjoint_vertical_um = fdtd_hook.getnamed('transmission_focal_monitor_', 'z') / 1e-6
 
 # TODO: Think we need to wrap this part in a function or class or another module honestly --------------------------------------------------------------------------------------------
+# todo: put it all in utils/lum_utils.py
 #*---- ADD TO FDTD ENVIRONMENT AND OBJECTS ----
 
 #! Step 0 Functions
@@ -238,7 +247,7 @@ def fdtd_update_object( fdtd_hook_, simDict, create_object=False ):
 		else:
 			template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
 			message = template.format(type(ex).__name__, ex.args)
-			logging.error(message + f' FDTD Object {simDict["name"]}: does not exist.')
+			logging.error(message + f'	 FDTD Object {simDict["name"]}: does not exist.')
 			return 0
 	
 	for i in range(2):	# Repeat the following twice because the order that the properties are changed matters. 
@@ -260,45 +269,75 @@ def fdtd_update_object( fdtd_hook_, simDict, create_object=False ):
 	simDict.update(updated_simdict)
 	return simDict
 
-def update_object(object_path, key, val):
+def update_object( fdtd_hook_, object_path, key, val):
 	'''Updates selected objects in the FDTD simulation.'''
 	global fdtd_objects
 	
 	utility.set_by_path(fdtd_objects, object_path + [key], val)
-	new_dict = fdtd_update_object(fdtd_hook, utility.get_by_path(fdtd_objects, object_path))
-	utility.set_by_path(fdtd_objects, object_path, new_dict)
+	new_dict = fdtd_update_object(fdtd_hook_, utility.get_by_path(fdtd_objects, object_path))
+	if new_dict == 0:
+		logging.error('Object did not update correctly! Aborting. (Value has been changed in fdtd_objects dict.)')
+	else:
+	 	utility.set_by_path(fdtd_objects, object_path, new_dict)
 
-def disable_objects(object_list):
+def disable_objects(fdtd_hook_, object_list, opposite=False):
 	'''Disable selected objects in the simulation, to save on memory and runtime'''
 	global fdtd_objects
 	lumapi.evalScript(fdtd_hook.handle, 'switchtolayout;')
 	
 	for object_path in object_list:
-		update_object(object_path, 'enabled', 0)
+		if not isinstance(object_path, list):
+			object_path = [object_path]
+		update_object(fdtd_hook_, object_path, 'enabled', opposite)
 
-def disable_all_sources():
+def disable_all_sources(opp=False):
 	'''Disable all sources in the simulation, so that we can selectively turn single sources on at a time'''
 	lumapi.evalScript(fdtd_hook.handle, 'switchtolayout;')
 
 	object_list = []
 
-	for xy_idx in range(0, 2):
-		# object_list.append( forward_sources[xy_idx]['name'] )
-		object_list.append(['forward_sources', xy_idx])
+	for key, val in fdtd_objects.items():
+		if isinstance(val, list):
+			# type_string = val[0]['type'].lower()
+			# We'll skip the lists since they are self-referring to things in the dictionary anyway.
+			pass
+		else:
+			type_string = val['type'].lower()
+  
+			if any(ele.lower() in type_string for ele in ['GaussianSource', 'TFSFSource', 'DipoleSource']):
+				object_list.append([val['name']])	# Remember to wrap the name string in a list for compatibility.
+	
+	disable_objects(fdtd_hook, object_list, opposite=opp)
 
-	for adj_src_idx in range(0, num_adjoint_sources):
-		for xy_idx in range(0, 2):
-			# object_list.append( adjoint_sources[adj_src_idx][xy_idx]['name'] )
-			object_list.append(['adjoint_sources', adj_src_idx, xy_idx])
-   
-	if add_pdaf:
-		for xy_idx in range(0, 2):
-			object_list.append(['pdaf_sources', xy_idx])
+def disable_all_devices(opp=False):
+	'''Disable all devices in the simulation, so that we can selectively turn single devices on at a time'''
+	lumapi.evalScript(fdtd_hook.handle, 'switchtolayout;')
 
-		for xy_idx in range(0, 2):
-			object_list.append(['pdaf_adjoint_sources', xy_idx])
+	object_list = ['design_import', 'device_mesh']
+	if fdtd_objects.get('design_copies') is not None:
+		for idx, design_copy in enumerate(fdtd_objects['design_copies']):
+			object_list.append(['design_copies', idx])
+	
+	disable_objects(fdtd_hook, object_list, opposite=opp)
 
-	disable_objects(object_list)
+def disable_all_sidewalls(opp=False):
+	'''Disable all sidewalls in the simulation, so that we can selectively turn sets of sidewalls on at a time'''
+	lumapi.evalScript(fdtd_hook.handle, 'switchtolayout;')
+
+	object_list = []
+	if fdtd_objects.get('device_sidewalls') is not None:
+		for idx, dev_sw in enumerate(fdtd_objects['device_sidewalls']):
+			object_list.append(['device_sidewalls', idx])
+	if fdtd_objects.get('device_sidewall_meshes') is not None:
+		for idx, dev_sw_mesh in enumerate(fdtd_objects['device_sidewall_meshes']):
+			object_list.append(['device_sidewall_meshes', idx])
+	
+	disable_objects(fdtd_hook, object_list, opposite=opp)
+
+	for obj_name in ['sidewall_misc', 'mesh_sidewall_misc']:
+		for i in range(int(fdtd_hook.getnamednumber(obj_name))):
+			# See https://optics.ansys.com/hc/en-us/articles/360034928793-setnamed
+			fdtd_hook.setnamed(obj_name, 'enabled', opp, i+1)	# i+1 because of zero-index mismatch
 
 #
 #* Step 0: Set up structures, regions and monitors from which E-fields, Poynting fields, and transmission data will be drawn.
@@ -314,9 +353,6 @@ if start_from_step == 0:
 	fdtd_objects = {}
 	for simObj in fdtd_get_all_simobjects(fdtd_hook):
 		fdtd_objects[simObj['name']] = fdtd_simobject_to_dict(simObj)
-	# TODO: Probably have to do some processing because this way of loading things means 
- 	# todo: fdtd_objects will have dictionaries for individual transmission monitors i.e. fdtd_objects['transmission_monitor_2'] = dict{}
-	# todo: instead of fdtd_objects['transmission_monitors'] =  list(dict{})
 
 	#
 	# Set up the FDTD monitors that weren't present during adjoint optimization
@@ -517,7 +553,8 @@ if start_from_step == 0:
 	try:
 		objExists = fdtd_hook.getnamed('sidewall_0', 'name')
 	except Exception as ex:
-		logging.warning('FDTD Object sidewall_0 does not exist - but should. Creating...')
+		if num_sidewalls != 0:
+			logging.warning('FDTD Object sidewall_0 does not exist - but should. Creating...')
  	
 		# Set up sidewalls on the side to try and attenuate crosstalk
 		device_sidewalls = []
@@ -565,27 +602,27 @@ if start_from_step == 0:
 		fdtd_objects['device_sidewall_meshes'] = device_sidewall_meshes
 	# todo: ------------------------------------------------------------------------------------------------------------------------------------
  
-	# Implement finer sidewall mesh
-	# Sidewalls may not match index with sidewall monitors...
-	sidewall_meshes = []
-	sidewall_mesh_override_x_mesh = [1,0,1,0]
+	# # Implement finer sidewall mesh
+	# # Sidewalls may not match index with sidewall monitors...
+	# sidewall_meshes = []
+	# sidewall_mesh_override_x_mesh = [1,0,1,0]
 
-	for sidewall_idx in range(0, num_sidewalls):
-		sidewall_mesh = {}
-		sidewall_mesh['name'] = 'mesh_sidewall_' + str(sidewall_idx)
-		sidewall_mesh['type'] = 'Mesh'
-		try:
-			sidewall_mesh['override x mesh'] = fdtd_hook.getnamed(sidewall_mesh['name'], 'override x mesh')
-		except Exception as err:
-			sidewall_mesh['override x mesh'] = sidewall_mesh_override_x_mesh[sidewall_idx]
+	# for sidewall_idx in range(0, num_sidewalls):
+	# 	sidewall_mesh = {}
+	# 	sidewall_mesh['name'] = 'mesh_sidewall_' + str(sidewall_idx)
+	# 	sidewall_mesh['type'] = 'Mesh'
+	# 	try:
+	# 		sidewall_mesh['override x mesh'] = fdtd_hook.getnamed(sidewall_mesh['name'], 'override x mesh')
+	# 	except Exception as err:
+	# 		sidewall_mesh['override x mesh'] = sidewall_mesh_override_x_mesh[sidewall_idx]
 			
-		if sidewall_mesh['override x mesh']:
-			sidewall_mesh['dx'] = fdtd_hook.getnamed('device_mesh','dx') / 1.5
-		else:	# then override y mesh is active
-			sidewall_mesh['dy'] = fdtd_hook.getnamed('device_mesh','dy') / 1.5
-		sidewall_mesh = fdtd_update_object(fdtd_hook, sidewall_mesh, create_object=True)
-		sidewall_meshes.append(sidewall_mesh)
-	fdtd_objects['sidewall_meshes'] = sidewall_meshes
+	# 	if sidewall_mesh['override x mesh']:
+	# 		sidewall_mesh['dx'] = fdtd_hook.getnamed('device_mesh','dx') / 1.5
+	# 	else:	# then override y mesh is active
+	# 		sidewall_mesh['dy'] = fdtd_hook.getnamed('device_mesh','dy') / 1.5
+	# 	sidewall_mesh = fdtd_update_object(fdtd_hook, sidewall_mesh, create_object=True)
+	# 	sidewall_meshes.append(sidewall_mesh)
+	# fdtd_objects['sidewall_meshes'] = sidewall_meshes
  
 	# Adjust lateral region size of FDTD region and device mesh
 	fdtd = fdtd_objects['FDTD']
@@ -611,7 +648,10 @@ if start_from_step == 0:
 	source_block['x'] = 0 * 1e-6
 	source_block['x span'] = 1.1*4/3*1.2 * device_size_lateral_um * 1e-6
 	source_block['y'] = 0 * 1e-6
-	source_block['y span'] = 1.1*4/3*1.2 * monitorbox_size_lateral_um * 1e-6
+	source_block['y span'] = 1.1*4/3*1.2 * device_size_lateral_um * 1e-6
+	if np.prod(device_array_shape) > 1:
+		source_block['x span'] = fdtd_region_size_lateral_um * 1e-6
+		source_block['y span'] = fdtd_region_size_lateral_um * 1e-6
 	source_block['z min'] = (monitorbox_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
 	source_block['z max'] = (monitorbox_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
 	source_block['material'] = 'PEC (Perfect Electrical Conductor)'
@@ -623,15 +663,20 @@ if start_from_step == 0:
 	source_aperture['name'] = 'source_aperture'
 	source_aperture['type'] = 'Rectangle'
 	source_aperture['x'] = 0 * 1e-6
-	source_aperture['x span'] = monitorbox_size_lateral_um * 1e-6
+	source_aperture['x span'] = device_size_lateral_um * 1e-6
 	source_aperture['y'] = 0 * 1e-6
-	source_aperture['y span'] = monitorbox_size_lateral_um * 1e-6
+	source_aperture['y span'] = device_size_lateral_um * 1e-6
 	source_aperture['z min'] = (monitorbox_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
 	source_aperture['z max'] = (monitorbox_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
 	source_aperture['material'] = 'etch'
 	# TODO: set enable true or false?
 	source_aperture = fdtd_update_object(fdtd_hook, source_aperture, create_object=True)
 	fdtd_objects['source_aperture'] = source_aperture
+
+	# TODO: Import device permittivity. This is where we would use the code from the restart or evaluate 
+ 	# todo: code block in SonyBayerFilterOptimization.py
+	# todo: and possibly also extract permittivity from cur_design_variable.npy or some other way of transference.
+	# todo: Also consider writing a method to extract the permittivity directly from Lumerical - I forget how to do that rn
 
 	# Duplicate devices and set in an array
 	if np.prod(device_array_shape) > 1:		
@@ -694,13 +739,1042 @@ if start_from_step == 0:
 						logging.warning(message+'FDTD Object Sidewall Mesh does not exist.')
 	
 	disable_all_sources()
-	disable_objects(disable_object_list)
+	disable_objects(fdtd_hook, disable_object_list)
 	fdtd_hook.save()
  
 	logging.info("Completed Step 0: Lumerical environment setup complete.")
 	# Save out all variables to save state file
 	backup_all_vars()		
 
+
+#*---- JOB RUNNING STEP BEGINS ----
+
+#! Step 1 Functions
+# todo: 20230316 - these functions could go into lum_utils.py but they're staying here because they use a bunch of other parameters
+# todo: and it would be a pain to transfer them all over in the function calls.
+
+def snellRefrOffset(src_angle_incidence, object_list):
+	''' Takes a list of objects in between source and device, retrieves heights and indices,
+	 and calculates injection angle so as to achieve the desired angle of incidence upon entering the device.'''
+	# structured such that n0 is the input interface and n_end is the last above the device
+	# height_0 should be 0
+
+	heights = [0.]
+	indices = [1.]
+	total_height = fdtd_hook.getnamed('design_import','z max') / 1e-6
+	max_height = fdtd_hook.getnamed('forward_src_x','z') / 1e-6
+	for object_name in object_list:
+		hgt = fdtd_hook.getnamed(object_name, 'z span')/1e-6
+		total_height += hgt
+		indices.append(float(fdtd_hook.getnamed(object_name, 'index')))
+		
+		if total_height >= max_height:
+			heights.append(hgt-(total_height - max_height))
+			break
+		else:
+			heights.append(hgt)
+	
+	# print(f'Device ends at z = {device_vertical_maximum_um}; Source is located at z = {max_height}')
+	# print(f'Heights are {heights} with corresponding indices {indices}')
+	# sys.stdout.flush()
+
+	src_angle_incidence = np.radians(src_angle_incidence)
+	snellConst = float(indices[-1])*np.sin(src_angle_incidence)
+	input_theta = np.degrees(np.arcsin(snellConst/float(indices[0])))
+
+	r_offset = 0
+	for cnt, h_i in enumerate(heights):
+		s_i = snellConst/indices[cnt]
+		r_offset = r_offset + h_i*s_i/np.sqrt(1-s_i**2)
+
+	return [input_theta, r_offset]
+
+def change_source_theta(theta_value, phi_value):
+	'''Changes the angle (theta and phi) of the overhead source.'''
+	global forward_src_x
+	forward_src_x = fdtd_objects['forward_src_x']
+
+	# Structure the objects list such that the last entry is the last medium above the device.
+	input_theta, r_offset = snellRefrOffset(theta_value, objects_above_device)
+
+	forward_src_x['angle theta'] = input_theta
+	forward_src_x['angle phi'] = phi_value
+	forward_src_x['x'] = r_offset*np.cos(np.radians(phi_value)) * 1e-6
+	forward_src_x['y'] = r_offset*np.sin(np.radians(phi_value)) * 1e-6
+	forward_src_x = fdtd_update_object(fdtd_hook, forward_src_x)
+ 
+	logging.info(f'Theta set to {input_theta}, Phi set to {phi_value}.')
+
+def change_source_beam_radius(param_value):
+	'''For a Gaussian beam source, changes the beam radius to focus or defocus it.'''
+	xy_names = ['x', 'y']
+
+	global forward_sources
+	if globals().get('forward_sources') is None:
+		forward_sources = []
+	
+	for xy_idx in range(0, 2):
+		global forward_src
+		forward_src = fdtd_simobject_to_dict( fdtd_get_simobject( fdtd_hook, 'forward_src_' + xy_names[xy_idx] ) )
+  
+		# fdtd_hook.set('beam radius wz', 100 * 1e-6)
+		# fdtd_hook.set('divergence angle', 3.42365) # degrees
+		# fdtd_hook.set('beam radius wz', 15 * 1e-6)
+		# # fdtd_hook.set('beam radius wz', param_value * 1e-6)
+		forward_src['beam parameters'] = 'Waist size and position'
+		forward_src['waist radius w0'] = param_value * 1e-6
+		forward_src['distance from waist'] = 0 * 1e-6
+		forward_src = fdtd_update_object(fdtd_hook, forward_src)
+  
+		try:
+			forward_sources[xy_idx] = forward_src
+		except Exception as ex:
+			forward_sources.append(forward_src)
+		fdtd_objects[forward_src['name']] = forward_src
+	fdtd_objects['forward_sources'] = forward_sources
+	
+	logging.info(f'Source beam radius set to {param_value}.')
+
+# TODO
+def change_fdtd_region_size(param_value):
+	pass
+
+def change_sidewall_thickness(param_value):
+	'''If sidewalls exist, changes their thickness.'''
+	# TODO: Need to rewrite this to use the fdtd_objects dictionary instead.
+	
+	monitorbox_size_lateral_um = device_size_lateral_um + 2 * param_value
+	
+	for idx in range(0, num_sidewalls):
+		sm_name = 'sidewall_' + str(idx)
+		
+		try:
+			objExists = fdtd_hook.getnamed(sm_name, 'name')
+			fdtd_hook.select(sm_name)
+		
+			if idx == 0:
+				fdtd_hook.setnamed(sm_name, 'x', (device_size_lateral_um + param_value)*0.5 * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'x span', param_value * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'y span', monitorbox_size_lateral_um * 1e-6)
+			elif idx == 1:
+				fdtd_hook.setnamed(sm_name, 'y', (device_size_lateral_um + param_value)*0.5 * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'y span', param_value * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'x span', monitorbox_size_lateral_um * 1e-6)
+			if idx == 2:
+				fdtd_hook.setnamed(sm_name, 'x', (-device_size_lateral_um - param_value)*0.5 * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'x span', param_value * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'y span', monitorbox_size_lateral_um * 1e-6)
+			elif idx == 3:
+				fdtd_hook.setnamed(sm_name, 'y', (-device_size_lateral_um - param_value)*0.5 * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'y span', param_value * 1e-6)
+				fdtd_hook.setnamed(sm_name, 'x span', monitorbox_size_lateral_um * 1e-6)
+					
+		except Exception as ex:
+			template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
+			message = template.format(type(ex).__name__, ex.args)
+			print(message+'FDTD Object does not exist.')
+			# fdtd_hook.addmesh(name=sidewall_mesh['name'])
+			# pass
+	
+	
+	fdtd_hook.setnamed('incident_aperture_monitor', 'x span', monitorbox_size_lateral_um * 1e-6)
+	fdtd_hook.setnamed('incident_aperture_monitor', 'y span', monitorbox_size_lateral_um * 1e-6)
+	fdtd_hook.setnamed('exit_aperture_monitor', 'x span', monitorbox_size_lateral_um * 1e-6)
+	fdtd_hook.setnamed('exit_aperture_monitor', 'y span', monitorbox_size_lateral_um * 1e-6)
+	
+	sm_x_pos = [monitorbox_size_lateral_um/2, 0, -monitorbox_size_lateral_um/2, 0]
+	sm_y_pos = [0, monitorbox_size_lateral_um/2, 0, -monitorbox_size_lateral_um/2]
+	sm_xspan_pos = [0, monitorbox_size_lateral_um, 0, monitorbox_size_lateral_um]
+	sm_yspan_pos = [monitorbox_size_lateral_um, 0, monitorbox_size_lateral_um, 0]
+	
+	for sm_idx in range(0, num_sidewalls):
+		sm_name = 'side_monitor_' + str(sm_idx)
+		fdtd_hook.select(sm_name)
+		fdtd_hook.setnamed(sm_name, 'x max', (sm_x_pos[sm_idx] + sm_xspan_pos[sm_idx]/2) * 1e-6)
+		fdtd_hook.setnamed(sm_name, 'x min', (sm_x_pos[sm_idx] - sm_xspan_pos[sm_idx]/2) * 1e-6)
+		fdtd_hook.setnamed(sm_name, 'y max', (sm_y_pos[sm_idx] + sm_yspan_pos[sm_idx]/2) * 1e-6)
+		fdtd_hook.setnamed(sm_name, 'y min', (sm_y_pos[sm_idx] - sm_yspan_pos[sm_idx]/2) * 1e-6)
+
+def change_divergence_angle(param_value):
+	'''For a Gaussian beam source, changes the divergence angle while keeping beam radius constant.'''
+	xy_names = ['x', 'y']
+	
+	global forward_sources
+	if globals().get('forward_sources') is None:
+		forward_sources = []
+
+	for xy_idx in range(0, 2):
+		global forward_src
+		forward_src = fdtd_simobject_to_dict( fdtd_get_simobject( fdtd_hook, 'forward_src_' + xy_names[xy_idx] ) )
+  
+		# fdtd_hook.set('beam radius wz', 100 * 1e-6)
+		# fdtd_hook.set('divergence angle', 3.42365) # degrees
+		# fdtd_hook.set('beam radius wz', 15 * 1e-6)
+		# # fdtd_hook.set('beam radius wz', param_value * 1e-6)
+  
+		# Resets distance from waist to 0, fixing waist radius and beam radius properties
+		forward_src['beam parameters'] = 'Waist size and position'
+		# src_beam_rad = const_parameters['bRad']['var_values'][const_parameters['bRad']['peakInd']]
+		forward_src['waist radius w0'] = gaussian_waist_radius_um * 1e-6
+		forward_src['distance from waist'] = 0 * 1e-6
+		# Change divergence angle
+		forward_src['beam parameters'] = 'Beam size and divergence angle'
+		forward_src['divergence angle'] = param_value # degrees
+  
+		forward_src = fdtd_update_object(fdtd_hook, forward_src)
+		try:
+			forward_sources[xy_idx] = forward_src
+		except Exception as ex:
+			forward_sources.append(forward_src)
+		fdtd_objects[forward_src['name']] = forward_src
+	fdtd_objects['forward_sources'] = forward_sources
+	
+	logging.info(f'Source divergence angle set to {param_value}.')
+
+#! Step 2 Functions
+# Functions for obtaining information from Lumerical monitors
+# See utils/lum_utils.py
+
+#! Step 3 Functions
+
+def append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics, band_idxs=None):
+	'''Logs peak/mean values and corresponding indices of the f_vector values, for each quadrant, IN BAND.
+	This means that it takes the values within a defined spectral band and picks a statistical value for each band within that band.
+	Produces num_sweep_values * num_bands values, i.e. B->{B,G,R}, G->{B,G,R}, R->{B,G,R}  
+	where for e.g. RB is the transmission of R quadrant within the B spectral band
+	Statistics determine how the value for the sweep is drawn from the spectrum: peak|mean'''
+
+	if band_idxs is None:
+		# Then take the whole spectrum as one band
+		band_idxs = [np.array([0, len(f_vectors[0]['var_values'])-1])]
+	num_bands = len(band_idxs)
+	
+	for idx in range(0, num_sweep_values):
+		for inband_idx in range(0, num_bands):
+			if statistics in ['peak']:
+				sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])]), key=(lambda x: x[1]))
+				sweep_stdev = 0
+				
+			else:
+				sweep_val = np.average(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+				sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
+				sweep_stdev = np.std(f_vectors[idx]['var_values'][slice(*band_idxs[inband_idx])])
+		
+		  
+			sweep_values.append({'value': float(sweep_val),
+							'index': sweep_index,
+							'std_dev': sweep_stdev,
+							'statistics': statistics
+							})
+	
+	return sweep_values
+
+def generate_sorting_eff_spectrum(monitors_data, produce_spectrum, statistics='peak', add_opp_polarizations = False):
+	'''Generates sorting efficiency spectrum and logs peak/mean values and corresponding indices of each quadrant. 
+	Sorting efficiency of a quadrant is defined as overall power in that quadrant normalized against overall power in all four quadrants.
+	Statistics determine how the value for the sweep is drawn from the spectrum: peak|mean'''
+	output_plot = {}
+	r_vectors = []      # Variables
+	f_vectors = []      # Functions
+	
+	lambda_vector = monitors_data['wavelength']
+	r_vectors.append({'var_name': 'Wavelength',
+					  'var_values': lambda_vector
+					})
+
+	quadrant_names = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']	
+ 
+	### E-field way of calculating sorting spectrum
+	# Enorm_scatter_plane = monitors_data['scatter_plane_monitor']['E']
+	# Enorm_focal_plane, Enorm_focal_monitor_arr = partition_scatter_plane_monitor(monitors_data['scatter_plane_monitor'], 'E')
+	
+	# # Integrates over area
+	# Enorm_fp_overall = np.sum(Enorm_focal_plane, (0,1,2))
+	# Enorm_fm_overall = []
+	# quadrant_names = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+	# for idx in range(0, num_adjoint_sources):
+	#     Enorm_fm_overall.append(np.sum(Enorm_focal_monitor_arr[idx], (0,1,2)))
+	#     f_vectors.append({'var_name': quadrant_names[idx],
+	#                   'var_values': np.divide(Enorm_fm_overall[idx], Enorm_fp_overall)
+	#                 })
+	
+	### Power way of calculating sorting spectrum
+	for idx in range(0, num_adjoint_sources):
+		f_vectors.append({'var_name': quadrant_names[idx],
+						'var_values': np.divide(monitors_data['transmission_monitor_'+str(idx)]['P'],
+												monitors_data['transmission_focal_monitor_']['P'])
+						})
+	
+	if add_opp_polarizations:
+		f_vectors[1]['var_name'] = 'Green'
+		f_vectors[1]['var_values'] = f_vectors[1]['var_values'] + f_vectors[3]['var_values']
+		f_vectors.pop(3)
+	
+	if produce_spectrum:
+		output_plot['r'] = r_vectors
+		output_plot['f'] = f_vectors
+		output_plot['title'] = 'Sorting Efficiency Spectrum'
+		output_plot['const_params'] = const_parameters
+		
+		# ## Plotting code to test
+		# fig,ax = plt.subplots()
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[0]['var_values'], color='blue')
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[1]['var_values'], color='green')
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[2]['var_values'], color='red')
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[3]['var_values'], color='gray')
+		# plt.show(block=False)
+		# plt.show()
+		logging.info('Generated sorting efficiency spectrum.')
+
+	
+	sweep_values = []
+	num_sweep_values = num_adjoint_sources if not add_opp_polarizations else num_bands
+	sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
+	
+	# for idx in range(0, num_sweep_values):
+	#     if statistics in ['peak']:
+	#         sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
+	#         sweep_stdev = 0
+	#     else:
+	#         sweep_val = np.average(f_vectors[idx]['var_values'])
+	#         sweep_index = min(range(len(f_vectors[idx]['var_values'])), key=lambda i: abs(f_vectors[idx]['var_values'][i]-sweep_val))
+	#         sweep_stdev = np.std(f_vectors[idx]['var_values'])
+			
+	#     sweep_values.append({'value': float(sweep_val),
+	#                     'index': sweep_index,
+	#                     'std_dev': sweep_stdev,
+	#                     'statistics': statistics
+	#                     })
+	
+	print('Picked peak efficiency points for each quadrant to pass to sorting efficiency variable sweep.')
+	
+	return output_plot, sweep_values
+
+def generate_sorting_transmission_spectrum(monitors_data, produce_spectrum, statistics='peak', add_opp_polarizations = False):
+	'''Generates sorting efficiency spectrum and logs peak/mean values and corresponding indices of each quadrant. 
+	Sorting efficiency of a quadrant is defined as overall power in that quadrant normalized against **sourcepower** (accounting for angle).
+	Statistics determine how the value for the sweep is drawn from the spectrum: peak|mean'''
+	output_plot = {}
+	r_vectors = []      # Variables
+	f_vectors = []      # Functions
+	
+	lambda_vector = monitors_data['wavelength']
+	r_vectors.append({'var_name': 'Wavelength',
+					  'var_values': lambda_vector
+					})
+	
+	quadrant_names = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+	for idx in range(0, num_adjoint_sources):
+		f_vectors.append({'var_name': quadrant_names[idx],
+						'var_values': np.divide(monitors_data['transmission_monitor_'+str(idx)]['P'],
+												monitors_data['incident_aperture_monitor']['P'])
+						})
+	f_vectors.append({'var_name': 'Overall Transmission',
+					'var_values':np.divide(monitors_data['transmission_focal_monitor_']['P'],
+												monitors_data['incident_aperture_monitor']['P'])
+						})
+	
+	if add_opp_polarizations:
+		f_vectors[1]['var_name'] = 'Green'
+		f_vectors[1]['var_values'] = f_vectors[1]['var_values'] + f_vectors[3]['var_values']
+		f_vectors.pop(3)
+		
+	#! Remove - rescaling
+	def rescale_vector(vec, amin, amax):
+		vec = (vec - np.min(vec))/(np.max(vec) - np.min(vec))
+		vec = amin + (amax-amin)*vec
+		return vec
+	
+	#! Remove rescale
+	# for f_vector in f_vectors:
+	#     f_vector['var_values'] = f_vector['var_values']*0.65/0.48
+	# f_vectors[0]['var_values'] = f_vectors[0]['var_values'] * 0.85
+	
+	# f_vectors[0]['var_values'] = rescale_vector(f_vectors[0]['var_values'], 0.05, 0.67)
+	# f_vectors[1]['var_values'] = rescale_vector(f_vectors[1]['var_values'], 0.08, 0.63)
+	# f_vectors[2]['var_values'] = rescale_vector(f_vectors[2]['var_values'], 0.03, 0.6)
+	
+	if produce_spectrum:
+		output_plot['r'] = r_vectors
+		output_plot['f'] = f_vectors
+		output_plot['title'] = 'Sorting Transmission Spectrum'
+		output_plot['const_params'] = const_parameters
+		
+		# ## Plotting code to test
+		# fig,ax = plt.subplots()
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[0]['var_values'], color='blue')
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[1]['var_values'], color='green')
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[2]['var_values'], color='red')
+		# plt.plot(r_vectors[0]['var_values'], f_vectors[3]['var_values'], color='gray')
+		# plt.show(block=False)
+		# plt.show()
+		logging.info('Generated sorting transmission spectrum.')
+  
+	sweep_values = []
+	num_sweep_values = num_adjoint_sources if not add_opp_polarizations else num_bands		# Indiv. quadrant transmissions
+	num_sweep_values += 1																	# Overall transmission
+	sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
+	
+	logging.info('Picked peak transmission points for each quadrant to pass to sorting transmission variable sweep.')
+	
+	sweep_peak_vals = []
+	for swp_val in sweep_values:
+		sweep_peak_vals.append(swp_val['value'])
+	logging.info('[' + ', '.join(map(lambda x: str(round(100*x,2)), sweep_peak_vals)) + ']')     # Converts to percentages with 2 s.f.
+	
+	return output_plot, sweep_values
+
+def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='mean'):
+	'''Generates power spectra on the same plot for all contributions to RTA, 
+	and logs peak/mean value and corresponding index.
+	Everything is normalized to the power input to the device.'''
+	# Overall RTA of the device, normalized against sum.
+			# - Overall Reflection
+			# - Side Powers
+			# - Focal Region Power
+			# - Oblique Scattering
+			# - Device Absorption / Unaccounted Power
+	
+	
+	output_plot = {}
+	r_vectors = []      # Variables
+	f_vectors = []      # Functions
+	
+	lambda_vector = monitors_data['wavelength']
+	r_vectors.append({'var_name': 'Wavelength',
+					  'var_values': lambda_vector
+					})
+	
+	sourcepower = monitors_data['sourcepower']
+	input_power = monitors_data['incident_aperture_monitor']['P']
+	
+	# The reflection monitor is the most troublesome and contentious one, here are some potential ways to measure it and most of them aren't correct
+	R_coeff = np.reshape(1 - monitors_data['src_transmission_monitor']['T'],    (len(lambda_vector),1))
+	R_coeff_2 = np.reshape(1 - monitors_data['incident_aperture_monitor']['T'], (len(lambda_vector),1))
+	R_coeff_3 = np.reshape(1 - monitors_data['src_spill_monitor']['T'], (len(lambda_vector),1))
+	R_coeff_4 = monitors_data['incident_aperture_monitor']['R_power']		# this is actually power not R-coefficient
+	R_coeff_5 = monitors_data['src_spill_monitor']['P'] - input_power		# this is actually power not R-coefficient
+	R_power_1 = (np.abs(R_coeff_4) + R_coeff_5) * 0.5
+	R_power_2 = np.abs(R_coeff_4)
+	R_power_3 = R_coeff_4
+ 
+	R_power = R_power_1
+
+	side_powers = []
+	side_directions = ['E','N','W','S']
+	sides_power = 0
+	for idx in range(0, 4):
+		side_powers.append(monitors_data['side_monitor_'+str(idx)]['P'])
+		sides_power = sides_power + monitors_data['side_monitor_'+str(idx)]['P']
+	
+	try:
+		scatter_power_2 = monitors_data['scatter_plane_monitor']['P']
+	except Exception as err:
+		scatter_power_2 = monitors_data['spill_plane_monitor']['P']
+		
+	focal_power = monitors_data['transmission_focal_monitor_']['P']
+	
+	scatter_power = 0
+	for idx in range(0,4):
+		scatter_power = scatter_power + monitors_data['vertical_scatter_monitor_'+str(idx)]['P']
+		
+	exit_aperture_power = monitors_data['exit_aperture_monitor']['P']
+	
+	#! Remove - rescaling
+	
+	def rescale_vector(vec, amin, amax):
+		vec = (vec - np.min(vec))/(np.max(vec) - np.min(vec))
+		vec = amin + (amax-amin)*vec
+		return vec
+	
+	# focal_power = rescale_vector(focal_power/input_power, 0.45, 0.65) * input_power
+	# scatter_power = scatter_power*0.7
+	# R_power = R_power*0.2
+	# for idx in range(0,4):
+	# 	side_powers[idx] = side_powers[idx]*0.5
+	
+	
+	power_sum = R_power + focal_power + scatter_power
+	for idx in range(0, 4):
+		power_sum += side_powers[idx]
+	
+	if np.max(power_sum/input_power) > 1:
+		logging.warning('Warning! Absorption less than 0 at some point on the spectrum.')
+
+	# # Test reflection power calculation method
+	# power_sum_2 = power_sum - R_power
+	# plt.plot(lambda_vector, R_power_1/input_power, label='Suggested Reflection Power')
+	# plt.plot(lambda_vector, 1 - power_sum_2/input_power, label='Reflection Power + Unaccounted Power')
+	# plt.plot(lambda_vector, 1 - power_sum_2/input_power - R_power_1/input_power, label=' Projected Unaccounted Power')
+	# plt.plot(lambda_vector, 1 - power_sum_2/input_power - R_power_2/input_power, label=' Projected Unaccounted Power, v2')
+	# plt.axhline(0, ls='--', c='gray')
+	# plt.legend()
+ 
+		
+	# Determine peak wavelengths for each band
+	quadrant_names = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+	for idx in range(0, num_adjoint_sources):
+		f_vectors.append({'var_name': quadrant_names[idx],
+						'var_values': np.divide(monitors_data['transmission_monitor_'+str(idx)]['P'],
+												monitors_data['incident_aperture_monitor']['P'])
+						})
+	
+	f_vectors[1]['var_name'] = 'Green'
+	f_vectors[1]['var_values'] = f_vectors[1]['var_values'] + f_vectors[3]['var_values']
+	f_vectors.pop(3)
+	
+	peak_idxs = []
+	for idx in range(0,3):
+		sweep_index, sweep_val = max(enumerate(f_vectors[idx]['var_values']), key=(lambda x: x[1]))
+		peak_idxs.append(sweep_index)
+	f_vectors = []
+	
+	
+	
+	f_vectors.append({'var_name': 'Device Reflection',
+					  'var_values': R_power/input_power
+					})
+	
+	for idx in range(0, 4):
+		f_vectors.append({'var_name': 'Side Scattering ' + side_directions[idx],
+					  'var_values': side_powers[idx]/input_power
+					})
+	f_vectors.append({'var_name': 'Side Scatter',
+					'var_values': sides_power/input_power
+                   })
+		
+	
+	f_vectors.append({'var_name': 'Focal Region Power',
+					  'var_values': focal_power/input_power
+					})
+	
+	f_vectors.append({'var_name': 'Oblique Scatter',
+					  'var_values': scatter_power/input_power   # (exit_aperture_power - focal_power)/input_power
+					})
+	
+	f_vectors.append({'var_name': 'Unaccounted Power',
+					  'var_values': 1 - power_sum/input_power
+					})
+	
+	# Limit the datapoints solely to the peak spectral indices
+	for vector in r_vectors:
+		vector['var_values'] = vector['var_values'][peak_idxs]
+	for vector in f_vectors:
+		vector['var_values'] = vector['var_values'][peak_idxs]
+	
+	if produce_spectrum:
+		output_plot['r'] = r_vectors
+		output_plot['f'] = f_vectors
+		output_plot['title'] = 'Device RTA Spectrum'
+		output_plot['const_params'] = const_parameters
+		
+		print('Generated device RTA power spectrum.')
+	
+	sweep_values = []
+	num_sweep_values = len(f_vectors)
+	sweep_values = append_new_sweep(sweep_values, f_vectors, num_sweep_values, statistics)
+	
+	sweep_mean_vals = []
+	for swp_val in sweep_values:
+		sweep_mean_vals.append(swp_val['value'])
+	logging.info('Mean Spectral Values: [' + ', '.join(map(lambda x: str(round(100*x,2)), sweep_mean_vals)) + ']')     # Converts to percentages with 2 s.f.
+
+	for vector in f_vectors:
+		message = vector['var_name'] + ' (B, G, R): '
+		message += ", ".join(map(lambda x: str(round(100*x,2)), vector['var_values'].reshape(-1).tolist()))
+		logging.info(message)
+	
+	logging.info('Picked device RTA points to pass to variable sweep.')
+	
+	return output_plot, sweep_values
+
+#! Step 4 Functions
+
+# TODO: Use plotter.py
+
+
+#* END FUNCTION DEFINITIONS -----------------------------------------------------------------------------------------------------
+
+
+#
+#* These numpy arrays store all the data we will pull out of the simulation.
+# These are just to keep track of the arrays we create. We re-initialize these right before their respective loops
+#
+
+forward_e_fields = {}                       # Records E-fields throughout device volume
+focal_data = {}                             # Records E-fields at focal plane spots (locations of adjoint sources)
+quadrant_efield_data = {}					# Records E-fields through each quadrant
+quadrant_transmission_data = {}             # Records transmission through each quadrant
+
+# By iteration, focal area, polarization, wavelength: 
+# Create a dictionary of FoMs. Each key corresponds to a value: an array storing data of a specific FoM,
+# for each epoch, iteration, quadrant, polarization, and wavelength.
+# TODO: Consider using xarray instead of numpy arrays in order to have dimension labels for each axis.
+fom_evolution = {}
+for fom_type in fom_types:
+	fom_evolution[fom_type] = np.zeros((num_epochs, num_iterations_per_epoch, 
+										num_focal_spots, len(xy_names), num_design_frequency_points))
+# The main FoM being used for optimization is indicated in the config.
+
+# TODO: Turned this off because the memory and savefile space of gradient_evolution are too large.
+# if start_from_step != 0:	# Repeat the definition of field_shape here just because it's not loaded in if we start from a debug point
+# 	field_shape = [device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
+# gradient_evolution = np.zeros((num_epochs, num_iterations_per_epoch, *field_shape,
+# 								num_focal_spots, len(xy_names), num_design_frequency_points))
+
+#
+#* Set up queue for parallel jobs
+#
+
+jobs_queue = queue.Queue()
+
+def add_job(job_name, queue_in):
+	full_name = projects_directory_location + "/" + job_name
+	fdtd_hook.save(os.path.abspath(full_name))
+	queue_in.put(full_name)
+
+	return full_name
+
+def run_jobs(queue_in):
+	small_queue = queue.Queue()
+
+	while not queue_in.empty():
+		
+		for node_idx in range(0, num_nodes_available):
+			# this scheduler schedules jobs in blocks of num_nodes_available, waits for them ALL to finish, and then schedules the next block
+			# TODO: write a scheduler that enqueues a new job as soon as one finishes
+			# not urgent because for the most part, all jobs take roughly the same time
+			if queue_in.qsize() > 0:
+				small_queue.put(queue_in.get())
+
+		run_jobs_inner(small_queue)
+		
+def run_jobs_inner( queue_in ):
+	processes = []
+	job_idx = 0
+	while not queue_in.empty():
+		get_job_path = queue_in.get()
+
+		logging.info(f'Node {cluster_hostnames[job_idx]} is processing file at {get_job_path}.')
+
+		process = subprocess.Popen(
+			[
+				'/home/gdrobert/Develompent/adjoint_lumerical/inverse_design/run_proc.sh',
+				cluster_hostnames[ job_idx ],
+				get_job_path
+			]
+		)
+		processes.append( process )
+
+		job_idx += 1
+	sys.stdout.flush()
+
+	job_queue_time = time.time()
+	completed_jobs = [ 0 for i in range( 0, len( processes ) ) ]
+	while np.sum( completed_jobs ) < len( processes ):
+		for job_idx in range( 0, len( processes ) ):
+			sys.stdout.flush()
+   
+			if completed_jobs[ job_idx ] == 0:
+
+				poll_result = processes[ job_idx ].poll()
+				if not( poll_result is None ):
+					completed_jobs[ job_idx ] = 1
+
+		if time.time()-job_queue_time > 3600:
+			logging.CRITICAL(r"Warning! The following jobs are taking more than an hour and might be stalling:")
+			logging.CRITICAL(completed_jobs)
+
+		time.sleep( 5 )
+
+# Control Parameters
+restart = False                 #!! Set to true if restarting from a particular iteration - be sure to change start_epoch and start_iter
+# if restart_epoch or restart_iter:		#! Disabled for this script so we don't have to turn restart off every time when coming from a restarted opt.
+# 	restart = True
+if restart:
+	logging.info(f'Restarting optimization from epoch {restart_epoch}, iteration {restart_iter}.')
+
+	current_job_idx = (0,0,0)
+	
+#
+# Run the simulation
+#
+
+start_epoch = 0	# restart_epoch
+for epoch in range(start_epoch, num_epochs):
+	fdtd_hook.switchtolayout()
+	
+	start_iter = 0 # restart_iter
+	for iteration in range(start_iter, num_iterations_per_epoch):
+		logging.info(f"Working on epoch {epoch} and iteration {iteration}")
+
+		job_names = {}
+		fdtd_hook.switchtolayout()
+
+		#
+		# Step 1: Import sweep parameters, assemble jobs corresponding to each value of the sweep. Edit the environment of each job accordingly.
+		# Queue and run parallel, save out.
+		#
+		
+		if start_from_step == 0 or start_from_step == 1:
+			if start_from_step == 1:
+				load_backup_vars(shelf_fn)
+			
+			logging.info("Beginning Step 1: Running Sweep Jobs")
+
+			for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
+				# Iterate through each dimension of the sweep parameter value array, landing on each coordinate.
+				parameter_filename_string = create_parameter_filename_string(idx)
+				current_job_idx = idx
+				logging.info(f'Creating Job: Current parameter index is {current_job_idx}')
+				fdtd_hook.load(os.path.abspath(os.path.join(projects_directory_location, device_filename)))
+
+				for t_idx, p_idx in enumerate(idx):
+					# We create a job corresponding to the coordinate in the parameter value space.
+	 
+					variable = list(sweep_parameters.values())[t_idx]	# Access the sweep parameter being changed in this job
+					variable_name = variable['var_name']				# Get its name
+					variable_value = variable['var_values'][p_idx]		# Get the value it will be changed to in this job
+					
+					current_parameter_values[variable_name] = variable_value
+					fdtd_hook.switchtolayout()
+					# depending on what variable is, edit Lumerical
+
+					if variable_name in ['angle_theta']:
+						change_source_theta(variable_value, current_parameter_values['angle_phi'])
+					elif variable_name in ['angle_phi']:
+						change_source_theta(current_parameter_values['angle_theta'], variable_value)
+					elif variable_name in ['beam_radius_um']:
+						change_source_beam_radius(variable_value)
+					elif variable_name in ['sidewall_thickness_um']:
+						change_sidewall_thickness(variable_value)
+					elif variable_name in ['divergence_angle']:
+						change_divergence_angle(variable_value)
+	
+					for xy_idx in range(0, 1): # range(0,2) if considering source with both polarizations
+						# We set up two simulations for each parameter coordinate: one with devices enabled, and one with devices disabled.
+
+						# Make sure to reduce memory requirements by disabling and enabling the right objects.
+						disable_all_sources()
+						disable_objects(fdtd_hook, disable_object_list)
+						update_object(fdtd_hook, ['design_import'], 'enabled', True)
+						update_object(fdtd_hook, ['forward_src_' + xy_names[xy_idx]], 'enabled', True)
+	
+						# Name the job and add to queue.
+						job_name = f'sweep_job_{parameter_filename_string}.fsp'
+						# fdtd_hook.save(os.path.abspath(projects_directory_location + "/optimization"))
+						logging.info('Saved out ' + job_name)
+						job_names[('sweep', xy_idx, idx)] = add_job(job_name, jobs_queue)
+	
+						# Disable design imports and sidewalls, to measure power through source aperture, and power that misses device
+						disable_all_devices()
+						disable_all_sidewalls()
+						update_object(fdtd_hook, ['src_spill_monitor'], 'enabled', True)
+	
+						# Name the job and add to queue.
+						job_name = f'sweep_job_nodev_{parameter_filename_string}.fsp'
+						# fdtd_hook.save(os.path.abspath(projects_directory_location + "/optimization"))
+						logging.info('Saved out ' + job_name)
+						job_names[('nodev', xy_idx, idx)] = add_job(job_name, jobs_queue)
+	
+			backup_all_vars()  
+			if not running_on_local_machine:
+				run_jobs(jobs_queue)
+			
+			logging.info("Completed Step 1: Forward Optimization Jobs Completed.")
+			backup_all_vars()
+
+		#
+		# Step 2: Extract fields from each monitor, pass as inputs to premade functions in order to extract plot data. Data is typically a
+		# spectrum for each function (e.g. sorting efficiency) and also the peak value across that spectrum.
+		#
+		
+		if start_from_step == 0 or start_from_step == 2:
+			if start_from_step == 2:
+				load_backup_vars(shelf_fn)
+
+			logging.info("Beginning Step 2: Extracting Fields from Monitors.")
+
+			jobs_data = {}
+			for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
+				current_job_idx = idx
+				logging.info(f'----- Accessing Job: Current parameter index is {current_job_idx}')
+
+				for xy_idx in range(0, 1): # range(0,2) if considering source with both polarizations
+					
+					# Load each individual job (with device)
+					completed_job_filepath = utility.convert_root_folder(job_names[('sweep', xy_idx, idx)], PULL_COMPLETED_JOBS_FOLDER)
+					start_loadtime = time.time()
+					fdtd_hook.load(os.path.abspath(completed_job_filepath))
+					logging.info(f'Loading: {utility.isolate_filename(completed_job_filepath)}. Time taken: {time.time()-start_loadtime} seconds.')
+
+					monitors_data = {}
+					# Add wavelength and sourcepower information, common to every monitor in a job
+					monitors_data['wavelength'] = np.divide(3e8, fdtd_hook.getresult('focal_monitor_0','f'))
+					monitors_data['sourcepower'] = lm.get_sourcepower(fdtd_hook)
+	
+					# Go through each individual monitor and extract respective data
+					for monitor in monitors:
+						if monitor['name'] not in ['src_spill_monitor']:	# Exclude these monitors; their data will be pulled from the nodev job
+							monitor_data = {}
+							monitor_data['name'] = monitor['name']		# Load name
+							monitor_data['save'] = monitor['save']		# Config parameter: Load whether or not to save this monitor's data 
+	
+							if monitor['enabled'] and monitor['getFromFDTD']:
+								# Load E-norm(x,y,z), power, and transmission, all as a function of frequency. Every monitor needs these.
+								monitor_data['E'] = lm.get_efield_magnitude(fdtd_hook, monitor['name'])
+								monitor_data['P'] = lm.get_overall_power(fdtd_hook, monitor['name'])
+								monitor_data['T'] = lm.get_transmission_magnitude(fdtd_hook, monitor['name'])
+        
+								# The reflected power from the device is R_power = incident_aperture_power (no device) - incident_aperture_power (device)
+								if monitor['name'] in ['incident_aperture_monitor']:
+									monitor_data['R_power'] = -1 * lm.get_overall_power(fdtd_hook, monitor['name'])
+	
+								#---------------------------- Field Profile Information
+								# Get xyz coordinates for these specific monitors, in order to plot field profiles
+								if monitor['name'] in ['spill_plane_monitor', 'scatter_plane_monitor',
+														'transmission_monitor_0','transmission_monitor_1','transmission_monitor_2','transmission_monitor_3',
+														'transmission_focal_monitor_',
+														'device_xsection_monitor_0', 'device_xsection_monitor_1', 'device_xsection_monitor_2', 
+														'device_xsection_monitor_3', 'device_xsection_monitor_4', 'device_xsection_monitor_5'
+			  											]:
+									monitor_data['coords'] = {'x': fdtd_hook.getresult(monitor['name'],'x'),
+															'y': fdtd_hook.getresult(monitor['name'],'y'),
+															'z': fdtd_hook.getresult(monitor['name'],'z')}
+		
+								# Get detailed Ex, Ey, Ez field information for these monitors in order to plot field profiles.
+								if monitor['name'] in ['device_xsection_monitor_0', 'device_xsection_monitor_1', 'device_xsection_monitor_2', 
+														'device_xsection_monitor_3', 'device_xsection_monitor_4', 'device_xsection_monitor_5']:
+									monitor_data['E_real'] = lm.get_efield(fdtd_hook, monitor['name'])
+								#---------------------------------------------------------------------------------------------------------
+
+							monitors_data[monitor['name']] = monitor_data
+
+
+					# Load each individual job (w/o device)
+					completed_job_filepath = utility.convert_root_folder(job_names[('nodev', xy_idx, idx)], PULL_COMPLETED_JOBS_FOLDER)
+					start_loadtime = time.time()
+					fdtd_hook.load(os.path.abspath(completed_job_filepath))
+					logging.info(f'Loading: {utility.isolate_filename(completed_job_filepath)}. Time taken: {time.time()-start_loadtime} seconds.')
+	
+					# Go through each individual monitor and extract respective data
+					for monitor in monitors:
+						if monitor['name'] in ['incident_aperture_monitor', 'src_spill_monitor']:	# These are the only monitors relevant for the nodev job.
+										# Also we are going to overwrite all the data of incident_aperture_monitor except for the 'R' key
+							monitor_data = {}
+							monitor_data['name'] = monitor['name']		# Load name
+							monitor_data['save'] = monitor['save']		# Config parameter: Load whether or not to save this monitor's data 
+	
+							if monitor['enabled'] and monitor['getFromFDTD']:
+								# Load E-norm(x,y,z), power, and transmission, all as a function of frequency. Every monitor needs these.
+								monitor_data['E'] = lm.get_efield_magnitude(fdtd_hook, monitor['name'])
+								monitor_data['P'] = lm.get_overall_power(fdtd_hook, monitor['name'])
+								monitor_data['T'] = lm.get_transmission_magnitude(fdtd_hook, monitor['name'])
+        
+								# The reflected power from the device is R_power = incident_aperture_power (no device) - incident_aperture_power (device)
+								if monitor['name'] in ['incident_aperture_monitor']:
+									monitor_data['R_power'] = monitors_data[monitor['name']]['R_power'] + lm.get_overall_power(fdtd_hook, monitor['name'])
+
+							monitors_data.update( {monitor['name']: monitor_data} )
+
+					# Save out to a dictionary, using job_names as keys
+					jobs_data[job_names[('sweep', xy_idx, idx)]] = monitors_data
+
+			logging.info("Completed Step 2: Extracted all monitor fields.")
+			backup_all_vars()
+
+		#
+		# Step 3: For each job / parameter combination, create the relevant plot data as a dictionary.
+		# The relevant plot types are all stored in sweep_settings.json
+		#
+	
+		if start_from_step == 0 or start_from_step == 3:
+			if start_from_step == 3:
+				load_backup_vars(shelf_fn)
+	
+			logging.info("Beginning Step 3: Gathering Function Data for Plots")
+	
+			# TODO: Sort this out. Where is it relevant? ------------------------------------------------------------------------------
+			#! For plotting relative power spectra of adjacent quadrants
+			# quad_crosstalk_plot_idxs = [15, 21, 9]
+			# quad_crosstalk_plot_colors = ['green', 'blue', 'cyan']
+			# quad_crosstalk_plot_labels = [r'$G_{1,c}$', r"$B_c$", r'$B_w$']
+
+			# quad_crosstalk_plot_idxs = [20, 21, 19]
+			# quad_crosstalk_plot_colors = ['green', 'blue', 'cyan']
+			# quad_crosstalk_plot_labels = [r'$G_{2,c}$', r"$B_c$", r'$B_s$']
+
+			quad_crosstalk_plot_idxs = [21, 15, 20, 22, 27]
+			quad_crosstalk_plot_colors = ['blue', r'#66ff66', r'#00ff00', r'#009900', r'#003300']
+			quad_crosstalk_plot_labels = [r"$B_c$", r'$G_{1,c}$', r'$G_{2,c}$', r'$G_{2,n}$', r'$G_{1,e}$']
+
+			# quad_crosstalk_plot_idxs = [14, 15, 20, 8, 13]
+			# quad_crosstalk_plot_colors = ['red', r'#66ff66', r'#00ff00', r'#009900', r'#003300']
+			# quad_crosstalk_plot_labels = [r"$R_c$", r'$G_{1,c}$', r'$G_{2,c}$', r'$G_{2,w}$', r'$G_{1,s}$']
+			# todo: ----------------------------------------------------------------------------------------------------------------
+
+			plots_data = {}
+			
+			for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
+				logging.info(f'----- Gathering Plot Data: Current parameter index is {idx}')
+				# Load the monitor data for each job and format it for plot data. 
+	
+				for xy_idx in range(0, 1): # range(0,2) if considering source with both polarizations
+					monitors_data = jobs_data[job_names[('sweep', xy_idx, idx)]]
+	
+					plot_data = {}
+					plot_data['wavelength'] = monitors_data['wavelength']
+					plot_data['sourcepower'] = monitors_data['sourcepower']
+	
+					for plot in plots:
+						if plot['enabled']:
+		
+							if plot['name'] in ['sorting_efficiency']:
+								plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+									generate_sorting_eff_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
+									
+							elif plot['name'] in ['sorting_transmission']:
+								plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+									generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
+        
+							elif plot['name'] in ['device_rta']:
+								plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+									generate_device_rta_spectrum(monitors_data, plot['generate_plot_per_job'])
+									# generate_device_rta_spectrum_2(monitors_data, plot['generate_plot_per_job'])
+
+					plots_data[job_names[('sweep', xy_idx, idx)]] = plot_data
+	
+			logging.info("Completed Step 3: Processed and saved relevant plot data.")
+			backup_all_vars()
+		
+		
+		#
+		# Step 4: Plot Sweeps across Jobs
+		#
+		
+		# # TODO: Undo the link between Step 3 and 4
+		# if start_from_step == 0 or start_from_step == 4:
+		#     if start_from_step == 4:
+		#         load_backup_vars(shelf_fn)
+
+			logging.info("Beginning Step 4: Extracting Sweep Data for Each Plot, Creating Plots and Saving Out")
+			if 'plots_data' not in globals():
+				logging.critical('*** Warning! Plots Data from previous step not present. Check your save state.')
+
+			if not os.path.isdir(PLOTS_FOLDER):
+				os.makedirs(PLOTS_FOLDER)
+
+			startTime = time.time()
+
+			#* Here a sweep plot means data points have been extracted from each job (each representing a value of a sweep parameter)
+			#* and we are going to combine them all into a single plot.
+			
+			# Create dictionary to hold all the sweep plots
+			sweep_plots = {}
+			for plot in plots:
+				# Each entry in the plots section of sweep_settings.json should have a sweep plot created for it
+
+				# Initialize the dictionary to hold output plot data:
+				output_plot = {}
+				if plot['name'] not in ['Enorm_focal_plane_image'] and plot['enabled']:
+	
+					r_vectors = sweep_parameters
+					
+					# Initialize f_vectors
+					f_vectors = []
+					job_name = list(job_names.values())[0]
+					# How many different things are being tracked over the sweep?
+					for f_idx in range(0, len(plots_data[job_name][plot['name']+'_sweep'])):
+						f_vectors.append({'var_name': plot['name'] + '_' + str(f_idx),
+										  'var_values': np.zeros(sweep_parameters_shape),
+										  'var_stdevs': np.zeros(sweep_parameters_shape),
+										  'statistics': ''
+										  })
+	
+					# Populate f_vectors
+					for xy_idx in range(0, 1): # range(0,2) if considering source with both polarizations    
+						for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
+							job_name = job_names[('sweep', xy_idx, idx)]
+							f_values = plots_data[job_name][plot['name']+'_sweep']
+							
+							for f_idx, f_value in enumerate(f_values):
+								f_vectors[f_idx]['var_values'][idx] = f_value['value']
+								f_vectors[f_idx]['var_stdevs'][idx] = f_value['std_dev']
+								f_vectors[f_idx]['statistics'] = f_value['statistics']
+
+					output_plot['r'] = r_vectors
+					output_plot['f'] = f_vectors
+					output_plot['title'] = plot['name']+'_sweep'
+			
+					sweep_plots[plot['name']] = output_plot
+	
+			plots_data['sweep_plots'] = sweep_plots
+
+			#* We now have data for each and every plot that we are going to export.
+			
+			#
+			# Step 4.1: Go through each job and export the spectra for that job
+			#
+
+			# Purge the nodev job names
+			job_names_check = job_names.copy()
+			for job_idx, job_name in job_names_check.items():
+				if 'nodev' in utility.isolate_filename(job_name):
+					job_names.pop(job_idx)
+	
+			# Access each job
+			for job_idx, job_name in job_names.items():
+				plot_data = plots_data[job_name]
+				
+				logging.info('Plotting for Job: ' + utility.isolate_filename(job_names[job_idx]))
+
+				# Produce all the spectrum plots for each job.
+				for plot in plots:
+					if plot['enabled']:
+		 
+						if plot['name'] in ['sorting_efficiency']:
+							# plot_sorting_eff_spectrum(plot_data[plot['name']+'_spectrum'], job_idx)
+							continue
+							
+						elif plot['name'] in ['sorting_transmission']:
+							plotter.plot_sorting_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
+																		sweep_parameters, job_names, PLOTS_FOLDER, include_overall=True)
+    
+						elif plot['name'] in ['device_rta']:
+							plotter.plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
+																		sweep_parameters, job_names, PLOTS_FOLDER, sum_sides=True)
+							plotter.plot_device_rta_pareto(plot_data[plot['name']+'_spectrum'], job_idx,
+																		sweep_parameters, job_names, PLOTS_FOLDER, sum_sides=True)
+	
+						# TODO: OTHER SPECTRA
+
+
+			#
+			# Step 4.2: Go through all the sweep plots and export each one
+			#
+
+			for plot in plots:
+				if plot['enabled']:
+						
+					if plot['name'] in ['sorting_efficiency']:
+						# # Here there is the most variability in what the user might wish to plot, so it will have to be hardcoded for the most part.
+						# # plot_function_sweep(plots_data['sweep_plots'][plot['name']], 'th', plot_sorting_eff_sweep_1d.__name__)
+						# # plot_sorting_eff_sweep(plots_data['sweep_plots'][plot['name']], 'phi')
+						# plot_sorting_eff_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
+						continue
+  
+					elif plot['name'] in ['sorting_transmission']:
+						# todo: Make this work
+						# plot_sorting_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
+						continue
+	
+					# TODO: OTHER SWEEPS
+
+			backup_var('plots_data', os.path.basename(python_src_directory))
+			backup_all_vars()
+
+			logging.info("Completed Step 4: Created and exported all plots and plot data.")
+			logging.info(f'Step 4 took {(time.time()-startTime)/60} minutes.')
 
 
 logging.info('Reached end of file. Code completed.')

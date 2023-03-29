@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.getcwd())
-from utils import *
+from utils import utility
 
 #* Logging
 # Logger is already initialized through the call to utility.py
@@ -27,8 +27,7 @@ if slurm_job_env_variable is None:
 
 
 #* Debug Options
-
-start_from_step = 0 	    # 0 if running entire file in one shot
+# start_from_step = 0 	    #NOTE: Overwritten by config anyway   # 0 if running entire file in one shot
 
 
 #* Input Arguments
@@ -323,6 +322,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 		weight_focal_plane_map_performance_weighting = [ 1.0, 1.0, 1.0, 1.0 ]
 		weight_focal_plane_map = [ 1.0, 1.0, 1.0, 1.0 ]
 		weight_individual_wavelengths = np.ones( len( lambda_values_um ) )
+		weight_individual_wavelengths_by_quad = np.ones((4,num_design_frequency_points))
 	
 	# Determine the wavelengths that will be directed to each focal area
 	spectral_focal_plane_map = [
@@ -549,5 +549,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 
 # Store all processed config variables in a dictionary, update raw config variables.
 processed_vars, config_vars = post_process_config_vars(**config_vars)
+cv = SimpleNamespace(**config_vars)                                 # The rename just makes it easier to code
+pv = SimpleNamespace(**processed_vars)
 
 logging.info('Config imported and processed.')

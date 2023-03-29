@@ -18,9 +18,9 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.051
+mesh_spacing_um: 0.051 # 0.051
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
-geometry_spacing_lateral_um: 0.051  #0.085    
+geometry_spacing_lateral_um: 0.085 # 0.051
 
 device_scale_um: 0.051    # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
 # TODO: Consolidate with geometry_spacing_lateral_um
@@ -40,8 +40,8 @@ focal_plane_center_lateral_um: 0
 
 #* Device
 
-num_vertical_layers: 40
-vertical_layer_height_um: 0.051 #0.051 * 4 #0.017 * 8
+num_vertical_layers: 10
+vertical_layer_height_um: 0.204 #0.051 * 4 #0.017 * 8
 
 device_size_lateral_um: 2.04 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
 
@@ -67,7 +67,7 @@ lambda_min_eval_um: 0.375
 lambda_max_eval_um: 0.725
 
 num_bands: 3
-num_points_per_band: 20 #15
+num_points_per_band: 10 #20 #15
 
 num_dispersive_ranges: 1
 
@@ -127,14 +127,14 @@ enforce_xy_gradient_symmetry: False #True#False#True
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-num_epochs: 10
-num_iterations_per_epoch: 30
+num_epochs: 1 # 10
+num_iterations_per_epoch: 1 #30
 
-optimizer_algorithm: 'ADAM' #'Gradient Descent'
-adam_betas: [0.9, 0.999]
+optimizer_algorithm: 'Gradient Descent' #'ADAM'
+adam_betas: [0.9, 0.999]                # actually needs to be a tuple but we just convert it in the code
 
-use_fixed_step_size: True
-fixed_step_size: 0.05
+use_fixed_step_size: False
+fixed_step_size: 2.0          # make sure to use floats
 
 epoch_start_design_change_max: 0.15
 epoch_end_design_change_max: 0.05

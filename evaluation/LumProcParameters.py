@@ -32,9 +32,6 @@ pv = SimpleNamespace(**processed_vars)
 logging.info(f'Starting up Lumerical processing params file: {os.path.basename(__file__)}')
 logging.debug(f'Current working directory: {os.getcwd()}')
 
-#* Debug Options
-start_from_step = 0                 # 0 if running entire file in one shot  # NOTE: Overwrites optimization config.
-
 #* Establish folder structure & location
 python_src_directory = os.path.dirname(os.path.dirname(__file__))   # Go up one folder
 
@@ -86,8 +83,12 @@ if not os.path.isdir(projects_directory_location):
 sweep_parameters = {}
 sweep_parameters_shape = []
 const_parameters = {}
+current_parameter_values = {}
 
 for val in sweep_settings['params']:
+    # Keep a copy of all parameters and their current values
+    current_parameter_values[val['var_name']] = val['var_values'][val['peakInd']]
+    
     # Identify parameters that are actually being swept
     if val['iterating']:
         sweep_parameters[val['short_form']] = val
@@ -103,6 +104,26 @@ for idx, x in np.ndenumerate(np.zeros(sweep_parameters_shape)):
     for t_idx, p_idx in enumerate(idx):
         sweep_parameter_value_array[idx][t_idx] = (list(sweep_parameters.values())[t_idx])['var_values'][p_idx]
 
+def create_parameter_filename_string(idx):
+    ''' Input: tuple coordinate in the N-D array. Cross-matches against the sweep_parameters dictionary.
+    Output: unique identifier string for naming the corresponding job'''
+    
+    output_string = ''
+    
+    for t_idx, p_idx in enumerate(idx):
+        try:
+            variable = list(sweep_parameters.values())[t_idx]
+            variable_name = variable['short_form']
+            if isinstance(p_idx, slice):
+                output_string += variable_name + '_swp_'
+            else:
+                variable_value = variable['var_values'][p_idx]
+                variable_format = variable['formatStr']
+                output_string += variable_name + '_' + variable_format%(variable_value) + '_'
+        except Exception as err:
+            pass
+        
+    return output_string[:-1]
 
 #* Plot Types
 # and global plot settings
@@ -163,7 +184,7 @@ if not accept_params_from_opt_file:
 
 # Sidewall and Side Monitors
 
-cv.num_sidewalls = 4                   #! Remember to turn this on if the optimization actually was done with sidewalls
+cv.num_sidewalls = 0                   #! Remember to turn this on if the optimization actually was done with sidewalls
 
 if cv.num_sidewalls == 0:
     cv.sidewall_thickness_um = 0.0
@@ -185,6 +206,7 @@ if not accept_params_from_opt_file:
 #* Run post-processing and update raw config:
 processed_vars, config_vars = post_process_config_vars(**vars(cv))
 #* Load all into globals().
+# TODO: EXCEPT FOR START_FROM_STEP AND WHATEVER AT THE TOP. We need to preserve them!!!
 globals().update(config_vars)
 globals().update(processed_vars)
 
@@ -199,7 +221,7 @@ objects_above_device = [] #['permittivity_layer_substrate',
 
 # Devices in Array
 
-device_array_shape = (3,3)    # A tuple describing dimension sizes such as (2,3)
+device_array_shape = (1) #(3,3)    # A tuple describing dimension sizes such as (2,3)
 
 # FDTD
 
@@ -211,5 +233,7 @@ fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 3.0 * device_size_latera
 num_epochs = 1
 num_iterations_per_epoch = 1
 
+#* Debug Options
+start_from_step = 0                 # 0 if running entire file in one shot  # NOTE: Overwrites optimization config.
 
 logging.info("Lumerical plotting parameters read and processed.")

@@ -2,8 +2,8 @@
   "params": [
      {
        "var_name": "angle_theta",
-       "var_values":[25.0, 27.5, 30.0, 32.5, 35.0, 37.5, 40.0, 42.5, 45.0, 47.5, 50.0, 52.5, 55.0],
-       "peakInd":6,
+       "var_values":[0.0],
+       "peakInd":0,
        "formatStr":  "%.3f",
        "iterating": true,
        "short_form": "th"
@@ -18,7 +18,7 @@
        },
      {
        "var_name": "beam_radius_um",
-       "var_values":[15],
+       "var_values":[1.06],
        "peakInd":0,
        "formatStr": "%d",
        "iterating": false,
@@ -199,19 +199,19 @@
        "generate_plot_per_job": true
      },
      {"name": "sorting_transmission_meanband",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "sorting_transmission_contrastband",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "crosstalk_adj_quadrants",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "Enorm_focal_plane_image",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "device_cross_section",
@@ -219,39 +219,39 @@
        "generate_plot_per_job": true
      },
      {"name": "src_spill_power",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "device_transmission",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "device_reflection",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "side_scattering_power",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "crosstalk_power",
-      "enabled": true,
+      "enabled": false,
       "generate_plot_per_job": true
      },
      {"name": "focal_region_power",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "focal_scattering_power",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "oblique_scattering_power",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "exit_power_distribution",
-       "enabled": true,
+       "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "device_rta",

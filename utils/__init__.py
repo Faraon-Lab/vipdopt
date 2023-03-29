@@ -3,4 +3,5 @@
 
 __all__ = ['utility']#,
         #    'device', 'filter', 'layering', 'scale', 'sigmoid', 'square_blur', 'square_blur_smooth',
-        #    'SonyBayerFilter']
+        #   'lum_utils', 
+        #   'SonyBayerFilter']

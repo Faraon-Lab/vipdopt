@@ -42,6 +42,7 @@ from configs import *
 from evaluation import *
 from executor import *
 from utils import *
+from utils import lum_utils as lm
 from utils import SonyBayerFilter
 
 # Photonics
@@ -96,6 +97,10 @@ if not os.path.isdir( OPTIMIZATION_INFO_FOLDER ):
 if not os.path.isdir( OPTIMIZATION_PLOTS_FOLDER ):
 	os.mkdir( OPTIMIZATION_PLOTS_FOLDER )
 
+try:
+	shutil.copy2( python_src_directory + "/slurm_vis.sh", SAVED_SCRIPTS_FOLDER + "/slurm_vis.sh" )
+except Exception as ex:
+	pass
 shutil.copy2( python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
 shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
 			 os.path.join(SAVED_SCRIPTS_FOLDER, os.path.basename(yaml_filename)) )
@@ -783,65 +788,9 @@ def run_jobs_inner( queue_in ):
 
 		time.sleep( 5 )
 
-#
+
 #* Functions for obtaining information from Lumerical monitors
-#
-
-def get_afield( monitor_name, field_indicator ):
-	field_polarizations = [ field_indicator + 'x', 
-					   	field_indicator + 'y', field_indicator + 'z' ]
-	data_xfer_size_MB = 0
-
-	start = time.time()
-
-	pol_idx = 0
-	logging.debug(f'Getting {field_polarizations[pol_idx]} from monitor {monitor_name}.')
-	field_pol_0 = fdtd_hook.getdata( monitor_name, field_polarizations[ pol_idx ] )
-	logging.debug(f'Size {field_pol_0.nbytes}.')
-
-	data_xfer_size_MB += field_pol_0.nbytes / ( 1024. * 1024. )
-
-	total_field = np.zeros( [ len (field_polarizations ) ] + 
-						list( field_pol_0.shape ), dtype=np.complex )
-	total_field[ 0 ] = field_pol_0
-
-	logging.info(f'Getting {field_polarizations[pol_idx]} from monitor {monitor_name}. Size: {data_xfer_size_MB}MB. Time taken: {time.time()-start} seconds.')
-
-	for pol_idx in range( 1, len( field_polarizations ) ):
-		logging.debug(f'Getting {field_polarizations[pol_idx]} from monitor {monitor_name}.')
-		field_pol = fdtd_hook.getdata( monitor_name, field_polarizations[ pol_idx ] )
-		logging.debug(f'Size {field_pol.nbytes}.')
-  
-		data_xfer_size_MB += field_pol.nbytes / ( 1024. * 1024. )
-
-		total_field[ pol_idx ] = field_pol
-
-		logging.info(f'Getting {field_polarizations[pol_idx]} from monitor {monitor_name}. Size: {field_pol.nbytes/(1024*1024)}MB. Total time taken: {time.time()-start} seconds.')
-
-	elapsed = time.time() - start
-
-	date_xfer_rate_MB_sec = data_xfer_size_MB / elapsed
-	logging.debug( "Transferred " + str( data_xfer_size_MB ) + " MB\n" )
-	logging.debug( "Data rate = " + str( date_xfer_rate_MB_sec ) + " MB/sec\n\n" )
-
-	return total_field
-
-def get_hfield( monitor_name ):
-	return get_afield( monitor_name, 'H' )
-
-def get_efield( monitor_name ):
-	return get_afield( monitor_name, 'E' )
-
-def get_Pfield( monitor_name ):
-	read_pfield = fdtd_hook.getresult( monitor_name, 'P' )
-	read_P = read_pfield[ 'P' ]
-	return read_P
-	# return get_afield( monitor_name, 'P' )
-
-def get_transmission_magnitude( monitor_name ):
-	read_T = fdtd_hook.getresult( monitor_name, 'T' )
-	return np.abs( read_T[ 'T' ] )
-
+# See utils/lum_utils.py
 
 #
 #* These numpy arrays store all the data we will pull out of the simulation.
@@ -1164,7 +1113,7 @@ else:		# optimization
 						fdtd_hook.load(os.path.abspath(completed_job_filepath))
 						logging.info(f'Loading: {utility.isolate_filename(completed_job_filepath)}. Time taken: {time.time()-start_loadtime} seconds.')
 	  
-						fwd_e_fields = get_efield(design_efield_monitor['name'])
+						fwd_e_fields = lm.get_efield(fdtd_hook, design_efield_monitor['name'])
 						logging.info('Accessed design E-field monitor.')
 	
 						#* Populate forward_e_fields with device E-field info
@@ -1187,10 +1136,11 @@ else:		# optimization
 						#* Populate arrays with adjoint source E-field and quadrant transmission info.
 						# NOTE: Only these will be needed to calculate the FoM.
 						for adj_src_idx in dispersive_range_to_adjoint_src_map[ dispersive_range_idx ]:					
-							focal_data[xy_names[xy_idx]][ adj_src_idx ] = get_efield(focal_monitors[adj_src_idx]['name'])
+							focal_data[xy_names[xy_idx]][ adj_src_idx ] = lm.get_efield(fdtd_hook, focal_monitors[adj_src_idx]['name'])
 							logging.info(f'Accessed adjoint E-field data at focal spot {adj_src_idx}.')
 
-							quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = get_transmission_magnitude(transmission_monitors[adj_src_idx]['name'])
+							quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = lm.get_transmission_magnitude(fdtd_hook, 
+                                                                                                   		transmission_monitors[adj_src_idx]['name'])
 							logging.info(f'Accessed transmission data for quadrant {adj_src_idx}.')
 
 				# Save out fields for debug purposes
@@ -1212,7 +1162,7 @@ else:		# optimization
 						for xy_idx in range(0, 2):
 							fdtd_hook.load( job_names[ ( 'pdaf_fwd', xy_idx, dispersive_range_idx ) ] )
 
-							fwd_e_fields = get_efield(design_efield_monitor['name'])
+							fwd_e_fields = lm.get_efield(fdtd_hook, design_efield_monitor['name'])
 
 							if ( dispersive_range_idx == 0 ):
 
@@ -1229,9 +1179,10 @@ else:		# optimization
 
 
 							for adj_src_idx in dispersive_range_to_adjoint_src_map[ dispersive_range_idx ]:					
-								pdaf_focal_data[xy_names[xy_idx]][ adj_src_idx ] = get_efield(focal_monitors[adj_src_idx]['name'])
+								pdaf_focal_data[xy_names[xy_idx]][ adj_src_idx ] = lm.get_efield(fdtd_hook, focal_monitors[adj_src_idx]['name'])
 
-								pdaf_quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = get_transmission_magnitude(transmission_monitors[adj_src_idx]['name'])
+								pdaf_quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = lm.get_transmission_magnitude(fdtd_hook, 
+                                                                                                         		transmission_monitors[adj_src_idx]['name'])
 
 				#* These arrays record intensity and transmission FoMs for all focal spots
 				transmission_green_blue_xpol = 0
@@ -1424,7 +1375,7 @@ else:		# optimization
 						logging.info(f'Loading: {utility.isolate_filename(completed_job_filepath)}. Time taken: {time.time()-start_loadtime} seconds.')
 
 						adjoint_e_fields.append(
-							get_efield(design_efield_monitor['name']))
+							lm.get_efield(fdtd_hook, design_efield_monitor['name']))
 						logging.info('Accessed design E-field monitor.')
 					
 					for pol_idx in range(0, len(polarizations)):		# For each polarization:
@@ -1531,7 +1482,7 @@ else:		# optimization
 						fdtd_hook.load( job_names[ ( 'pdaf_adj', xy_idx, lookup_dispersive_range_idx ) ] )
 
 						pdaf_adjoint_e_fields.append(
-							get_efield(design_efield_monitor['name']))
+							lm.get_efield(fdtd_hook, design_efield_monitor['name']))
 
 
 					for pol_idx in range(0, len(polarizations)):
@@ -1707,6 +1658,7 @@ else:		# optimization
 				# Feed proposed design gradient into bayer_filter, run it through filters and update permittivity
 				# negative of the device gradient because the step() function has a - sign instead of a +
 				# NOT the design gradient; we do not want to backpropagate twice!
+
 				if optimizer_algorithm.lower() in ['adam']:
 					adam_moments = bayer_filter.step_adam(epoch*num_iterations_per_epoch+iteration, -device_gradient,
 													adam_moments, step_size, adam_betas)
