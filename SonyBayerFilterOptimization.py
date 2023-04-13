@@ -119,6 +119,7 @@ shutil.copytree(os.path.join(python_src_directory, "utils"), EVALUATION_UTILS_FO
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/LumProcSweep.py"), EVALUATION_FOLDER + "/LumProcSweep.py" )
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/LumProcParameters.py"), EVALUATION_CONFIG_FOLDER + "/LumProcParameters.py" )
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/sweep_settings.json"), EVALUATION_CONFIG_FOLDER + "/sweep_settings.json" )
+shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
 
 
 # SLURM Environment
@@ -463,6 +464,46 @@ if start_from_step == 0:
  
 	for xy_idx in range(0, 2):
 		if use_gaussian_sources:
+	  
+			def snellRefrOffset(src_angle_incidence, object_list):
+				''' Takes a list of objects in between source and device, retrieves heights and indices,
+				and calculates injection angle so as to achieve the desired angle of incidence upon entering the device.'''
+				# structured such that n0 is the input interface and n_end is the last above the device
+				# height_0 should be 0
+				
+				input_theta = 0
+				r_offset = 0
+
+				heights = [0.]
+				indices = [1.]
+				total_height = device_vertical_maximum_um
+				max_height = src_maximum_vertical_um + src_hgt_Si
+				for object_name in object_list:
+					hgt = fdtd_hook.getnamed(object_name, 'z span')/1e-6
+					total_height += hgt
+					indices.append(float(fdtd_hook.getnamed(object_name, 'index')))
+					
+					if total_height >= max_height:
+						heights.append(hgt-(total_height - max_height))
+						break
+					else:
+						heights.append(hgt)
+
+				# print(f'Device ends at z = {device_vertical_maximum_um}; Source is located at z = {max_height}')
+				# print(f'Heights are {heights} with corresponding indices {indices}')
+				# sys.stdout.flush()
+
+				src_angle_incidence = np.radians(src_angle_incidence)
+				snellConst = float(indices[-1])*np.sin(src_angle_incidence)
+				input_theta = np.degrees(np.arcsin(snellConst/float(indices[0])))
+
+				r_offset = 0
+				for cnt, h_i in enumerate(heights):
+					s_i = snellConst/indices[cnt]
+					r_offset = r_offset + h_i*s_i/np.sqrt(1-s_i**2)
+
+				return [input_theta, r_offset]
+
 			forward_src = {}
 			forward_src['name'] = 'forward_src_' + xy_names[xy_idx]
 			forward_src['type'] = 'GaussianSource'
@@ -474,9 +515,9 @@ if start_from_step == 0:
 			forward_src['y span'] = 2 * fdtd_region_size_lateral_um * 1e-6
 			forward_src['z'] = src_maximum_vertical_um * 1e-6
 
+			# forward_src['angle theta'], shift_x_center = snellRefrOffset(source_angle_theta_deg, objects_above_device)	# this code takes substrates and objects above device into account
 			shift_x_center = np.abs( device_vertical_maximum_um - src_maximum_vertical_um ) * np.tan( source_angle_theta_rad )
 			forward_src['x'] = shift_x_center * 1e-6
-			# TODO: Edit this as per previous ian edits in order to take substrates or whatever into account
 
 			forward_src['wavelength start'] = lambda_min_um * 1e-6
 			forward_src['wavelength stop'] = lambda_max_um * 1e-6
@@ -890,7 +931,6 @@ if restart or evaluate:
 	bayer_filter.update_permittivity()
 
 	# # Other necessary savestate data
-	# TODO: Check a restarted file to make sure everything is being loaded properly and that you didn't forget to load anything.
 	figure_of_merit_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/figure_of_merit.npy")
 	# gradient_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/gradient_by_focal_pol_wavelength.npy")		# Took out feature because it consumes too much memory
 	for fom_type in fom_types:
@@ -898,6 +938,31 @@ if restart or evaluate:
 	step_size_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/step_size_evolution.npy")
 	average_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/average_design_change_evolution.npy")
 	max_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/max_design_change_evolution.npy")
+
+
+	if restart_epoch == 0 and restart_iter == 1:
+		# Redeclare everything if starting from scratch (but using a certain design as the seed)
+		figure_of_merit_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
+		pdaf_transmission_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
+		step_size_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
+		average_design_variable_change_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
+		max_design_variable_change_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
+		fom_evolution = {}
+		for fom_type in fom_types:
+			fom_evolution[fom_type] = np.zeros((num_epochs, num_iterations_per_epoch, 
+												num_focal_spots, len(xy_names), num_design_frequency_points))
+		# The main FoM being used for optimization is indicated in the config.
+	
+	# Set everything ahead of the restart epoch and iteration to zero.
+	for rs_epoch in range(restart_epoch, num_epochs):
+		for rs_iter in range(restart_iter, num_iterations_per_epoch):
+			figure_of_merit_evolution[rs_epoch, rs_iter] = 0
+			pdaf_transmission_evolution[rs_epoch, rs_iter] = 0
+			step_size_evolution[rs_epoch, rs_iter] = 0
+			average_design_variable_change_evolution[rs_epoch, rs_iter] = 0
+			max_design_variable_change_evolution[rs_epoch, rs_iter] = 0
+			for fom_type in fom_types:
+				fom_evolution[fom_type][rs_epoch, rs_iter] = np.zeros((num_focal_spots, len(xy_names), num_design_frequency_points))
 
 
 if evaluate:
@@ -1084,7 +1149,8 @@ else:		# optimization
 					fdtd_hook.save( os.path.abspath(EVALUATION_FOLDER + "/optimization.fsp" ))
 
 				backup_all_vars()
-				run_jobs( jobs_queue )
+				if not running_on_local_machine:
+					run_jobs( jobs_queue )
 	
 				logging.info("Completed Step 1: Forward and Adjoint Optimization Jobs Completed.")
 				backup_all_vars()
@@ -1140,7 +1206,7 @@ else:		# optimization
 							logging.info(f'Accessed adjoint E-field data at focal spot {adj_src_idx}.')
 
 							quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = lm.get_transmission_magnitude(fdtd_hook, 
-                                                                                                   		transmission_monitors[adj_src_idx]['name'])
+																								   		transmission_monitors[adj_src_idx]['name'])
 							logging.info(f'Accessed transmission data for quadrant {adj_src_idx}.')
 
 				# Save out fields for debug purposes
@@ -1182,7 +1248,7 @@ else:		# optimization
 								pdaf_focal_data[xy_names[xy_idx]][ adj_src_idx ] = lm.get_efield(fdtd_hook, focal_monitors[adj_src_idx]['name'])
 
 								pdaf_quadrant_transmission_data[xy_names[xy_idx]][ adj_src_idx ] = lm.get_transmission_magnitude(fdtd_hook, 
-                                                                                                         		transmission_monitors[adj_src_idx]['name'])
+																										 		transmission_monitors[adj_src_idx]['name'])
 
 				#* These arrays record intensity and transmission FoMs for all focal spots
 				transmission_green_blue_xpol = 0
@@ -1266,6 +1332,10 @@ else:		# optimization
 
 				# Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
 				plotter.plot_fom_trace(figure_of_merit_evolution, OPTIMIZATION_PLOTS_FOLDER)
+				plotter.plot_quadrant_transmission_trace(fom_evolution['transmission'], OPTIMIZATION_PLOTS_FOLDER)
+				plotter.plot_individual_quadrant_transmission(quadrant_transmission_data, lambda_values_um, OPTIMIZATION_PLOTS_FOLDER,
+												  		epoch, iteration=30)	# continuously produces only one plot per epoch to save space
+				plotter.plot_overall_transmission_trace(fom_evolution['transmission'], OPTIMIZATION_PLOTS_FOLDER)
 
 
 
