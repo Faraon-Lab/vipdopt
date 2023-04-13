@@ -1078,21 +1078,6 @@ def generate_sorting_transmission_spectrum(monitors_data, produce_spectrum, stat
 		f_vectors[1]['var_name'] = 'Green'
 		f_vectors[1]['var_values'] = f_vectors[1]['var_values'] + f_vectors[3]['var_values']
 		f_vectors.pop(3)
-		
-	#! Remove - rescaling
-	def rescale_vector(vec, amin, amax):
-		vec = (vec - np.min(vec))/(np.max(vec) - np.min(vec))
-		vec = amin + (amax-amin)*vec
-		return vec
-	
-	#! Remove rescale
-	# for f_vector in f_vectors:
-	#     f_vector['var_values'] = f_vector['var_values']*0.65/0.48
-	# f_vectors[0]['var_values'] = f_vectors[0]['var_values'] * 0.85
-	
-	# f_vectors[0]['var_values'] = rescale_vector(f_vectors[0]['var_values'], 0.05, 0.67)
-	# f_vectors[1]['var_values'] = rescale_vector(f_vectors[1]['var_values'], 0.08, 0.63)
-	# f_vectors[2]['var_values'] = rescale_vector(f_vectors[2]['var_values'], 0.03, 0.6)
 	
 	if produce_spectrum:
 		output_plot['r'] = r_vectors
@@ -1179,19 +1164,6 @@ def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='me
 		scatter_power = scatter_power + monitors_data['vertical_scatter_monitor_'+str(idx)]['P']
 		
 	exit_aperture_power = monitors_data['exit_aperture_monitor']['P']
-	
-	#! Remove - rescaling
-	
-	def rescale_vector(vec, amin, amax):
-		vec = (vec - np.min(vec))/(np.max(vec) - np.min(vec))
-		vec = amin + (amax-amin)*vec
-		return vec
-	
-	# focal_power = rescale_vector(focal_power/input_power, 0.45, 0.65) * input_power
-	# scatter_power = scatter_power*0.7
-	# R_power = R_power*0.2
-	# for idx in range(0,4):
-	# 	side_powers[idx] = side_powers[idx]*0.5
 	
 	
 	power_sum = R_power + focal_power + scatter_power

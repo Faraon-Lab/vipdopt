@@ -463,7 +463,7 @@ if __name__ == "__main__":
 	plot_directory_location = 'plots'
 	cutoff_1d_sweep_offset = [0, 0]
 
-	#* This is where we perturb the data points as needed
+	#* This is where we perturb the final plot parameters as necessary
 	# TODO: modify data code
 
 	#* Call plotting function and export 
