@@ -801,7 +801,7 @@ def run_jobs_inner( queue_in ):
 
 		process = subprocess.Popen(
 			[
-				'/home/gdrobert/Develompent/adjoint_lumerical/inverse_design/run_proc.sh',
+				os.path.abspath(python_src_directory + "/utils/run_proc.sh"),
 				cluster_hostnames[ job_idx ],
 				get_job_path
 			]
