@@ -1,3 +1,13 @@
+# Copyright © 2023, California Institute of Technology. All rights reserved.
+#
+# Use in source and binary forms for nonexclusive, nonsublicenseable, commercial purposes with or without modification, is permitted provided that the following conditions are met:
+# - Use of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+# - Use in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the software.
+# - Neither the name of the California Institute of Technology (Caltech) nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 import sys
 import os
 import copy
@@ -92,8 +102,9 @@ def convert_root_folder(address, root_folder_new):
 
 def generate_value_array(start,end,step):
     '''Returns a conveniently formatted output list according to np.arange() that can be copy-pasted to a JSON.'''
-    output_array = json.dumps(np.arange(start,end+step,step).tolist())
+    import json
     import pyperclip
+    output_array = json.dumps(np.arange(start,end+step,step).tolist())
     pyperclip.copy(output_array)
     return output_array
 
@@ -110,7 +121,6 @@ def del_by_path(root, items):
     """Delete a key-value in a nested object in root by item sequence."""
     del get_by_path(root, items[:-1])[items[-1]]
 #######################################
-
 
 def index_from_permittivity(permittivity_):
 	'''Checks all permittivity values are real and then takes square root to give index.'''

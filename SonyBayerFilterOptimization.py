@@ -1,3 +1,13 @@
+# Copyright © 2023, California Institute of Technology. All rights reserved.
+#
+# Use in source and binary forms for nonexclusive, nonsublicenseable, commercial purposes with or without modification, is permitted provided that the following conditions are met:
+# - Use of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+# - Use in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the software.
+# - Neither the name of the California Institute of Technology (Caltech) nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 ## Main file for the adjoint source optimization.
 # Accesses config file via: configs/xxx.py
 # Sets up instances of all the classes in utils
@@ -98,7 +108,7 @@ if not os.path.isdir( OPTIMIZATION_PLOTS_FOLDER ):
 	os.mkdir( OPTIMIZATION_PLOTS_FOLDER )
 
 try:
-	shutil.copy2( python_src_directory + "/slurm_vis.sh", SAVED_SCRIPTS_FOLDER + "/slurm_vis.sh" )
+	shutil.copy2( python_src_directory + "/slurm_vis10lyr.sh", SAVED_SCRIPTS_FOLDER + "/slurm_vis10lyr.sh" )
 except Exception as ex:
 	pass
 shutil.copy2( python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
@@ -117,6 +127,7 @@ if os.path.exists(EVALUATION_UTILS_FOLDER):
 shutil.copytree(os.path.join(python_src_directory, "utils"), EVALUATION_UTILS_FOLDER)
 
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/LumProcSweep.py"), EVALUATION_FOLDER + "/LumProcSweep.py" )
+shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/slurm_lumproc.sh"), EVALUATION_FOLDER + "/slurm_lumproc.sh" )
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/LumProcParameters.py"), EVALUATION_CONFIG_FOLDER + "/LumProcParameters.py" )
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/sweep_settings.json"), EVALUATION_CONFIG_FOLDER + "/sweep_settings.json" )
 shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
@@ -518,6 +529,7 @@ if start_from_step == 0:
 			# forward_src['angle theta'], shift_x_center = snellRefrOffset(source_angle_theta_deg, objects_above_device)	# this code takes substrates and objects above device into account
 			shift_x_center = np.abs( device_vertical_maximum_um - src_maximum_vertical_um ) * np.tan( source_angle_theta_rad )
 			forward_src['x'] = shift_x_center * 1e-6
+			# TODO: Edit this as per previous ian edits in order to take substrates or whatever into account
 
 			forward_src['wavelength start'] = lambda_min_um * 1e-6
 			forward_src['wavelength stop'] = lambda_max_um * 1e-6
@@ -710,6 +722,36 @@ if start_from_step == 0:
 	design_import = fdtd_update_object(fdtd_hook, design_import, create_object=True)
 	fdtd_objects['design_import'] = design_import
 
+	# Install Aperture that blocks off source
+	if use_source_aperture:
+		source_block = {}
+		source_block['name'] = 'PEC_screen'
+		source_block['type'] = 'Rectangle'
+		source_block['x'] = 0 * 1e-6
+		source_block['x span'] = 1.1*4/3*1.2 * device_size_lateral_um * 1e-6
+		source_block['y'] = 0 * 1e-6
+		source_block['y span'] = 1.1*4/3*1.2 * device_size_lateral_um * 1e-6
+		source_block['z min'] = (device_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
+		source_block['z max'] = (device_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
+		source_block['material'] = 'PEC (Perfect Electrical Conductor)'
+		# TODO: set enable true or false?
+		source_block = fdtd_update_object(fdtd_hook, source_block, create_object=True)
+		fdtd_objects['source_block'] = source_block
+		
+		source_aperture = {}
+		source_aperture['name'] = 'source_aperture'
+		source_aperture['type'] = 'Rectangle'
+		source_aperture['x'] = 0 * 1e-6
+		source_aperture['x span'] = device_size_lateral_um * 1e-6
+		source_aperture['y'] = 0 * 1e-6
+		source_aperture['y span'] = device_size_lateral_um * 1e-6
+		source_aperture['z min'] = (device_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
+		source_aperture['z max'] = (device_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
+		source_aperture['material'] = 'etch'
+		# TODO: set enable true or false?
+		source_aperture = fdtd_update_object(fdtd_hook, source_aperture, create_object=True)
+		fdtd_objects['source_aperture'] = source_aperture
+
 	# Set up sidewalls on the side to try and attenuate crosstalk
 	device_sidewalls = []
 
@@ -801,7 +843,9 @@ def run_jobs_inner( queue_in ):
 
 		process = subprocess.Popen(
 			[
-				os.path.abspath(python_src_directory + "/utils/run_proc.sh"),
+				#! Make sure this points to the right place
+				# os.path.abspath(python_src_directory + "/utils/run_proc.sh"),		# TODO: There's some permissions issue??
+				'/home/gdrobert/Develompent/adjoint_lumerical/inverse_design/run_proc.sh',
 				cluster_hostnames[ job_idx ],
 				get_job_path
 			]
@@ -952,6 +996,13 @@ if restart or evaluate:
 			fom_evolution[fom_type] = np.zeros((num_epochs, num_iterations_per_epoch, 
 												num_focal_spots, len(xy_names), num_design_frequency_points))
 		# The main FoM being used for optimization is indicated in the config.
+
+		# Use binarized density variable instead of intermediate
+		bayer_filter.update_filters( num_epochs - 1 )
+		bayer_filter.update_permittivity()
+		cur_density = bayer_filter.get_permittivity()
+		cur_design_variable = cur_density
+		bayer_filter.w[0] = cur_design_variable
 	
 	# Set everything ahead of the restart epoch and iteration to zero.
 	for rs_epoch in range(restart_epoch, num_epochs):
@@ -1090,6 +1141,9 @@ else:		# optimization
 					#! This is the only cur_whatever_variable that will ever be anything other than [0, 1].
 					cur_permittivity = min_device_permittivity + ( dispersive_max_permittivity - min_device_permittivity ) * cur_density
 					cur_index = utility.index_from_permittivity( cur_permittivity )
+    
+					# Update bayer_filter data for actual permittivity (not just density 0 to 1) and save out
+					bayer_filter.update_actual_permittivity_values(min_device_permittivity, dispersive_max_permittivity)
 
 					fdtd_hook.switchtolayout()
 					fdtd_hook.select( design_import['name'] )
@@ -1283,7 +1337,7 @@ else:		# optimization
 		
 							#* Transmission FoM Calculation: FoM = T
 							# \text{FoM}_{\text{transmission}} = \sum_i^{} \left{ \sum_\lambda^{} w_{\text{rejection}}(\lambda) w_{f_i} T_{f_i}(\lambda) \right}
-							# https://i.imgur.com/L414ybG.png
+							# https://imgur.com/7qefinH.png
 							transmission_addition = weight_spectral_rejection * 																					\
 															get_quad_transmission_data[focal_idx][spectral_focal_plane_map[focal_idx][0] + spectral_idx] / 			\
 															one_over_weight_focal_plane_map_performance_weighting
@@ -1336,6 +1390,7 @@ else:		# optimization
 				plotter.plot_individual_quadrant_transmission(quadrant_transmission_data, lambda_values_um, OPTIMIZATION_PLOTS_FOLDER,
 												  		epoch, iteration=30)	# continuously produces only one plot per epoch to save space
 				plotter.plot_overall_transmission_trace(fom_evolution['transmission'], OPTIMIZATION_PLOTS_FOLDER)
+				plotter.visualize_device(cur_index, OPTIMIZATION_PLOTS_FOLDER)
 
 
 

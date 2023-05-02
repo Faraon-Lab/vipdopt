@@ -1,3 +1,13 @@
+# Copyright © 2023, California Institute of Technology. All rights reserved.
+#
+# Use in source and binary forms for nonexclusive, nonsublicenseable, commercial purposes with or without modification, is permitted provided that the following conditions are met:
+# - Use of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+# - Use in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the software.
+# - Neither the name of the California Institute of Technology (Caltech) nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 #* Debug
 
 start_from_step: 0          # 0 if running entire file in one shot
@@ -18,7 +28,7 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.051 # 0.051
+mesh_spacing_um: 0.017 # 0.051
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.085 # 0.051
 
@@ -52,11 +62,11 @@ device_vertical_minimum_um: 0
 # Structure the following list such that the last entry is the last medium above the device.
 objects_above_device: [] #['permittivity_layer_substrate',
                         #'silicon_substrate']
-num_sidewalls: 0
-sidewall_thickness_um: 0.24
+num_sidewalls: 4
+sidewall_thickness_um: 0.204
 sidewall_material: 'etch'
-sidewall_extend_focalplane: False
-sidewall_vertical_minimum_um: -0.765
+sidewall_extend_focalplane: True
+sidewall_vertical_minimum_um: -0.765    # only needed if sidewall_extend_focalplane is False; describes how far down from the device they extend
 
 #* Spectral
 
@@ -86,7 +96,7 @@ fdtd_simulation_time_fs: 600 #3000
 #* Forward (Input) Source
 
 weight_by_individual_wavelength: True   # At present this changes nothing.
-use_gaussian_sources: True
+use_gaussian_sources: False
 
 use_airy_approximation: True
 f_number: 2.2
@@ -100,6 +110,8 @@ source_angle_phi_deg: 0
 xy_phi_rotations: [0, 90]
 xy_pol_rotations: [0, 90]
 xy_names: ['x', 'y']
+
+use_source_aperture: True
 
 #* Adjoint Source
 
@@ -127,14 +139,14 @@ enforce_xy_gradient_symmetry: False #True#False#True
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-num_epochs: 1 # 10
-num_iterations_per_epoch: 1 #30
+num_epochs: 10 # 10
+num_iterations_per_epoch: 30 #30
 
-optimizer_algorithm: 'Gradient Descent' #'ADAM'
+optimizer_algorithm: 'ADAM' #'Gradient Descent'
 adam_betas: [0.9, 0.999]                # actually needs to be a tuple but we just convert it in the code
 
 use_fixed_step_size: False
-fixed_step_size: 2.0          # make sure to use floats
+fixed_step_size: 0.01 #2.0          # make sure to use floats
 
 epoch_start_design_change_max: 0.15
 epoch_end_design_change_max: 0.05
@@ -156,9 +168,9 @@ do_green_balance: False #True
 
 polarization_name_to_idx: { 'x':0, 'y':1, 'z':2 }
 
-# desired_peaks_per_band_um: [ 0.46, 0.52, 0.61 ]
-desired_peaks_per_band_um: [ 0.48, 0.52, 0.59 ]
-# desired_peaks_per_band_um: [ 0.46, 0.52, 0.59 ]
+desired_peaks_per_band_um: [ 0.45, 0.54, 0.65 ]
+# desired_peaks_per_band_um: [ 0.48, 0.52, 0.59 ]
+# desired_peaks_per_band_um: [ 0.48, 0.53, 0.62 ]
 
 explicit_band_centering: True
 shuffle_green: False #True#False#True#False

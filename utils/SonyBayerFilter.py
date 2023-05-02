@@ -1,6 +1,17 @@
+# Copyright © 2023, California Institute of Technology. All rights reserved.
+#
+# Use in source and binary forms for nonexclusive, nonsublicenseable, commercial purposes with or without modification, is permitted provided that the following conditions are met:
+# - Use of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+# - Use in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the software.
+# - Neither the name of the California Institute of Technology (Caltech) nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 import os
 import sys
 import time
+import json
 
 import numpy as np
 from scipy import ndimage
@@ -40,9 +51,9 @@ class SonyBayerFilter(device.Device):
 		self.minimum_design_value = 0
 		self.maximum_design_value = 1
 		self.current_iteration = 0
-		self.design_height_voxels = design_height_voxels
+		self.design_height_voxels = design_height_voxels	# unused
 
-		self.layer_height_voxels = self.design_height_voxels
+		self.layer_height_voxels = self.design_height_voxels	# unused
 
 		self.init_filters_and_variables()
 
@@ -63,6 +74,20 @@ class SonyBayerFilter(device.Device):
 		self.w[0] = init_density * np.ones( self.w[0].shape )
 		self.update_permittivity()
 
+	def update_actual_permittivity_values( self, min_device_actual_perm, max_device_actual_perm ):
+		self.min_actual_permittivity = min_device_actual_perm
+		self.max_actual_permittivity = max_device_actual_perm
+
+	# def export( self, curr_epoch, min_device_perm, max_device_perm):
+	# 	'''[NOT WORKING] Export filter variables so it can be regenerated'''
+	# 	self.update_actual_permittivity_values(min_device_perm, max_device_perm)
+	# 	self.current_epoch = curr_epoch
+
+	# 	# # JSON doesn't work because the class contains ndarrays and the filters are class objects
+	# 	# with open("bayerfilter_state.json", "w") as outfile:
+	# 	# 	outfile.write(json.dumps(self.__dict__, indent=4))
+
+	# 	# use shelve
 
 	def update_permittivity(self):
 		'''Override the update_permittivity function so we can handle layer-dependent collapsing along either x- or y-dimensions.'''
@@ -113,6 +138,7 @@ class SonyBayerFilter(device.Device):
 		return gradient
 
 	def update_filters(self, epoch):
+		self.current_epoch = epoch
 		self.sigmoid_beta = 0.0625 * (2**epoch)
 
 		self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
@@ -154,8 +180,8 @@ class SonyBayerFilter(device.Device):
 		scale_min = self.permittivity_bounds[0]
 		scale_max = self.permittivity_bounds[1]
 		# self.scale_2 = scale.Scale([scale_min, scale_max])
-		self.scale_4 = scale.Scale([scale_min, scale_max])
 
+		self.scale_4 = scale.Scale([scale_min, scale_max])
 		
 		if gp.cv.use_smooth_blur:
 			self.max_blur_xy_2 = square_blur_smooth.SquareBlurSmooth(
@@ -180,9 +206,79 @@ class SonyBayerFilter(device.Device):
 		self.w[0], moments = self.proposed_design_step_adam(iteration, gradient, moments, step_size, betas, eps)
 		self.update_permittivity()
 		return moments
-    
+	
 	def convert_to_binary_map(self, variable):
 		return np.greater(variable, self.mid_permittivity)
+
+def visualize(cur_design_variable, visualize_epoch=10, min_device_perm=2.25, max_device_perm=5.76,
+			  num_vertical_layers=10, init_permittivity_0_1_scale=0.5):
+	'''Plots out the separate layers of the cur_design_variable. The visualize_epoch argument controls
+	the degree of binarization.
+	Note: The arguments of this function are precisely what are needed to regenerate the savestate of
+	a SonyBayerFilter instance.'''
+	# # This is the information that the filter needs to save
+	# # cur_design_variable address to load
+	# num_vertical_layers = 10				# bayer_filter.num_z_layers
+	# init_permittivity_0_1_scale = 0.5		# bayer_filter.init_permittivity
+	# min_device_permittivity = 2.25
+	# max_device_permittivity = 5.76
+	# current_epoch = 0
+	# current_iter = 0
+	
+	import logging
+	from utils import utility
+	logging.info(f'Loading filter from cur_design_variable.npy.')
+ 
+	# Create an instance of the device to store permittivity values
+	bayer_filter_size_voxels = np.array(cur_design_variable.shape)
+	logging.info(f'Creating Bayer Filter with voxel size {bayer_filter_size_voxels}.')
+
+	bayer_filter = SonyBayerFilter.SonyBayerFilter(
+		bayer_filter_size_voxels,
+		[ 0.0, 1.0 ],
+		init_permittivity_0_1_scale,
+		num_vertical_layers,
+		vertical_layer_height_voxels=cur_design_variable.shape[2]/num_vertical_layers)
+
+	# Update design data
+	bayer_filter.w[0] = cur_design_variable
+	# Regenerate permittivity based on the most recent design, assuming epoch 0		
+ 	# NOTE: This gets corrected later down below
+	bayer_filter.update_permittivity()
+
+	# Use binarized density variable instead of intermediate
+	bayer_filter.update_filters( visualize_epoch )
+	bayer_filter.update_permittivity()
+
+	# Get density after passing design through sigmoid filters
+	cur_density = bayer_filter.get_permittivity()
+
+	# Assume a simple dispersion model without any actual dispersion
+	# dispersion_model = DevicePermittivityModel()
+	dispersive_max_permittivity = max_device_perm # dispersion_model.average_permittivity( dispersive_ranges_um[ dispersive_range_idx ] )
+
+	# Scale from [0, 1] back to [min_device_permittivity, max_device_permittivity]
+	#! This is the only cur_whatever_variable that will ever be anything other than [0, 1].
+	cur_permittivity = min_device_perm + ( dispersive_max_permittivity - min_device_perm ) * cur_density
+	cur_index = utility.index_from_permittivity( cur_permittivity )
+
+	# Then plot cur_index, each layer
+	from evaluation import plotter
+	plotter.visualize_device(cur_index, OPTIMIZATION_PLOTS_FOLDER, num_visualize_layers=num_vertical_layers)
+
+# If this code is run by itself, visualize the device:
+if __name__ == "__main__":
+
+	DATA_FOLDER = 'ares' + os.path.basename(os.path.dirname(os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))))
+	OPTIMIZATION_INFO_FOLDER = os.path.join(DATA_FOLDER, 'opt_info')
+	OPTIMIZATION_PLOTS_FOLDER = os.path.join(OPTIMIZATION_INFO_FOLDER, 'plots')
+
+	# Load in the most recent Design density variable (before filters of device), values between 0 and 1
+	cur_design_variable = np.load(
+			OPTIMIZATION_INFO_FOLDER + "/cur_design_variable.npy" )
+	visualize(cur_design_variable, OPTIMIZATION_PLOTS_FOLDER)
+
+#print(3)
 
 
 

@@ -1,3 +1,13 @@
+# Copyright © 2023, California Institute of Technology. All rights reserved.
+#
+# Use in source and binary forms for nonexclusive, nonsublicenseable, commercial purposes with or without modification, is permitted provided that the following conditions are met:
+# - Use of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+# - Use in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the software.
+# - Neither the name of the California Institute of Technology (Caltech) nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 import os
 import sys
 import copy
@@ -104,7 +114,7 @@ def apply_common_plot_style(ax=None, plt_kwargs={}, show_legend=True):
 	ax.yaxis.set_minor_locator(AutoMinorLocator())
 	
 	# Y-Axis Exponent Repositioning
-	# ax.get_yaxis().get_offset_text().set_position((0, 0.5))
+	ax.get_yaxis().get_offset_text().set_position((-0.1, 0.5))
 	
 	return ax
 
@@ -241,7 +251,7 @@ class SpectrumPlot(BasicPlot):
 		for sweep_param_value in list(self.sweep_parameters.values()):
 			current_value = sweep_param_value['var_values'][job_idx[2][0]]
 			optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
-			title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, Optimized for {optimized_value}'
+			title_string += '\n' + sweep_param_value['var_name'] + f': Current Value {current_value}, \nOptimized for {optimized_value}'
 			
 		self.plot_config['title'] = title_string	
 
@@ -286,7 +296,7 @@ def plot_basic_1d(plot_data,  plot_directory_location, plot_subfolder_name, file
 #* Evaluation during Optimization
 
 def plot_fom_trace(f, plot_directory_location):
-	# Plot FOM trace
+	'''Plot FOM trace during evolution of optimization.'''
 	trace = []
 	numEpochs = len(f); numIter = len(f[0])
 	upperRange = np.ceil(np.max(f))
@@ -312,11 +322,200 @@ def plot_fom_trace(f, plot_directory_location):
 	bp.fig, bp.ax = fig, ax
 	bp.export_plot_config(plot_directory_location,'','fom_trace')
  
+def plot_quadrant_transmission_trace(f, plot_directory_location):
+	'''Plot evolution trace of quadrant transmission'''
+	numEpochs = len(f); numIter = len(f[0])
+	upperRange = np.ceil(np.max(f))
+
+	num_adjoint_src = 4
+	trace = np.zeros((num_adjoint_src, numEpochs*numIter))
+
+	for epoch_fom in f:
+		for iter_fom in epoch_fom:
+			for adj_src in range(num_adjoint_src):
+				trace[adj_src, :] = np.max(iter_fom[adj_src, 0, :])
+
+	iterations = copy.deepcopy(TEMPLATE_R_VECTOR)
+	iterations.update({'var_name': 'Iterations', 'var_values': range(trace.shape[1]), 'short_form': 'iter'})
+	quad_trace = num_adjoint_src * [copy.deepcopy(TEMPLATE_F_VECTOR)]
+	for adj_src in range(num_adjoint_src):
+		quad_trace[adj_src] = copy.deepcopy(quad_trace)[adj_src]
+		quad_trace[adj_src].update({'var_name': f'Q{adj_src}', 'var_values': trace[adj_src]})
+	logging.info('Quadrant Transmissions Trace is:')
+	logging.info(f'{plot_data}')
+	plot_data = {'r':[iterations],
+				'f': quad_trace,
+				'title': 'Quadrant Transmissions - Trace'}
+ 
+	bp = BasicPlot(plot_data)
+	bp.append_line_data(plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'])
+	bp.assign_title()
+	bp.assign_axis_labels(y_label_string='Quad Trans.')
+	fig, ax = bp.fig, bp.ax
+	for i in range(0,numEpochs+1):
+		plt.vlines(i*numIter, 0,upperRange, **vline_style)
+	bp.fig, bp.ax = fig, ax
+	bp.export_plot_config(plot_directory_location,'','quad_trans_trace')
+
+def plot_individual_quadrant_transmission(f, r, plot_directory_location, epoch, iteration, pol='x'):
+	'''Plot the most updated quadrant transmission.'''
+
+	# Convert to ndarray
+	f = np.array(f[pol])
+	upperRange = np.max(f)
+
+	num_adjoint_src = 4
+	lambda_vector = copy.deepcopy(TEMPLATE_R_VECTOR)
+	lambda_vector.update({'var_name': 'Wavelength', 'var_values': r, 'short_form': 'wl'})
+
+	quad_trace = num_adjoint_src * [copy.deepcopy(TEMPLATE_F_VECTOR)]
+	for adj_src in range(num_adjoint_src):
+		quad_trace[adj_src] = copy.deepcopy(quad_trace)[adj_src]
+		quad_trace[adj_src].update({'var_name': f'Q{adj_src}', 'var_values': f[adj_src,:]})
+	plot_data = {'r':[lambda_vector],
+				'f': quad_trace,
+				'title': 'Quadrant Transmissions - Trace'}
+
+	bp = BasicPlot(plot_data)
+	bp.plot_config['y_axis']['limits'] = [0.0, 1.0]
+	bp.append_line_data(plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'])
+	bp.assign_title()
+	bp.assign_axis_labels(y_label_string='Quad Trans.')
+	# fig, ax = bp.fig, bp.ax
+	# for i in range(0,numEpochs+1):
+	# 	plt.vlines(i*numIter, 0,upperRange, **vline_style)
+	# bp.fig, bp.ax = fig, ax
+	bp.export_plot_config(plot_directory_location,'quad_trans', f'trans_e{epoch}i{iteration}')
+
+def visualize_device(cur_data, plot_directory_location, num_visualize_layers=5):
+	'''Visualizes each (voxel) layer of cur_data. This data can be either density, permittivity, or index,
+	and should be processed as such before passing to this function.
+	Uses the binarization sigmoid corresponding to the epoch passed as input argument.'''
+	
+	output_plot = {}
+	r_vectors = []      # Variables
+	f_vectors = []      # Functions
+	lambda_vectors = [] # Wavelengths
+	
+	r_vectors.append({'var_name': 'x-axis',
+					  'var_values': range(cur_data.shape[0])
+					  })
+	r_vectors.append({'var_name': 'y-axis',
+					  'var_values': range(cur_data.shape[1])
+					  })
+	
+	f_vectors.append({'var_name': 'Device Data',
+					  'var_values': cur_data
+						})
+	
+	output_plot['r'] = r_vectors
+	output_plot['f'] = f_vectors
+	output_plot['title'] = 'Device Visualization'
+	
+	plot_layers = np.linspace(0, cur_data.shape[2]-1, num_visualize_layers).astype(int)
+	for layer in plot_layers:
+		fig, ax = plt.subplots()
+
+		Y_grid, X_grid = np.meshgrid(np.squeeze(r_vectors[0]['var_values']),
+									np.squeeze(r_vectors[1]['var_values']))
+
+		c = ax.pcolormesh(X_grid, Y_grid, f_vectors[0]['var_values'][:,:,layer],
+							cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
+		plt.gca().set_aspect('equal')
+
+		title_string = f'Device Layer {layer}'
+		plt.title(title_string)
+		# plt.xlabel('x (um)')
+		# plt.ylabel('y (um)')
+
+		divider = make_axes_locatable(ax)
+		cax = divider.append_axes("right", size="5%", pad=0.25)
+		fig.colorbar(c, cax=cax)
+		
+		fig_width = 8.0
+		fig_height = fig_width*1.0
+		l = ax.figure.subplotpars.left
+		r = ax.figure.subplotpars.right
+		t = ax.figure.subplotpars.top
+		b = ax.figure.subplotpars.bottom
+		figw = float(fig_width)/(r-l)
+		figh = float(fig_height)/(t-b)
+		ax.figure.set_size_inches(figw, figh, forward=True)
+		plt.tight_layout()
+
+		plot_subfolder_name = 'device_layers'
+		if not os.path.isdir(plot_directory_location + '/' + plot_subfolder_name):
+			os.makedirs(plot_directory_location + '/' + plot_subfolder_name)
+			
+		plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
+			+ '/' + f'{layer}' + '.png',
+			bbox_inches='tight')
+		print(f'Exported: Device Layer {layer}')
+
+		plt.close()
+
+	return fig, ax
+		
+
+
+def plot_overall_transmission_trace(f, plot_directory_location):
+	'''Plot evolution trace of overall transmission'''
+	numEpochs = len(f); numIter = len(f[0])
+	upperRange = np.ceil(np.max(f))
+
+	trace = []
+
+	for epoch_fom in f:
+		for iter_fom in epoch_fom:
+			trace.append(np.max(np.sum(iter_fom[:, 0, :], 0)))
+
+	iterations = copy.deepcopy(TEMPLATE_R_VECTOR)
+	iterations.update({'var_name': 'Iterations', 'var_values': range(len(trace)), 'short_form': 'iter'})
+	trans_trace = copy.deepcopy(TEMPLATE_F_VECTOR)
+	trans_trace.update({'var_name': 'Transmission', 'var_values': trace})
+	plot_data = {'r':[iterations],
+				'f': [trans_trace],
+				'title': 'Overall Peak Transmission - Trace'}
+ 
+	bp = BasicPlot(plot_data)
+	bp.append_line_data(plot_colors=['gray'])
+	bp.assign_title()
+	bp.assign_axis_labels()
+	fig, ax = bp.fig, bp.ax
+	for i in range(0,numEpochs+1):
+		plt.vlines(i*numIter, 0,upperRange, **vline_style)
+	bp.fig, bp.ax = fig, ax
+	bp.export_plot_config(plot_directory_location,'','overall_trans_trace')
+
 #* Evaluation after Optimization
 
 # -- Spectrum Plot Functions (Per Job)
 
-def plot_sorting_transmission_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder, include_overall=False):
+def plot_sorting_eff_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder, include_overall=False):
+	'''For the given job index, plots the sorting efficiency (transmission) spectrum corresponding to that job.'''
+	
+	# plot_colors = ['blue', 'green', 'red', 'pink']
+	# plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+	plot_colors = ['blue', 'green', 'red']	
+	plot_labels = ['Blue', 'Green', 'Red']
+	
+	if include_overall:
+		plot_colors.append('gray')
+		plot_labels.append('Trans.')
+	else:
+		plot_data['f'].pop(-1)		# remove overall transmission from f-vectors
+
+	sp = SpectrumPlot(plot_data, sweep_parameters)
+	
+	sp.append_line_data(plot_colors, plot_labels)
+	
+	sp.assign_title('Spectrum in Each Quadrant', job_idx)
+	sp.assign_axis_labels('Wavelength (um)', 'Sorting Efficiency')
+	
+	sp.export_plot_config(plot_folder, 'sorting_efficiency_spectra', utility.isolate_filename(job_names[job_idx]).replace('.fsp', ''))
+	return sp.fig, sp.ax
+
+def plot_sorting_transmission_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder, include_overall=False, normalize_against='input_power'):
 	'''For the given job index, plots the sorting efficiency (transmission) spectrum corresponding to that job.'''
 	
 	# plot_colors = ['blue', 'green', 'red', 'pink']
@@ -335,12 +534,290 @@ def plot_sorting_transmission_spectrum(plot_data, job_idx, sweep_parameters, job
 	sp.append_line_data(plot_colors, plot_labels)
 	
 	sp.assign_title('Spectrum in Each Quadrant', job_idx)
-	sp.assign_axis_labels('Wavelength (um)', 'Sorting Transmission Efficiency')
+	if normalize_against == 'unity':
+		sp.assign_axis_labels('Wavelength (um)', 'Sorting Transmission Power')
+	else:	sp.assign_axis_labels('Wavelength (um)', 'Sorting Transmission Efficiency')
 	
 	sp.export_plot_config(plot_folder, 'sorting_trans_efficiency_spectra', utility.isolate_filename(job_names[job_idx]).replace('.fsp', ''))
 	return sp.fig, sp.ax
 
-def plot_device_rta_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder, sum_sides=False):
+def plot_crosstalk_adj_quadrants_spectrum(plot_data, job_idx, plot_colors, plot_labels, sweep_parameters, job_names, plot_folder):
+	'''For the given job index, plots the crosstalk of adjacent quadrants according to that job, and the quadrant indices given to generate_crosstalk_adj_quadrants_spectrum().'''
+	
+	sp = SpectrumPlot(plot_data, sweep_parameters)
+	
+	sp.append_line_data(plot_colors, plot_labels)
+	
+	sp.assign_title('Spectrum in Each Quadrant', job_idx)
+	sp.assign_axis_labels('Wavelength (um)', 'Power')
+	
+	sp.export_plot_config(plot_folder, 'crosstalk_adj_quadrants_spectra', utility.isolate_filename(job_names[job_idx]).replace('.fsp', ''))
+	return sp.fig, sp.ax
+
+def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder,
+										  plot_wavelengths = None, ignore_opp_polarization = True):
+	'''For the given job index, plots the E-norm f.p. image at specific input spectra, corresponding to that job.
+	Note: Includes focal scatter region. '''
+	
+	r_vectors = plot_data['r']
+	f_vectors = plot_data['f']
+	lambda_vectors = plot_data['lambda']
+	wl_vector = np.squeeze(lambda_vectors[0]['var_values']).tolist()
+ 
+	if plot_wavelengths is None:
+		## We split the wavelength range into equal bands, and grab their midpoints.
+		# plot_wavelengths = [lambda_min_um, lambda_values_um[int(len(lambda_values_um/2))]lambda_max_um]
+		spectral_band_midpoints = np.multiply(gp.cv.num_points_per_band, np.arange(0.5, gp.cv.num_bands + 0.5)).astype(int)         # This fails if num_points_per_band and num_bands are different than what was optimized
+		plot_wavelengths = np.array(wl_vector)[spectral_band_midpoints].tolist()
+	
+	if ignore_opp_polarization:
+		plot_wavelengths = plot_wavelengths[:-1]
+	
+	for plot_wl in plot_wavelengths:
+		plot_wl = float(plot_wl)
+			
+		fig, ax = plt.subplots()
+		
+		# Find the index of plot_wl in the wl_vector
+		wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
+
+		# If the monitor area is rectangular, truncate to a square
+		max_spatial_idx = np.min(np.shape(f_vectors[0]['var_values'])[0:2])
+		r_vectors[0]['var_values'] = r_vectors[0]['var_values'][0:max_spatial_idx]
+		r_vectors[1]['var_values'] = r_vectors[1]['var_values'][0:max_spatial_idx]
+
+		Y_grid, X_grid = np.meshgrid(np.squeeze(r_vectors[0]['var_values'])*1e6, np.squeeze(r_vectors[1]['var_values'])*1e6)
+		c = ax.pcolormesh(X_grid, Y_grid, f_vectors[0]['var_values'][0:max_spatial_idx,0:max_spatial_idx,wl_index],
+							cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
+		plt.gca().set_aspect('equal')
+		
+		wl_str = f'{plot_wl*1e9:.0f} nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f} um'
+		title_string = r'$E_{norm}$' + ' at Focal Plane: $\lambda = $ ' + f'{wl_str}'
+		plt.title(title_string)
+		plt.xlabel('x (um)')
+		plt.ylabel('y (um)')
+		
+		divider = make_axes_locatable(ax)
+		cax = divider.append_axes("right", size="5%", pad=0.25)
+		fig.colorbar(c, cax=cax)
+		
+		fig_width = 8.0
+		fig_height = fig_width*1.0
+		l = ax.figure.subplotpars.left
+		r = ax.figure.subplotpars.right
+		t = ax.figure.subplotpars.top
+		b = ax.figure.subplotpars.bottom
+		figw = float(fig_width)/(r-l)
+		figh = float(fig_height)/(t-b)
+		ax.figure.set_size_inches(figw, figh, forward=True)
+		plt.tight_layout()
+		
+		#plt.show(block=False)
+		#plt.show()
+		
+		plot_subfolder_name = 'Enorm_fp_image_spectra'
+		if not os.path.isdir(plot_folder + '/' + plot_subfolder_name):
+			os.makedirs(plot_folder + '/' + plot_subfolder_name)
+			
+		plt.savefig(plot_folder + '/' + plot_subfolder_name\
+			+ '/' + utility.isolate_filename(job_names[job_idx]).replace('.fsp', '')\
+			+ '_' + f'{wl_str}' + '.png',
+			bbox_inches='tight')
+		logging.info('Exported: Enorm Focal Plane Image at wavelength ' + wl_str)
+	
+		plt.close()
+	
+	return fig, ax
+
+def plot_device_cross_section_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder,
+									   plot_wavelengths = None, ignore_opp_polarization = True):
+	'''For the given job index, plots the device cross section image plots at specific input spectra, corresponding to that job.'''
+	import gc
+
+	r_vectors = plot_data['r']
+	f_vectors = plot_data['f']
+	lambda_vectors = plot_data['lambda']
+	wl_vector = np.squeeze(lambda_vectors[0]['var_values']).tolist()
+	
+	if plot_wavelengths is None:
+		## We split the wavelength range into equal bands, and grab their midpoints.
+		# plot_wavelengths = [lambda_min_um, lambda_values_um[int(len(lambda_values_um/2))]lambda_max_um]
+		spectral_band_midpoints = np.multiply(gp.cv.num_points_per_band, np.arange(0.5, gp.cv.num_bands + 0.5)).astype(int)         # This fails if num_points_per_band and num_bands are different than what was optimized
+		plot_wavelengths = np.array(wl_vector)[spectral_band_midpoints].tolist()
+	
+	if ignore_opp_polarization:
+		plot_wavelengths = plot_wavelengths[:-1]
+	
+
+	for device_cross_idx in range(0,6):
+		
+		#* Create E-norm images
+		for plot_wl in plot_wavelengths:
+			plot_wl = float(plot_wl)
+			
+			fig, ax = plt.subplots()
+		
+			is_x_slice = False
+			y_grid = r_vectors[device_cross_idx * 3 + 2]['var_values']                   # Plot the z-axis as the vertical
+			x_grid = r_vectors[device_cross_idx * 3]['var_values']                       # Check if it's the x-axis or y-axis that is the slice; plot the non-slice as the horizontal of the image plot
+			slice_val = r_vectors[device_cross_idx * 3 + 1]['var_values']
+			slice_str = f'$y = '
+			if isinstance(x_grid, (int, float)):
+				is_x_slice = True
+				x_grid = r_vectors[device_cross_idx * 3 + 1]['var_values']
+				slice_val = r_vectors[device_cross_idx * 3]['var_values']
+				slice_str = f'$x = '
+			slice_str +=  f'{slice_val:.2e}$; '
+			
+			# Find the index of plot_wl in the wl_vector
+			wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
+
+			Y_grid, X_grid = np.meshgrid(np.squeeze(y_grid)*1e6, np.squeeze(x_grid)*1e6)
+			c = ax.pcolormesh(X_grid, Y_grid, 
+							  f_vectors[device_cross_idx * 2]['var_values'][:,:,wl_index],
+							cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
+			plt.axhline(0,color='black', linestyle='-',linewidth=2.2)
+			plt.gca().set_aspect('auto')
+			
+			wl_str = f'{plot_wl*1e9:.0f} nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f} um'
+			title_string = r'$E_{norm}$' + ', Device Cross-Section:\n' + slice_str + '$\lambda = $ ' + f'{wl_str}'
+			plt.title(title_string)
+			plt.xlabel('y (um)' if is_x_slice else 'x (um)')
+			plt.ylabel('z (um)')
+			
+			divider = make_axes_locatable(ax)
+			cax = divider.append_axes("right", size="5%", pad=0.25)
+			fig.colorbar(c, cax=cax)
+			
+			fig_width = 8.0
+			fig_height = fig_width / np.shape(X_grid)[0] * np.shape(X_grid)[1]
+			l = ax.figure.subplotpars.left
+			r = ax.figure.subplotpars.right
+			t = ax.figure.subplotpars.top
+			b = ax.figure.subplotpars.bottom
+			figw = float(fig_width)/(r-l)
+			figh = float(fig_height)/(t-b)
+			ax.figure.set_size_inches(figw, figh, forward=True)
+			plt.tight_layout()
+			
+			#plt.show(block=False)
+			#plt.show()
+			
+			plot_subfolder_name = 'device_cross_section_spectra'
+			if not os.path.isdir(plot_folder + '/' + plot_subfolder_name):
+				os.makedirs(plot_folder + '/' + plot_subfolder_name)
+				
+			plt.savefig(plot_folder + '/' + plot_subfolder_name\
+				+ '/' + utility.isolate_filename(job_names[job_idx]).replace('.fsp', '')\
+				+ '_Enorm_' + f'{device_cross_idx}' + '_' + f'{wl_str}' + '.png',
+				bbox_inches='tight')
+			logging.info(f'Exported: Device Cross Section Enorm Image {device_cross_idx} at wavelength ' + wl_str)
+
+			plt.close()
+
+		#* Create real_E_x images
+		display_vector_labels = ['x','y','z']
+		display_vector_component = 0            # 0 for x, 1 for y, 2 for z
+		
+		for display_vector_component in range(0,3):
+			for plot_wl in plot_wavelengths:
+				plot_wl = float(plot_wl)
+				
+				fig, ax = plt.subplots()
+				
+				is_x_slice = False
+				y_grid = r_vectors[device_cross_idx * 3 + 2]['var_values']                   # Plot the z-axis as the vertical
+				x_grid = r_vectors[device_cross_idx * 3]['var_values']                       # Check if it's the x-axis or y-axis that is the slice; plot the non-slice as the horizontal of the image plot
+				slice_val = r_vectors[device_cross_idx * 3 + 1]['var_values']
+				slice_str = f'$y = '
+				if isinstance(x_grid, (int, float)):
+					is_x_slice = True
+					x_grid = r_vectors[device_cross_idx * 3 + 1]['var_values']
+					slice_val = r_vectors[device_cross_idx * 3]['var_values']
+					slice_str = f'$x = '
+				slice_str +=  f'{slice_val:.2e}$; '
+					
+				# Find the index of plot_wl in the wl_vector
+				wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
+
+				Y_grid, X_grid = np.meshgrid(np.squeeze(y_grid)*1e6, np.squeeze(x_grid)*1e6)
+				c = ax.pcolormesh(X_grid, Y_grid, 
+								  np.real(f_vectors[device_cross_idx * 2 + 1]['var_values'][display_vector_component][:,:,wl_index]),
+								cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
+				plt.axhline(0,color='black', linestyle='-',linewidth=2.2)
+				plt.gca().set_aspect('auto')
+				
+				wl_str = f'{plot_wl*1e9:.0f} nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f} um'
+				title_string = r'$Re(E_x)$' + ', Device Cross-Section:\n' + slice_str + '$\lambda = $ ' + f'{wl_str}'
+				plt.title(title_string)
+				plt.xlabel('y (um)' if is_x_slice else 'x (um)')
+				plt.ylabel('z (um)')
+				
+				divider = make_axes_locatable(ax)
+				cax = divider.append_axes("right", size="5%", pad=0.25)
+				fig.colorbar(c, cax=cax)
+				
+				fig_width = 8.0
+				fig_height = fig_width / np.shape(X_grid)[0] * np.shape(X_grid)[1]
+				l = ax.figure.subplotpars.left
+				r = ax.figure.subplotpars.right
+				t = ax.figure.subplotpars.top
+				b = ax.figure.subplotpars.bottom
+				figw = float(fig_width)/(r-l)
+				figh = float(fig_height)/(t-b)
+				ax.figure.set_size_inches(figw, figh, forward=True)
+				plt.tight_layout()
+				
+				#plt.show(block=False)
+				#plt.show()
+				
+				plot_subfolder_name = 'device_cross_section_spectra'
+				if not os.path.isdir(plot_folder + '/' + plot_subfolder_name):
+					os.makedirs(plot_folder + '/' + plot_subfolder_name)
+					
+				plt.savefig(plot_folder + '/' + plot_subfolder_name\
+					+ '/' + utility.isolate_filename(job_names[job_idx]).replace('.fsp', '')\
+					+ '_realE' + f'{display_vector_labels[display_vector_component]}' + '_' + f'{device_cross_idx}' + '_' + f'{wl_str}' + '.png',
+					bbox_inches='tight')
+				logging.info(f'Exported: Device Cross Section E{display_vector_labels[display_vector_component]}_real Image {device_cross_idx} at wavelength ' + wl_str)
+		
+		plt.close()
+	
+	gc.collect()
+	
+	return fig, ax
+
+def plot_crosstalk_power_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder):
+	'''For the given job index, plots the crosstalk power corresponding to that job.'''
+
+	plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+	plot_labels = ['NW', 'N', 'NE', 'W', 'Center', 'E', 'SW', 'S', 'SE']
+
+	sp = SpectrumPlot(plot_data, sweep_parameters)
+
+	sp.append_line_data(plot_colors, plot_labels)
+	
+	sp.assign_title('Device Crosstalk Power', job_idx)
+	sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
+	
+	sp.export_plot_config(plot_folder, 'crosstalk_power_spectra', utility.isolate_filename(job_names[job_idx]).replace('.fsp', ''))
+	return sp.fig, sp.ax
+
+def plot_exit_power_distribution_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder):
+	'''For the given job index, plots the power spectrum for focal region power and oblique scattering power, corresponding to that job.
+	The two are normalized against their sum.'''
+	
+	sp = SpectrumPlot(plot_data, sweep_parameters)
+
+	sp.append_line_data(None, None)
+
+	sp.assign_title('Power Distribution at Focal Plane', job_idx)
+	sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
+	
+	sp.export_plot_config(plot_folder,  'exit_power_distribution_spectra', utility.isolate_filename(job_names[job_idx]).replace('.fsp', ''))
+	return sp.fig, sp.ax
+
+def plot_device_rta_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder, sum_sides=False, normalize_against='input_power'):
 	'''For the given job index, plots the device RTA and all power components in and out, corresponding to that job.
 	The normalization factor is the power through the device input aperture.'''
 
@@ -361,12 +838,14 @@ def plot_device_rta_spectrum(plot_data, job_idx, sweep_parameters, job_names, pl
 	sp.append_line_data(plot_colors, plot_labels)
 	
 	sp.assign_title('Device RTA', job_idx)
-	sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
+	if normalize_against == 'unity':
+		sp.assign_axis_labels('Wavelength (um)', 'Power')
+	else:	sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
 	
 	sp.export_plot_config(plot_folder, 'device_rta_spectra', utility.isolate_filename(job_names[job_idx]).replace('.fsp', ''))
 	return sp.fig, sp.ax
 
-def plot_device_rta_pareto(plot_data, job_idx, sweep_parameters, job_names, plot_folder, sum_sides=False):
+def plot_device_rta_pareto(plot_data, job_idx, sweep_parameters, job_names, plot_folder, sum_sides=False, normalize_against='input_power'):
 	'''For the given job index, plots the device RTA and all power components in and out, corresponding to that job.
 	The normalization factor is the power through the device input aperture.'''
 
@@ -410,7 +889,8 @@ def plot_device_rta_pareto(plot_data, job_idx, sweep_parameters, job_names, plot
 
 		fig, ax = plt.subplots()
 		ax.bar(df.index, df[spectral_band], color=spectral_band)
-		ax.yaxis.set_major_formatter(PercentFormatter())
+		if normalize_against != 'unity':
+			ax.yaxis.set_major_formatter(PercentFormatter())
 		ax.set_ylabel('Normalized Power', color=spectral_band)
 		ax2 = ax.twinx()
 		ax2.plot(df.index, df["cumpercentage"], color="C1", marker="D", ms=7)
@@ -438,6 +918,9 @@ def plot_device_rta_pareto(plot_data, job_idx, sweep_parameters, job_names, plot
 		logging.info('Exported: ' + export_msg_string)
 		plt.close()
 
+def plot_device_indiv_rta_spectra(plot_data, job_idx, sweep_parameters, job_names, plot_folder, sum_sides=False):
+
+	return 3
 
 # -- Sweep Plot Functions (Overall)
 
@@ -463,11 +946,11 @@ if __name__ == "__main__":
 	plot_directory_location = 'plots'
 	cutoff_1d_sweep_offset = [0, 0]
 
-	#* This is where we perturb the final plot parameters as necessary
+	#* This is where we perturb the data points as needed
 	# TODO: modify data code
 
 	#* Call plotting function and export 
 	plot_basic_1d(TEMPLATE_PLOT_DATA, 'evaluation/plots', 'test', 'test1',
 			  			 title='Variation of Circle Diameter with Radius')
  
-print(3)
+# print(3)
