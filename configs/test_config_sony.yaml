@@ -28,7 +28,7 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um:  0.051 # 0.017 
+mesh_spacing_um:  0.017
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.085 # 0.051
 
@@ -45,6 +45,7 @@ min_device_index: 1.5
 max_device_index: 2.4   # SiO2
 
 init_permittivity_0_1_scale: 0.5
+binarize_3_levels: False      #! new
 
 focal_plane_center_lateral_um: 0
 
@@ -64,9 +65,9 @@ objects_above_device: [] #['permittivity_layer_substrate',
                         #'silicon_substrate']
 num_sidewalls: 4
 sidewall_material: 'etch'
-sidewall_extend_pml: True
+sidewall_extend_pml: False
 sidewall_extend_focalplane: True
-sidewall_thickness_um: 0.204          # only needed if sidewall_extend_pml is False
+sidewall_thickness_um: 0.085          # only needed if sidewall_extend_pml is False
 sidewall_vertical_minimum_um: -0.765    # only needed if sidewall_extend_focalplane is False; describes how far down from the device they extend
 
 #* Spectral
@@ -103,6 +104,7 @@ use_airy_approximation: True
 f_number: 2.2
 airy_correction_factor: 0.84  # Approximation of central Airy lobe using a Gaussian profile
 # See https://en.wikipedia.org/wiki/Airy_disk#Approximation_using_a_Gaussian_profile:~:text=to%20the%20intensity.-,Approximation%20using%20a%20Gaussian%20profile,-%5Bedit%5D
+beam_size_multiplier: 1   #! new
 
 source_angle_theta_vacuum_deg: 0 #46
 source_angle_phi_deg: 0
@@ -156,6 +158,18 @@ epoch_end_design_change_min: 0
 
 fom_types: ['transmission', 'intensity']
 optimization_fom: 'intensity'    # Has to be one from the fom_types list
+
+#! new-------
+reinterpolate_permittivity: True #False
+reinterpolate_permittivity_factor: 5 #1#5
+reinterpolate_type: 'nearest' #'linear'
+
+
+#! new-------
+border_optimization: False
+
+layer_gradient: False
+flip_gradient: False
 
 #* Spectral and polarization selectivity information
 

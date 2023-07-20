@@ -159,7 +159,6 @@ def create_dict_nx(dict_name):
 	else:
 		globals()[dict_name] = {}
 
-
 #
 #* Create FDTD hook
 #
@@ -742,9 +741,15 @@ if start_from_step == 0:
 		design_import = fdtd_objects['design_import']
 
 		cur_density = np.load("cur_design_variable.npy" )
+		cur_density = np.add(
+			np.multiply(1.0, np.greater(cur_density, 0.5)),
+			np.multiply(0.0, np.less_equal(cur_density, 0.5))
+			)		# binarize
 		cur_permittivity = min_device_permittivity + ( max_device_permittivity - min_device_permittivity ) * cur_density
 		cur_index = utility.index_from_permittivity( cur_permittivity )
 		logging.info(f'TiO2% is {100 * np.count_nonzero(cur_index > min_device_index) / cur_index.size}%.')
+		# logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
+		logging.info(f'Binarization is {100 * utility.compute_binarization(cur_density)}%.')
 
 		bayer_filter_size_voxels = np.array(
 								[device_voxels_lateral, device_voxels_lateral, device_voxels_vertical])
@@ -2108,6 +2113,9 @@ for epoch in range(start_epoch, num_epochs):
 								# The reflected power from the device is R_power = incident_aperture_power (no device) - incident_aperture_power (device)
 								if monitor['name'] in ['incident_aperture_monitor']:
 									monitor_data['R_power'] = monitors_data[monitor['name']]['R_power'] + lm.get_overall_power(fdtd_hook, monitor['name'])
+									monitor_data['coords'] = {'x': fdtd_hook.getresult(monitor['name'],'x'),
+															'y': fdtd_hook.getresult(monitor['name'],'y'),
+															'z': fdtd_hook.getresult(monitor['name'],'z')}
 
 							monitors_data.update( {monitor['name']: monitor_data} )
 					input_power_without_device = monitors_data['incident_aperture_monitor']['P']
@@ -2369,10 +2377,10 @@ for epoch in range(start_epoch, num_epochs):
 				# Finally, plot the individual RTA plots
 				# TODO: Based on dev_indiv_rta_names, pop out dictionaries from plot_data['f']
 				device_indiv_rta_plots = ['device_reflection', 'side_scattering_power']
-				plotter.plot_device_indiv_rta_spectra(plot_data['device_rta_spectrum'], job_idx,
-													sweep_parameters, job_names, PLOTS_FOLDER,
-													device_indiv_rta_plots,
-													sum_sides=True, normalize_against=normalize_against)
+				# plotter.plot_device_indiv_rta_spectra(plot_data['device_rta_spectrum'], job_idx,
+				# 									sweep_parameters, job_names, PLOTS_FOLDER,
+				# 									device_indiv_rta_plots,
+				# 									sum_sides=True, normalize_against=normalize_against)
 							
 
 

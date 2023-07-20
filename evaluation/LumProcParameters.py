@@ -155,9 +155,9 @@ for monitor in monitors:
 # Can also use this: https://stackoverflow.com/a/8653568
 
 # What kind of source and boundary condition are we using to evaluate this situation?
-evaluation_source_bcs = 'gaussian' # options: {'tfsf', 'gaussian', 'periodic_plane'}
+evaluation_source_bcs = 'periodic_plane' # options: {'tfsf', 'gaussian', 'periodic_plane'}
 # Determine the global value that all power settings are normalized against
-normalize_against = 'input_power'   #options: {'input_power', 'sourcepower', 'power_sum', 'unity', 'uniform_cube'}
+normalize_against = 'power_sum'   #options: {'input_power', 'sourcepower', 'power_sum', 'unity', 'uniform_cube'}
 if evaluation_source_bcs in ['tfsf']:
     normalize_against = 'sourcepower'
 
@@ -200,8 +200,8 @@ if not accept_params_from_opt_file:
 
 # Sidewall and Side Monitors
 
-cv.num_sidewalls = 0                   #! Remember to turn this on if the optimization actually was done with sidewalls
-cv.sidewall_thickness_um =  0.102 #0.051 #0.204
+cv.num_sidewalls = 4                   #! Remember to turn this on if the optimization actually was done with sidewalls
+# cv.sidewall_thickness_um =  0.102 #0.051 #0.204
 
 if cv.num_sidewalls == 0:
     cv.sidewall_thickness_um = 0.0
@@ -255,6 +255,6 @@ num_epochs = 1
 num_iterations_per_epoch = 1
 
 #* Debug Options
-start_from_step = 4                 # 0 if running entire file in one shot  # NOTE: Overwrites optimization config.
+start_from_step = 0                 # 0 if running entire file in one shot  # NOTE: Overwrites optimization config.
 
 logging.info("Lumerical plotting parameters read and processed.")

@@ -96,6 +96,7 @@ def get_config_vars(param_dict):
 	min_device_index = get_check_none(param_dict, "min_device_index")
 	max_device_index = get_check_none(param_dict, "max_device_index")
 	init_permittivity_0_1_scale = get_check_none(param_dict, "init_permittivity_0_1_scale")
+	binarize_3_levels = get_check_none(param_dict, "binarize_3_levels")
 	focal_plane_center_lateral_um = get_check_none(param_dict, "focal_plane_center_lateral_um")
 	num_vertical_layers = get_check_none(param_dict, "num_vertical_layers")
 	vertical_layer_height_um = get_check_none(param_dict, "vertical_layer_height_um")
@@ -103,10 +104,10 @@ def get_config_vars(param_dict):
 	device_vertical_minimum_um = get_check_none(param_dict, "device_vertical_minimum_um")
 	objects_above_device = get_check_none(param_dict, "objects_above_device")
 	num_sidewalls = get_check_none(param_dict, "num_sidewalls")
-	sidewall_thickness_um = get_check_none(param_dict, "sidewall_thickness_um")
 	sidewall_material = get_check_none(param_dict, "sidewall_material")
 	sidewall_extend_pml = get_check_none(param_dict, "sidewall_extend_pml")
 	sidewall_extend_focalplane = get_check_none(param_dict, "sidewall_extend_focalplane")
+	sidewall_thickness_um = get_check_none(param_dict, "sidewall_thickness_um")
 	sidewall_vertical_minimum_um = get_check_none(param_dict, "sidewall_vertical_minimum_um")
 	add_infrared = get_check_none(param_dict, "add_infrared")
 	lambda_min_um = get_check_none(param_dict, "lambda_min_um")
@@ -126,6 +127,7 @@ def get_config_vars(param_dict):
 	use_airy_approximation = get_check_none(param_dict, "use_airy_approximation")
 	f_number = get_check_none(param_dict, "f_number")
 	airy_correction_factor = get_check_none(param_dict, "airy_correction_factor")
+	beam_size_multiplier = get_check_none(param_dict, "beam_size_multiplier")
 	source_angle_theta_vacuum_deg = get_check_none(param_dict, "source_angle_theta_vacuum_deg")
 	source_angle_phi_deg = get_check_none(param_dict, "source_angle_phi_deg")
 	xy_phi_rotations = get_check_none(param_dict, "xy_phi_rotations")
@@ -149,6 +151,12 @@ def get_config_vars(param_dict):
 	epoch_end_design_change_min = get_check_none(param_dict, "epoch_end_design_change_min")
 	fom_types = get_check_none(param_dict, "fom_types")
 	optimization_fom = get_check_none(param_dict, "optimization_fom")
+	reinterpolate_permittivity = get_check_none(param_dict, "reinterpolate_permittivity")
+	reinterpolate_permittivity_factor = get_check_none(param_dict, "reinterpolate_permittivity_factor")
+	reinterpolate_type = get_check_none(param_dict, "reinterpolate_type")
+	border_optimization = get_check_none(param_dict, "border_optimization")
+	layer_gradient = get_check_none(param_dict, "layer_gradient")
+	flip_gradient = get_check_none(param_dict, "flip_gradient")
 	polarizations_focal_plane_map = get_check_none(param_dict, "polarizations_focal_plane_map")
 	weight_focal_plane_map_performance_weighting = get_check_none(param_dict, "weight_focal_plane_map_performance_weighting")
 	weight_focal_plane_map = get_check_none(param_dict, "weight_focal_plane_map")
@@ -160,6 +168,7 @@ def get_config_vars(param_dict):
 	infrared_center_um = get_check_none(param_dict, "infrared_center_um")
 	do_rejection = get_check_none(param_dict, "do_rejection")
 	softplus_kappa = get_check_none(param_dict, "softplus_kappa")
+
 
 
 	# # Non-Pythonic way:
@@ -238,6 +247,15 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 
 	device_vertical_maximum_um = device_size_vertical_um	# NOTE: Unused
 
+	#! new
+	device_size_lateral_bordered_um = cd.device_size_lateral_um
+	device_voxels_lateral_bordered = device_voxels_lateral
+	device_voxels_simulation_mesh_lateral_bordered = device_voxels_simulation_mesh_lateral
+	if cd.border_optimization:
+		device_size_lateral_bordered_um += 2 * border_size_um
+		device_voxels_lateral_bordered = int(np.round( device_size_lateral_bordered_um / cd.geometry_spacing_lateral_um))
+		device_voxels_simulation_mesh_lateral_bordered = 2 + int(device_size_lateral_bordered_um / cd.mesh_spacing_um)
+
 	# FDTD
 	vertical_gap_size_um = cd.geometry_spacing_lateral_um * 15
 	lateral_gap_size_um = cd.device_scale_um * 10 #25#50
@@ -249,7 +267,11 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
 	fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
 
-	# Surrounding         
+	# Surrounding
+
+	pec_aperture_thickness_um = 3 * cd.mesh_spacing_um #new
+	assert not ( cd.border_optimization and cd.num_sidewalls != 0 ), "This combination is not supported!"	# new
+      
 	if cd.sidewall_extend_pml:
 		cd.sidewall_thickness_um = (fdtd_region_size_lateral_um - cd.device_size_lateral_um)/2
 	sidewall_x_positions_um = [cd.device_size_lateral_um / 2 + cd.sidewall_thickness_um / 2, 0, -cd.device_size_lateral_um / 2 - cd.sidewall_thickness_um / 2, 0]
@@ -310,6 +332,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 		gaussian_waist_radius_um = mid_lambda_um / ( np.pi * ( 1. / ( 2 * cd.f_number ) ) )
 	# TODO: Check which one we decided on in the end - Airy disk of Gaussian on input aperture, or f-number determining divergence half-angle?
 	# TODO: Add frequency dependent profile?
+	gaussian_waist_radius_um *= cd.beam_size_multiplier		#! new
 
 	source_angle_theta_rad = np.arcsin( np.sin( cd.source_angle_theta_vacuum_deg * np.pi / 180. ) * 1.0 / cd.background_index )
 	source_angle_theta_deg = source_angle_theta_rad * 180. / np.pi
@@ -329,6 +352,51 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	epoch_range_design_change_min = cd.epoch_start_design_change_min - cd.epoch_end_design_change_min
 
 	adam_betas = tuple(cd.adam_betas)
+
+	#! new ------------------------------------------------------
+	if not cd.reinterpolate_permittivity:	# new
+		assert cd.reinterpolate_permittivity_factor == 1, 'Expected this factor to be 1 if not reinterpolating permittivity'
+
+ 
+	border_size_um = 5 * cd.device_scale_um		# new
+	border_size_voxels = int( np.round( border_size_um / cd.geometry_spacing_lateral_um ) )		# new
+	assert not ( cd.border_optimization and cd.use_smooth_blur ), "This combination is not supported!"	# new
+
+	if cd.layer_gradient:
+		# would also like to try thin, thick, thin and then thick, thin, thick
+		#is mode matching easier with the thin layers? and then scatter with the thick?
+		assert cd.num_vertical_layers == 10, 'Expecting a specific number of layers == 10'
+
+		voxels_per_layer = np.array( [ 1, 2, 4, 4, 4, 4, 5, 5, 5, 6 ] )
+		assert np.sum( voxels_per_layer ) == device_voxels_vertical, "Expected the total layer sizes to add up to the total size!"
+
+		# alpha = 3
+		# delta = 1
+
+		# device_mesh_voxels_vertical = int(np.round( device_size_vertical_um / mesh_spacing_um ) )
+
+
+		# voxels_per_layer = []
+
+		# for idx in range( 0, num_vertical_layers - 1 ):
+		# 	voxels_per_layer.append( alpha + 2 * idx * delta )
+
+		# total_voxels = np.sum( voxels_per_layer )
+
+		# voxels_per_layer.append( device_mesh_voxels_vertical - total_voxels )
+
+
+		# voxels_per_layer = np.array( voxels_per_layer )
+
+		# import matplotlib.pyplot as plt
+		# plt.plot( voxels_per_layer * 17 )
+		# # plt.axhline( y=total_voxels )
+		# plt.show()
+		# asdf
+
+		if cd.flip_gradient:
+			voxels_per_layer = np.flip( voxels_per_layer )
+	#! --------------------------------------------------------------------
 
 	# Spectral and polarization selectivity information
 	if cd.weight_by_individual_wavelength:

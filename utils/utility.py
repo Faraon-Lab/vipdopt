@@ -127,6 +127,10 @@ def index_from_permittivity(permittivity_):
 
 	return np.sqrt(permittivity_)
 
+def compute_binarization( input_variable, set_point=0.5 ):
+	total_shape = np.product( input_variable.shape )
+	return ( 2. / total_shape ) * np.sum( np.sqrt( ( input_variable - set_point )**2 ) )
+
 
 def softplus( x_in, softplus_kappa ):
 	'''Softplus is a smooth approximation to the ReLu function.

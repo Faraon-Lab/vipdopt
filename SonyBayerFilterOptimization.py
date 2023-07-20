@@ -390,8 +390,19 @@ def disable_all_sources():
 #
 
 # Create an instance of the device to store permittivity values
+# bayer_filter_size_voxels = np.array(
+# 	[device_voxels_lateral, device_voxels_lateral, device_voxels_vertical])
+# logging.info(f'Creating Bayer Filter with voxel size {bayer_filter_size_voxels}.')
+# bayer_filter = SonyBayerFilter.SonyBayerFilter(
+# 	bayer_filter_size_voxels,
+# 	[ 0.0, 1.0 ],
+# 	init_permittivity_0_1_scale,
+# 	num_vertical_layers,
+# 	vertical_layer_height_voxels)
+
+#! new
 bayer_filter_size_voxels = np.array(
-	[device_voxels_lateral, device_voxels_lateral, device_voxels_vertical])
+	[device_voxels_lateral_bordered, device_voxels_lateral_bordered, device_voxels_vertical])
 logging.info(f'Creating Bayer Filter with voxel size {bayer_filter_size_voxels}.')
 bayer_filter = SonyBayerFilter.SonyBayerFilter(
 	bayer_filter_size_voxels,
@@ -399,6 +410,7 @@ bayer_filter = SonyBayerFilter.SonyBayerFilter(
 	init_permittivity_0_1_scale,
 	num_vertical_layers,
 	vertical_layer_height_voxels)
+
 
 if start_from_step == 0:
  
@@ -408,23 +420,57 @@ if start_from_step == 0:
 	# plt.colorbar(c)
 	# plt.show()
 
-	bayer_filter_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_lateral)
-	bayer_filter_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_lateral)
+	# bayer_filter_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_lateral)
+	# bayer_filter_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_lateral)
+	# bayer_filter_region_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, device_voxels_vertical)
+
+	#! new	
+	bayer_filter_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_lateral_bordered)
+	bayer_filter_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_lateral_bordered)
 	bayer_filter_region_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, device_voxels_vertical)
- 
+
+	bayer_filter_region_reinterpolate_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_lateral_bordered * reinterpolate_permittivity_factor)
+	bayer_filter_region_reinterpolate_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_lateral_bordered * reinterpolate_permittivity_factor)
+	bayer_filter_region_reinterpolate_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, device_voxels_vertical * reinterpolate_permittivity_factor)
+
+
 	# Populate a 3+1-D array at each xyz-position with the values of x, y, and z
-	bayer_filter_region = np.zeros( 
-		( device_voxels_lateral, device_voxels_lateral, device_voxels_vertical, 3 ) )
-	for x_idx in range( 0, device_voxels_lateral ):
-		for y_idx in range( 0, device_voxels_lateral ):
+	# bayer_filter_region = np.zeros( 
+	# 	( device_voxels_lateral, device_voxels_lateral, device_voxels_vertical, 3 ) )
+	# for x_idx in range( 0, device_voxels_lateral ):
+	# 	for y_idx in range( 0, device_voxels_lateral ):
+	# 		for z_idx in range( 0, device_voxels_vertical ):
+	# 			bayer_filter_region[ x_idx, y_idx, z_idx, : ] = [
+	# 					bayer_filter_region_x[ x_idx ], bayer_filter_region_y[ y_idx ], bayer_filter_region_z[ z_idx ] ]
+	
+	#! new
+	bayer_filter_region = np.zeros( ( device_voxels_lateral_bordered, device_voxels_lateral_bordered, device_voxels_vertical, 3 ) )
+	for x_idx in range( 0, device_voxels_lateral_bordered ):
+		for y_idx in range( 0, device_voxels_lateral_bordered ):
 			for z_idx in range( 0, device_voxels_vertical ):
-				bayer_filter_region[ x_idx, y_idx, z_idx, : ] = [
-						bayer_filter_region_x[ x_idx ], bayer_filter_region_y[ y_idx ], bayer_filter_region_z[ z_idx ] ]
+				bayer_filter_region[ x_idx, y_idx, z_idx, : ] = [ bayer_filter_region_x[ x_idx ], bayer_filter_region_y[ y_idx ], bayer_filter_region_z[ z_idx ] ]
+	# todo: adjust the bordered stuff accordingly. Rewrite this part for cleanliness. You really need to compare the parts where
+	# todo: device_size_lateral_um is replaced with device_size_lateral_bordered_um
+ 
 	logging.debug(f'Bayer Filter Region has array shape {np.shape(bayer_filter_region)}.')
 
-	gradient_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
-	gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
+	bayer_filter_region_reinterpolate = np.zeros( ( device_voxels_lateral_bordered * reinterpolate_permittivity_factor, device_voxels_lateral_bordered * reinterpolate_permittivity_factor, device_voxels_vertical * reinterpolate_permittivity_factor, 3 ) )
+	for x_idx in range( 0, device_voxels_lateral_bordered * reinterpolate_permittivity_factor ):
+		for y_idx in range( 0, device_voxels_lateral_bordered * reinterpolate_permittivity_factor ):
+			for z_idx in range( 0, device_voxels_vertical * reinterpolate_permittivity_factor ):
+				bayer_filter_region_reinterpolate[ x_idx, y_idx, z_idx, : ] = [ bayer_filter_region_reinterpolate_x[ x_idx ], bayer_filter_region_reinterpolate_y[ y_idx ], bayer_filter_region_reinterpolate_z[ z_idx ] ]
+
+
+	# gradient_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
+	# gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
+	# gradient_region_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, device_voxels_simulation_mesh_vertical)
+
+	# new
+	gradient_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_simulation_mesh_lateral_bordered)
+	gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_simulation_mesh_lateral_bordered)
 	gradient_region_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, device_voxels_simulation_mesh_vertical)
+
+
 
 	# Get the device's dimensions in terms of (MESH) voxels
 	field_shape = [device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
@@ -734,7 +780,7 @@ if start_from_step == 0:
 		source_block['y'] = 0 * 1e-6
 		source_block['y span'] = 1.1*4/3*1.2 * device_size_lateral_um * 1e-6
 		source_block['z min'] = (device_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
-		source_block['z max'] = (device_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
+		source_block['z max'] = (device_vertical_maximum_um + 3 * mesh_spacing_um + pec_aperture_thickness_um) * 1e-6
 		source_block['material'] = 'PEC (Perfect Electrical Conductor)'
 		# TODO: set enable true or false?
 		source_block = fdtd_update_object(fdtd_hook, source_block, create_object=True)
@@ -748,8 +794,8 @@ if start_from_step == 0:
 		source_aperture['y'] = 0 * 1e-6
 		source_aperture['y span'] = device_size_lateral_um * 1e-6
 		source_aperture['z min'] = (device_vertical_maximum_um + 3 * mesh_spacing_um) * 1e-6
-		source_aperture['z max'] = (device_vertical_maximum_um + 6 * mesh_spacing_um) * 1e-6
-		source_aperture['material'] = 'etch'
+		source_aperture['z max'] = (device_vertical_maximum_um + 3 * mesh_spacing_um + pec_aperture_thickness_um) * 1e-6
+		source_aperture['index'] = background_index
 		# TODO: set enable true or false?
 		source_aperture = fdtd_update_object(fdtd_hook, source_aperture, create_object=True)
 		fdtd_objects['source_aperture'] = source_aperture
@@ -1142,14 +1188,28 @@ else:		# optimization
 					# [DEPRECATED] Account for dispersion by using the dispersion_model.
 					dispersive_max_permittivity = dispersion_model.average_permittivity( dispersive_ranges_um[ dispersive_range_idx ] )
 					dispersive_max_index = utility.index_from_permittivity( dispersive_max_permittivity )
-	 
+
+					#! new
+					if reinterpolate_permittivity:
+						if reinterpolate_type == 'nearest':
+							cur_density_import = np.repeat( np.repeat( np.repeat( cur_density, reinterpolate_permittivity_factor, axis=0 ), 
+												 				reinterpolate_permittivity_factor, axis=1 ), 
+                                    					reinterpolate_permittivity_factor, axis=2 )
+						else:
+							cur_density_import = interpolate.interpn( ( bayer_filter_region_x, bayer_filter_region_y, bayer_filter_region_z ), 
+                                            				cur_density, bayer_filter_region_reinterpolate, 
+                                            				method='linear' )
+					else:
+						cur_density_import = cur_density.copy()	 
+  
 					# Scale from [0, 1] back to [min_device_permittivity, max_device_permittivity]
 					#! This is the only cur_whatever_variable that will ever be anything other than [0, 1].
 					cur_permittivity = min_device_permittivity + ( dispersive_max_permittivity - min_device_permittivity ) * cur_density
 					cur_index = utility.index_from_permittivity( cur_permittivity )
 					logging.info(f'TiO2% is {100 * np.count_nonzero(cur_index > min_device_index) / cur_index.size}%.')
-                    logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
-    
+					# logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
+					logging.info(f'Binarization is {100 * utility.compute_binarization(cur_density)}%.')
+	
 					# Update bayer_filter data for actual permittivity (not just density 0 to 1)
 					bayer_filter.update_actual_permittivity_values(min_device_permittivity, dispersive_max_permittivity)
 
