@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --time=2:00:00
+#SBATCH --time=4:00:00
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=8
 #SBATCH --qos=normal

@@ -23,6 +23,8 @@ import pandas as pd
 
 sys.path.append(os.getcwd())
 from configs import global_params as gp
+try:	from configs import LumProcParameters as lmp
+except Exception as ex:	pass
 from utils import utility
 
 #* Template
@@ -162,7 +164,7 @@ class BasicPlot():
 							'lines': []
 							}
 	
-	def append_line_data(self, plot_colors=None, plot_labels=None):
+	def append_line_data(self, plot_colors=None, plot_labels=None, plot_alphas=None):
 		'''Appends all line data stored in the f_vectors to the plot_config. Here we can assign colors and legend labels all at once.'''
 		
 		for plot_idx in range(0, len(self.f_vectors)):
@@ -185,6 +187,8 @@ class BasicPlot():
 			if plot_labels is not None:
 				line_data['legend'] = plot_labels[plot_idx]
 			else: line_data['legend'] = self.f_vectors[plot_idx]['var_name']
+			if plot_alphas is not None:
+				line_data['alpha'] = plot_alphas[plot_idx]
 			
 			self.plot_config['lines'].append(line_data)
 	
@@ -280,7 +284,111 @@ class SpectrumPlot(BasicPlot):
 		if close_plot:
 			plt.close()
 
-# TODO: Class SweepPlot
+class SweepPlot(BasicPlot):
+	def __init__(self, plot_data, slice_coords):
+		'''Initializes the plot_config variable of this class object and also the Plot object.'''
+		super(SweepPlot, self).__init__(plot_data)
+		
+		# Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
+		r_vector_value_idx = [index for (index , item) in enumerate(slice_coords) if isinstance(item, slice)][0]
+		self.r_vectors = list(plot_data['r'][0].values())[r_vector_value_idx]
+		#f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+	
+	
+	def append_line_data(self, slice_coords, plot_stdDev, plot_colors=None, plot_labels=None, 
+					  	normalize_against_max=False):
+		'''Appends all line data stored in the f_vectors to the plot_config. Here we can assign colors and legend labels all at once.
+		Overwriting the method in BasePlot.'''
+		
+		for plot_idx in range(0, len(self.f_vectors)-0):
+			line_data = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+						'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+						'cutoff': None,
+						'color': None,
+						'alpha': 1.0,
+						'legend': None,
+						'marker_style': marker_style
+					}
+		
+			y_plot_data = self.f_vectors[plot_idx]['var_values']
+			y_plot_data = np.reshape(y_plot_data, (len(y_plot_data), 1))
+			y_plot_data = y_plot_data[tuple(slice_coords)]
+			
+			normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
+			line_data['y_axis']['values'] = y_plot_data / normalization_factor
+			line_data['x_axis']['values'] = self.r_vectors['var_values']
+			# line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
+			line_data['cutoff'] = slice(0 + lmp.cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + lmp.cutoff_1d_sweep_offset[1])
+			
+			line_data['color'] = plot_colors[plot_idx]
+			line_data['legend'] = plot_labels[plot_idx]
+			
+			self.plot_config['lines'].append(line_data)
+			
+			
+			if plot_stdDev and self.f_vectors[plot_idx]['statistics'] in ['mean']:
+				line_data_2 = {'x_axis': {'values': None, 'factor': 1, 'offset': 0},
+						'y_axis': {'values': None, 'factor': 1, 'offset': 0},
+						'cutoff': None,
+						'color': None,
+						'alpha': 0.3,
+						'legend': '_nolegend_',
+						'marker_style': dict(linestyle='-', linewidth=1.0)
+					}
+			
+				line_data_2['x_axis']['values'] = self.r_vectors['var_values']
+				line_data_2['y_axis']['values'] = (y_plot_data + self.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+				# line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
+				line_data_2['cutoff'] = slice(0 + lmp.cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + lmp.cutoff_1d_sweep_offset[1])
+				
+				colors_so_far = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+				line_data_2['color'] = colors_so_far[-1]
+				
+				self.plot_config['lines'].append(line_data_2)
+				
+				line_data_3 = copy.deepcopy(line_data_2)
+				line_data_3['y_axis']['values'] = (y_plot_data - self.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+				self.plot_config['lines'].append(line_data_3)
+		
+	def assign_title(self, title_string):
+		'''Replaces title of plot. 
+		Overwriting the method in BasePlot.'''
+		
+		for sweep_param_value in list(lmp.sweep_parameters.values()):
+			optimized_value = sweep_param_value['var_values'][sweep_param_value['peakInd']]
+			title_string += '\n' + sweep_param_value['var_name'] + f': Optimized at {optimized_value}'
+		self.plot_config['title'] = title_string
+	
+	def assign_axis_labels(self, slice_coords, y_label_string):
+		'''Replaces axis labels of plot.
+		Overwriting the method in BasePlot.'''
+		
+		sweep_variable_idx = [index for (index, item) in enumerate(slice_coords) if type(item) is slice][0]
+		self.plot_config['x_axis']['label'] = list(lmp.sweep_parameters.values())[sweep_variable_idx]['var_name']
+		self.plot_config['y_axis']['label'] = y_label_string
+   
+	def export_plot_config(self, plot_directory_location, plot_subfolder_name, filename, 
+                    		slice_coords, close_plot=True):
+		'''Creates plot using the plot config, and then exports.
+		Overwriting the method in BasePlot.'''
+		self.fig, self.ax = enter_plot_data_1d(self.plot_config, self.fig, self.ax)
+  
+		#! NOTE: This is where you do any additional adjustment of the plot before saving out
+		# plot adjustment code
+
+		SAVE_LOCATION = os.path.abspath(os.path.join(plot_directory_location, plot_subfolder_name))
+		if not os.path.isdir(SAVE_LOCATION):
+			os.makedirs(SAVE_LOCATION)
+
+		param_filename_str = lmp.create_parameter_filename_string(slice_coords)
+		plt.savefig(SAVE_LOCATION + f'/{filename}{param_filename_str}.png', bbox_inches='tight')
+		
+		# export_msg_string = (SAVE_LOCATION + f'/{filename}'.replace("_", " ")).title()
+		export_msg_string = filename.replace("_", "").title()
+		logging.info('Exported: ' + export_msg_string + param_filename_str)
+		
+		if close_plot:
+			plt.close()
 
 #* Functions that call one of the Plot classes
 
@@ -330,10 +438,12 @@ def plot_quadrant_transmission_trace(f, plot_directory_location):
 	num_adjoint_src = 4
 	trace = np.zeros((num_adjoint_src, numEpochs*numIter))
 
+	counter = 0
 	for epoch_fom in f:
 		for iter_fom in epoch_fom:
 			for adj_src in range(num_adjoint_src):
-				trace[adj_src, :] = np.max(iter_fom[adj_src, 0, :])
+				trace[adj_src, counter] = np.max(iter_fom[adj_src, 0, :])
+			counter += 1
 
 	iterations = copy.deepcopy(TEMPLATE_R_VECTOR)
 	iterations.update({'var_name': 'Iterations', 'var_values': range(trace.shape[1]), 'short_form': 'iter'})
@@ -342,10 +452,14 @@ def plot_quadrant_transmission_trace(f, plot_directory_location):
 		quad_trace[adj_src] = copy.deepcopy(quad_trace)[adj_src]
 		quad_trace[adj_src].update({'var_name': f'Q{adj_src}', 'var_values': trace[adj_src]})
 	logging.info('Quadrant Transmissions Trace is:')
-	logging.info(f'{plot_data}')
 	plot_data = {'r':[iterations],
 				'f': quad_trace,
 				'title': 'Quadrant Transmissions - Trace'}
+
+	# colors = [ 'b', 'g', 'r', 'm' ]
+	# for quad_idx in range( 0, 4 ):
+	# 	plt.plot( quad_trace[quad_idx]['var_values'], color=colors[ quad_idx ] )
+	# plt.show()
  
 	bp = BasicPlot(plot_data)
 	bp.append_line_data(plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'])
@@ -413,7 +527,8 @@ def visualize_device(cur_data, plot_directory_location, num_visualize_layers=5):
 	output_plot['title'] = 'Device Visualization'
 	
 	plot_layers = np.linspace(0, cur_data.shape[2]-1, num_visualize_layers).astype(int)
-	for layer in plot_layers:
+	actual_layers = np.linspace(0, gp.cv.num_vertical_layers, num_visualize_layers).astype(int)
+	for layer_idx, layer in enumerate(plot_layers):
 		fig, ax = plt.subplots()
 
 		Y_grid, X_grid = np.meshgrid(np.squeeze(r_vectors[0]['var_values']),
@@ -423,7 +538,7 @@ def visualize_device(cur_data, plot_directory_location, num_visualize_layers=5):
 							cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
 		plt.gca().set_aspect('equal')
 
-		title_string = f'Device Layer {layer}'
+		title_string = f'Device Layer {actual_layers[layer_idx]}'
 		plt.title(title_string)
 		# plt.xlabel('x (um)')
 		# plt.ylabel('y (um)')
@@ -450,7 +565,7 @@ def visualize_device(cur_data, plot_directory_location, num_visualize_layers=5):
 		plt.savefig(plot_directory_location + '/' + plot_subfolder_name\
 			+ '/' + f'{layer}' + '.png',
 			bbox_inches='tight')
-		print(f'Exported: Device Layer {layer}')
+		print(f'Exported: Device Layer {actual_layers[layer_idx]}')
 
 		plt.close()
 
@@ -918,26 +1033,90 @@ def plot_device_rta_pareto(plot_data, job_idx, sweep_parameters, job_names, plot
 		logging.info('Exported: ' + export_msg_string)
 		plt.close()
 
-def plot_device_indiv_rta_spectra(plot_data, job_idx, sweep_parameters, job_names, plot_folder, sum_sides=False):
+def plot_device_indiv_rta_spectra(plot_data, job_idx, sweep_parameters, job_names, plot_folder,
+                                dev_indiv_rta_names, sum_sides=False, normalize_against='input_power'):
+	'''For the given job index, plots the device RTA and all power components in and out, corresponding to that job.
+	The normalization factor is the power through the device input aperture.
 
-	return 3
+	Accepts as input argument: list of Booleans saying which things to make individual plots of
+	e.g. transmission, reflection, side power, etc.
+	Then makes individual plots of them.'''
+ 
+	DEVICE_CHANNEL_LIST = ["device_transmission", "device_reflection", "side_scattering_power",
+							"focal_scattering_power", "oblique_scattering_power"]
+
+	plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+	plot_labels = dev_indiv_rta_names
+
+	# TODO: Based on dev_indiv_rta_names, compare to DEVICE_CHANNEL_LIST and 
+ 	# todo: pop out dictionaries from plot_data['f']	
+
+	sp = SpectrumPlot(plot_data, sweep_parameters)
+ 
+	sp.append_line_data(plot_colors, plot_labels)
+	
+	sp.assign_title('Device RTA', job_idx)
+	if normalize_against == 'unity':
+		sp.assign_axis_labels('Wavelength (um)', 'Power')
+	else:	sp.assign_axis_labels('Wavelength (um)', 'Normalized Power')
+	
+	sp.export_plot_config(plot_folder, 'device_indiv_rta_spectra', utility.isolate_filename(job_names[job_idx]).replace('.fsp', ''))
+	return sp.fig, sp.ax
 
 # -- Sweep Plot Functions (Overall)
 
-def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_stdDev = True):
+def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_folder,
+									   include_overall=True, plot_stdDev = True, cutoff_1d_sweep_offset = [0,0]):
 	'''Produces a 1D sorting (transmission) efficiency plot using given coordinates to slice the N-D array of data contained in plot_data.
 	X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
 	
 	sp = SweepPlot(plot_data, slice_coords)
 	
-	plot_colors = ['blue', 'green', 'red', 'gray']
-	plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+	# plot_colors = ['blue', 'green', 'red', 'gray']
+	# plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+	plot_colors = ['blue', 'green', 'red']	
+	plot_labels = ['Blue', 'Green', 'Red']
+
+	if include_overall:
+		plot_colors.append('gray')
+		plot_labels.append('Trans.')
+	else:
+		plot_data['f'].pop(-1)		# remove overall transmission from f-vectors
 	sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
-	
+
 	sp.assign_title('Sorting Transmission Efficiency - Parameter Range:')
 	sp.assign_axis_labels(slice_coords, 'Sorting Transmission Efficiency')
+
+	sp.export_plot_config(plot_folder, '', 'sorting_trans_eff_sweep_', slice_coords)
 	
-	sp.export_plot_config('sorting_trans_eff_sweep_', slice_coords)
+	return sp.fig, sp.ax
+
+def plot_device_rta_sweep_1d(plot_data, slice_coords, plot_folder,
+									   include_overall=True, plot_stdDev = True, cutoff_1d_sweep_offset = [0,0]):
+	'''Produces a 1D power plot of device RTA using given coordinates to slice the N-D array 
+	of data contained in plot_data.
+	X-axis i.e. sweep variable is given by the index of the entry of type 'slice' in the slice_coords.'''
+
+	sp = SweepPlot(plot_data, slice_coords)
+	
+	mean_vals = []
+	for f_vec in plot_data['f']:
+		var_value = f_vec['var_values'][0]
+		mean_vals.append(var_value)
+	logging.info('Device RTA values are:')
+	logging.info('[' + ', '.join(map(lambda x: str(round(100*x,2)), mean_vals)) + ']')     # Converts to percentages with 2 s.f.
+	logging.info('with total side scattering at:')
+	logging.info(f'{round(100*sum(mean_vals[1:5]),2)}')
+	
+	plot_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+	plot_labels = ['Device Reflection', 'Side Scattering E', 'Side Scattering N', 'Side Scattering W', 'Side Scattering S', 'Side Scattering',
+				   'Focal Region Power', 'Oblique Scattering Power', 'Absorbed Power']
+	sp.append_line_data(slice_coords, plot_stdDev, plot_colors, plot_labels)
+	
+	sp.assign_title('Device RTA - Parameter Range:')
+	sp.assign_axis_labels(slice_coords, 'Normalized Power')
+
+	sp.export_plot_config(plot_folder, '', 'device_rta_sweep_', slice_coords)
 	
 	return sp.fig, sp.ax
 

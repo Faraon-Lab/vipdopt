@@ -105,6 +105,7 @@ def get_config_vars(param_dict):
 	num_sidewalls = get_check_none(param_dict, "num_sidewalls")
 	sidewall_thickness_um = get_check_none(param_dict, "sidewall_thickness_um")
 	sidewall_material = get_check_none(param_dict, "sidewall_material")
+	sidewall_extend_pml = get_check_none(param_dict, "sidewall_extend_pml")
 	sidewall_extend_focalplane = get_check_none(param_dict, "sidewall_extend_focalplane")
 	sidewall_vertical_minimum_um = get_check_none(param_dict, "sidewall_vertical_minimum_um")
 	add_infrared = get_check_none(param_dict, "add_infrared")
@@ -130,6 +131,7 @@ def get_config_vars(param_dict):
 	xy_phi_rotations = get_check_none(param_dict, "xy_phi_rotations")
 	xy_pol_rotations = get_check_none(param_dict, "xy_pol_rotations")
 	xy_names = get_check_none(param_dict, "xy_names")
+	use_source_aperture = get_check_none(param_dict, "use_source_aperture")
 	num_focal_spots = get_check_none(param_dict, "num_focal_spots")
 	dispersive_range_to_adjoint_src_map = get_check_none(param_dict, "dispersive_range_to_adjoint_src_map")
 	adjoint_src_to_dispersive_range_map = get_check_none(param_dict, "adjoint_src_to_dispersive_range_map")
@@ -236,14 +238,26 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 
 	device_vertical_maximum_um = device_size_vertical_um	# NOTE: Unused
 
-	# Surrounding          
+	# FDTD
+	vertical_gap_size_um = cd.geometry_spacing_lateral_um * 15
+	lateral_gap_size_um = cd.device_scale_um * 10 #25#50
+	# vertical_gap_size_um = geometry_spacing_minimum_um * 15
+	# lateral_gap_size_um = geometry_spacing_minimum_um * 10#25#50
+
+	fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
+	fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + cd.device_size_lateral_um
+	fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
+	fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
+
+	# Surrounding         
+	if cd.sidewall_extend_pml:
+		cd.sidewall_thickness_um = (fdtd_region_size_lateral_um - cd.device_size_lateral_um)/2
 	sidewall_x_positions_um = [cd.device_size_lateral_um / 2 + cd.sidewall_thickness_um / 2, 0, -cd.device_size_lateral_um / 2 - cd.sidewall_thickness_um / 2, 0]
 	sidewall_y_positions_um = [0, cd.device_size_lateral_um / 2 + cd.sidewall_thickness_um / 2, 0, -cd.device_size_lateral_um / 2 - cd.sidewall_thickness_um / 2]
 	sidewall_xspan_positions_um = [cd.sidewall_thickness_um, cd.device_size_lateral_um + cd.sidewall_thickness_um * 2,
 								cd.sidewall_thickness_um, cd.device_size_lateral_um + cd.sidewall_thickness_um * 2]
 	sidewall_yspan_positions_um = [cd.device_size_lateral_um + cd.sidewall_thickness_um * 2, cd.sidewall_thickness_um, 
 								cd.device_size_lateral_um + cd.sidewall_thickness_um * 2, cd.sidewall_thickness_um]
-	# sidewall_vertical_minimum_um = device_vertical_minimum_um
 
 	# Spectral
 
@@ -278,17 +292,6 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 
 	pdaf_lambda_values_um = np.linspace(pdaf_lambda_min_um, pdaf_lambda_max_um, num_design_frequency_points)
 	pdaf_max_intensity_by_wavelength = (cd.device_size_lateral_um**2)**2 / (focal_length_um**2 * pdaf_lambda_values_um**2)
-
-	# FDTD
-	vertical_gap_size_um = cd.geometry_spacing_lateral_um * 15
-	lateral_gap_size_um = cd.device_scale_um * 10 #25#50
-	# vertical_gap_size_um = geometry_spacing_minimum_um * 15
-	# lateral_gap_size_um = geometry_spacing_minimum_um * 10#25#50
-
-	fdtd_region_size_vertical_um = 2 * vertical_gap_size_um + device_size_vertical_um + focal_length_um
-	fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + cd.device_size_lateral_um
-	fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um
-	fdtd_region_minimum_vertical_um = -focal_length_um - vertical_gap_size_um
 
 	# Forward (Input) Source
 	lateral_aperture_um = 1.1 * cd.device_size_lateral_um

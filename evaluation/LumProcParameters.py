@@ -154,8 +154,12 @@ for monitor in monitors:
     monitors_keyed[monitor['name']] = monitor
 # Can also use this: https://stackoverflow.com/a/8653568
 
+# What kind of source and boundary condition are we using to evaluate this situation?
+evaluation_source_bcs = 'gaussian' # options: {'tfsf', 'gaussian', 'periodic_plane'}
 # Determine the global value that all power settings are normalized against
 normalize_against = 'input_power'   #options: {'input_power', 'sourcepower', 'power_sum', 'unity', 'uniform_cube'}
+if evaluation_source_bcs in ['tfsf']:
+    normalize_against = 'sourcepower'
 
 #* Overwrite some variables from optimization config		                                           
 # SonyBayerFilterParameters.py is separated into two parts. 
@@ -228,6 +232,8 @@ globals().update(processed_vars)
 
 # Device
 
+restart_from_cur_design_variable = True
+
 # Structure the following list such that the last entry is the last medium above the device.
 objects_above_device = [] #['permittivity_layer_substrate',
                         #'silicon_substrate']
@@ -239,6 +245,8 @@ device_array_shape = (1) #(3,3)    # A tuple describing dimension sizes such as 
 # FDTD
 
 fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 3.0 * device_size_lateral_um
+if evaluation_source_bcs in ['periodic_plane']:
+    fdtd_region_size_lateral_um = 1 * lateral_gap_size_um + 1.0 * device_size_lateral_um
 
 # Optimization
 
@@ -247,6 +255,6 @@ num_epochs = 1
 num_iterations_per_epoch = 1
 
 #* Debug Options
-start_from_step = 0                 # 0 if running entire file in one shot  # NOTE: Overwrites optimization config.
+start_from_step = 4                 # 0 if running entire file in one shot  # NOTE: Overwrites optimization config.
 
 logging.info("Lumerical plotting parameters read and processed.")

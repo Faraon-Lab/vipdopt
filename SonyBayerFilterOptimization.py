@@ -50,15 +50,16 @@ globals().update(processed_vars)
 # Custom Classes and Imports
 from configs import *
 from evaluation import *
-from executor import *
+# from executor import *
 from utils import *
 from utils import lum_utils as lm
 from utils import SonyBayerFilter
 
 # Photonics
-import imp	# Lumerical hook Python library API
-imp.load_source( "lumapi", lumapi_filepath)
-import lumapi
+import importlib.util as imp	# Lumerical hook Python library API
+spec_lumapi = imp.spec_from_file_location('lumapi', lumapi_filepath)
+lumapi = imp.module_from_spec(spec_lumapi)
+spec_lumapi.loader.exec_module(lumapi)
 
 # Start logging - Logger is already initialized through the call to cfg_to_params_sony.py
 logging.info(f'Starting up optimization file: {os.path.basename(__file__)}')
@@ -427,6 +428,7 @@ if start_from_step == 0:
 
 	# Get the device's dimensions in terms of (MESH) voxels
 	field_shape = [device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
+	logging.info(f'NOTE: Simulation mesh should yield field shape in design_Efield_monitor of {field_shape}.')
 	
 	
 	logging.info("Beginning Step 0: Lumerical Environment Setup")
@@ -1006,7 +1008,11 @@ if restart or evaluate:
 	
 	# Set everything ahead of the restart epoch and iteration to zero.
 	for rs_epoch in range(restart_epoch, num_epochs):
-		for rs_iter in range(restart_iter, num_iterations_per_epoch):
+		if rs_epoch == restart_epoch:
+			rst_iter = restart_iter
+		else:	rst_iter = 0
+
+		for rs_iter in range(rst_iter, num_iterations_per_epoch):
 			figure_of_merit_evolution[rs_epoch, rs_iter] = 0
 			pdaf_transmission_evolution[rs_epoch, rs_iter] = 0
 			step_size_evolution[rs_epoch, rs_iter] = 0
@@ -1141,8 +1147,10 @@ else:		# optimization
 					#! This is the only cur_whatever_variable that will ever be anything other than [0, 1].
 					cur_permittivity = min_device_permittivity + ( dispersive_max_permittivity - min_device_permittivity ) * cur_density
 					cur_index = utility.index_from_permittivity( cur_permittivity )
+					logging.info(f'TiO2% is {100 * np.count_nonzero(cur_index > min_device_index) / cur_index.size}%.')
+                    logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
     
-					# Update bayer_filter data for actual permittivity (not just density 0 to 1) and save out
+					# Update bayer_filter data for actual permittivity (not just density 0 to 1)
 					bayer_filter.update_actual_permittivity_values(min_device_permittivity, dispersive_max_permittivity)
 
 					fdtd_hook.switchtolayout()
@@ -1234,7 +1242,7 @@ else:		# optimization
 						logging.info(f'Loading: {utility.isolate_filename(completed_job_filepath)}. Time taken: {time.time()-start_loadtime} seconds.')
 	  
 						fwd_e_fields = lm.get_efield(fdtd_hook, design_efield_monitor['name'])
-						logging.info('Accessed design E-field monitor.')
+						logging.info(f'Accessed design E-field monitor. NOTE: Field shape obtained is: {fwd_e_fields.shape}')
 	
 						#* Populate forward_e_fields with device E-field info
 						if ( dispersive_range_idx == 0 ):
@@ -1735,6 +1743,9 @@ else:		# optimization
 				# Step size
 	 
 				cur_design_variable = bayer_filter.get_design_variable()
+
+				if optimizer_algorithm.lower() not in ['gradient descent']:
+					use_fixed_step_size = True
 				if use_fixed_step_size:
 					step_size = fixed_step_size
 				else:

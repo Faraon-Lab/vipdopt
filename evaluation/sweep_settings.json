@@ -207,11 +207,11 @@
        "generate_plot_per_job": true
      },
      {"name": "crosstalk_adj_quadrants",
-       "enabled": false,
+       "enabled": true,
        "generate_plot_per_job": true
      },
      {"name": "Enorm_focal_plane_image",
-       "enabled": false,
+       "enabled": true,
        "generate_plot_per_job": true
      },
      {"name": "device_cross_section",
@@ -222,39 +222,40 @@
        "enabled": false,
        "generate_plot_per_job": true
      },
+     {"name": "crosstalk_power",
+      "enabled": true,
+      "generate_plot_per_job": true
+     },
+     {"name": "exit_power_distribution",
+       "enabled": true,
+       "generate_plot_per_job": true
+     },
+     {"name": "device_rta",
+       "enabled": true,
+       "generate_plot_per_job": true
+     },
+
      {"name": "device_transmission",
-       "enabled": false,
+       "enabled": true,
        "generate_plot_per_job": true
      },
      {"name": "device_reflection",
-       "enabled": false,
+       "enabled": true,
        "generate_plot_per_job": true
      },
      {"name": "side_scattering_power",
-       "enabled": false,
+       "enabled": true,
        "generate_plot_per_job": true
-     },
-     {"name": "crosstalk_power",
-      "enabled": false,
-      "generate_plot_per_job": true
      },
      {"name": "focal_region_power",
        "enabled": false,
        "generate_plot_per_job": true
      },
      {"name": "focal_scattering_power",
-       "enabled": false,
+       "enabled": true,
        "generate_plot_per_job": true
      },
      {"name": "oblique_scattering_power",
-       "enabled": false,
-       "generate_plot_per_job": true
-     },
-     {"name": "exit_power_distribution",
-       "enabled": false,
-       "generate_plot_per_job": true
-     },
-     {"name": "device_rta",
        "enabled": true,
        "generate_plot_per_job": true
      }

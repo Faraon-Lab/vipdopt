@@ -11,8 +11,7 @@
 import sys
 import os
 import copy
-import numpy as npf
-import autograd.numpy as np
+import numpy as np
 import logging
 import traceback
 import shelve

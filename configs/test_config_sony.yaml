@@ -28,7 +28,7 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.017 # 0.051
+mesh_spacing_um:  0.051 # 0.017 
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.085 # 0.051
 
@@ -63,9 +63,10 @@ device_vertical_minimum_um: 0
 objects_above_device: [] #['permittivity_layer_substrate',
                         #'silicon_substrate']
 num_sidewalls: 4
-sidewall_thickness_um: 0.204
 sidewall_material: 'etch'
+sidewall_extend_pml: True
 sidewall_extend_focalplane: True
+sidewall_thickness_um: 0.204          # only needed if sidewall_extend_pml is False
 sidewall_vertical_minimum_um: -0.765    # only needed if sidewall_extend_focalplane is False; describes how far down from the device they extend
 
 #* Spectral
@@ -96,14 +97,14 @@ fdtd_simulation_time_fs: 600 #3000
 #* Forward (Input) Source
 
 weight_by_individual_wavelength: True   # At present this changes nothing.
-use_gaussian_sources: False
+use_gaussian_sources: True
 
 use_airy_approximation: True
 f_number: 2.2
 airy_correction_factor: 0.84  # Approximation of central Airy lobe using a Gaussian profile
 # See https://en.wikipedia.org/wiki/Airy_disk#Approximation_using_a_Gaussian_profile:~:text=to%20the%20intensity.-,Approximation%20using%20a%20Gaussian%20profile,-%5Bedit%5D
 
-source_angle_theta_vacuum_deg: 0 #63
+source_angle_theta_vacuum_deg: 0 #46
 source_angle_phi_deg: 0
 
 # General polarized source information
@@ -145,7 +146,7 @@ num_iterations_per_epoch: 30 #30
 optimizer_algorithm: 'ADAM' #'Gradient Descent'
 adam_betas: [0.9, 0.999]                # actually needs to be a tuple but we just convert it in the code
 
-use_fixed_step_size: False
+use_fixed_step_size: True   # Should be True for anything except Gradient Descent
 fixed_step_size: 0.01 #2.0          # make sure to use floats
 
 epoch_start_design_change_max: 0.15

@@ -56,17 +56,24 @@ class SonyBayerFilter(device.Device):
 		self.layer_height_voxels = self.design_height_voxels	# unused
 
 		self.init_filters_and_variables()
+		# self.set_random_init(self.init_permittivity, 0.27)
 
 		# set to the 0th epoch value
 		self.update_filters( 0 )
 
 		self.update_permittivity()
 
-
-	def set_random_init( self, mean, std_dev ):
+	def set_random_init( self, mean, std_dev, symmetric=False ):
 		'''Random initialization of permittivity.'''
 		self.w[0] = np.random.normal( mean, std_dev, self.w[0].shape )
 		self.w[0] = np.maximum( np.minimum( self.w[0], 1.0 ), 0.0 )
+		if symmetric:
+			for layer in range(self.w[0].shape[2]):
+				self.w[0][:,:,layer] = np.tril(self.w[0][:,:,layer]) + np.triu(self.w[0][:,:,layer].T, 1)
+				self.w[0][:,:,layer] = np.flip(self.w[0][:,:,layer], axis=1)
+				# check symmetry
+				a = np.flip((self.w[0][:,:,layer]), axis=1)
+				assert np.allclose(a, a.T, rtol=1e-5, atol=1e-8), f"Layer {layer} is not symmetric."
 		self.update_permittivity()
 
 	def set_fixed_init( self, init_density ):

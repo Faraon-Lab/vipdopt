@@ -238,6 +238,8 @@ def fdtd_update_object( fdtd_hook_, simDict, create_object=False ):
 				fdtd_hook_.addgaussian(name=simDict['name'])
 			elif any(ele.lower() in type_string for ele in ['TFSFSource']):
 				fdtd_hook_.addtfsf(name=simDict['name'])
+			elif any(ele.lower() in type_string for ele in ['PlaneSource']):
+				fdtd_hook_.addplane(name=simDict['name'])
 			elif any(ele.lower() in type_string for ele in ['DipoleSource']):
 				fdtd_hook_.adddipole(name=simDict['name'])
 			elif any(ele.lower() in type_string for ele in ['DFTMonitor']):
@@ -487,6 +489,9 @@ if start_from_step == 0:
 	scatter_plane_monitor['x span'] = ((fdtd_hook.getnamed('transmission_focal_monitor_','x span') /2 * 6) / 1e-6) * 1e-6
 	scatter_plane_monitor['y'] = 0 * 1e-6
 	scatter_plane_monitor['y span'] = ((fdtd_hook.getnamed('transmission_focal_monitor_','y span') /2 * 6) / 1e-6) * 1e-6
+	if evaluation_source_bcs in ['periodic_plane']:
+		scatter_plane_monitor['x span'] = fdtd_hook.getnamed('transmission_focal_monitor_','x span')
+		scatter_plane_monitor['y span'] = fdtd_hook.getnamed('transmission_focal_monitor_','y span')
 	scatter_plane_monitor['z'] = adjoint_vertical_um * 1e-6
 	scatter_plane_monitor['override global monitor settings'] = 1
 	scatter_plane_monitor['use wavelength spacing'] = 1
@@ -666,8 +671,14 @@ if start_from_step == 0:
 	fdtd = fdtd_objects['FDTD']
 	fdtd['x span'] = fdtd_region_size_lateral_um * 1e-6
 	fdtd['y span'] = fdtd_region_size_lateral_um * 1e-6
+	# Boundary condition adjustment
+	if evaluation_source_bcs in ['periodic_plane']:
+		fdtd['x min bc'] = 'Bloch'
+		fdtd['y min bc'] = 'Bloch'
 	fdtd = fdtd_update_object(fdtd_hook, fdtd)
+ 
 
+	#! SOURCE ADJUSTMENT
 	# TODO: Change this to adjust wavelength ranges for every single monitor, and not just sources
 	forward_src_x = fdtd_objects['forward_src_x']
 	forward_src_x['x span'] = (device_size_lateral_um + (mesh_spacing_um)*3  + 2 * sidewall_thickness_um) * 1e-6
@@ -681,8 +692,71 @@ if start_from_step == 0:
 			forward_src_x['distance from waist'] = -(src_maximum_vertical_um - device_size_vertical_um) * 1e-6
 	forward_src_x = fdtd_update_object(fdtd_hook, forward_src_x)
 
-	# Install Aperture that blocks off source
-	if use_source_aperture:
+	if evaluation_source_bcs in ['tfsf']:
+		# update dictionary entries of forward_src_x with the below
+		# delete the forward_src_x
+		# update again with create_object=True
+		forward_src_x.update({'type': 'TFSFSource'})
+		forward_src_x.update({'polarization angle': 0})
+		forward_src_x.update({'direction': 'Backward'})
+		forward_src_x.update({'z max': src_maximum_vertical_um * 1e-6})
+		forward_src_x.update({'z min': src_minimum_vertical_um * 1e-6})
+		forward_src_x.pop('z')
+		forward_src_x.pop('z span')
+	elif evaluation_source_bcs in ['periodic_plane']:
+		forward_src_x.update({'type': 'PlaneSource'})
+		forward_src_x.update({'source shape': 'Plane wave'})
+		forward_src_x.update({'plane wave type': 'BFAST'})
+		forward_src_x.update({'injection axis': 'z-axis'})
+		forward_src_x.update({'direction': 'Backward'})
+		forward_src_x.update({'z': src_maximum_vertical_um * 1e-6})
+		forward_src_x.update({'angle theta': source_angle_theta_deg})
+		forward_src_x.update({'angle phi': source_angle_phi_deg})
+		forward_src_x.update({'polarization angle': 0})
+	# elif evaluation_source_bcs in ['gaussian']:
+	else:
+		forward_src_x.update({'type': 'GaussianSource'})
+		forward_src_x.update({'angle theta': source_angle_theta_deg})
+		forward_src_x.update({'angle phi': source_angle_phi_deg})
+		forward_src_x.update({'polarization angle': 0})
+		forward_src_x.update({'direction': 'Backward'})
+		forward_src_x.update({'z': src_maximum_vertical_um * 1e-6})
+
+		# forward_src['angle theta'], shift_x_center = snellRefrOffset(source_angle_theta_deg, objects_above_device)	# this code takes substrates and objects above device into account
+		shift_x_center = np.abs( device_vertical_maximum_um - src_maximum_vertical_um ) * np.tan( source_angle_theta_rad )
+		forward_src_x.update({'x': shift_x_center * 1e-6})
+  
+	forward_src_x['enabled'] = True
+	fdtd_hook.select('forward_src_x')
+	fdtd_hook.delete()
+	forward_src_x = fdtd_update_object(fdtd_hook, forward_src_x, create_object=True)
+ 
+	
+	
+
+
+	# Import device permittivity from a save file.
+	# todo: and possibly also extract permittivity from cur_design_variable.npy or some other way of transference.
+	# todo: Also consider writing a method to extract the permittivity directly from Lumerical - use an index monitor
+	if restart_from_cur_design_variable:
+		design_import = fdtd_objects['design_import']
+
+		cur_density = np.load("cur_design_variable.npy" )
+		cur_permittivity = min_device_permittivity + ( max_device_permittivity - min_device_permittivity ) * cur_density
+		cur_index = utility.index_from_permittivity( cur_permittivity )
+		logging.info(f'TiO2% is {100 * np.count_nonzero(cur_index > min_device_index) / cur_index.size}%.')
+
+		bayer_filter_size_voxels = np.array(
+								[device_voxels_lateral, device_voxels_lateral, device_voxels_vertical])
+		bayer_filter_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_lateral)
+		bayer_filter_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_lateral)
+		bayer_filter_region_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, device_voxels_vertical)
+
+		fdtd_hook.select( design_import['name'] )
+		fdtd_hook.importnk2( cur_index, bayer_filter_region_x, bayer_filter_region_y, bayer_filter_region_z )
+
+	# Install Aperture that blocks off Gaussian source
+	if evaluation_source_bcs in ['gaussian']: # and use_source_aperture:
 		source_block = {}
 		source_block['name'] = 'PEC_screen'
 		source_block['type'] = 'Rectangle'
@@ -713,11 +787,13 @@ if start_from_step == 0:
 		# TODO: set enable true or false?
 		source_aperture = fdtd_update_object(fdtd_hook, source_aperture, create_object=True)
 		fdtd_objects['source_aperture'] = source_aperture
-
-	# TODO: Import device permittivity. This is where we would use the code from the restart or evaluate 
- 	# todo: code block in SonyBayerFilterOptimization.py
-	# todo: and possibly also extract permittivity from cur_design_variable.npy or some other way of transference.
-	# todo: Also consider writing a method to extract the permittivity directly from Lumerical - I forget how to do that rn
+	else:
+		source_block = fdtd_objects['PEC_screen']
+		source_aperture = fdtd_objects['source_aperture']
+		source_block['enabled'] = False
+		source_aperture['enabled'] = False
+		source_block = fdtd_update_object(fdtd_hook, source_block)
+		source_aperture = fdtd_update_object(fdtd_hook, source_aperture)
 
 	# Duplicate devices and set in an array
 	if np.prod(device_array_shape) > 1:		
@@ -1652,7 +1728,7 @@ def generate_device_rta_spectrum(monitors_data, produce_spectrum, statistics='me
 		f_vectors.append({'var_name': quadrant_names[idx],
 						'var_values': np.divide(monitors_data['transmission_monitor_'+str(idx)]['P'],
 												baseline_power)
-      											# monitors_data['incident_aperture_monitor']['P'])
+	  											# monitors_data['incident_aperture_monitor']['P'])
 						})
 	
 	f_vectors[1]['var_name'] = 'Green'
@@ -2073,7 +2149,7 @@ for epoch in range(start_epoch, num_epochs):
 								plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
 									generate_sorting_eff_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
 									
-							elif plot['name'] in ['sorting_transmission']:
+							elif plot['name'] in ['sorting_transmission']:	
 								plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
 									generate_sorting_transmission_spectrum(monitors_data, plot['generate_plot_per_job'], add_opp_polarizations=True)
 		
@@ -2118,6 +2194,11 @@ for epoch in range(start_epoch, num_epochs):
 								plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
 									generate_device_cross_section_spectrum(monitors_data, plot['generate_plot_per_job'])
 		
+							# TODO:
+							# elif plot['name'] in ['src_spill_power']:
+							# 	plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+							# 		generate_source_spill_power_spectrum(monitors_data, plot['generate_plot_per_job'])
+		
 							elif plot['name'] in ['crosstalk_power']:
 								plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
 									generate_crosstalk_power_spectrum(monitors_data, plot['generate_plot_per_job'])
@@ -2141,10 +2222,11 @@ for epoch in range(start_epoch, num_epochs):
 		# Step 4: Plot Sweeps across Jobs
 		#
 		
-		# # TODO: Undo the link between Step 3 and 4
-		# if start_from_step == 0 or start_from_step == 4:
-		#     if start_from_step == 4:
-		#         load_backup_vars(shelf_fn)
+		# TODO: Undo the link between Step 3 and 4
+		if start_from_step == 0 or start_from_step == 4:
+			if start_from_step == 4:
+				load_backup_vars(shelf_fn)
+		
 
 			logging.info("Beginning Step 4: Extracting Sweep Data for Each Plot, Creating Plots and Saving Out")
 			if 'plots_data' not in globals():
@@ -2165,9 +2247,11 @@ for epoch in range(start_epoch, num_epochs):
 
 				# Initialize the dictionary to hold output plot data:
 				output_plot = {}
-				if plot['name'] not in ['Enorm_focal_plane_image'] and plot['enabled']:
+				if plot['enabled'] and plot['name'] not in ['Enorm_focal_plane_image', 
+											"device_transmission", "device_reflection", "side_scattering_power",
+											"focal_region_power", "focal_scattering_power", "oblique_scattering_power"]:
 	
-					r_vectors = sweep_parameters
+					r_vectors = [sweep_parameters]
 					
 					# Initialize f_vectors
 					f_vectors = []
@@ -2218,6 +2302,8 @@ for epoch in range(start_epoch, num_epochs):
 				logging.info('Plotting for Job: ' + utility.isolate_filename(job_names[job_idx]))
 
 				# Produce all the spectrum plots for each job.
+				device_indiv_rta_plots = []		# This will save which of the individual RTA plots are used
+    
 				for plot in plots:
 					if plot['enabled']:
 		 
@@ -2229,7 +2315,9 @@ for epoch in range(start_epoch, num_epochs):
 						elif plot['name'] in ['sorting_transmission']:
 							plotter.plot_sorting_transmission_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
 																		sweep_parameters, job_names, PLOTS_FOLDER, 
-                  														include_overall=True, normalize_against=normalize_against)
+				  														include_overall=True, normalize_against=normalize_against)
+	
+						# TODO: sorting_transmission_meanband and contrast_band
 
 						elif plot['name'] in ['crosstalk_adj_quadrants']:
 							plotter.plot_crosstalk_adj_quadrants_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
@@ -2251,6 +2339,11 @@ for epoch in range(start_epoch, num_epochs):
 																		sweep_parameters, job_names, PLOTS_FOLDER,
 										plot_wavelengths = np.array(desired_peaks_per_band_um) * 1e-6,
 										ignore_opp_polarization=False)
+	
+						# TODO: Spill power
+						# elif plot['name'] in ['src_spill_power']:
+						# 		plot_data[plot['name']+'_spectrum'], plot_data[plot['name']+'_sweep'] = \
+						# 			generate_source_spill_power_spectrum(monitors_data, plot['generate_plot_per_job'])
 
 						elif plot['name'] in ['crosstalk_power']:
 							plotter.plot_crosstalk_power_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
@@ -2263,17 +2356,24 @@ for epoch in range(start_epoch, num_epochs):
 						elif plot['name'] in ['device_rta']:
 							plotter.plot_device_rta_spectrum(plot_data[plot['name']+'_spectrum'], job_idx,
 																		sweep_parameters, job_names, PLOTS_FOLDER,
-                  														sum_sides=True, normalize_against=normalize_against)
+				  														sum_sides=True, normalize_against=normalize_against)
 							plotter.plot_device_rta_pareto(plot_data[plot['name']+'_spectrum'], job_idx,
 																		sweep_parameters, job_names, PLOTS_FOLDER,
-                  														sum_sides=True, normalize_against=normalize_against)
-	
+				  														sum_sides=True, normalize_against=normalize_against)
+						
 						# Check if any of the quantities normalized to input power are present
-						# elif plot['name'] in []
-						# 	plotter.plot_device_indiv_rta_spectra(plot_data['device_rta_spectrum'], job_idx,
-						# 												sweep_parameters, job_names, PLOTS_FOLDER, sum_sides=True)
-	
-						# TODO: OTHER SPECTRA
+						elif plot['name'] in ["device_transmission", "device_reflection", "side_scattering_power",
+											"focal_region_power", "focal_scattering_power", "oblique_scattering_power"]:
+							device_indiv_rta_plots.append(plot['name'])
+        
+				# Finally, plot the individual RTA plots
+				# TODO: Based on dev_indiv_rta_names, pop out dictionaries from plot_data['f']
+				device_indiv_rta_plots = ['device_reflection', 'side_scattering_power']
+				plotter.plot_device_indiv_rta_spectra(plot_data['device_rta_spectrum'], job_idx,
+													sweep_parameters, job_names, PLOTS_FOLDER,
+													device_indiv_rta_plots,
+													sum_sides=True, normalize_against=normalize_against)
+							
 
 
 			#
@@ -2291,15 +2391,17 @@ for epoch in range(start_epoch, num_epochs):
 						continue
   
 					elif plot['name'] in ['sorting_transmission']:
-						# todo: Make this work
-						# plot_sorting_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0])
-						continue
+						plotter.plot_sorting_transmission_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], PLOTS_FOLDER)
+	  
+					elif plot['name'] in ['device_rta']:
+						plotter.plot_device_rta_sweep_1d(plots_data['sweep_plots'][plot['name']], [slice(None), 0], PLOTS_FOLDER,
+									   plot_stdDev=False)
 	
 					# TODO: OTHER SWEEPS
 
 			backup_var('plots_data', os.path.basename(python_src_directory))
 			backup_all_vars()
-
+ 
 			logging.info("Completed Step 4: Created and exported all plots and plot data.")
 			logging.info(f'Step 4 took {(time.time()-startTime)/60} minutes.')
 
