@@ -26,6 +26,7 @@ import device
 import layering
 import scale
 import sigmoid
+import sigmoid_3_level
 import square_blur
 import square_blur_smooth
 from configs import global_params as gp
@@ -100,9 +101,39 @@ class SonyBayerFilter(device.Device):
 		'''Override the update_permittivity function so we can handle layer-dependent collapsing along either x- or y-dimensions.'''
 		var0 = self.w[ 0 ]
 
-		if gp.cv.use_smooth_blur:
+		if gp.cv.should_fix_layers:
+			for idx in range( 0, len( gp.cv.fixed_layers ) ):
+				start_layer = gp.cv.fixed_layers[ idx ] * gp.pv.vertical_layer_height_voxels
+				end_layer = start_layer + gp.pv.vertical_layer_height_voxels
+
+				var0[ :, :, start_layer : end_layer ] = gp.cv.fixed_layers_density
+
+
+		if gp.cv.border_optimization:
+
+			endpoint = var0.shape[ 0 ] - gp.pv.border_size_voxels
+			var0_ = var0[ gp.pv.border_size_voxels : endpoint, gp.pv.border_size_voxels : endpoint, : ]
+
+			var0 = np.pad( var0_, ( ( gp.pv.border_size_voxels, gp.pv.border_size_voxels ), ( gp.pv.border_size_voxels, gp.pv.border_size_voxels ), ( 0, 0 ) ), mode='wrap' )
+
+
+		if not gp.cv.layer_gradient:
 			var1 = self.layering_z_0.forward( var0 )
 			self.w[ 1 ] = var1
+		else:
+			var1 = np.zeros( var0.shape, dtype=var0.dtype )
+
+			for z_idx in range( 0, len( gp.pv.voxels_per_layer ) ):
+				start_voxel = np.sum( gp.pv.voxels_per_layer[ 0 : z_idx ] )
+				end_voxel = start_voxel + gp.pv.voxels_per_layer[ z_idx ]
+				get_mean = np.mean( var0[ :, :, start_voxel : end_voxel ], axis=2 )
+
+				for internal_z_idx in range( start_voxel, end_voxel ):
+					var1[ :, :, internal_z_idx ] = get_mean
+
+			self.w[ 1 ] = var1
+
+		if gp.cv.use_smooth_blur:
 
 			var2 = self.sigmoid_1.forward( var1 )
 			self.w[ 2 ] = var2
@@ -117,8 +148,6 @@ class SonyBayerFilter(device.Device):
 			self.w[ 5 ] = var5
 
 		else:
-			var1 = self.layering_z_0.forward( var0 )
-			self.w[ 1 ] = var1
 
 			var2 = self.sigmoid_1.forward( var1 )
 			self.w[ 2 ] = var2
@@ -142,16 +171,84 @@ class SonyBayerFilter(device.Device):
 			gradient = self.sigmoid_1.chain_rule( gradient, self.w[ 2 ], self.w[ 1 ] )
 			gradient = self.layering_z_0.chain_rule( gradient, self.w[ 1 ], self.w[ 0 ] )
 
+
+		if not gp.cv.layer_gradient:
+			gradient = self.layering_z_0.chain_rule( gradient, self.w[ 1 ], self.w[ 0 ] )
+		else:
+			for z_idx in range( 0, len( gp.pv.voxels_per_layer ) ):
+				start_voxel = np.sum( gp.pv.voxels_per_layer[ 0 : z_idx ] )
+				end_voxel = start_voxel + gp.pv.voxels_per_layer[ z_idx ]
+				get_mean = np.mean( gradient[ :, :, start_voxel : end_voxel ], axis=2 )
+
+				for internal_z_idx in range( start_voxel, end_voxel ):
+					gradient[ :, :, internal_z_idx ] = get_mean
+
+
+		if gp.cv.border_optimization:
+
+			endpoint = gradient.shape[ 0 ] - gp.pv.border_size_voxels
+
+
+			gradient[ gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ), gp.pv.border_size_voxels : endpoint, : ] += gradient[ endpoint :, gp.pv.border_size_voxels : endpoint, : ]
+			gradient[ ( endpoint - gp.pv.border_size_voxels ) : endpoint, gp.pv.border_size_voxels : endpoint, : ] += gradient[ 0 : gp.pv.border_size_voxels, gp.pv.border_size_voxels : endpoint, : ]
+
+			gradient[ gp.pv.border_size_voxels : endpoint, gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ), : ] += gradient[ gp.pv.border_size_voxels : endpoint, endpoint :, : ]
+			gradient[ gp.pv.border_size_voxels : endpoint, ( endpoint - gp.pv.border_size_voxels ) : endpoint, : ] += gradient[ gp.pv.border_size_voxels : endpoint, 0 : gp.pv.border_size_voxels, : ]
+
+
+			gradient[
+				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
+				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
+				: ] += gradient[ endpoint :, endpoint :, : ]
+
+			gradient[
+				( endpoint - gp.pv.border_size_voxels ) : endpoint,
+				( endpoint - gp.pv.border_size_voxels ) : endpoint,
+				: ] += gradient[ 0 : gp.pv.border_size_voxels, 0 : gp.pv.border_size_voxels, : ]
+
+			gradient[
+				( endpoint - gp.pv.border_size_voxels ) : endpoint,
+				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
+				: ] += gradient[ 0 : gp.pv.border_size_voxels, endpoint :, : ]
+
+			gradient[
+				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
+				( endpoint - gp.pv.border_size_voxels ) : endpoint,
+				: ] += gradient[ endpoint :, 0 : gp.pv.border_size_voxels, : ]
+
+
+
+			gradient[ 0 : gp.pv.border_size_voxels, :, : ] = 0
+			gradient[ endpoint :, :, : ] = 0
+			gradient[ :, 0 : gp.pv.border_size_voxels, : ] = 0
+			gradient[ :, endpoint :, : ] = 0
+
+
+		if gp.cv.should_fix_layers:
+			for idx in range( 0, len( gp.cv.fixed_layers ) ):
+				start_layer = gp.cv.fixed_layers[ idx ] * gp.pv.vertical_layer_height_voxels
+				end_layer = start_layer + gp.pv.vertical_layer_height_voxels
+
+				gradient[ :, :, start_layer : end_layer ] = 0
+
+
+
 		return gradient
 
 	def update_filters(self, epoch):
 		self.current_epoch = epoch
 		self.sigmoid_beta = 0.0625 * (2**epoch)
 
-		self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
-		# self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_2 ]
-  
-		self.sigmoid_3 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+		# self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+		# self.sigmoid_3 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+
+		if gp.cv.binarize_3_levels:
+			self.sigmoid_1 = sigmoid_3_level.Sigmoid3Level(self.sigmoid_beta )
+			self.sigmoid_3 = sigmoid_3_level.Sigmoid3Level(self.sigmoid_beta )
+		else:
+			self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+			self.sigmoid_3 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+
 
 		self.filters = [ self.layering_z_0, self.sigmoid_1, self.scale_4 ]
 
@@ -172,8 +269,13 @@ class SonyBayerFilter(device.Device):
 		# Start the sigmoids at weak strengths
 		self.sigmoid_beta = 0.0625
 		self.sigmoid_eta = 0.5
-		self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
-		self.sigmoid_3 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+
+		if gp.cv.binarize_3_levels:
+			self.sigmoid_1 = sigmoid_3_level.Sigmoid3Level(self.sigmoid_beta )
+			self.sigmoid_3 = sigmoid_3_level.Sigmoid3Level(self.sigmoid_beta )
+		else:
+			self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+			self.sigmoid_3 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
 
 		x_dimension_idx = 0
 		y_dimension_idx = 1

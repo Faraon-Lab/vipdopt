@@ -473,7 +473,7 @@ if start_from_step == 0:
 
 
 	# Get the device's dimensions in terms of (MESH) voxels
-	field_shape = [device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
+	field_shape = [device_voxels_simulation_mesh_lateral_bordered, device_voxels_simulation_mesh_lateral_bordered, device_voxels_simulation_mesh_vertical]
 	logging.info(f'NOTE: Simulation mesh should yield field shape in design_Efield_monitor of {field_shape}.')
 	
 	
@@ -683,8 +683,8 @@ if start_from_step == 0:
 	design_efield_monitor['type'] = 'DFTMonitor'
 	design_efield_monitor['power_monitor'] = False
 	design_efield_monitor['monitor type'] = '3D'
-	design_efield_monitor['x span'] = device_size_lateral_um * 1e-6
-	design_efield_monitor['y span'] = device_size_lateral_um * 1e-6
+	design_efield_monitor['x span'] = device_size_lateral_bordered_um * 1e-6
+	design_efield_monitor['y span'] = device_size_lateral_bordered_um * 1e-6
 	design_efield_monitor['z max'] = device_vertical_maximum_um * 1e-6
 	design_efield_monitor['z min'] = device_vertical_minimum_um * 1e-6
 	design_efield_monitor['override global monitor settings'] = 1
@@ -763,8 +763,8 @@ if start_from_step == 0:
 	design_import = {}
 	design_import['name'] = 'design_import'
 	design_import['type'] = 'Import'
-	design_import['x span'] = device_size_lateral_um * 1e-6
-	design_import['y span'] = device_size_lateral_um * 1e-6
+	design_import['x span'] = device_size_lateral_bordered_um * 1e-6
+	design_import['y span'] = device_size_lateral_bordered_um * 1e-6
 	design_import['z max'] = device_vertical_maximum_um * 1e-6
 	design_import['z min'] = device_vertical_minimum_um * 1e-6
 	design_import = fdtd_update_object(fdtd_hook, design_import, create_object=True)
@@ -1016,8 +1016,21 @@ if restart or evaluate:
 	# Load in the most recent Design density variable (before filters of device), values between 0 and 1
 	cur_design_variable = np.load(
 			OPTIMIZATION_INFO_FOLDER + "/cur_design_variable.npy" )
-	# Re-initialize bayer_filter instance
-	bayer_filter.w[0] = cur_design_variable
+
+	reload_design_variable = cur_design_variable.copy()
+	if evaluate_bordered_extended:
+		design_var_reload_width = cur_design_variable.shape[ 0 ]
+		design_var_width = bayer_filter.w[0].shape[ 0 ]
+
+		pad_2x_width_reload = design_var_width - design_var_reload_width
+		assert ( pad_2x_width_reload > 0 ) and ( ( pad_2x_width_reload % 2 ) == 0 ), 'Expected the width difference to be positive and even!'
+		pad_width_reload = pad_2x_width_reload // 2
+  
+		reload_design_variable = np.pad( cur_design_variable, ( ( pad_width_reload, pad_width_reload ), ( pad_width_reload, pad_width_reload ), ( 0, 0 ) ), mode='constant' )
+ 
+	# # Re-initialize bayer_filter instance
+	# bayer_filter.w[0] = cur_design_variable
+	bayer_filter.w[0] = reload_design_variable
 	# Regenerate permittivity based on the most recent design, assuming epoch 0		
  	# NOTE: This gets corrected later in the optimization loop (Step 1)
 	bayer_filter.update_permittivity()
@@ -1074,6 +1087,28 @@ if evaluate:
 	bayer_filter.update_filters( num_epochs - 1 )
 	bayer_filter.update_permittivity()
 	cur_density = bayer_filter.get_permittivity()
+ 
+	#
+	# Binarize the current permittivity
+	#
+	hard_binarize = True#False#True
+
+	if hard_binarize:
+		if binarize_3_levels:
+			low_distance = np.abs( cur_density )
+			mid_distance = np.abs( cur_density - 0.5 )
+			high_distance = np.abs( cur_density - 1.0 )
+
+			cur_density = (
+				( ( low_distance < mid_distance ) * ( low_distance < high_distance ) ) * np.zeros( cur_density.shape ) +
+				( ( mid_distance <= low_distance ) * ( mid_distance < high_distance ) ) * 0.5 * np.ones( cur_density.shape ) +
+				( ( high_distance <= low_distance ) * ( high_distance <= mid_distance ) ) * np.ones( cur_density.shape ) )
+
+		else:
+			cur_density = 1.0 * np.greater_equal( cur_density, 0.5 )
+
+	if do_normalize:
+		cur_density = np.mean( cur_density ) * np.ones( cur_density.shape )
 
 	fdtd_hook.switchtolayout()
 	

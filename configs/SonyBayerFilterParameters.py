@@ -168,6 +168,12 @@ def get_config_vars(param_dict):
 	infrared_center_um = get_check_none(param_dict, "infrared_center_um")
 	do_rejection = get_check_none(param_dict, "do_rejection")
 	softplus_kappa = get_check_none(param_dict, "softplus_kappa")
+	evaluate_bordered_extended = get_check_none(param_dict, "evaluate_bordered_extended")
+	do_normalize = get_check_none(param_dict, "do_normalize")
+	should_fix_layers = get_check_none(param_dict, "should_fix_layers")
+	fixed_layers = get_check_none(param_dict, "fixed_layers")
+	fixed_layers_density = get_check_none(param_dict, "fixed_layers_density")
+
 
 
 
@@ -244,6 +250,8 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	# device_voxels_simulation_mesh_vertical = 2 + int(device_size_vertical_um / mesh_spacing_um)
 	device_voxels_simulation_mesh_vertical = lookup_additional_vertical_mesh_cells[ cd.num_vertical_layers ] + \
 	 													int(device_size_vertical_um / cd.mesh_spacing_um)
+    # TODO: 20230720 Ian - Need to write something that automatically corrects for this. It's taking WAY too much time
+    # todo: to manually guess-and-check this array mismatch.
 
 	device_vertical_maximum_um = device_size_vertical_um	# NOTE: Unused
 
@@ -251,10 +259,18 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	device_size_lateral_bordered_um = cd.device_size_lateral_um
 	device_voxels_lateral_bordered = device_voxels_lateral
 	device_voxels_simulation_mesh_lateral_bordered = device_voxels_simulation_mesh_lateral
+	
+	border_size_um = 5 * cd.device_scale_um		# new
+	border_size_voxels = int( np.round( border_size_um / cd.geometry_spacing_lateral_um ) )		# new
+	assert not ( cd.border_optimization and cd.use_smooth_blur ), "This combination is not supported!"	# new
+	if cd.evaluate_bordered_extended:
+		assert cd.border_optimization, 'Expecting border optimization to be true for this mode'
+		border_size_um = cd.device_size_lateral_um
+
 	if cd.border_optimization:
 		device_size_lateral_bordered_um += 2 * border_size_um
 		device_voxels_lateral_bordered = int(np.round( device_size_lateral_bordered_um / cd.geometry_spacing_lateral_um))
-		device_voxels_simulation_mesh_lateral_bordered = 2 + int(device_size_lateral_bordered_um / cd.mesh_spacing_um)
+		device_voxels_simulation_mesh_lateral_bordered = int(device_size_lateral_bordered_um / cd.mesh_spacing_um) + 2 #1 if mesh_spacing_um == 0.017
 
 	# FDTD
 	vertical_gap_size_um = cd.geometry_spacing_lateral_um * 15
@@ -269,9 +285,9 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 
 	# Surrounding
 
-	pec_aperture_thickness_um = 3 * cd.mesh_spacing_um #new
-	assert not ( cd.border_optimization and cd.num_sidewalls != 0 ), "This combination is not supported!"	# new
-      
+	pec_aperture_thickness_um = 3 * cd.mesh_spacing_um #! new
+	assert not ( cd.border_optimization and cd.num_sidewalls != 0 ), "This combination is not supported!"	#! new
+	  
 	if cd.sidewall_extend_pml:
 		cd.sidewall_thickness_um = (fdtd_region_size_lateral_um - cd.device_size_lateral_um)/2
 	sidewall_x_positions_um = [cd.device_size_lateral_um / 2 + cd.sidewall_thickness_um / 2, 0, -cd.device_size_lateral_um / 2 - cd.sidewall_thickness_um / 2, 0]
@@ -356,11 +372,6 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	#! new ------------------------------------------------------
 	if not cd.reinterpolate_permittivity:	# new
 		assert cd.reinterpolate_permittivity_factor == 1, 'Expected this factor to be 1 if not reinterpolating permittivity'
-
- 
-	border_size_um = 5 * cd.device_scale_um		# new
-	border_size_voxels = int( np.round( border_size_um / cd.geometry_spacing_lateral_um ) )		# new
-	assert not ( cd.border_optimization and cd.use_smooth_blur ), "This combination is not supported!"	# new
 
 	if cd.layer_gradient:
 		# would also like to try thin, thick, thin and then thick, thin, thick
