@@ -246,7 +246,9 @@ device_array_shape = (1) #(3,3)    # A tuple describing dimension sizes such as 
 
 fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 3.0 * device_size_lateral_um
 if evaluation_source_bcs in ['periodic_plane']:
-    fdtd_region_size_lateral_um = 1 * lateral_gap_size_um + 1.0 * device_size_lateral_um
+    # fdtd_region_size_lateral_um = 1 * lateral_gap_size_um + 1.0 * device_size_lateral_um      # too often side monitor is outside of FDTD region
+    fdtd_region_size_lateral_um = 2 * lateral_gap_size_um + 1.0 * device_size_lateral_um
+    
 
 # Optimization
 

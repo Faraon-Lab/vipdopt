@@ -51,8 +51,8 @@ focal_plane_center_lateral_um: 0
 
 #* Device
 
-num_vertical_layers: 10
-vertical_layer_height_um: 0.204 #0.051 * 4 #0.017 * 8
+num_vertical_layers: 5 # 10
+vertical_layer_height_um: 0.408 # 0.204 #0.051 * 4 #0.017 * 8
 
 device_size_lateral_um: 2.04 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
 
@@ -62,11 +62,11 @@ device_vertical_minimum_um: 0
 
 # Structure the following list such that the last entry is the last medium above the device.
 objects_above_device: [] #['permittivity_layer_substrate', #'silicon_substrate']
-num_sidewalls: 0 #4
+num_sidewalls: 4
 sidewall_material: 'etch'
 sidewall_extend_pml: False
 sidewall_extend_focalplane: True
-sidewall_thickness_um: 0.085          # only needed if sidewall_extend_pml is False
+sidewall_thickness_um: 0.085          # only needed if sidewall_extend_pml is False - 0.085 is a good value based on Study #20
 sidewall_vertical_minimum_um: -0.765    # only needed if sidewall_extend_focalplane is False; describes how far down from the device they extend
 
 #* Spectral
@@ -78,7 +78,7 @@ lambda_min_eval_um: 0.375
 lambda_max_eval_um: 0.725
 
 num_bands: 3
-num_points_per_band: 10 #20 #15
+num_points_per_band: 20 #15
 
 num_dispersive_ranges: 1
 
@@ -165,7 +165,7 @@ reinterpolate_type: 'nearest' #'linear'
 
 
 #! new-------
-border_optimization: True
+border_optimization: False
 
 layer_gradient: False
 flip_gradient: False
