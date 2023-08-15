@@ -28,7 +28,7 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.051 #0.051
+mesh_spacing_um: 0.017 #0.051
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.085 # 0.051
 
@@ -63,7 +63,7 @@ device_vertical_minimum_um: 0
 
 # Structure the following list such that the last entry is the last medium above the device.
 objects_above_device: [] #['permittivity_layer_substrate', #'silicon_substrate']
-num_sidewalls: 0
+num_sidewalls: 4
 sidewall_material: 'etch'
 sidewall_extend_pml: False
 sidewall_extend_focalplane: True
@@ -79,7 +79,7 @@ lambda_min_eval_um: 0.375
 lambda_max_eval_um: 0.725
 
 num_bands: 3
-num_points_per_band: 10 #20 #15
+num_points_per_band: 15
 
 num_dispersive_ranges: 1
 
@@ -142,7 +142,7 @@ enforce_xy_gradient_symmetry: False #True#False#True
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-num_epochs: 10 # 10
+num_epochs: 5 # 10
 num_iterations_per_epoch: 30 #30
 
 optimizer_algorithm: 'ADAM' #'Gradient Descent'
@@ -166,7 +166,7 @@ reinterpolate_type: 'nearest' #'linear'
 
 
 #! new-------
-border_optimization: True
+border_optimization: False
 
 layer_gradient: False
 flip_gradient: False
@@ -211,7 +211,7 @@ do_normalize: False #True#False#True#False#True#False
 
 #* Spacers
 # assuming we don't have something like vertically blurring - i.e. - each layer is controlled independently
-should_fix_layers: True #True#False#True#False
+should_fix_layers: False #True
 # fixed_layers: [ 1, 2, 3, 5, 6, 7 ]
 fixed_layers: [ 1, 3 ]
 fixed_layers_density: 0

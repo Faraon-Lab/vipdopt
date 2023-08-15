@@ -177,7 +177,7 @@ device_vertical_minimum_um = fdtd_hook.getnamed('design_import','z min') / 1e-6
 fdtd_region_maximum_vertical_um = fdtd_hook.getnamed('FDTD','z max') / 1e-6
 fdtd_region_minimum_vertical_um = fdtd_hook.getnamed('FDTD','z min') / 1e-6
 fdtd_region_size_vertical_um = fdtd_region_maximum_vertical_um + abs(fdtd_region_minimum_vertical_um)
-monitorbox_size_lateral_um = device_size_lateral_um + (mesh_spacing_um)*3 + 2 * sidewall_thickness_um
+monitorbox_size_lateral_um = device_size_lateral_um + (mesh_spacing_um)*5 + 2 * sidewall_thickness_um
 monitorbox_vertical_maximum_um = device_vertical_maximum_um + (mesh_spacing_um*5)
 monitorbox_vertical_minimum_um = device_vertical_minimum_um - (mesh_spacing_um*5)
 adjoint_vertical_um = fdtd_hook.getnamed('transmission_focal_monitor_', 'z') / 1e-6
@@ -1911,8 +1911,8 @@ def run_jobs_inner( queue_in ):
 					completed_jobs[ job_idx ] = 1
 
 		# if time.time()-job_queue_time > 3600:
-		# 	logging.CRITICAL(r"Warning! The following jobs are taking more than an hour and might be stalling:")
-		# 	logging.CRITICAL(completed_jobs)
+		#	logging.CRITICAL(r"Warning! The following jobs are taking more than an hour and might be stalling:")
+		#	logging.CRITICAL(completed_jobs)
 
 		time.sleep( 5 )
 
