@@ -177,7 +177,7 @@ device_vertical_minimum_um = fdtd_hook.getnamed('design_import','z min') / 1e-6
 fdtd_region_maximum_vertical_um = fdtd_hook.getnamed('FDTD','z max') / 1e-6
 fdtd_region_minimum_vertical_um = fdtd_hook.getnamed('FDTD','z min') / 1e-6
 fdtd_region_size_vertical_um = fdtd_region_maximum_vertical_um + abs(fdtd_region_minimum_vertical_um)
-monitorbox_size_lateral_um = device_size_lateral_um + (mesh_spacing_um)*5 + 2 * sidewall_thickness_um
+monitorbox_size_lateral_um = device_size_lateral_um + (mesh_spacing_um)*3 + 2 * sidewall_thickness_um
 monitorbox_vertical_maximum_um = device_vertical_maximum_um + (mesh_spacing_um*5)
 monitorbox_vertical_minimum_um = device_vertical_minimum_um - (mesh_spacing_um*5)
 adjoint_vertical_um = fdtd_hook.getnamed('transmission_focal_monitor_', 'z') / 1e-6
@@ -706,6 +706,7 @@ if start_from_step == 0:
 		forward_src_x.update({'type': 'PlaneSource'})
 		forward_src_x.update({'source shape': 'Plane wave'})
 		forward_src_x.update({'plane wave type': 'BFAST'})
+		# forward_src_x.update({'plane wave type': 'Bloch/periodic'})
 		forward_src_x.update({'injection axis': 'z-axis'})
 		forward_src_x.update({'direction': 'Backward'})
 		forward_src_x.update({'z': src_maximum_vertical_um * 1e-6})
@@ -741,9 +742,15 @@ if start_from_step == 0:
 		design_import = fdtd_objects['design_import']
 
 		cur_density = np.load("cur_design_variable.npy" )
-		cur_density = np.add(
-			np.multiply(1.0, np.greater(cur_density, 0.5)),
-			np.multiply(0.0, np.less_equal(cur_density, 0.5))
+		if binarize_3_levels:
+			cur_density = \
+				np.multiply(1.0, np.greater(cur_density, 0.667)) + \
+				np.multiply(0.5, np.logical_and(cur_density > 0.333, cur_density < 0.667)) + \
+				np.multiply(0.0, np.less_equal(cur_density, 0.5))
+		else:
+			cur_density = np.add(
+				np.multiply(1.0, np.greater(cur_density, 0.5)),
+				np.multiply(0.0, np.less_equal(cur_density, 0.5))
 			)		# binarize
 		cur_permittivity = min_device_permittivity + ( max_device_permittivity - min_device_permittivity ) * cur_density
 		cur_index = utility.index_from_permittivity( cur_permittivity )
@@ -1903,9 +1910,9 @@ def run_jobs_inner( queue_in ):
 				if not( poll_result is None ):
 					completed_jobs[ job_idx ] = 1
 
-		if time.time()-job_queue_time > 3600:
-			logging.CRITICAL(r"Warning! The following jobs are taking more than an hour and might be stalling:")
-			logging.CRITICAL(completed_jobs)
+		# if time.time()-job_queue_time > 3600:
+		# 	logging.CRITICAL(r"Warning! The following jobs are taking more than an hour and might be stalling:")
+		# 	logging.CRITICAL(completed_jobs)
 
 		time.sleep( 5 )
 

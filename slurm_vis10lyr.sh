@@ -12,10 +12,16 @@
 #SBATCH -A Faraon_Computing
 #SBATCH --time=96:00:00
 #SBATCH --nodes=10
-#SBATCH --ntasks-per-node=8
-## SBATCH --ntasks=80
+
+##SBATCH --ntasks-per-node=8
+### SBATCH --ntasks=80
+##SBATCH --mem-per-cpu=8G
+
+#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks=10
+#SBATCH --mem-per-cpu=20G
+
 #SBATCH --qos=normal
-#SBATCH --mem-per-cpu=8G
 #SBATCH --comment="Get completed jobs for merge of draft2, SONY"
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=BEGIN

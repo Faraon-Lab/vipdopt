@@ -270,7 +270,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	if cd.border_optimization:
 		device_size_lateral_bordered_um += 2 * border_size_um
 		device_voxels_lateral_bordered = int(np.round( device_size_lateral_bordered_um / cd.geometry_spacing_lateral_um))
-		device_voxels_simulation_mesh_lateral_bordered = int(device_size_lateral_bordered_um / cd.mesh_spacing_um) + 2 #1 if mesh_spacing_um == 0.017
+		device_voxels_simulation_mesh_lateral_bordered = int(device_size_lateral_bordered_um / cd.mesh_spacing_um) + 1 #1 if mesh_spacing_um == 0.017
 
 	# FDTD
 	vertical_gap_size_um = cd.geometry_spacing_lateral_um * 15

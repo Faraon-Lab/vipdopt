@@ -28,11 +28,12 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.017 #0.051
+mesh_spacing_um: 0.051 #0.051
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.085 # 0.051
 
 device_scale_um: 0.051    # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
+# Edit: device_scale_um is just meant to arbitrarily scale a few things it's not necessarily ONLY used for vertical dimensions
 # TODO: Consolidate with geometry_spacing_lateral_um
 
 use_smooth_blur: False
@@ -62,7 +63,7 @@ device_vertical_minimum_um: 0
 
 # Structure the following list such that the last entry is the last medium above the device.
 objects_above_device: [] #['permittivity_layer_substrate', #'silicon_substrate']
-num_sidewalls: 4
+num_sidewalls: 0
 sidewall_material: 'etch'
 sidewall_extend_pml: False
 sidewall_extend_focalplane: True
@@ -78,7 +79,7 @@ lambda_min_eval_um: 0.375
 lambda_max_eval_um: 0.725
 
 num_bands: 3
-num_points_per_band: 20 #15
+num_points_per_band: 10 #20 #15
 
 num_dispersive_ranges: 1
 
@@ -165,7 +166,7 @@ reinterpolate_type: 'nearest' #'linear'
 
 
 #! new-------
-border_optimization: False
+border_optimization: True
 
 layer_gradient: False
 flip_gradient: False

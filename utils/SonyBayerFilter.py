@@ -110,12 +110,19 @@ class SonyBayerFilter(device.Device):
 
 
 		if gp.cv.border_optimization:
-
+			
+			# The border indices of the array will be <border_size_voxels> and <endpoint>.
 			endpoint = var0.shape[ 0 ] - gp.pv.border_size_voxels
+			# Take the central region of the array, the part that actually corresponds to the device.
 			var0_ = var0[ gp.pv.border_size_voxels : endpoint, gp.pv.border_size_voxels : endpoint, : ]
-
+			# Pad it back out to the full array size with copies of portions of the central region - this is achieved instantly by 'wrap' mode.
 			var0 = np.pad( var0_, ( ( gp.pv.border_size_voxels, gp.pv.border_size_voxels ), ( gp.pv.border_size_voxels, gp.pv.border_size_voxels ), ( 0, 0 ) ), mode='wrap' )
 
+			# var0.shape = (30, 30, 40)
+			# border_size_voxels = 3
+			# endpoint =  27
+			# var0_ = var0[3:27, 3:27,:]
+			# var0 = np.pad( var0_, ((3,3), (3,3), (0,0)), mode='wrap')
 
 		if not gp.cv.layer_gradient:
 			var1 = self.layering_z_0.forward( var0 )
@@ -186,43 +193,65 @@ class SonyBayerFilter(device.Device):
 
 		if gp.cv.border_optimization:
 
+			# The border indices of the array will be <border_size_voxels> and <endpoint>.
 			endpoint = gradient.shape[ 0 ] - gp.pv.border_size_voxels
+			# For, say,
+   			# gradient.shape = (30, 30, 40)
+			# border_size_voxels = 3
+			# endpoint = 30 - 3 = 27
+			# so that means the central region is actually (3:27, 3:27, 40)
 
+			# Fold in the gradient on the edges (x-direction) and all across the y-direction.
+			gradient[ gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ), gp.pv.border_size_voxels : endpoint, : ] \
+						+= gradient[ endpoint :, gp.pv.border_size_voxels : endpoint, : ]
+			gradient[ ( endpoint - gp.pv.border_size_voxels ) : endpoint, gp.pv.border_size_voxels : endpoint, : ] \
+						+= gradient[ 0 : gp.pv.border_size_voxels, gp.pv.border_size_voxels : endpoint, : ]
+			# gradient[3:6, 3:27, :] += gradient[27:, 3:27,:]
+			# gradient[24:27, 3:27, :] += gradient[0:3, 3:27,:]
 
-			gradient[ gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ), gp.pv.border_size_voxels : endpoint, : ] += gradient[ endpoint :, gp.pv.border_size_voxels : endpoint, : ]
-			gradient[ ( endpoint - gp.pv.border_size_voxels ) : endpoint, gp.pv.border_size_voxels : endpoint, : ] += gradient[ 0 : gp.pv.border_size_voxels, gp.pv.border_size_voxels : endpoint, : ]
+			# Fold in the gradient on the edges (y-direction) and all across the x-direction.
+			gradient[ gp.pv.border_size_voxels : endpoint, gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ), : ] \
+						+= gradient[ gp.pv.border_size_voxels : endpoint, endpoint :, : ]
+			gradient[ gp.pv.border_size_voxels : endpoint, ( endpoint - gp.pv.border_size_voxels ) : endpoint, : ] \
+						+= gradient[ gp.pv.border_size_voxels : endpoint, 0 : gp.pv.border_size_voxels, : ]
+			# gradient[3:27, 3:6, :] += gradient[3:27, 27:, :]
+			# gradient[3:27, 24:27, :] += gradient[3:27, 0:3, :]
 
-			gradient[ gp.pv.border_size_voxels : endpoint, gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ), : ] += gradient[ gp.pv.border_size_voxels : endpoint, endpoint :, : ]
-			gradient[ gp.pv.border_size_voxels : endpoint, ( endpoint - gp.pv.border_size_voxels ) : endpoint, : ] += gradient[ gp.pv.border_size_voxels : endpoint, 0 : gp.pv.border_size_voxels, : ]
-
-
+			# Fold in the gradient for the corners as well! Each corner takes the gradient from its opposite corner (on a 2D square).
 			gradient[
 				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
 				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
 				: ] += gradient[ endpoint :, endpoint :, : ]
+			# gradient[3:6, 3:6, :] += gradient[27:, 27:, :]
 
 			gradient[
 				( endpoint - gp.pv.border_size_voxels ) : endpoint,
 				( endpoint - gp.pv.border_size_voxels ) : endpoint,
 				: ] += gradient[ 0 : gp.pv.border_size_voxels, 0 : gp.pv.border_size_voxels, : ]
+			# gradient[24:27, 24:27, :] += gradient[0:3, 0:3, :]
 
 			gradient[
 				( endpoint - gp.pv.border_size_voxels ) : endpoint,
 				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
 				: ] += gradient[ 0 : gp.pv.border_size_voxels, endpoint :, : ]
+			# gradient[24:27, 3:6, :] += gradient[0:3, 27:, :]
 
 			gradient[
 				gp.pv.border_size_voxels : ( gp.pv.border_size_voxels + gp.pv.border_size_voxels ),
 				( endpoint - gp.pv.border_size_voxels ) : endpoint,
 				: ] += gradient[ endpoint :, 0 : gp.pv.border_size_voxels, : ]
+			# gradient[3:6, 24:27, :] += gradient[27:, 0:3, :]
 
-
-
+			# Finally set the gradient on the border to just be zero so that it's not stepped forward.
+			# The border areas themselves will be regenerated in the next call to update_permittivity().
 			gradient[ 0 : gp.pv.border_size_voxels, :, : ] = 0
 			gradient[ endpoint :, :, : ] = 0
 			gradient[ :, 0 : gp.pv.border_size_voxels, : ] = 0
 			gradient[ :, endpoint :, : ] = 0
-
+			# gradient[0:3, :, :] = 0
+			# gradient[27:, :, :] = 0
+			# gradient[:, 0:3, :] = 0
+			# gradient[:, 27:, :] = 0
 
 		if gp.cv.should_fix_layers:
 			for idx in range( 0, len( gp.cv.fixed_layers ) ):

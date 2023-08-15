@@ -944,6 +944,7 @@ pdaf_quadrant_transmission_data = {}
 figure_of_merit_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
 pdaf_transmission_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
 step_size_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
+binarization_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
 average_design_variable_change_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
 max_design_variable_change_evolution = np.zeros((num_epochs, num_iterations_per_epoch))
 
@@ -1043,6 +1044,7 @@ if restart or evaluate:
 	step_size_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/step_size_evolution.npy")
 	average_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/average_design_change_evolution.npy")
 	max_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/max_design_change_evolution.npy")
+	adam_moments = np.load(OPTIMIZATION_INFO_FOLDER + "/adam_moments.npy")
 
 
 	if restart_epoch == 0 and restart_iter == 1:
@@ -1244,6 +1246,7 @@ else:		# optimization
 					logging.info(f'TiO2% is {100 * np.count_nonzero(cur_index > min_device_index) / cur_index.size}%.')
 					# logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
 					logging.info(f'Binarization is {100 * utility.compute_binarization(cur_density)}%.')
+					binarization_evolution[epoch, iteration] = 100 * utility.compute_binarization(cur_density)
 	
 					# Update bayer_filter data for actual permittivity (not just density 0 to 1)
 					bayer_filter.update_actual_permittivity_values(min_device_permittivity, dispersive_max_permittivity)
@@ -1494,6 +1497,9 @@ else:		# optimization
 												  		epoch, iteration=30)	# continuously produces only one plot per epoch to save space
 				plotter.plot_overall_transmission_trace(fom_evolution['transmission'], OPTIMIZATION_PLOTS_FOLDER)
 				plotter.visualize_device(cur_index, OPTIMIZATION_PLOTS_FOLDER)
+				# plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
+				# plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
+
 
 
 
@@ -1909,11 +1915,14 @@ else:		# optimization
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + '/device_gradient.npy'), device_gradient)			# Gradient of FoM obtained from adjoint method
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + '/design_gradient.npy'), design_gradient)			# device_gradient, propagated through chain-rule filters
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/step_size_evolution.npy"), step_size_evolution)
+				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/binarization_evolution.npy"), binarization_evolution)
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/cur_design_variable.npy"), cur_design_variable)	# Current Design variable i.e. density between 0 and 1
+				np.save(os.path.abspath(EVALUATION_FOLDER + "/cur_design_variable.npy"), cur_design_variable)
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/cur_design.npy"), cur_design)						# Current Design variable after filters
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/cur_design_variable_epoch_" + str( epoch ) + ".npy"), cur_design_variable)
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/average_design_change_evolution.npy"), average_design_variable_change_evolution)
 				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + "/max_design_change_evolution.npy"), max_design_variable_change_evolution)
+				np.save(os.path.abspath(OPTIMIZATION_INFO_FOLDER + '/adam_moments.npy'), adam_moments)			# ADAM Moments
 				
 				logging.info("Completed Step 4: Saved out cur_design_variable.npy and other files.")
 				backup_all_vars()
