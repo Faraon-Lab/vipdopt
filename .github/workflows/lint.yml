@@ -18,9 +18,9 @@ jobs:
           python-version: 3.11
           auto-activate-base: false
       
-        run: |
-          conda info
-          conda list
+      - run: |
+        conda info
+        conda list
   lint:
     needs: setup
     runs-on: ubuntu-latest
