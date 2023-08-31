@@ -1,7 +1,12 @@
+name: vipdopt-dev
+channels:
+  - conda-forge
+  - defaults
 dependencies:
   - python=3.11.*
   - scipy=1.11.*
   - numpy=1.25.*
   - matplotlib=3.7.*
   - scikit-image=0.20.*
+  - pytest
   - pip
