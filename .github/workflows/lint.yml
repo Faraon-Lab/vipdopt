@@ -1,7 +1,7 @@
-nmae: Linting, Formating, Type Checking
+name: Linting, Formating, Type Checking
 on: [push, pull_request]
 jobs:
-  setup:
+  CI-Lint:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -17,22 +17,16 @@ jobs:
           environment-file: environment.yml
           python-version: 3.11
           auto-activate-base: false
-      
-      - run: |
-        conda info
-        conda list
-  lint:
-    needs: setup
-    runs-on: ubuntu-latest
-    uses: wearrerequired/lint-action@v1
-    with:
-      auto_fix: true
-      black: true
-      black_args: --exclude tests
-      flake8: true
-  type_check:
-    needs: setup
-    runs-on: ubuntu-latest
-    uses: jakebailey/pyright-action@v1
-    with:
-      working-directory: vipdopt
+  
+      - name: Lint
+        uses: wearrerequired/lint-action@v1
+        with:
+          auto_fix: true
+          black: true
+          black_args: --exclude tests
+          flake8: true
+  
+      - name: Type Check
+        uses: jakebailey/pyright-action@v1
+        with:
+          working-directory: vipdopt
