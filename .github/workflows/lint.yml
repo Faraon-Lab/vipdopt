@@ -19,7 +19,7 @@ jobs:
           auto-activate-base: false
   
       - name: Lint
-        uses: wearrerequired/lint-action@v1
+        uses: wearerequired/lint-action@v1
         with:
           auto_fix: true
           black: true
