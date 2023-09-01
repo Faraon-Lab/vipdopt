@@ -8,5 +8,8 @@ dependencies:
   - numpy=1.25.*
   - matplotlib=3.7.*
   - scikit-image=0.20.*
+  - flake8=6.0.*
+  - black=23.3.*
+  - pylint=2.16.*
   - pytest
   - pip
