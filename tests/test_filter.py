@@ -1,7 +1,7 @@
 import pytest
 
 from vipdopt.filter import Filter
-from .utils import is_equal
+from testing import assert_equal
 
 import numpy as np
 
@@ -23,7 +23,7 @@ def test_verify_bounds(min: float, max: float, var: np.ndarray, expected: bool):
 
     print(result)
 
-    assert is_equal(result, expected)
+    assert_equal(result, expected)
 
 def test_base_filter_not_impl():
     filter = Filter((0, 1))

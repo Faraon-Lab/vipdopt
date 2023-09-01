@@ -8,8 +8,14 @@ dependencies:
   - numpy=1.25.*
   - matplotlib=3.7.*
   - scikit-image=0.20.*
+  - pip
+  # For Linting
   - flake8=6.0.*
   - black=23.3.*
   - pylint=2.16.*
+  # For Type annotations
+  - mypy
+  # for Testing
   - pytest
-  - pip
+  - pytest-cov
+  - pytest-xdist
