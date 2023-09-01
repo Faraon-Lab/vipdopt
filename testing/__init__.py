@@ -8,4 +8,4 @@ should be able to just import functions and have them work right away.
 from .utils import *
 from . import utils
 
-__all__ = (utils.__all__)
+__all__ = utils.__all__
