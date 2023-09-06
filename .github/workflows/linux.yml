@@ -1,0 +1,60 @@
+name: Linux Continuous Integration
+
+# This file is intended for testing on linux platforms, running benchmarks, measuring
+# code coverage, etc.
+
+on:
+  push:
+    branches:
+      - main
+      - cleanup
+  pull_request:
+
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+    
+      - name: Setup python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.11'
+    
+      - name: Install ruff
+        run: python -m pip install ruff
+
+      - name: Lint with ruff
+        uses: chartboost/ruff-action@v1
+        with:
+          src: "."
+          args: --config pyproject.toml
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+    
+      - name: Setup python
+        uses: .github/actions/python-setup-cache
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: './*_requirements.txt'
+    
+      - name: Run tests
+        run: pytest -m smoke
+
+# TODO: add workflows for auto-documentation, full test-suite, code-coverage, benchmarking

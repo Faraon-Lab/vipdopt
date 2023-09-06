@@ -1,0 +1,52 @@
+name: Run MyPy
+
+# Mypy is too slow to run as part of regular CI. The purpose of the jobs in
+# this file is to cover running Mypy across:
+#
+#   - OSes: Linux, Windows and macOS
+#   - Python versions: lowest/highest supported versions, and an intermediate one
+
+on:
+  push:
+    branches:
+      - main
+      - cleanup
+  pull_request:
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+
+jobs:
+  mypy:
+    name: "MyPy"
+    runs-on: ${{ matrix.os_python[0] }}
+    strategy:
+      matrix:
+        os_python:
+          - [ubuntu-latest, '3.11']  # switch to 3.12-dev after mypy is upgraded (see gh-23764)
+          - [windows-2019, '3.11.1']
+          - [macos-12, '3.11.2']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+            submodules: recursive
+            fetch-depth: 0
+
+      - uses: actions/setup-python@v4
+        with:
+            python-version: ${{ matrix.os_python[1] }}
+
+      - name: Install dependencies
+        run: |
+            pip install -r build_requirements.txt
+            pip install -r test_requirements.txt
+
+      - name: Run MyPy 
+        run: mypy vipdopt tests testing
