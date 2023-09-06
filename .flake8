@@ -1,3 +1,0 @@
-[flake8]
-exclude = .git,__pychache__,docs,tests,.github, testing
-max-line-length = 90

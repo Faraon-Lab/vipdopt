@@ -6,29 +6,7 @@ on:
       - cleanup
   pull_request:
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-    
-      - name: Setup python
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.11'
-    
-      - name: Install Linter Requirements
-        run: python -m pip install -r linter_requirements.txt
-
-      - name: Lint
-        uses: wearerequired/lint-action@v1
-        with:
-          auto_fix: true
-          black: true
-          black_args: --exclude tests
-          flake8: true
-
-  test:
+  smoke-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -45,9 +23,9 @@ jobs:
           python -m pip install -r test_requirements.txt
     
       - name: Run tests
-        run: python -m pytest
-
+        run: pytest -m smoke
   mypy:
+    needs: smoke-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -65,4 +43,23 @@ jobs:
     
       - name: Run MyPy 
         run: mypy vipdopt tests testing
- 
+  lint:
+    needs: [smoke-test, mypy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+    
+      - name: Setup python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.11'
+    
+      - name: Install ruff
+        run: python -m pip install ruff
+
+      - name: Lint with ruff
+        uses: chartboost/ruff-action@v1
+        with:
+          src: "."
+          args: --config pyproject.toml

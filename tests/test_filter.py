@@ -5,6 +5,7 @@ from testing import assert_equal
 
 import numpy as np
 
+@pytest.mark.smoke
 @pytest.mark.parametrize(
     'min, max, var, expected',
     [
@@ -25,6 +26,8 @@ def test_verify_bounds(min: float, max: float, var: np.ndarray, expected: bool):
 
     assert_equal(result, expected)
 
+
+@pytest.mark.smoke
 def test_base_filter_not_impl():
     filter = Filter((0, 1))
 
