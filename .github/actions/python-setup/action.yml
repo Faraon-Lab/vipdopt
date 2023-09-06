@@ -19,12 +19,12 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
         cache: ${{ inputs.cache }}
-        cache-dependency-path: ${{ inputs.cache-directory-path }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
 
     - name: Install Dependencies 
       shell: bash
       run: |
-        for file in ${{ inputs.cache-directory-path }}
+        for file in ${{ inputs.cache-dependency-path }}
         do
           pip install -r file
         done
