@@ -9,7 +9,7 @@ inputs:
     default: 'pip'
   cache-dependency-path:
     required: true 
-    default: '**/requirements.txt'
+    default: './requirements.txt'
     
   runs:
     using: composite
