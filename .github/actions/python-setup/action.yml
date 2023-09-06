@@ -17,13 +17,13 @@ inputs:
       - name: Setup python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ inputs.python-version }}
-          cache: ${{ inputs.cache }}
-          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          python-version: ${{ github.event.inputs.python-version }}
+          cache: ${{ github.event.inputs.cache }}
+          cache-dependency-path: ${{ github.event.inputs.cache-dependency-path }}
     
       - name: Install Dependencies 
         run: |
-          for file in ${{ cache-dependency-path }}
+          for file in ${{ github.event.inputs.cache-dependency-path }}
           do
             pip install -r file
           done
