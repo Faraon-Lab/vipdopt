@@ -2,28 +2,28 @@ name: Setup Python and Cache Dependencies
 
 inputs:
   python-version:
-    required: true
+    required: false
     default: 3.11
   cache:
-    required: true 
+    required: false 
     default: 'pip'
   cache-dependency-path:
-    required: true 
+    required: false
     default: './requirements.txt'
     
-  runs:
-    using: composite
-    steps:
-      - name: Setup python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ INPUT_PYTHON-VERSION }}
-          cache: ${{ INPUT_CACHE }}
-          cache-dependency-path: ${{ INPUT_CACHE-DEPENDENCY-PATH}}
+runs:
+  using: composite
+  steps:
+    - name: Setup python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-directory-path }}
 
-      - name: Install Dependencies 
-        run: |
-          for file in ${{ INPUT_CACHE-DEPENDENCY-PATH }}
-          do
-            pip install -r file
-          done
+    - name: Install Dependencies 
+      run: |
+        for file in ${{ inputs.cache-directory-path }}
+        do
+          pip install -r file
+        done
