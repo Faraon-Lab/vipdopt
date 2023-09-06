@@ -22,6 +22,7 @@ runs:
         cache-dependency-path: ${{ inputs.cache-directory-path }}
 
     - name: Install Dependencies 
+      shell: bash
       run: |
         for file in ${{ inputs.cache-directory-path }}
         do
