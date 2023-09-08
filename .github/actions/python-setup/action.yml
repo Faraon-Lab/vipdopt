@@ -26,5 +26,5 @@ runs:
       run: |
         for file in ${{ inputs.cache-dependency-path }}
         do
-          pip install -r file
+          pip install -r $file
         done
