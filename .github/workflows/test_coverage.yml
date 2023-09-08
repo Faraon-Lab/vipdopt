@@ -31,7 +31,7 @@ jobs:
           - name: Install Dependencies 
             shell: bash
             run: |
-                for file in '\./*_requirements\.txt'
+                for file in '**requirements\.txt'
                 do
                   pip install -r $file
                 done
