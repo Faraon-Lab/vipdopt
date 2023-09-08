@@ -10,12 +10,12 @@ dependencies:
   - scikit-image=0.20.*
   - pip
   # For Linting
-  - ruff
+  - ruff=0.0.287
   # For static type checking
-  - mypy
-  - overrides
+  - mypy=1.5.*
+  - overrides=7.4.*
   # For testing
-  - pytest
-  - pytest-cov
-  - pytest-xdist
-  - coverage[toml]
+  - pytest=7.4.*
+  - pytest-cov=4.1.*
+  - pytest-xdist=3.3.*
+  - coverage[toml]=7.2.*

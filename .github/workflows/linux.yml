@@ -55,6 +55,6 @@ jobs:
           cache-dependency-path: './*_requirements.txt'
     
       - name: Run tests
-        run: pytest -m 'not slow'
+        run: pytest -m 'smoke'
 
 # TODO: add workflows for auto-documentation, full test-suite, code-coverage, benchmarking
