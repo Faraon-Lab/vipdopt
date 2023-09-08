@@ -99,7 +99,7 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-include = ["*/vipdopt/*"]
+source = ["vipdopt"]
 omit = ["*tests*", "*testing*"]
 
 [tool.coverage.report]
