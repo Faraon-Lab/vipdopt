@@ -99,6 +99,7 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
+source = ["vipdopt"]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
