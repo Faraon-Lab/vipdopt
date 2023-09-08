@@ -33,7 +33,7 @@ jobs:
             run: |
                 for file in '**requirements\.txt'
                 do
-                  pip install -r $file
+                  pip install \-r $file
                 done
         
           # TODO: Increase fail percentage to 90
