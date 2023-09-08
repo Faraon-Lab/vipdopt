@@ -11,9 +11,10 @@ dependencies:
   - pip
   # For Linting
   - ruff
-  # For Type annotations
+  # For static type checking
   - mypy
-  # for Testing
+  - overrides
+  # For testing
   - pytest
   - pytest-cov
   - pytest-xdist

@@ -1,38 +1,39 @@
-import pytest
-
-from vipdopt.filter import Filter
-from testing import assert_equal
+"""Tests for filter.py"""
 
 import numpy as np
+import numpy.typing as npt
+import pytest
 
-@pytest.mark.smoke
+from testing import assert_equal
+from vipdopt.filter import Sigmoid
+
+# Generic values for instantiating Sigmoid filters
+ETA = 0.5
+BETA = 0.05
+
+@pytest.mark.smoke()
 @pytest.mark.parametrize(
-    'min, max, var, expected',
+    'var, expected',
     [
-        (0, 100, 50, True),
-        (-100, 0, -50, True),
-        (0, 100, 101, False),
-        (0, 100, 100, True),
-        (0, 100, 0, True),
-        (0, 0, 1, False),
-        (0, 1, 0.5, True)
+        (0.0, True),
+        (1.0, True),
+        (0.5, True),
+        (-1.0, False),
+        (1.1, False),
+        ([0.0, 1.0, 0.5], True),
+        ([-0.1, 1.1], False),
+        ([-0.1, 0.5, 1.1], False),
     ]
 )
-def test_verify_bounds(min: float, max: float, var: np.ndarray, expected: bool):
-    filter = Filter((min, max))
-    result = filter.verify_bounds(var)
-
-    print(result)
-
+def test_verify_bounds_sigmoid(var: npt.ArrayLike | np.number, expected: bool):
+    # Sigmoid always has bounds [0, 1]
+    sig = Sigmoid(ETA, BETA)
+    result = sig.verify_bounds(var)
     assert_equal(result, expected)
 
 
-@pytest.mark.smoke
-def test_base_filter_not_impl():
-    filter = Filter((0, 1))
-
-    with pytest.raises(NotImplementedError):
-        filter.forward(None)
-
-    with pytest.raises(NotImplementedError):
-        filter.chain_rule(None, None, None)
+@pytest.mark.smoke()
+@pytest.mark.parametrize('eta', [-0.1, 1.1])
+def test_sigmoid_bad_eta(eta: float):
+    with pytest.raises(ValueError, match=r'Eta must be in the range \[0, 1\]'):
+        Sigmoid(eta, BETA)

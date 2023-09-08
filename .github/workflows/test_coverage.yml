@@ -1,0 +1,25 @@
+name: Tests and Code coverage
+
+on:
+  push:
+    branches:
+      - main
+      - cleanup
+  pull_request:
+
+jobs:
+    tests:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Setup python
+            uses: ./.github/actions/python-setup
+            with:
+                python-version: '3.11'
+                cache: 'pip'
+                cache-dependency-path: './*_requirements.txt'
+        
+          - name: Get coverage information and test coverage
+            run: |
+              coverage run -m pytest -n auto
+              coverage report -m --fail-under 90
+        
