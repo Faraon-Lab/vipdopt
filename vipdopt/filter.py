@@ -6,8 +6,6 @@ import numpy as np
 import numpy.typing as npt
 from overrides import override
 
-from vipdopt.utils import sech
-
 SIGMOID_BOUNDS = (0.0, 1.0)
 
 
@@ -74,8 +72,11 @@ class Sigmoid(IFilter):
 
     @override
     def forward(self, x):
-        numerator = np.tanh(self.beta * self.eta) + \
-            np.power(sech(np.tanh(self.beta * (x - self.eta))), 2)
+        """Propogate x through the filter and return the result.
+        All input values of x above the threshold eta, are projected to 1, and the
+        values below, projected to 0. This is Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y.
+        """
+        numerator = np.tanh(self.beta * self.eta) + np.tanh(self.beta * (x - self.eta))
         return numerator / self._denominator
 
     @override

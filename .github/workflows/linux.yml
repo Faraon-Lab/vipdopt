@@ -27,7 +27,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
     
-      - name: Setup python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
@@ -47,10 +47,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
     
-      - name: Setup python
+      - name: Setup Python
         uses: ./.github/actions/python-setup
     
-      - name: Run tests
+      - name: Run Smoke Tests
         run: pytest -m 'smoke'
 
 # TODO: add workflows for auto-documentation, full test-suite, code-coverage, benchmarking

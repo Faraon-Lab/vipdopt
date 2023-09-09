@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from testing import assert_equal
+from testing import assert_close, assert_equal
 from vipdopt.filter import Sigmoid
 
 # Generic values for instantiating Sigmoid filters
@@ -37,3 +37,22 @@ def test_verify_bounds_sigmoid(var: npt.ArrayLike | np.number, expected: bool):
 def test_sigmoid_bad_eta(eta: float):
     with pytest.raises(ValueError, match=r'Eta must be in the range \[0, 1\]'):
         Sigmoid(eta, BETA)
+
+@pytest.mark.smoke()
+@pytest.mark.parametrize(
+    'eta, beta, x, y',
+    [
+        # Check that \rho=0.5 always get projected to 0.5, for lare and small beta
+        (0.5, 1, 0.5, 0.5),
+        (0.5, 1e9, 0.5, 0.5),
+
+        # Check that going around the center pushes towards the ends
+        (0.5, 1, 0.4, 0.39216),
+        (0.5, 1, 0.6, 0.607838),
+        (0.5, 1e3, 0.4, 0),
+        (0.5, 1e3, 0.6, 1),
+    ]
+)
+def test_sigmoid_forward(eta: float, beta: float, x: float, y: float):
+    sig = Sigmoid(eta, beta)
+    assert_close(sig.forward(x), y)
