@@ -123,3 +123,9 @@ exclude_also = [
     ]
 
 ignore_errors = true
+
+#
+# mypy Settings
+#
+[tool.mypy]
+disable_error_code = ["operator"]
