@@ -15,11 +15,14 @@ BETA = 0.05
 @pytest.mark.parametrize(
     'var, expected',
     [
+        # Simple edge cases
         (0.0, True),
         (1.0, True),
         (0.5, True),
         (-1.0, False),
         (1.1, False),
+
+        # Works on arrays too
         ([0.0, 1.0, 0.5], True),
         ([-0.1, 1.1], False),
         ([-0.1, 0.5, 1.1], False),
@@ -56,3 +59,25 @@ def test_sigmoid_bad_eta(eta: float):
 def test_sigmoid_forward(eta: float, beta: float, x: float, y: float):
     sig = Sigmoid(eta, beta)
     assert_close(sig.forward(x), y)
+
+@pytest.mark.smoke()
+@pytest.mark.parametrize(
+    'eta, beta, x, y',
+    [
+        # All combinations of eta = 0.5, beta = {1, 1e3}, x = {0, 0.4, 0.6, 1}
+        (0.5, 1, 0, 0.85092),
+        (0.5, 1, 0.4, 1.07123),
+        (0.5, 1, 0.6, 1.07123),
+        (0.5, 1, 1.0, 0.85092),
+        (0.5, 1e3, 0, 0),
+        (0.5, 1e3, 0.4, 0),
+        (0.5, 1e3, 0.6, 0),
+        (0.5, 1e3, 1.0, 0),
+    ]
+)
+def test_sigmoid_chain_rule(eta: float, beta: float, x: float, y: float):
+    sig = Sigmoid(eta, beta)
+    _ = 1  # sigmoid chain rule doesn't user deriv_out or var_out
+    assert_close(sig.chain_rule(_, _, x), y)
+
+

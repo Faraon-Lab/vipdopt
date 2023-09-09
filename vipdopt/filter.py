@@ -6,6 +6,8 @@ import numpy as np
 import numpy.typing as npt
 from overrides import override
 
+from vipdopt.utils import sech
+
 SIGMOID_BOUNDS = (0.0, 1.0)
 
 
@@ -27,11 +29,16 @@ class IFilter(abc.ABC):
         )
 
     @abc.abstractmethod
-    def forward(self, x):
+    def forward(self, x: npt.ArrayLike | np.number) -> npt.ArrayLike | np.number:
         """Propogate x through the filter and return the result."""
 
     @abc.abstractmethod
-    def chain_rule(self, derivative, y, x):
+    def chain_rule(
+        self,
+        deriv_out: npt.ArrayLike | np.number,
+        var_out: npt.ArrayLike | np.number,
+        var_in: npt.ArrayLike | np.number
+        ) -> npt.ArrayLike | np.number:
         """Apply the chain rule and propogate the derivative back one step."""
 
 
@@ -71,7 +78,7 @@ class Sigmoid(IFilter):
         return f'Sigmoid filter with eta={self.eta:0.3f} and beta={self.beta:0.3f}'
 
     @override
-    def forward(self, x):
+    def forward(self, x: npt.ArrayLike | np.number) -> npt.ArrayLike | np.number:
         """Propogate x through the filter and return the result.
         All input values of x above the threshold eta, are projected to 1, and the
         values below, projected to 0. This is Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y.
@@ -80,14 +87,20 @@ class Sigmoid(IFilter):
         return numerator / self._denominator
 
     @override
-    def chain_rule(self, derivative, y, x):
+    def chain_rule(
+        self,
+        deriv_out: npt.ArrayLike | np.number,
+        var_out: npt.ArrayLike | np.number,
+        var_in: npt.ArrayLike | np.number
+        ) -> npt.ArrayLike | np.number:
         """Apply the chain rule and propogate the derivative back one step.
 
         Returns the first argument, multiplied by the direct derivative of forward()
         i.e. Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y, with respect to
         \\tilde{p_i}.
         """
-        raise NotImplementedError
+        numerator = self.beta * np.power(sech(self.beta * (var_in - self.eta)), 2)
+        return numerator / self._denominator
 
     def fabricate(self, x: npt.ArrayLike | np.number) -> npt.ArrayLike | np.number:
         """Apply filter to input as a hard step-function instead of sigmoid.
