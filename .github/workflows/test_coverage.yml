@@ -35,9 +35,5 @@ jobs:
                 pip install -r test_requirements.txt
         
           # TODO: Increase fail percentage to 90
-          - name: Get coverage information and test coverage
-            run: |
-              coverage --version
-              coverage run -m pytest -n auto
-              coverage report -m --fail-under 80
-        
+          - name: Get coverage information and test above threshold
+            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 80
