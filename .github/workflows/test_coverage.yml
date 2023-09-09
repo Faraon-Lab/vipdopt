@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-    tests:
+    check_coverage:
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v4
@@ -23,18 +23,21 @@ jobs:
         #         python-version: '3.11'
         #         cache: 'pip'
         #         cache-dependency-path: './*_requirements.txt'
+        #   - name: Setup python
+        #     uses: actions/setup-python@v4
+        #     with:
+        #         python-version: '3.11'
+        #         cache: 'pip'
+        #         cache-dependency-path: '*requirements.txt'
+
           - name: Setup python
-            uses: actions/setup-python@v4
-            with:
-                python-version: '3.11'
-                cache: 'pip'
-                cache-dependency-path: '*requirements.txt'
+            uses: ./.github/actions/python-setup
         
-          - name: Install Dependencies 
-            shell: bash
-            run: |
-                pip install -r build_requirements.txt
-                pip install -r test_requirements.txt
+        #   - name: Install Dependencies 
+        #     shell: bash
+        #     run: |
+        #         pip install -r build_requirements.txt
+        #         pip install -r test_requirements.txt
 
           - name: Get coverage information and test above threshold
             run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 90

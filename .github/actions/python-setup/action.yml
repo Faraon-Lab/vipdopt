@@ -1,4 +1,4 @@
-name: Setup Python and Cache Dependencies
+name: Setup Python and Install All Dependencies
 
 inputs:
   python-version:
@@ -9,7 +9,7 @@ inputs:
     default: 'pip'
   cache-dependency-path:
     required: false
-    default: './requirements.txt'
+    default: '*requirements.txt'
     
 runs:
   using: composite
