@@ -31,10 +31,8 @@ jobs:
           - name: Install Dependencies 
             shell: bash
             run: |
-                for file in '**requirements\.txt'
-                do
-                  pip install -r $file
-                done
+                pip install -r build_requirements.txt
+                pip install -r test_requirements.txt
         
           # TODO: Increase fail percentage to 90
           - name: Get coverage information and test coverage
