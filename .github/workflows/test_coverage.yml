@@ -35,7 +35,6 @@ jobs:
             run: |
                 pip install -r build_requirements.txt
                 pip install -r test_requirements.txt
-        
-          # TODO: Increase fail percentage to 90
+
           - name: Get coverage information and test above threshold
-            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 80
+            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 90
