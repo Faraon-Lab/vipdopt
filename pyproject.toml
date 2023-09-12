@@ -59,7 +59,13 @@ target-version = "py311"
 
 # Ignore documentation for tests
 # Ignore boolean arguments in methods for tests
-"**/tests/*" = ["E402", "D", "FBT001"]
+"**/tests/*" = [
+    "E402", "F403", "F405",  # Import violations
+    "D",  # Documentation
+    "FBT",  # Boolean arguments in methods
+    "ARG001",  # Unused function argument
+]
+
 
 [tool.ruff.flake8-quotes]
 docstring-quotes = "double"
