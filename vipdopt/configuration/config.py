@@ -1,5 +1,6 @@
 """Module for handling configuration parameters."""
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -23,27 +24,18 @@ def _yaml_loader(filepath: str) -> dict:
 
 
 class Config:
-    """A wrapper class for a loaded configuration file."""
+    """A generic class for stroing parameters from a configuration file."""
 
-    def __init__(self, config_file, config_format='yaml'):
-        """Initialize a Config option.
+    def __init__(self):
+        """Initialize a Config object.
 
         Creates an attribute for each parameter in a provided config file.
         """
-        self.config_file = config_file
+        self._files = set()
 
-        # Get the correct loader method for the format and load the config file
-        config_loader = get_config_loader(config_format)
-        config = config_loader(config_file)
-
-        # Create an attribute for each of the parameters in the resulting dict
-        if config is not None:
-            for (k, v) in config.items():
-                self.__dict__[k] = v
-
-    def __repr__(self):
-        """Return a string representation of the Config object."""
-        return f'Config object representing {self.config_file}'
+    def __str__(self):
+        """Return shorter string version of the Config object."""
+        return f'Config object for {self._files}'
 
     def __getattr__(self, name: str) -> Any:
         """Get an attrbitute of the Config object."""
@@ -57,32 +49,15 @@ class Config:
         """Set the value of an attribute, creating it if it doesn't already exist."""
         self.__dict__[name] = value
 
+    def read_file(self, filename: str, cfg_format: str='yaml'):
+        """Read a config file and update the dictionary."""
+        # Get the correct loader method for the format and load the config file
+        config_loader = get_config_loader(cfg_format)
+        config = config_loader(filename)
 
-class SonyBayerConfig(Config):
-    """Config object specifically for use with the Sony bayer filter optimization."""
+        # Create an attribute for each of the parameters in the config file
+        if config is not None:
+            self.__dict__.update(config)
 
-    # List of all the cascading parameters, their dependencies, and a function to
-    # compute it.
-    # TODO: Is this going to have to be hard-coded?
-    _cascading_parameters = (
-        # e.g. ('sum_of_a_and_b', ('a', 'b'), lambda a, b: a + b),
-        (
-            'total_iterations',
-            ('num_epochs', 'num_iterations_per_epoch'),
-            lambda a, b: a * b
-        ),
-    )
-
-    def __init__(self, config_file, config_format='yaml'):
-        """Initialize SonyBayerConfig object."""
-        super().__init__(config_file, config_format)
-        self._derive_cascading_params()
-
-    def _derive_cascading_params(self):
-        """Compute all the cascading parameters."""
-        for (name, deps, f) in self._cascading_parameters:
-            # Map all dependency attributes to their values
-            deps_vals = tuple(self.__getattr__(x) for x in deps)
-
-            # Call the provided function to compute `name` with the dependencies
-            self.__setattr__(name, f(*deps_vals))
+        self._files.add(filename)
+        logging.info(f'\nSuccesfully loaded configuration from {filename}')

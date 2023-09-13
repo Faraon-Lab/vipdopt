@@ -6,12 +6,13 @@ import pytest
 from testing import assert_equal
 from vipdopt.configuration import Config, SonyBayerConfig
 
-TEST_YAML_PATH = 'tests/common/test_config.yml'
+TEST_YAML_PATH = 'config.yml.example'
 
 @pytest.mark.smoke()
 @pytest.mark.usefixtures('_mocker_empty_config')
 def test_load_empty_yaml():
-    cfg = Config('fakefile')
+    cfg = Config()
+    cfg.read_file('fakefile')
 
     with pytest.raises(KeyError):
         _ = cfg.fixed_layers  # Accessing a property that doesn't exist
@@ -19,7 +20,9 @@ def test_load_empty_yaml():
 
 @pytest.mark.smoke()
 def test_load_yaml():
-    cfg = Config(TEST_YAML_PATH)
+    cfg = Config()
+    cfg.read_file(TEST_YAML_PATH)
+
     expected_pairs = [
         ('fixed_layers', [1, 3]),
         ('do_rejection', False),
@@ -35,6 +38,7 @@ def test_load_yaml():
 
 
 def test_cascading_params():
-    cfg = SonyBayerConfig(TEST_YAML_PATH)
+    cfg = SonyBayerConfig()
+    cfg.read_file(TEST_YAML_PATH)
 
     assert_equal(cfg.total_iterations, 150)

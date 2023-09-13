@@ -57,6 +57,9 @@ target-version = "py311"
 "**/__init__.py" = ["E402", "F403", "F405"]
 "**/{testing,docs}/*" = ["E402"]
 
+# Ignore import order in __main__.py
+"**/__main__.py" = ["E402"]
+
 # Ignore documentation for tests
 # Ignore boolean arguments in methods for tests
 "**/tests/*" = [
