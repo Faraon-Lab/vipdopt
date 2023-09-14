@@ -60,6 +60,9 @@ target-version = "py311"
 # Ignore import order in __main__.py
 "**/__main__.py" = ["E402"]
 
+# Ignore docstrings for properties in SonyBayerFilter config
+"**/configuration/sbc.py" = ["D"]
+
 # Ignore documentation for tests
 # Ignore boolean arguments in methods for tests
 "**/tests/*" = [

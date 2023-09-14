@@ -1,5 +1,6 @@
 """Module containing common functions used throughout the package."""
 
+
 import numpy as np
 import numpy.typing as npt
 

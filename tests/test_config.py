@@ -41,4 +41,4 @@ def test_cascading_params():
     cfg = SonyBayerConfig()
     cfg.read_file(TEST_YAML_PATH)
 
-    assert_equal(cfg.total_iterations, 150)
+    assert_equal(cfg.min_device_permittivity, 1.5 ** 2)
