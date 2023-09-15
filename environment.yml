@@ -9,6 +9,7 @@ dependencies:
   - matplotlib=3.7.*
   - scikit-image=0.20.*
   - PyYAML
+  - types-PyYAML
   - pip
   # For Linting
   - ruff=0.0.287
