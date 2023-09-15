@@ -28,13 +28,13 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.017 #0.051
+mesh_spacing_um: 0.017 # 0.051
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.085 # 0.051
 
 device_scale_um: 0.051    # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
 # Edit: device_scale_um is just meant to arbitrarily scale a few things it's not necessarily ONLY used for vertical dimensions
-# TODO: Consolidate with geometry_spacing_lateral_um
+# TODO: Consolidate with geometry_spacing_lateral_um 
 
 use_smooth_blur: False
 min_feature_size_um: 0.085  # used only for blurring
@@ -79,7 +79,7 @@ lambda_min_eval_um: 0.375
 lambda_max_eval_um: 0.725
 
 num_bands: 3
-num_points_per_band: 15
+num_points_per_band: 20 #15
 
 num_dispersive_ranges: 1
 
@@ -162,7 +162,7 @@ optimization_fom: 'intensity'    # Has to be one from the fom_types list
 #! new-------
 reinterpolate_permittivity: True #False
 reinterpolate_permittivity_factor: 5 #1#5
-reinterpolate_type: 'nearest' #'linear'
+reinterpolate_type: 'nearest' #'linear'   #NOTE: In the end we implement both anyway. Deprecated
 
 
 #! new-------
