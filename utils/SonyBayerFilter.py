@@ -287,7 +287,7 @@ class SonyBayerFilter(device.Device):
 
 	def init_variables(self):
 		super(SonyBayerFilter, self).init_variables()
-		self.w[0] = np.multiply(self.init_permittivity, np.ones(self.size, dtype=np.complex))
+		self.w[0] = np.multiply(self.init_permittivity, np.ones(self.size, dtype=np.complex128))
 
 	def init_filters_and_variables(self):
 		self.num_filters = 3

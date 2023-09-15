@@ -30,8 +30,8 @@ class Device:
 		Each subsequent layer represents the permittivity after being passed through the corresponding number of filters.
 		The first entry / array is the design variable, and the last entry / array is the updated permittivity.'''
 		
-		self.w = [np.zeros(self.size, dtype=np.complex) for i in range(0, self.num_variables)]
-		self.w[0] = np.multiply(self.init_permittivity, np.ones(self.size, dtype=np.complex))
+		self.w = [np.zeros(self.size, dtype=np.complex128) for i in range(0, self.num_variables)]
+		self.w[0] = np.multiply(self.init_permittivity, np.ones(self.size, dtype=np.complex128))
 
 	def get_design_variable(self):
 		return self.w[0]

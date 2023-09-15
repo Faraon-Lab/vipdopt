@@ -35,7 +35,7 @@ def get_afield( fdtd_hook_, monitor_name, field_indicator ):
 	data_xfer_size_MB += field_pol_0.nbytes / ( 1024. * 1024. )
 
 	total_field = np.zeros( [ len (field_polarizations ) ] + 
-						list( field_pol_0.shape ), dtype=np.complex )
+						list( field_pol_0.shape ), dtype=np.complex128 )
 	total_field[ 0 ] = field_pol_0
 
 	logging.info(f'Getting {field_polarizations[pol_idx]} from monitor {monitor_name}. Size: {data_xfer_size_MB}MB. Time taken: {time.time()-start} seconds.')
