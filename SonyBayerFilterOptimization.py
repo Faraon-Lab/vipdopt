@@ -235,6 +235,16 @@ def create_dict_nx(dict_name):
 	else:
 		globals()[dict_name] = {}
 
+def density_to_index(cur_density):
+	cur_permittivity = min_device_permittivity + (dispersive_max_permittivity - min_device_permittivity) * cur_density
+	cur_index = utility.index_from_permittivity( cur_permittivity )
+	return cur_index
+
+def index_to_density(cur_index):
+	cur_permittivity = cur_index**2
+	cur_density = (cur_permittivity - min_device_permittivity) / (dispersive_max_permittivity - min_device_permittivity)
+	return cur_density
+
 
  
 # TODO: Put into some dispersion module -----------------------------
@@ -386,6 +396,22 @@ def disable_all_sources():
 
 	disable_objects(object_list)
 
+def get_device_index(fdtd_hook):
+	'''Returns index data from the device index monitor.'''
+	device_index = fdtd_hook.getresult(design_index_monitor['name'],"index preview")
+	n_dev = device_index['index_x']
+	return device_index, n_dev
+
+def check_indices_equal(device_index):
+	'''Check for anisotropy in the device index monitor.'''
+	n_x = np.real(device_index['index_x'])
+	n_y = np.real(device_index['index_y'])
+	n_z = np.real(device_index['index_z'])
+	if np.all(n_x == n_y) and np.all(n_x == n_z):
+		return True
+	else:   return False 
+
+
 #
 #* Step 0: Set up structures, regions and monitors from which E-fields, Poynting fields, and transmission data will be drawn.
 # Also any other necessary editing of the Lumerical environment and objects.
@@ -446,22 +472,31 @@ if start_from_step == 0:
 	# 					bayer_filter_region_x[ x_idx ], bayer_filter_region_y[ y_idx ], bayer_filter_region_z[ z_idx ] ]
 	
 	#! new
-	bayer_filter_region = np.zeros( ( device_voxels_lateral_bordered, device_voxels_lateral_bordered, device_voxels_vertical, 3 ) )
-	for x_idx in range( 0, device_voxels_lateral_bordered ):
-		for y_idx in range( 0, device_voxels_lateral_bordered ):
-			for z_idx in range( 0, device_voxels_vertical ):
-				bayer_filter_region[ x_idx, y_idx, z_idx, : ] = [ bayer_filter_region_x[ x_idx ], bayer_filter_region_y[ y_idx ], bayer_filter_region_z[ z_idx ] ]
+	# bayer_filter_region = np.zeros( ( device_voxels_lateral_bordered, device_voxels_lateral_bordered, device_voxels_vertical, 3 ) )
+	# for x_idx in range( 0, device_voxels_lateral_bordered ):
+	# 	for y_idx in range( 0, device_voxels_lateral_bordered ):
+	# 		for z_idx in range( 0, device_voxels_vertical ):
+	# 			bayer_filter_region[ x_idx, y_idx, z_idx, : ] = [ bayer_filter_region_x[ x_idx ], bayer_filter_region_y[ y_idx ], bayer_filter_region_z[ z_idx ] ]
 	# todo: adjust the bordered stuff accordingly. Rewrite this part for cleanliness. You really need to compare the parts where
 	# todo: device_size_lateral_um is replaced with device_size_lateral_bordered_um
- 
+
+	# bayer_filter_region[x,y,z,:] = [ region_x[x], region_y[y], region_z[z] ]
+	bayer_filter_region = np.array(np.meshgrid(bayer_filter_region_x,bayer_filter_region_y,bayer_filter_region_z, indexing='ij')
+							   ).transpose((1,2,3,0))
 	logging.debug(f'Bayer Filter Region has array shape {np.shape(bayer_filter_region)}.')
 
-	bayer_filter_region_reinterpolate = np.zeros( ( device_voxels_lateral_bordered * reinterpolate_permittivity_factor, device_voxels_lateral_bordered * reinterpolate_permittivity_factor, device_voxels_vertical * reinterpolate_permittivity_factor, 3 ) )
-	for x_idx in range( 0, device_voxels_lateral_bordered * reinterpolate_permittivity_factor ):
-		for y_idx in range( 0, device_voxels_lateral_bordered * reinterpolate_permittivity_factor ):
-			for z_idx in range( 0, device_voxels_vertical * reinterpolate_permittivity_factor ):
-				bayer_filter_region_reinterpolate[ x_idx, y_idx, z_idx, : ] = [ bayer_filter_region_reinterpolate_x[ x_idx ], bayer_filter_region_reinterpolate_y[ y_idx ], bayer_filter_region_reinterpolate_z[ z_idx ] ]
+	# bayer_filter_region_reinterpolate = np.zeros( ( device_voxels_lateral_bordered * reinterpolate_permittivity_factor, device_voxels_lateral_bordered * reinterpolate_permittivity_factor, device_voxels_vertical * reinterpolate_permittivity_factor, 3 ) )
+	# for x_idx in range( 0, device_voxels_lateral_bordered * reinterpolate_permittivity_factor ):
+	# 	for y_idx in range( 0, device_voxels_lateral_bordered * reinterpolate_permittivity_factor ):
+	# 		for z_idx in range( 0, device_voxels_vertical * reinterpolate_permittivity_factor ):
+	# 			bayer_filter_region_reinterpolate[ x_idx, y_idx, z_idx, : ] = [ bayer_filter_region_reinterpolate_x[ x_idx ], bayer_filter_region_reinterpolate_y[ y_idx ], bayer_filter_region_reinterpolate_z[ z_idx ] ]
 
+	bayer_filter_region_reinterpolate_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_lateral_bordered * reinterpolate_permittivity_factor)
+	bayer_filter_region_reinterpolate_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, device_voxels_lateral_bordered * reinterpolate_permittivity_factor)
+	bayer_filter_region_reinterpolate_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, device_voxels_vertical * reinterpolate_permittivity_factor)
+	bayer_filter_region_reinterpolate = np.array(np.meshgrid(bayer_filter_region_reinterpolate_x,bayer_filter_region_reinterpolate_y,
+														 bayer_filter_region_reinterpolate_z, indexing='ij')
+							   				).transpose((1,2,3,0))
 
 	# gradient_region_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
 	# gradient_region_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_um, 0.5 * device_size_lateral_um, device_voxels_simulation_mesh_lateral)
@@ -771,7 +806,7 @@ if start_from_step == 0:
 	design_import['z min'] = device_vertical_minimum_um * 1e-6
 	design_import = fdtd_update_object(fdtd_hook, design_import, create_object=True)
 	fdtd_objects['design_import'] = design_import
- 
+
 	# Add device index monitor
 	design_index_monitor = {}
 	design_index_monitor['name'] = 'design_index_monitor'
@@ -781,6 +816,7 @@ if start_from_step == 0:
 	design_index_monitor['y span'] = device_size_lateral_bordered_um * 1e-6
 	design_index_monitor['z max'] = device_vertical_maximum_um * 1e-6
 	design_index_monitor['z min'] = device_vertical_minimum_um * 1e-6
+	design_index_monitor['spatial interpolation'] = 'nearest mesh cell'
 	design_index_monitor = fdtd_update_object(fdtd_hook, design_index_monitor, create_object=True)
 	fdtd_objects['design_index_monitor'] = design_index_monitor
 
@@ -972,7 +1008,7 @@ for fom_type in fom_types:
 										num_focal_spots, len(xy_names), num_design_frequency_points))
 # The main FoM being used for optimization is indicated in the config.
 
-# TODO: Turned this off because the memory and savefile space of gradient_evolution are too large.
+# NOTE: Turned this off because the memory and savefile space of gradient_evolution are too large.
 # if start_from_step != 0:	# Repeat the definition of field_shape here just because it's not loaded in if we start from a debug point
 # 	field_shape = [device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_lateral, device_voxels_simulation_mesh_vertical]
 # gradient_evolution = np.zeros((num_epochs, num_iterations_per_epoch, *field_shape,
@@ -1074,7 +1110,7 @@ if restart or evaluate:
 												num_focal_spots, len(xy_names), num_design_frequency_points))
 		# The main FoM being used for optimization is indicated in the config.
 
-		# Use binarized density variable instead of intermediate
+		# [OPTIONAL]: Use binarized density variable instead of intermediate
 		bayer_filter.update_filters( num_epochs - 1 )
 		bayer_filter.update_permittivity()
 		cur_density = bayer_filter.get_permittivity()
@@ -1242,23 +1278,34 @@ else:		# optimization
 
 					#! new
 					if reinterpolate_permittivity:
-						if reinterpolate_type == 'nearest':
-							cur_density_import = np.repeat( np.repeat( np.repeat( cur_density, reinterpolate_permittivity_factor, axis=0 ), 
-												 				reinterpolate_permittivity_factor, axis=1 ), 
-                                    					reinterpolate_permittivity_factor, axis=2 )
-						else:
-							cur_density_import = interpolate.interpn( ( bayer_filter_region_x, bayer_filter_region_y, bayer_filter_region_z ), 
-                                            				cur_density, bayer_filter_region_reinterpolate, 
-                                            				method='linear' )
+		
+						cur_density_import = np.repeat( np.repeat( np.repeat( cur_density, 
+														int(np.ceil(reinterpolate_permittivity_factor)), axis=0 ),
+													int(np.ceil(reinterpolate_permittivity_factor)), axis=1 ),
+												int(np.ceil(reinterpolate_permittivity_factor)), axis=2 )
+
+						bayer_filter_region_import_x = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, 300)
+						bayer_filter_region_import_y = 1e-6 * np.linspace(-0.5 * device_size_lateral_bordered_um, 0.5 * device_size_lateral_bordered_um, 300)
+						bayer_filter_region_import_z = 1e-6 * np.linspace(device_vertical_minimum_um, device_vertical_maximum_um, 306)
+						bayer_filter_region_import = np.array( np.meshgrid(
+									bayer_filter_region_import_x, bayer_filter_region_import_y, bayer_filter_region_import_z,
+								indexing='ij')
+							).transpose((1,2,3,0))
+
+						cur_density_import_interp = interpolate.interpn( ( bayer_filter_region_reinterpolate_x, 
+																			bayer_filter_region_reinterpolate_y, 
+															 				bayer_filter_region_reinterpolate_z ), 
+									cur_density_import, bayer_filter_region_import, 
+									method='linear' )
+	
 					else:
-						cur_density_import = cur_density.copy()	 
-  
+						cur_density_import_interp = cur_density.copy()	 
+
+					# Uncomment if explicitly binarizing before import
+					# cur_density_import_interp = utility.binarize(cur_density_import_interp)
+
 					# Scale from [0, 1] back to [min_device_permittivity, max_device_permittivity]
 					#! This is the only cur_whatever_variable that will ever be anything other than [0, 1].
-	
-					# Uncomment if explicitly binarizing before import
-					# cur_density = 1.0 * np.greater_equal(cur_density_import, 0.5)
-    
 					cur_permittivity = min_device_permittivity + ( dispersive_max_permittivity - min_device_permittivity ) * cur_density
 					cur_index = utility.index_from_permittivity( cur_permittivity )
 					logging.info(f'TiO2% is {100 * np.count_nonzero(cur_index > min_device_index) / cur_index.size}%.')
@@ -1289,7 +1336,7 @@ else:		# optimization
 					# 					bayer_filter_region_y, bayer_filter_region_z )
 					fdtd_hook.importnk2( cur_index, bayer_filter_region_reinterpolate_x, 
 										bayer_filter_region_reinterpolate_y, bayer_filter_region_reinterpolate_z )
-	
+
 					test_density = bayer_filter.get_permittivity()
 					test_permittivity = min_device_permittivity + ( dispersive_max_permittivity - min_device_permittivity ) * test_density
 					test_binarization = binarization_average_perm(test_permittivity, min_device_permittivity, dispersive_max_permittivity)
@@ -1312,7 +1359,24 @@ else:		# optimization
 					n_x_3 = np.sum(np.abs(n_x_2 - test_density))/n_x.size
 					logging.info(f'Binarization after reinterpolation is {100 * utility.compute_binarization(n_x_2)}%.')
 
-
+					# Check binarizations throughout imported device
+					device_index, n_dev = get_device_index(fdtd_hook)
+					logging.debug(f"Device index monitor's mesh has array shape {n_dev.shape}.")
+					logging.debug(f"Endpoints of device index monitor's mesh are {device_index['x'][0]} and {device_index['x'][-1]}.")
+					logging.debug(f"Device index monitor's mesh size is {device_index['x'][3] - device_index['x'][2]}.")
+					layer_binarizations = []
+					for layer_number in range(0, n_dev.shape[2]):
+						layer_binarizations.append(utility.compute_binarization(np.real(index_to_density(n_dev[:,:,layer_number]))))
+					layer_binarizations = 100 * np.array(layer_binarizations)
+					plt.plot(np.arange(0,n_dev.shape[2],1), layer_binarizations)
+					plt.vlines(np.floor(np.linspace(0,n_dev.shape[2],6)), 60, 100, 'k', 'dashdot', alpha=0.3)
+					plt.title('Binarization % in z-direction, from top face downwards')
+					plt.xlabel('Mesh cells')
+					plt.show()
+	 
+					# Disable device index monitor
+					design_index_monitor['enabled'] = False
+					design_index_monitor = fdtd_update_object(fdtd_hook, design_index_monitor, create_object=True)
 
 
 					for xy_idx in range(0, 2):

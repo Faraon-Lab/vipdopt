@@ -7,7 +7,6 @@
 # 
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 import filter as filter
 
 import numpy as np
@@ -16,10 +15,13 @@ def sech(input):
 	return np.divide(1, np.cosh(input))
 
 
-#
 # Needs more testing and figuring out.. quick version for testing
-#
+
 class Sigmoid3Level(filter.Filter):
+	'''Takes an input auxiliary density p(x) ranging from 0 to 1 and applies a sigmoidal projection filter to binarize / push it to either extreme.
+	This depends on the strength of the filter. See OPTICA paper supplement Section IIA, https://doi.org/10.1364/OPTICA.384228,  for details.
+	See also Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y.'''
+
 
 	#
 	# beta: strength of sigmoid3Level filter
