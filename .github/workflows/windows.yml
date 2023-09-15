@@ -1,6 +1,6 @@
-name: Linux Continuous Integration
+name: Windows Continuous Integration
 
-# This file is intended for testing on linux platforms, running benchmarks, measuring
+# This file is intended for testing on windows platforms, running benchmarks, measuring
 # code coverage, etc.
 
 on:
@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -42,13 +42,17 @@ jobs:
           args: --config pyproject.toml
 
   smoke-test:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
     
       - name: Setup Python
         uses: ./.github/actions/python-setup
+
+      - name: Install python-magic bin
+        run: |
+            pip install python-magic-bin
     
       - name: Run Smoke Tests
         run: pytest -m 'smoke'
