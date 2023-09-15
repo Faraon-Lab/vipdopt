@@ -16,7 +16,7 @@
 ## SBATCH --ntasks=80
 #SBATCH --qos=normal
 #SBATCH --mem-per-cpu=8G
-#SBATCH --comment="Case 1: 5 layers, 2 material, 85nm, airgap 85nm"
+#SBATCH --comment="Case 9: 5 layers, 3 material, 51nm feature, airgap 85nm"
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END

@@ -571,7 +571,7 @@ def phase_imaging_shift_optimization_goal(
 
 	# assert num_orders == 1, 'For now, we are just doing the zeroth order!'
 
-	transmission_goal = np.zeros( ( num_frequencies, num_polarizations, num_theta, num_phi, 2, num_orders ), dtype=np.complex )
+	transmission_goal = np.zeros( ( num_frequencies, num_polarizations, num_theta, num_phi, 2, num_orders ), dtype=np.complex128 )
 
 	phase_by_order = np.zeros( num_orders )
 	amplitude_by_order = np.zeros( num_orders )

@@ -318,6 +318,8 @@ def fdtd_update_object( fdtd_hook_, simDict, create_object=False ):
 					fdtd_hook_.addpower(name=simDict['name'])
 				else:
 					fdtd_hook_.addprofile(name=simDict['name'])
+			elif any(ele.lower() in type_string for ele in ['IndexMonitor']):
+				fdtd_hook_.addindex(name=simDict['name'])
 			elif any(ele.lower() in type_string for ele in ['Import']):
 				fdtd_hook_.addimport(name=simDict['name'])
 			elif any(ele.lower() in type_string for ele in ['Rectangle']):
@@ -769,6 +771,18 @@ if start_from_step == 0:
 	design_import['z min'] = device_vertical_minimum_um * 1e-6
 	design_import = fdtd_update_object(fdtd_hook, design_import, create_object=True)
 	fdtd_objects['design_import'] = design_import
+ 
+	# Add device index monitor
+	design_index_monitor = {}
+	design_index_monitor['name'] = 'design_index_monitor'
+	design_index_monitor['type'] = 'IndexMonitor'
+	design_index_monitor['monitor type'] = '3D'
+	design_index_monitor['x span'] = device_size_lateral_bordered_um * 1e-6
+	design_index_monitor['y span'] = device_size_lateral_bordered_um * 1e-6
+	design_index_monitor['z max'] = device_vertical_maximum_um * 1e-6
+	design_index_monitor['z min'] = device_vertical_minimum_um * 1e-6
+	design_index_monitor = fdtd_update_object(fdtd_hook, design_index_monitor, create_object=True)
+	fdtd_objects['design_index_monitor'] = design_index_monitor
 
 	# Install Aperture that blocks off source
 	if use_source_aperture:
@@ -1241,20 +1255,65 @@ else:		# optimization
   
 					# Scale from [0, 1] back to [min_device_permittivity, max_device_permittivity]
 					#! This is the only cur_whatever_variable that will ever be anything other than [0, 1].
+	
+					# Uncomment if explicitly binarizing before import
+					# cur_density = 1.0 * np.greater_equal(cur_density_import, 0.5)
+    
 					cur_permittivity = min_device_permittivity + ( dispersive_max_permittivity - min_device_permittivity ) * cur_density
 					cur_index = utility.index_from_permittivity( cur_permittivity )
 					logging.info(f'TiO2% is {100 * np.count_nonzero(cur_index > min_device_index) / cur_index.size}%.')
 					# logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
 					logging.info(f'Binarization is {100 * utility.compute_binarization(cur_density)}%.')
 					binarization_evolution[epoch, iteration] = 100 * utility.compute_binarization(cur_density)
+
+					def binarization_average_perm(test_permittivity, min_device_permittivity, dispersive_max_permittivity):
+         
+						ave_perm = min_device_permittivity  + ( dispersive_max_permittivity - min_device_permittivity ) / 2
+						test_num = np.sum(np.abs(test_permittivity - ave_perm))
+						test_denom = test_permittivity.size * (ave_perm - min_device_permittivity)
+
+						return test_num/test_denom
+    
+					test_permittivity = copy.deepcopy(cur_permittivity)
+					test_binarization = binarization_average_perm(test_permittivity, min_device_permittivity, dispersive_max_permittivity)
+					logging.info(f'Binarization using permittivity directly, is {100 * test_binarization}%.')
+	
+					
 	
 					# Update bayer_filter data for actual permittivity (not just density 0 to 1)
 					bayer_filter.update_actual_permittivity_values(min_device_permittivity, dispersive_max_permittivity)
 
 					fdtd_hook.switchtolayout()
 					fdtd_hook.select( design_import['name'] )
-					fdtd_hook.importnk2( cur_index, bayer_filter_region_x, 
-										bayer_filter_region_y, bayer_filter_region_z )
+					# fdtd_hook.importnk2( cur_index, bayer_filter_region_x, 
+					# 					bayer_filter_region_y, bayer_filter_region_z )
+					fdtd_hook.importnk2( cur_index, bayer_filter_region_reinterpolate_x, 
+										bayer_filter_region_reinterpolate_y, bayer_filter_region_reinterpolate_z )
+	
+					test_density = bayer_filter.get_permittivity()
+					test_permittivity = min_device_permittivity + ( dispersive_max_permittivity - min_device_permittivity ) * test_density
+					test_binarization = binarization_average_perm(test_permittivity, min_device_permittivity, dispersive_max_permittivity)
+					logging.info(f'Binarization using permittivity directly after importnk2, is {100 * test_binarization}%.')
+
+					device_index = fdtd_hook.getresult("design_index_monitor","index preview")
+					n_x = np.real(device_index['index_x'])
+					n_x_u = np.unique(np.real(n_x))
+					# NOTE: Looks pretty binarized to me.
+    
+					def rescale_vector(x, min0, max0, min1, max1):
+						return (max1-min1)/(max0-min0)*(x-min0) + min1
+
+					n_x_2 = rescale_vector(n_x, 1.5,2.4, 0.0,1.0)
+					# n_x_2 = (1.0 - 0.0) / (2.4 - 1.5) * (n_x - 1.5) + 0.0
+					test_density = 1.0 * np.greater_equal(n_x_2, 0.5)
+					test_index = rescale_vector(test_density, 0.0,1.0, 1.5,2.4)
+					n_x_u_2 = np.unique(np.real(test_index))
+    
+					n_x_3 = np.sum(np.abs(n_x_2 - test_density))/n_x.size
+					logging.info(f'Binarization after reinterpolation is {100 * utility.compute_binarization(n_x_2)}%.')
+
+
+
 
 					for xy_idx in range(0, 2):
 						disable_all_sources()	# Create a job with only the source of interest active.
@@ -1573,7 +1632,7 @@ else:		# optimization
 	
 				# Initialize arrays to store the gradients of each polarization, each the shape of the voxel mesh
 				# This array therefore has shape (polarizations, mesh_lateral, mesh_lateral, mesh_vertical)
-				xy_polarized_gradients = [ np.zeros(field_shape, dtype=np.complex), np.zeros(field_shape, dtype=np.complex) ]
+				xy_polarized_gradients = [ np.zeros(field_shape, dtype=np.complex128), np.zeros(field_shape, dtype=np.complex128) ]
 				
 
 				for adj_src_idx in range(0, num_adjoint_sources):
@@ -1704,7 +1763,7 @@ else:		# optimization
 
 				if add_pdaf:
 
-					xy_polarized_gradients_pdaf = [ np.zeros(field_shape, dtype=np.complex), np.zeros(field_shape, dtype=np.complex) ]
+					xy_polarized_gradients_pdaf = [ np.zeros(field_shape, dtype=np.complex128), np.zeros(field_shape, dtype=np.complex128) ]
 
 					polarizations = [ 'x', 'y' ]
 
