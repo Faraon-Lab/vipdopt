@@ -8,6 +8,9 @@ dependencies:
   - numpy=1.25.*
   - matplotlib=3.7.*
   - scikit-image=0.20.*
+  - PyYAML
+  - types-PyYAML
+  - python-magic
   - pip
   # For Linting
   - ruff=0.0.287
@@ -18,4 +21,5 @@ dependencies:
   - pytest=7.4.*
   - pytest-cov=4.1.*
   - pytest-xdist=3.3.*
+  - pytest-mock
   - coverage[toml]=7.2.*
