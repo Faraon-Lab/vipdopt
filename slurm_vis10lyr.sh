@@ -17,7 +17,7 @@
 # SBATCH --ntasks=80
 #SBATCH --mem-per-cpu=8G
 #SBATCH --qos=normal
-#SBATCH --comment="SONY VIP Optimization Code"
+#SBATCH --comment="SONY VIP Optimization Code "
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
