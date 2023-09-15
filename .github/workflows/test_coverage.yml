@@ -1,0 +1,25 @@
+name: Tests and Code coverage
+
+on:
+  push:
+    branches:
+      - main
+      - cleanup
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+    check_coverage:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Checkout Repository
+            uses: actions/checkout@v4
+
+          - name: Setup Python
+            uses: ./.github/actions/python-setup
+        
+          - name: Check Coverage
+            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 90
