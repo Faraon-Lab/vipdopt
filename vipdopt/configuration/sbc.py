@@ -1,6 +1,7 @@
 """Configuration manager for SonyBayerFilter."""
 
 import logging
+from typing import Any
 
 import numpy as np
 from overrides import override
@@ -16,10 +17,13 @@ VERTICAL_LAYERS = 10
 class SonyBayerConfig(Config):
     """Config object specifically for use with the Sony bayer filter optimization."""
 
-
     def __init__(self):
         """Initialize SonyBayerConfig object."""
         super().__init__()
+    
+    def __setattr__(self, name: str, value: Any) -> Any:
+        """Set the value of an attribute, creating it if it doesn't already exist."""
+        self.__dict__[name] = value
 
     @override
     def read_file(self, filename: str, cfg_format: str = 'yaml'):
@@ -254,6 +258,7 @@ class SonyBayerConfig(Config):
         """
         return self.min_feature_size_um / self.geometry_spacing_lateral_um
 
+    #! Not Tested
     @property
     def blur_half_width_voxels(self):
         """Meant for square_blur and square_blur_smooth.
