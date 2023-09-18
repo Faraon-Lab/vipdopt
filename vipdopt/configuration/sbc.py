@@ -20,7 +20,7 @@ class SonyBayerConfig(Config):
     def __init__(self):
         """Initialize SonyBayerConfig object."""
         super().__init__()
-    
+
     def __setattr__(self, name: str, value: Any) -> Any:
         """Set the value of an attribute, creating it if it doesn't already exist."""
         self.__dict__[name] = value
@@ -554,10 +554,6 @@ class SonyBayerConfig(Config):
     def epoch_range_design_change_min(self):
       return  self.epoch_start_design_change_min - self.epoch_end_design_change_min
 
-    @property
-    def adam_betas(self):
-      return  tuple(self.adam_betas)
-
     # Determine the wavelengths that will be directed to each focal area
     @property
     def spectral_focal_plane_map(self):
@@ -573,9 +569,9 @@ class SonyBayerConfig(Config):
         # Find indices of desired peak locations in lambda_values_um
         res = [
                 np.argmin(
-                    (self.lambda_values_um - self.desired_peaks_per_band_um[idx])**2,
+                    (self.lambda_values_um - b)**2,
                 )
-                for idx in range( len( self.desired_peaks_per_band_um ) )
+                for b in self.desired_peaks_per_band_um
         ]
         logging.debug(f'Desired peak locations per band are: {res}')
         return res

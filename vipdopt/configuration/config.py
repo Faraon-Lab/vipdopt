@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 import yaml
+from yaml.constructor import SafeConstructor
 
 
 def get_config_loader(config_format) -> Callable[[str], dict]:
@@ -19,6 +20,11 @@ def get_config_loader(config_format) -> Callable[[str], dict]:
 
 def _yaml_loader(filepath: str) -> dict:
     """Config file loader for YAML files."""
+    # Allow the safeloader to convert sequences to tuples
+    SafeConstructor.add_constructor(
+        'tag:yaml.org,2002:python/tuple',
+        lambda self, x: tuple(self.construct_sequence(x))
+    )
     with open(filepath, 'rb') as stream:
         return yaml.safe_load(stream)
 
@@ -54,6 +60,7 @@ class Config:
         # Get the correct loader method for the format and load the config file
         config_loader = get_config_loader(cfg_format)
         config = config_loader(filename)
+        logging.debug(f'Loaded config file:\n {config}')
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
