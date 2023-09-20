@@ -1,7 +1,8 @@
 
 """Tests for filter.py"""
 
-from typing import Any
+from typing import Any, Pattern
+import re
 
 import numpy as np
 import pytest
@@ -12,12 +13,12 @@ from vipdopt.configuration import Config, SonyBayerConfig
 TEST_YAML_PATH = 'config.yml.example'
 
 @pytest.mark.smoke()
-@pytest.mark.usefixtures('_mocker_empty_config')
+@pytest.mark.usefixtures('mock_empty_config')
 def test_load_empty_yaml():
     cfg = Config()
     cfg.read_file('fakefile')
 
-    with pytest.raises(KeyError):
+    with pytest.raises(AttributeError):
         _ = cfg.fixed_layers  # Accessing a property that doesn't exist
 
 
@@ -34,7 +35,7 @@ def test_load_yaml():
     ]
 
     for (k, v) in expected_pairs:
-        assert_equal(cfg.__getattr__(k), v)
+        assert_equal(getattr(cfg, k), v)
 
     assert_equal(cfg.fixed_layers, [1, 3])
     assert_equal(cfg.do_rejection, False)
@@ -195,13 +196,27 @@ def test_cascading_params(func, value: Any):
 
 
 @pytest.mark.smoke
-def test_explicit_band_centering():
-    pass
-
-
-@pytest.mark.smoke()
-@pytest.mark.usefixtures('_mocker_empty_config')
+@pytest.mark.usefixtures('mock_empty_config')
 def test_unsupported_filetype():
     cfg = Config()
     with pytest.raises(NotImplementedError):
         cfg.read_file('fakefilename', 'json')
+
+@pytest.mark.smoke
+@pytest.mark.usefixtures('mock_bad_config')
+@pytest.mark.parametrize(
+    'fname, msg',
+    [
+        ('bad_config_1.yml', r'.*border_optimization.+use_smooth_blur.*'),
+        ('bad_config_2.yml', r'.*border_optimization.+num_sidewalls.*> 0.*'),
+        ('bad_config_3.yml', r'.*device_voxels_lateral.+(None|\d+(?!\d)(?<=[13579])).*'),
+        ('bad_config_4.yml', r'.*device_voxels_lateral.+(None|\d+(?!\d)(?<=[13579])).*'),
+        ('bad_config_5.yml', r'.*add_pdaf.*add_infrared.*not compatible'),
+        ('bad_config_6.yml', r'.*reinterpolate_permittivity_factor.*(?!1)(\d|None).*'),
+    ]
+)
+def test_bad_config(fname: str, msg: Pattern):
+    cfg = SonyBayerConfig()
+    with pytest.raises(ValueError) as e:
+        cfg.read_file(fname)
+    assert re.match(msg, e.value.args[0])

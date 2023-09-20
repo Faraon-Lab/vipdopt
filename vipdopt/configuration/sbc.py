@@ -217,32 +217,33 @@ class SonyBayerConfig(Config):
 
     def _validate(self):
         """Validate the config file and compute conditional attributes."""
-        if self.border_optimization and self.use_smooth_blur:
-            msg = "Combining 'border_optimization' and "
-            "'use_smooth_blur' is not supported"
+        if self.safe_get('border_optimization') and self.safe_get('use_smooth_blur'):
+            msg = ("Combining 'border_optimization' and "
+            "'use_smooth_blur' is not supported")
             raise ValueError(msg)
 
-        if self.border_optimization and self.num_sidewalls != 0:
-            msg = "Combining 'border_optimization' and "
-            "'use_smooth_blur' > 0 is not supported"
+        if self.safe_get('border_optimization') and self.safe_get('num_sidewalls') != 0:
+            msg = ("Combining 'border_optimization' and "
+            "'num_sidewalls' > 0 is not supported")
             raise ValueError(msg)
 
 
-        if self.add_pdaf:
-            if self.device_voxels_lateral % 2 != 0:
-               raise ValueError("Expected 'device_vocels_lateral' to be even for"
-                                'PDAF implementation ease, got '
-                                '{self.device_voxels_lateral}')
+        if self.safe_get('add_pdaf'):
+            dvl = self.safe_get(SonyBayerConfig.device_voxels_lateral)
+            if dvl is None or dvl % 2 != 0:
+               raise ValueError(("Expected 'device_voxels_lateral' to be even for"
+                                ' PDAF implementation ease, got '
+                                f'\'{dvl}\'.'))
 
-            if self.add_infrared:
+            if self.safe_get('add_infrared'):
                raise ValueError("'add_pdaf and 'add_infrared' are not compatible.")
 
 
-        if not self.reinterpolate_permittivity and \
-            self.reinterpolate_permittivity_factor != 1:
-               raise ValueError("Expected 'reinterpolate_permittivity' to be 1 if not"
+        if self.safe_get('reinterpolate_permittivity') == False and \
+            self.safe_get('reinterpolate_permittivity_factor') != 1:
+               raise ValueError(("Expected 'reinterpolate_permittivity_factor' to be 1 if not"
                                 ' reinterpolating permittivity,'
-                                f' got {self.reinterpolate_permittivity}.')
+                                f' got \'{self.reinterpolate_permittivity_factor}\'.'))
 
         self._derive_params()
 

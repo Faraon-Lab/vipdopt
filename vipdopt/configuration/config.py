@@ -43,13 +43,15 @@ class Config:
         """Return shorter string version of the Config object."""
         return f'Config object for {self._files}'
 
-    def __getattr__(self, name: str) -> Any:
-        """Get an attrbitute of the Config object."""
-        try:
-            return self.__dict__[name]
-        except KeyError as e:
-            msg = f"'{type(self).__name__}' has no attribute '{name}'"
-            raise KeyError(msg) from e
+    
+    def safe_get(self, name: str | Callable) -> Any | None:
+        if type(name) is str:
+            return getattr(self, name, None)
+        else:
+            try:
+                return name.__get__(self)
+            except AttributeError:
+                return None
 
     def __setattr__(self, name: str, value: Any) -> Any:
         """Set the value of an attribute, creating it if it doesn't already exist."""
@@ -61,6 +63,7 @@ class Config:
         config_loader = get_config_loader(cfg_format)
         config = config_loader(filename)
         logging.debug(f'Loaded config file:\n {config}')
+        print(config)
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
