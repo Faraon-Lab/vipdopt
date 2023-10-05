@@ -137,13 +137,21 @@ class Worker(object):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(message)s')
 
+    N = 1000
+
+
+    slurm_env_vars = {var:os.getenv(var) for var in SLURM_ENV_VARS}
+    nnodes = slurm_env_vars['SLURM_JOB_NUMNODES']
+    nprocs = slurm_env_vars['SLURM_NPROCS']
+
     comm_world = MPI.COMM_WORLD
     size = comm_world.Get_size()
     my_rank = comm_world.Get_rank()
 
     if my_rank == 0:
-        logging.debug(f'\nComputing 2^n for all n in [1, ..., 1000] with {size} proceess{(size > 1) * "es"}\n')
+        logging.debug(f'\nComputing 2^n for all n in [1, ..., 1000] with {nprocs} proceess{(nprocs > 1) * "es"}\n')
 
-    with MPIPoolExecutor(max_workers=size, main=False) as executor:
-        for res in executor.starmap(pow, [(2, n) for n in range(1000)]):
-            logging.info(res)
+    with MPIPoolExecutor(max_workers=nprocs, main=False) as executor:
+        for i, res in enumerate(executor.starmap(pow, [(2, n) for n in range(N)])):
+            if i % (N / 10) == 0:
+                logging.info(f'2^{i}\t=\t{res}')
