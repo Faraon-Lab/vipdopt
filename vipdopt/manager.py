@@ -3,8 +3,10 @@
 
 import sys
 import os
-from typing import Any, Callable
+import socket
+import time
 import logging
+from typing import Any, Callable
 
 from mpi4py import MPI
 from mpi4py.futures import MPIPoolExecutor
@@ -17,7 +19,7 @@ SLURM_ENV_VARS = (
     'SLURM_CPUS_ON_NODE',
     'SLURM_JOB_NAME',
     'SLURM_JOB_NODELIST',
-    'SLURM_JOB_NUMNODES',
+    'SLURM_JOB_NUM_NODES',
     'SLURM_NPROCS'
 )
 
@@ -134,24 +136,37 @@ class Worker(object):
         pass
     
 
+def test_work(n, N):
+    time.sleep(2 * n / N)
+    return f'Process running on host: {socket.gethostname()}. {n}*2 = {n*2}'
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(message)s')
 
-    N = 1000
+    N = int(1e2)
 
 
     slurm_env_vars = {var:os.getenv(var) for var in SLURM_ENV_VARS}
-    nnodes = slurm_env_vars['SLURM_JOB_NUMNODES']
-    nprocs = slurm_env_vars['SLURM_NPROCS']
+    print(slurm_env_vars)
+    nnodes = int(slurm_env_vars['SLURM_JOB_NUM_NODES'])
+    nprocs_per_node = int(slurm_env_vars['SLURM_CPUS_ON_NODE'])
+    nprocs = nnodes * nprocs_per_node
+    
 
     comm_world = MPI.COMM_WORLD
     size = comm_world.Get_size()
     my_rank = comm_world.Get_rank()
+    print(f'MPI size:\t{size}')
+
 
     if my_rank == 0:
-        logging.debug(f'\nComputing 2^n for all n in [1, ..., 1000] with {nprocs} proceess{(nprocs > 1) * "es"}\n')
+        logging.debug(f'\nComputing n^2 for all n in [1, ..., {N}] with {nprocs} proceess{(nprocs > 1) * "es"} across {nnodes} nodes\n')
 
-    with MPIPoolExecutor(max_workers=nprocs, main=False) as executor:
-        for i, res in enumerate(executor.starmap(pow, [(2, n) for n in range(N)])):
-            if i % (N / 10) == 0:
-                logging.info(f'2^{i}\t=\t{res}')
+    with MPIPoolExecutor() as executor:
+        for res in executor.map(test_work, range(N), [N] * N):
+            print(res)
+        
+        # for i, res in enumerate(executor.starmap(pow, [(n, 2) for n in range(N)])):
+        #     if i % (N / 10) == 0:
+        #         logging.info(f'{i}^2\t=\t{res:e}')

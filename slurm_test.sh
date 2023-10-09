@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH -A Faraon_Computing
-#SBATCH --time=0:30:00   # walltime
+#SBATCH --time=0:05:00   # walltime
 
-#SBATCH --ntasks-per-node=1 # number of processor cores (i.e. tasks)
 #SBATCH --nodes=1   # number of nodes
-#SBATCH --mem-per-cpu=50M   # memory per CPU core
+#SBATCH --ntasks-per-node=1  # number of processor cores (i.e. tasks)
+#SBATCH --mem=1G
 
-#SBATCH -J "test"   # job name
+#SBATCH -J "test-pool"   # job name
 
 #SBATCH --mail-user=nmcnichols@caltech.edu
 #SBATH --qos=debug
@@ -15,7 +15,8 @@
 ## /SBATCH -o slurm.%N.%j.out # STDOUT
 ## /SBATCH -e slurm.%N.%j.err # STDERR
 
+## Load relevant modules
 source /home/${USER}/.bashrc
 source activate vipdopt-dev
 
-srun --mpi=pmi2 /groups/Faraon_Computing/nia/SonyBayerFilter/vipdopt/manager.py
+time srun -n $SLURM_NPROCS python -m mpi4py.futures vipdopt/manager.py

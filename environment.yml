@@ -11,7 +11,7 @@ dependencies:
   - PyYAML
   - types-PyYAML
   - python-magic
-  - mpi4py
+  - mpi4py mpich
   - pip
   # For Linting
   - ruff=0.0.287
