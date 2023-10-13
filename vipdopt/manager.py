@@ -1,13 +1,12 @@
-import os
-import sys
+"""Workload manager using MPI to create a job pool."""
 import atexit
 import logging
-import socket
-from typing import Any, Callable, Iterable
-
+import os
+import sys
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from mpi4py import MPI
-import numpy as np
 
 if __name__ == '__main__':
     #  Here so that running this script directly doesn't blow up
@@ -19,24 +18,29 @@ if __name__ == '__main__':
     path = os.path.join(path, '..')
     sys.path.insert(0, path)
 
-from vipdopt.utils import T, R
+from vipdopt.utils import R
 
 ROOT = 0
 
-SLURM_ENV_VARS = (
-    'SLURM_JOB_ID',
-    'SLURM_SUBMIT_DIR',
-    'SLURM_CPUS_ON_NODE',
-    'SLURM_JOB_NAME',
-    'SLURM_JOB_NODELIST',
-    'SLURM_JOB_NUM_NODES',
-    'SLURM_NPROCS'
-) 
+# TODO: Allow multiple processes per job
+class MPIPool:
+    """A Job Pool for use with MPI.
 
+    Splits into a manager/worker dynamic. The manager process is indicated by
+    rank == ROOT (by default ROOT = 0). When the manager receives jobs it assigns them
+    to available worker processes. The workers wait for jobs and send results back to
+    the manager.
 
-class MPIPool(object):
+    Attributes:
+        comm (MPI.Comm): The MPI communicator containing the manager and
+            worker processes
+        size: The total number of processes
+        rank (int): The rank of this particular process.
+        workers (set[int]): All the ranks of worker processes
+    """
 
-    def __init__(self, comm=None) -> None:
+    def __init__(self, comm: MPI.Comm | None=None) -> None:
+        """Create MPIPool object and start manager / worker relationship."""
         if comm is None:
             comm = MPI.COMM_WORLD
         self.comm = comm
@@ -48,26 +52,22 @@ class MPIPool(object):
         if self.is_worker():
             self.wait()
             return
-        
-        comm_size = self.comm.Get_size()
 
+        comm_size = self.comm.Get_size()
         self.workers = set(range(comm_size))
         self.workers.discard(ROOT)
         self.size = comm_size - 1
 
         if self.size == 0:
-            raise ValueError("More than one process required to create MPIPool.")
+            raise ValueError('More than one process required to create MPIPool.')
 
     def wait(self):
         """If a worker, wait for work to be provided."""
         if self.is_manager():
             return
 
-        # logging.debug(f'Worker {self.rank} waiting for work...')
-        
         status = MPI.Status()
         while True:
-
             # Blocking receive
             work = self.comm.recv(source=ROOT, tag=MPI.ANY_TAG, status=status)
 
@@ -76,59 +76,74 @@ class MPIPool(object):
                 return
 
             func, args = work
-
-            # logging.debug(f'Worker {self.rank} received work {work} with tag {status.tag}...')
-
             res = func(args)
-            # logging.debug(f'Worker {self.rank} sending result {res}...')
-
             self.comm.ssend(res, ROOT, status.tag)
 
     def is_manager(self):
+        """Return whether this process is the manager."""
         return self.rank == ROOT
-    
+
     def is_worker(self):
+        """Return whether this process is a worker."""
         return self.rank != ROOT
-    
-    def submit(self, func, task):
+
+    def submit(self, func: Callable[..., R | None], task: Any) -> R | None:
+        """Submit a single job to the pool."""
         return self.map(func, [task])[0]
-    
-    def map(self, func: Callable[..., R], tasks: Iterable[Any]) -> Iterable[R]:
+
+    def map(self, # noqa: A003
+            func: Callable[..., R | None],
+            tasks: Sequence[Any]
+        ) -> Sequence[R | None]:
+        """Compute `func` on a list of inputs in parallel.
+
+        The output order will always be the same as input. This method is equivalent to
+        [self.submit(func, task) for task in tasks].
+
+        Arguments:
+            func (Callable[..., R]): The function to compute.
+            tasks (Sequence[Any]): The list of arguments to pass to the function. Type
+                of individual tasks should match the signature of `func`.
+
+
+        Returns:
+            (Sequence[R]) A list of `func(task)` for all the tasks provided.
+        """
+        results: list[R | None] = [None] * len(tasks)
+
+        # Workers should be waiting for jobs
         if self.is_worker():
             self.wait()
-            return
+            return results
 
+        # Initialize jobs and output list
         available_workers = self.workers.copy()
         jobs = [(idx, (func, arg)) for idx, arg in enumerate(tasks)]
         logging.debug(f'Jobs: {jobs}\n')
-        results = [None] * len(jobs)
+
         pending = len(jobs)
 
         logging.debug(f'Available workers: {available_workers}\n')
 
         while pending > 0:
+            # If a worker is free and jobs need to be assigned still...
             if available_workers and len(jobs) > 0:
                 worker = available_workers.pop()  # This worker is busy now
                 idx, job = jobs.pop()
 
-                # logging.debug(f'Sending job {job} with index {idx}')
-                # logging.debug(f'Anticipated result: {job[0](job[1])}\n')
-
-                # Non-blocking send
-                self.comm.send(job, dest=worker, tag=idx)
+                # Blocking send
+                self.comm.ssend(job, dest=worker, tag=idx)
                 logging.debug(f'Sent job {job} to worker {worker} with tag {idx}')
-            
+
             if len(jobs) > 0:
-                # check if any workers are sending results
-                flag = self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
+                # Check if any workers are sending results
+                flag = self.comm.iprobe(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
 
                 # If there are more jobs to do and no results yet,
                 # we can keep assigning them while we wait for results
                 if not flag:
                     continue
-            # else:
-            #     self.comm.Probe(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
-            
+
             status = MPI.Status()
             # Blocking receive
             res = self.comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
@@ -141,39 +156,24 @@ class MPIPool(object):
 
             available_workers.add(worker)  # Allow worker to be assigned work
             pending -= 1
-        
+
         return results
 
     def close(self):
+        """Send the stop signal (None) to all processes."""
         if self.is_worker():
             return
-        
-        # Send 'None' to each worker to signal to stop the wait loop
+
         for worker in self.workers:
             self.comm.isend(None, worker)
-        
+
     def __enter__(self):
+        """Yield the MPIPool for context manager usage."""
         return self
-    
-    # TODO: May need to handle exceptions, cause it's just hanging
+
     def __exit__(self, *args):
-        return self.close()
-
-
-def test_work(n):
-    # time.sleep(2 * n / N)
-    return n ** 2
-
-def test_multiproc(pow):
-    comm_world = MPI.COMM_WORLD
-    #size = comm_world.Get_size()
-    my_rank = comm_world.Get_rank()
-    data = np.array(np.power(pow, my_rank), dtype=np.intc)
-
-    sum_buf = np.empty(1, dtype=np.intc)
-
-    comm_world.allreduce(data, sum_buf)
-    return sum_buf
+        """Close the MPIPool for context manager usage."""
+        self.close()
 
 
 if __name__ == '__main__':
@@ -185,20 +185,16 @@ if __name__ == '__main__':
     size = comm_world.Get_size()
     my_rank = comm_world.Get_rank()
 
+    def square(n: int) -> int:
+        """Compute square of a number."""
+        return n ** 2
+
     if my_rank == ROOT:
-        logging.debug(f'MPI size:\t{size}')
+        logging.debug(f'\nComputing n^2 for all n in [1, ..., {N}] using'
+                      f' {size} proceess{(size> 1) * "es"}\n')
 
-
-        slurm_env_vars = {var:os.getenv(var) for var in SLURM_ENV_VARS}
-        logging.debug(slurm_env_vars)
-        nnodes = int(slurm_env_vars['SLURM_JOB_NUM_NODES'])
-        nprocs_per_node = int(slurm_env_vars['SLURM_CPUS_ON_NODE'])
-        nprocs = nnodes * nprocs_per_node
-
-        logging.debug(f'\nComputing n^2 for all n in [1, ..., {N}] with {nprocs} proceess{(nprocs > 1) * "es"} across {nnodes} nodes\n')
-    
     with MPIPool(comm_world) as pool:
         if pool.is_manager():
-            for i, res in enumerate(pool.map(test_work, range(N))):
+            for i, res in enumerate(pool.map(square, range(N))):
                 if i % (N / 10) == 0:
                     logging.info(f'{i}^2\t=\t{res:e}')
