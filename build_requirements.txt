@@ -1,8 +1,0 @@
-scipy==1.11.*
-numpy==1.25.*
-matplotlib==3.7.*
-scikit-image==0.20.*
-overrides==7.4.*
-PyYAML
-types-PyYAML
-python-magic
