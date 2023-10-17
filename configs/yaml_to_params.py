@@ -7,7 +7,6 @@
 # 
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 import os
 import shutil
 import sys
@@ -19,6 +18,7 @@ from types import SimpleNamespace
 
 sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.getcwd())
+from utils import WorkloadManager
 from utils import utility
 
 #* Logging
@@ -26,10 +26,25 @@ from utils import utility
 logging.info(f'Starting up config loader file: {os.path.basename(__file__)}')
 logging.debug(f'Current working directory: {os.getcwd()}')
 
+#* Input Arguments
+parser = argparse.ArgumentParser(description=\
+					"Takes a config file and processes it. Should only ever be called from another Python script, not directly - will trigger import cycle chain otherwise.")
+for argument in utility.argparse_universal_args:
+	parser.add_argument(argument[0], argument[1], **(argument[2]))
+args = parser.parse_args()
+
 #* Establish folder structure & location
 python_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
 python_src_directory = os.path.dirname(python_src_directory)		# Go up one folder
 
+# Create project folder to store all files
+# projects_directory_location = '_trials_' + os.path.basename(python_src_directory)
+projects_directory_location = 'ares_' + os.path.basename(python_src_directory)
+if args.override is not None:
+	projects_directory_location = args.override
+if not os.path.isdir(projects_directory_location):
+	os.mkdir(projects_directory_location)
+ 
 running_on_local_machine = False
 slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
 if slurm_job_env_variable is None:
@@ -39,27 +54,11 @@ if slurm_job_env_variable is None:
 #* Debug Options
 # start_from_step = 0 	    #NOTE: Overwritten by config anyway   # 0 if running entire file in one shot
 
-
-#* Input Arguments
-parser = argparse.ArgumentParser(description=\
-					"Takes a config file and processes it. Should only ever be called from another Python script, not directly - will trigger import cycle chain otherwise.")
-for argument in utility.argparse_universal_args:
-	parser.add_argument(argument[0], argument[1], **(argument[2]))
-args = parser.parse_args()
-
 #* Load YAML file
 yaml_filename = args.filename
 with open( yaml_filename, 'rb' ) as yaml_file:
 	parameters = yaml.safe_load( yaml_file )
 logging.debug(f'Read parameters from file: {yaml_filename}')
-
-#* Create project folder to store all files
-projects_directory_location = 'ares_' + os.path.basename(python_src_directory)
-if args.override is not None:
-	projects_directory_location = args.override
-if not os.path.isdir(projects_directory_location):
-	os.mkdir(projects_directory_location)
-
 
 #
 #* Pull out variables from parameters directly
@@ -86,6 +85,7 @@ def get_config_vars(param_dict):
 	restart_iter = get_check_none(param_dict, "restart_iter")
 	lumapi_filepath_local = get_check_none(param_dict, "lumapi_filepath_local")
 	lumapi_filepath_hpc = get_check_none(param_dict, "lumapi_filepath_hpc")
+	simulator_name = get_check_none(param_dict, "simulator_name")
 	convert_existing = get_check_none(param_dict, "convert_existing")
 	mesh_spacing_um = get_check_none(param_dict, "mesh_spacing_um")
 	geometry_spacing_lateral_um = get_check_none(param_dict, "geometry_spacing_lateral_um")
@@ -177,6 +177,7 @@ def get_config_vars(param_dict):
 
 
 
+
 	# # Non-Pythonic way:
 	# # But don't do this. For back-compatibility, we want there to be a None object if we call a variable that is not defined in raw config
 	# locals().update(**param_dict)
@@ -196,11 +197,26 @@ config_vars = get_config_vars(parameters)
 cv = SimpleNamespace(**config_vars)
 
 #* Environment Variables
-if running_on_local_machine:	
+if running_on_local_machine:
+	workload_manager_name = None
 	lumapi_filepath =  cv.lumapi_filepath_local
 else:	
 	#! do not include spaces in filepaths passed to linux
+	workload_manager_name = 'SLURM'
 	lumapi_filepath = cv.lumapi_filepath_hpc
+
+#* Create instances of WorkloadManager class and Simulator class
+
+if workload_manager_name in ['SLURM']:
+# if workload_manager_name not in ['SLURM']:
+	workload_manager = WorkloadManager.SLURM()
+else:	
+    workload_manager = None
+
+if cv.simulator_name in ['LumericalFDTD']:
+    from utils import LumericalUtils as lm
+    simulator = lm.LumericalFDTD(lumapi_filepath)
+
 
 #* Process variables
 # Here we pass config_vars as a dictionary to a function that does all relevant post-processing.
@@ -219,7 +235,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	# Device Height with Number of Layers
 	# Creates a lookup table that adds additional vertical mesh cells depending on the number of layers
 	lookup_additional_vertical_mesh_cells = {1:3, 2:3, 3:2, 4:3, 5:2, 6:2, 8:3, 10:2,
-											15:2, 20:2, 30:2, 40:2}
+											15:2, 20:2, 30:2, 40:3}
 
 	# Mesh
 	# mesh_to_geometry_factor = int( ( geometry_spacing_um + 0.5 * mesh_spacing_um ) / mesh_spacing_um )	# TODO: Do we need this for back-compatibility?
@@ -233,7 +249,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	max_device_permittivity = cd.max_device_index**2
 
 	#! 20230220 - Empirically, keeping focal length at 3/4 of device length seems the most effective.
-	focal_length_um = cd.device_scale_um * 30#40#10#20#40#50#30	
+	focal_length_um = cd.device_scale_um * 30
 	focal_plane_center_vertical_um = -focal_length_um
 
 	# Device
@@ -250,8 +266,8 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	# device_voxels_simulation_mesh_vertical = 2 + int(device_size_vertical_um / mesh_spacing_um)
 	device_voxels_simulation_mesh_vertical = lookup_additional_vertical_mesh_cells[ cd.num_vertical_layers ] + \
 	 													int(device_size_vertical_um / cd.mesh_spacing_um)
-    # TODO: 20230720 Ian - Need to write something that automatically corrects for this. It's taking WAY too much time
-    # todo: to manually guess-and-check this array mismatch.
+	# TODO: 20230720 Ian - Need to write something that automatically corrects for this. It's taking WAY too much time
+	# todo: to manually guess-and-check this array mismatch.
 
 	device_vertical_maximum_um = device_size_vertical_um	# NOTE: Unused
 
@@ -347,8 +363,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	else:
 		gaussian_waist_radius_um = mid_lambda_um / ( np.pi * ( 1. / ( 2 * cd.f_number ) ) )
 	# TODO: Check which one we decided on in the end - Airy disk of Gaussian on input aperture, or f-number determining divergence half-angle?
-	# TODO: Add frequency dependent profile?
-	gaussian_waist_radius_um *= cd.beam_size_multiplier		#! new
+	gaussian_waist_radius_um *= cd.beam_size_multiplier
 
 	source_angle_theta_rad = np.arcsin( np.sin( cd.source_angle_theta_vacuum_deg * np.pi / 180. ) * 1.0 / cd.background_index )
 	source_angle_theta_deg = source_angle_theta_rad * 180. / np.pi

@@ -22,6 +22,8 @@ lumapi_filepath_local: "C:\\Program Files\\Lumerical\\v212\\api\\python\\lumapi.
 lumapi_filepath_hpc: "/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
 #! do not include spaces in filepaths passed to linux
 
+simulator_name: 'LumericalFDTD'
+
 #* Back-Compatibility
 
 convert_existing: False     # Are we converting a previous file that didn't have the mode overlap FoM?
@@ -138,12 +140,12 @@ adjoint_src_to_dispersive_range_map: [
 
 enforce_xy_gradient_symmetry: False #True#False#True
 
-# Alternative is to weight by focal intensity - need to check max intensity weighting thing
+# Alternative is to weight by focal intensity - need to check max intensity weighting
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-num_epochs: 5 # 10
-num_iterations_per_epoch: 30 #30
+num_epochs: 10
+num_iterations_per_epoch: 30
 
 optimizer_algorithm: 'ADAM' #'Gradient Descent'
 adam_betas: [0.9, 0.999]                # actually needs to be a tuple but we just convert it in the code
@@ -161,7 +163,7 @@ optimization_fom: 'intensity'    # Has to be one from the fom_types list
 
 #! new-------
 reinterpolate_permittivity: True #False
-reinterpolate_permittivity_factor: 5 #1#5
+reinterpolate_permittivity_factor: 15 #8 #1#5
 reinterpolate_type: 'nearest' #'linear'   #NOTE: In the end we implement both anyway. Deprecated
 
 
@@ -196,9 +198,7 @@ softplus_kappa:  2
 
 
 
-#!* GREG NEW STUFF JULY
-
-# pec_aperture_device: True # unnecessary - this is the same as use_source_aperture
+#!* NEW STUFF JULY 2023
 
 #* Border aperiodic
 evaluate_bordered_extended: False # True   
@@ -207,11 +207,11 @@ evaluate_bordered_extended: False # True
 
 
 #* Three-material levels
-do_normalize: False #True#False#True#False#True#False
+do_normalize: False
 
 #* Spacers
 # assuming we don't have something like vertically blurring - i.e. - each layer is controlled independently
-should_fix_layers: False #True
+should_fix_layers: True
 # fixed_layers: [ 1, 2, 3, 5, 6, 7 ]
 fixed_layers: [ 1, 3 ]
 fixed_layers_density: 0

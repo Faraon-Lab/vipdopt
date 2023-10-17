@@ -14,7 +14,7 @@ import yaml
 import pyperclip
 
 #* Load YAML file
-yaml_filename = 'configs/test_config_sony.yaml'
+yaml_filename = 'configs/test_config.yaml'
 with open( yaml_filename, 'rb' ) as yaml_file:
 	parameters = yaml.safe_load( yaml_file )
 
