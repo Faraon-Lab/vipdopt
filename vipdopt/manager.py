@@ -179,7 +179,7 @@ class MPIPool:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-    N = int(1e6)
+    N = int(1e3)
 
     comm_world = MPI.COMM_WORLD
     size = comm_world.Get_size()

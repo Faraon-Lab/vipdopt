@@ -1,20 +1,45 @@
-# import pytest
+import numpy as np
+import pytest
 
-# from testing import assert_equal
-# from vipdopt.manager import MPIPool
+from testing import assert_equal
+from vipdopt.manager import MPIPool
 
 
-# @pytest.mark.mpi()
-# def test_MPI(mocker):
-#     def square(n):
-#         return n ** 2
+def square(n):
+    return n ** 2
 
-#     spy = mocker.spy(square)
 
-#     from mpi4py import MPI
-#     comm = MPI.COMM_WORLD
-#     with MPIPool(comm) as pool:
-#         assert_equal(pool.submit(square, 4), 16)
+@pytest.mark.mpi(min_size=2)
+def test_submit():
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
 
-#     assert_equal(spy.call_count, 1)
-#     assert_equal(spy.spy_return, 16)
+    with MPIPool(comm) as pool:
+        res = pool.submit(square, 4)
+        if pool.is_manager():
+            assert_equal(res, 16)
+        else:
+            assert_equal(res, None)
+
+
+@pytest.mark.mpi(min_size=2)
+def test_map():
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+
+    with MPIPool(comm) as pool:
+        res = pool.map(square, range(10))
+        if pool.is_manager():
+            assert_equal(res, np.power(range(10), 2))
+        else:
+            assert_equal(res, [None] * 10)
+
+
+@pytest.mark.mpi(min_size=2)
+def test_no_comm():
+    with MPIPool() as pool:
+        res = pool.submit(square, 4)
+        if pool.is_manager():
+            assert_equal(res, 16)
+        else:
+            assert_equal(res, None)

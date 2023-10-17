@@ -21,9 +21,9 @@ def get_config_loader(config_format) -> Callable[[str], dict]:
 def _yaml_loader(filepath: str) -> dict:
     """Config file loader for YAML files."""
     # Allow the safeloader to convert sequences to tuples
-    SafeConstructor.add_constructor(
+    SafeConstructor.add_constructor(  # type: ignore
         'tag:yaml.org,2002:python/tuple',
-        lambda self, x: tuple(self.construct_sequence(x))
+        lambda self, x: tuple(SafeConstructor.construct_sequence(self, x))
     )
     with open(filepath, 'rb') as stream:
         return yaml.safe_load(stream)

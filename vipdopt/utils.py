@@ -5,7 +5,7 @@ from typing import TypeVar
 import numpy as np
 import numpy.typing as npt
 
-Number = TypeVar('Number', int, float, complex)
+Number = int | float | complex
 
 # Generic types for type hints
 T = TypeVar('T')
