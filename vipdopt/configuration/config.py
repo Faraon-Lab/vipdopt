@@ -43,15 +43,15 @@ class Config:
         """Return shorter string version of the Config object."""
         return f'Config object for {self._files}'
 
-    
+
     def safe_get(self, name: str | Callable) -> Any | None:
-        if type(name) is str:
+        """Get attribute and return None if it doesn't exist."""
+        if isinstance(name, str):
             return getattr(self, name, None)
-        else:
-            try:
-                return name.__get__(self)
-            except AttributeError:
-                return None
+        try:
+            return name.__get__(self)
+        except AttributeError:
+            return None
 
     def __setattr__(self, name: str, value: Any) -> Any:
         """Set the value of an attribute, creating it if it doesn't already exist."""
@@ -63,7 +63,6 @@ class Config:
         config_loader = get_config_loader(cfg_format)
         config = config_loader(filename)
         logging.debug(f'Loaded config file:\n {config}')
-        print(config)
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:

@@ -16,7 +16,6 @@ sys.path.insert(0, path)
 
 
 from vipdopt.configuration.config import Config
-from vipdopt.manager import MPIPool
 
 ROOT = 0  # Index of root process
 
@@ -59,11 +58,11 @@ if __name__ == '__main__':
         # if pool.ismanager():
 
             # While optimize:
-                # Run simulations in parallel 
+                # Run simulations in parallel
                 # Combine results from simulations
                 # Compute gradient & run optimizer
                 # Update simulation values
-    
+
     # Extract final data from optimization
     # Evaluate device and generate plots (could also be parallelized if needed)
 

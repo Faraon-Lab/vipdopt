@@ -23,4 +23,5 @@ dependencies:
   - pytest-cov=4.1.*
   - pytest-xdist=3.3.*
   - pytest-mock
+  - pytest-mpi
   - coverage[toml]=7.2.*

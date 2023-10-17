@@ -1,8 +1,9 @@
 
 """Tests for filter.py"""
 
-from typing import Any, Pattern
 import re
+from re import Pattern
+from typing import Any
 
 import numpy as np
 import pytest
@@ -13,7 +14,7 @@ from vipdopt.configuration import Config, SonyBayerConfig
 TEST_YAML_PATH = 'config.yml.example'
 
 @pytest.mark.smoke()
-@pytest.mark.usefixtures('mock_empty_config')
+@pytest.mark.usefixtures('_mock_empty_config')
 def test_load_empty_yaml():
     cfg = Config()
     cfg.read_file('fakefile')
@@ -195,28 +196,31 @@ def test_cascading_params(func, value: Any):
     assert_equal(func.__get__(cfg), value)
 
 
-@pytest.mark.smoke
-@pytest.mark.usefixtures('mock_empty_config')
+@pytest.mark.smoke()
+@pytest.mark.usefixtures('_mock_empty_config')
 def test_unsupported_filetype():
     cfg = Config()
     with pytest.raises(NotImplementedError):
         cfg.read_file('fakefilename', 'json')
 
-@pytest.mark.smoke
-@pytest.mark.usefixtures('mock_bad_config')
+@pytest.mark.smoke()
+@pytest.mark.usefixtures('_mock_bad_config')
 @pytest.mark.parametrize(
     'fname, msg',
     [
         ('bad_config_1.yml', r'.*border_optimization.+use_smooth_blur.*'),
         ('bad_config_2.yml', r'.*border_optimization.+num_sidewalls.*> 0.*'),
-        ('bad_config_3.yml', r'.*device_voxels_lateral.+(None|\d+(?!\d)(?<=[13579])).*'),
-        ('bad_config_4.yml', r'.*device_voxels_lateral.+(None|\d+(?!\d)(?<=[13579])).*'),
+        ('bad_config_3.yml',
+         r'.*device_voxels_lateral.+(None|\d+(?!\d)(?<=[13579])).*'),
+        ('bad_config_4.yml',
+         r'.*device_voxels_lateral.+(None|\d+(?!\d)(?<=[13579])).*'),
         ('bad_config_5.yml', r'.*add_pdaf.*add_infrared.*not compatible'),
-        ('bad_config_6.yml', r'.*reinterpolate_permittivity_factor.*(?!1)(\d|None).*'),
+        ('bad_config_6.yml',
+         r'.*reinterpolate_permittivity_factor.*(?!1)(\d|None).*'),
     ]
 )
 def test_bad_config(fname: str, msg: Pattern):
     cfg = SonyBayerConfig()
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as e:  # noqa: PT011
         cfg.read_file(fname)
     assert re.match(msg, e.value.args[0])
