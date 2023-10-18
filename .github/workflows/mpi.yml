@@ -36,7 +36,9 @@ jobs:
           mpi: ${{ matrix.mpi }} 
     
       - name: Update Path
-        run: export $LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
+        run: |
+          LD_LIBRARY_PATH=$LD_LIBRARY_PATH\:/usr/local/lib
+          export LD_LIBRARY_PATH
     
       - name: Setup Python
         uses: ./.github/actions/python-setup
@@ -59,7 +61,9 @@ jobs:
           mpi: ${{ matrix.mpi }} 
 
       - name: Update Path
-        run: export $LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
+        run: |
+          LD_LIBRARY_PATH=$LD_LIBRARY_PATH\:/usr/local/lib
+          export LD_LIBRARY_PATH
     
       - name: Setup Python
         uses: ./.github/actions/python-setup
@@ -84,8 +88,8 @@ jobs:
       - name: Update Path
         if: ${{ matrix.mpi == 'msmpi'}}
         run: |
-          set PATH=%PATH%;C:\Program Files\Microsoft MPI\Bin
-          set PATH=%PATH%;C:\Program Files (x86)\Microsoft SDKs\MPI
+          set PATH="%PATH%;C:\Program Files\Microsoft MPI\Bin"
+          set PATH="%PATH%;C:\Program Files (x86)\Microsoft SDKs\MPI"
     
       - name: Setup Python
         uses: ./.github/actions/python-setup
