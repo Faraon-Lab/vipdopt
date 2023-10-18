@@ -65,7 +65,7 @@ jobs:
     runs-on: windows-latest
     strategy:
         matrix:
-            mpi: ['msmpi', 'intlempi']
+            mpi: ['msmpi', 'intelmpi']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
