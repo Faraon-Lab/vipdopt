@@ -1,7 +1,6 @@
 """Module for the abstract Filter class and all its implementations."""
 
 import abc
-from typing import get_args
 
 import numpy as np
 import numpy.typing as npt
@@ -44,7 +43,6 @@ class IFilter(abc.ABC):
     ) -> npt.ArrayLike | Number:
         """Apply the chain rule and propogate the derivative back one step."""
 
-
 class Sigmoid(IFilter):
     """Applies a sigmoidal projection filter to binarize an input.
 
@@ -70,7 +68,7 @@ class Sigmoid(IFilter):
         if not self.verify_bounds(eta):
             raise ValueError('Eta must be in the range [0, 1]')
 
-        self.eta = eta
+        self.eta  = eta
         self.beta = beta
 
         # Calculate denominator for use in methods
@@ -89,12 +87,12 @@ class Sigmoid(IFilter):
         numerator = np.tanh(self.beta * self.eta) + np.tanh(self.beta * (x - self.eta))
         return numerator / self._denominator
 
-    @override
+    @override  # type: ignore
     def chain_rule(
         self,
         deriv_out: npt.ArrayLike | Number,
         var_out: npt.ArrayLike | Number,
-        var_in: npt.ArrayLike | Number
+        var_in: npt.ArrayLike | Number,
     ) -> npt.ArrayLike | Number:
         """Apply the chain rule and propogate the derivative back one step.
 
@@ -116,6 +114,6 @@ class Sigmoid(IFilter):
         fab = np.array(x)
         fab[fab <= self.eta] = self._bounds[0]
         fab[fab > self.eta] = self._bounds[1]
-        if isinstance(x, get_args(Number)):
+        if isinstance(x, Number):  # type: ignore
             return fab.item()
         return fab

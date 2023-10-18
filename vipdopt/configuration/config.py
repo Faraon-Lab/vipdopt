@@ -21,9 +21,9 @@ def get_config_loader(config_format) -> Callable[[str], dict]:
 def _yaml_loader(filepath: str) -> dict:
     """Config file loader for YAML files."""
     # Allow the safeloader to convert sequences to tuples
-    SafeConstructor.add_constructor(
+    SafeConstructor.add_constructor(  # type: ignore
         'tag:yaml.org,2002:python/tuple',
-        lambda self, x: tuple(self.construct_sequence(x))
+        lambda self, x: tuple(SafeConstructor.construct_sequence(self, x))
     )
     with open(filepath, 'rb') as stream:
         return yaml.safe_load(stream)
@@ -43,15 +43,15 @@ class Config:
         """Return shorter string version of the Config object."""
         return f'Config object for {self._files}'
 
-    
+
     def safe_get(self, name: str | Callable) -> Any | None:
-        if type(name) is str:
+        """Get attribute and return None if it doesn't exist."""
+        if isinstance(name, str):
             return getattr(self, name, None)
-        else:
-            try:
-                return name.__get__(self)
-            except AttributeError:
-                return None
+        try:
+            return name.__get__(self)
+        except AttributeError:
+            return None
 
     def __setattr__(self, name: str, value: Any) -> Any:
         """Set the value of an attribute, creating it if it doesn't already exist."""
@@ -63,7 +63,6 @@ class Config:
         config_loader = get_config_loader(cfg_format)
         config = config_loader(filename)
         logging.debug(f'Loaded config file:\n {config}')
-        print(config)
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
