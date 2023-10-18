@@ -11,7 +11,7 @@ def square(n):
 
 @pytest.mark.mpi(min_size=2)
 def test_submit():
-    with MPIPool() as pool:
+    with MPIPool(use_dill=True) as pool:
         res = pool.submit(square, 4)
         if pool.is_manager():
             assert_equal(res, 16)
@@ -21,7 +21,7 @@ def test_submit():
 
 @pytest.mark.mpi(min_size=2)
 def test_map():
-    with MPIPool() as pool:
+    with MPIPool(use_dill=True) as pool:
         res = pool.map(square, range(10))
         if pool.is_manager():
             assert_equal(res, np.power(range(10), 2))

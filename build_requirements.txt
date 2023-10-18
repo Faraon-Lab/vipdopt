@@ -7,3 +7,4 @@ PyYAML
 types-PyYAML
 python-magic
 mpi4py
+dill

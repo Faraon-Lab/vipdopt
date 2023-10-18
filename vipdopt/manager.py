@@ -19,18 +19,17 @@ if __name__ == '__main__':
 from vipdopt.utils import R
 
 
-def _import_mpi(quiet=False, use_dill=False):
-    global MPI
+def _import_mpi(quiet=False, use_dill=False):  # noqa: FBT002
+    global MPI  # noqa: PLW0603
     try:
         from mpi4py import MPI as _MPI
         if use_dill:
-            import dill
+            import dill  # type: ignore
             _MPI.pickle.__init__(dill.dumps, dill.loads, dill.HIGHEST_PROTOCOL)
         MPI = _MPI
-    except ImportError:
+    except ImportError as e:
         if not quiet:
-            # Re-raise with a more user-friendly error:
-            raise ImportError("Please install mpi4py")
+            raise ImportError('Problem with mpi4py. Check installation') from e
 
     return MPI
 
@@ -54,9 +53,11 @@ class MPIPool:
         workers (set[int]): All the ranks of worker processes
     """
 
-    def __init__(self, comm: Any=None, use_dill=False) -> None:
+    def __init__(self, comm: Any=None, use_dill=False) -> None:  # noqa: FBT002
         """Create MPIPool object and start manager / worker relationship."""
+        global MPI  # noqa: PLW0603
         MPI = _import_mpi(use_dill=use_dill)
+        assert MPI is not None
         if comm is None:
             comm = MPI.COMM_WORLD
         self.comm = comm
@@ -81,6 +82,8 @@ class MPIPool:
         """If a worker, wait for work to be provided."""
         if self.is_manager():
             return
+
+        assert MPI is not None
 
         status = MPI.Status()
         while True:
@@ -125,6 +128,8 @@ class MPIPool:
         Returns:
             (Sequence[R]) A list of `func(task)` for all the tasks provided.
         """
+        assert MPI is not None
+
         results: list[R | None] = [None] * len(tasks)
 
         # Workers should be waiting for jobs

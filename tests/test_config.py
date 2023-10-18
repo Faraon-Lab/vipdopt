@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from testing import assert_equal, assert_close
+from testing import assert_close, assert_equal
 from vipdopt.configuration import Config, SonyBayerConfig
 
 TEST_YAML_PATH = 'config.yml.example'
