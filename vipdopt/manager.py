@@ -6,8 +6,6 @@ import sys
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from mpi4py import MPI
-
 if __name__ == '__main__':
     #  Here so that running this script directly doesn't blow up
     f = sys.modules[__name__].__file__
@@ -20,6 +18,23 @@ if __name__ == '__main__':
 
 from vipdopt.utils import R
 
+
+def _import_mpi(quiet=False, use_dill=False):
+    global MPI
+    try:
+        from mpi4py import MPI as _MPI
+        if use_dill:
+            import dill
+            _MPI.pickle.__init__(dill.dumps, dill.loads, dill.HIGHEST_PROTOCOL)
+        MPI = _MPI
+    except ImportError:
+        if not quiet:
+            # Re-raise with a more user-friendly error:
+            raise ImportError("Please install mpi4py")
+
+    return MPI
+
+MPI = None
 ROOT = 0
 
 # TODO: Allow multiple processes per job
@@ -39,8 +54,9 @@ class MPIPool:
         workers (set[int]): All the ranks of worker processes
     """
 
-    def __init__(self, comm: MPI.Comm | None=None) -> None:
+    def __init__(self, comm: Any=None, use_dill=False) -> None:
         """Create MPIPool object and start manager / worker relationship."""
+        MPI = _import_mpi(use_dill=use_dill)
         if comm is None:
             comm = MPI.COMM_WORLD
         self.comm = comm
@@ -179,22 +195,16 @@ class MPIPool:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-    N = int(1e3)
-
-    comm_world = MPI.COMM_WORLD
-    size = comm_world.Get_size()
-    my_rank = comm_world.Get_rank()
+    N = int(1e6)
 
     def square(n: int) -> int:
         """Compute square of a number."""
         return n ** 2
 
-    if my_rank == ROOT:
-        logging.debug(f'\nComputing n^2 for all n in [1, ..., {N}] using'
-                      f' {size} proceess{(size> 1) * "es"}\n')
-
-    with MPIPool(comm_world) as pool:
+    with MPIPool() as pool:
         if pool.is_manager():
+            logging.info(f'\nComputing n^2 for all n in [1, ..., {N}] using'
+                            f' {pool.size} process{(pool.size> 1) * "es"}\n')
             for i, res in enumerate(pool.map(square, range(N))):
                 if i % (N / 10) == 0:
                     logging.info(f'{i}^2\t=\t{res:e}')

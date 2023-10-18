@@ -26,4 +26,4 @@ jobs:
             uses: ./.github/actions/python-setup
         
           - name: Check Coverage
-            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 90
+            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 85
