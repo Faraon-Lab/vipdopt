@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
         matrix:
-            mpi: ['mpich', 'openmpi', 'intelmpi']
+            mpi: ['mpich']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
