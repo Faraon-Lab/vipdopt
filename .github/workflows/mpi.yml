@@ -21,11 +21,16 @@ concurrency:
 
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
+  test-with-mpi:
     strategy:
-        matrix:
-            mpi: ['mpich', 'openmpi', 'intelmpi']
+      matrix:
+        os_mpi:
+          - [ubuntu-latest, 'mpich']
+          - [ubuntu-latest, 'openmpi']
+          - [ubuntu-latest, 'intelmpi']
+          - [macos-latest, 'mpich']
+          - [macos-latest, 'openmpi']
+    runs-on: ${{ matrix.os_mpi[0]}}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -33,7 +38,7 @@ jobs:
       - name: Setup MPI
         uses: mpi4py/setup-mpi@v1
         with:
-          mpi: ${{ matrix.mpi }} 
+          mpi: ${{ matrix.os_mpi[1] }} 
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -46,39 +51,11 @@ jobs:
             do
                 pip install --no-cache-dir -r $file
             done
-    
-      - name: Run Smoke Tests
-        run: mpiexec -n 4 python -m pytest --with-mpi
 
-  macos:
-    runs-on: macos-latest
-    strategy:
-        matrix:
-            mpi: ['mpich', 'openmpi']
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup MPI
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: ${{ matrix.mpi }} 
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-    
-      - name: Install Dependencies
-        run: |
-            for file in *requirements.txt
-            do
-                pip install --no-cache-dir -r $file
-            done
-    
       - name: Install python-magic bin
+        if: ${{ matrix.os_mpi[0] == 'macos-latest'}}
         run: |
             pip install python-magic-bin
     
-      - name: Run Smoke Tests
+      - name: Run Tests
         run: mpiexec -n 4 python -m pytest --with-mpi

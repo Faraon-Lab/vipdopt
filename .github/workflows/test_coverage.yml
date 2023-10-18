@@ -1,5 +1,8 @@
 name: Tests and Code coverage
 
+# Runs all tests (except for  MPI) and generates a coverage report.defaults:
+# Job fails if less than 85 percetn coverage
+
 on:
   push:
     branches:
