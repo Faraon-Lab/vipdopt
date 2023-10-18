@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
         matrix:
-            mpi: ['openmpi']
+            mpi: ['mpich', 'openmpi', 'intelmpi']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -34,14 +34,18 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }} 
-    
-      - name: Update Path
-        run: |
-          LD_LIBRARY_PATH=$LD_LIBRARY_PATH\:/usr/local/lib
-          export LD_LIBRARY_PATH
-    
+
       - name: Setup Python
-        uses: ./.github/actions/python-setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+    
+      - name: Install Dependencies
+        run: |
+            for file in *requirements.txt
+            do
+                pip install --no-cache-dir -r $file
+            done
     
       - name: Run Smoke Tests
         run: mpiexec -n 4 python -m pytest --with-mpi
@@ -60,14 +64,18 @@ jobs:
         with:
           mpi: ${{ matrix.mpi }} 
 
-      - name: Update Path
-        run: |
-          LD_LIBRARY_PATH=$LD_LIBRARY_PATH\:/usr/local/lib
-          export LD_LIBRARY_PATH
-    
       - name: Setup Python
-        uses: ./.github/actions/python-setup
-
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+    
+      - name: Install Dependencies
+        run: |
+            for file in *requirements.txt
+            do
+                pip install --no-cache-dir -r $file
+            done
+    
       - name: Install python-magic bin
         run: |
             pip install python-magic-bin
