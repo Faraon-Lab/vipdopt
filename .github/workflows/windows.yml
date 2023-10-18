@@ -3,15 +3,7 @@ name: Windows Continuous Integration
 # This file is intended for testing on windows platforms, running benchmarks, measuring
 # code coverage, etc.
 
-on:
-  push:
-    branches:
-      - main
-      - dev
-  pull_request:
-    branches:
-      - main
-      - dev
+on: [push, pull_request]
 
 
 permissions:
@@ -49,6 +41,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Setup MPI
+        uses: mpi4py/setup-mpi@v1
     
       - name: Setup Python
         uses: ./.github/actions/python-setup

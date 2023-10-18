@@ -1,0 +1,82 @@
+name: MPI Tests
+
+# This file is intended for running all tests that require MPI
+# Runs on all available MPI implementations for each OS
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+        matrix:
+            mpi: ['mpich', 'openmpi', 'intelmpi']
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }} 
+    
+      - name: Setup Python
+        uses: ./.github/actions/python-setup
+    
+      - name: Run Smoke Tests
+        run: mpiexec -n 4 python -m pytest --with-mpi
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+        matrix:
+            mpi: ['mpich', 'openmpi']
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }} 
+    
+      - name: Setup Python
+        uses: ./.github/actions/python-setup
+    
+      - name: Run Smoke Tests
+        run: mpiexec -n 4 python -m pytest --with-mpi
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+        matrix:
+            mpi: ['msmpi', 'intlempi']
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }} 
+    
+      - name: Setup Python
+        uses: ./.github/actions/python-setup
+    
+      - name: Run Smoke Tests
+        run: mpiexec -n 4 python -m pytest --with-mpi
