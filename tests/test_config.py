@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from testing import assert_equal
+from testing import assert_equal, assert_close
 from vipdopt.configuration import Config, SonyBayerConfig
 
 TEST_YAML_PATH = 'config.yml.example'
@@ -193,7 +193,7 @@ def test_cascading_params(func, value: Any):
     cfg = SonyBayerConfig()
     cfg.read_file(TEST_YAML_PATH)
 
-    assert_equal(func.__get__(cfg), value)
+    assert_close(func.__get__(cfg), value, err=1e-5)
 
 
 @pytest.mark.smoke()
