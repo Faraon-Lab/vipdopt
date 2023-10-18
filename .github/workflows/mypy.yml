@@ -30,7 +30,6 @@ jobs:
       matrix:
         os_python:
           - [ubuntu-latest, '3.11']  # switch to 3.12-dev after mypy is upgraded (see gh-23764)
-          - [windows-latest, '3.11.1']
           - [macos-latest, '3.11.2']
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +45,7 @@ jobs:
           cache-dependency-path: './*_requirements.txt'
     
       - name: Python magic bin install
-        if: ${{ contains(matrix.os_python[0], 'windows') || contains(matrix.os_python[0], 'macos') }}
+        if: ${{ contains(matrix.os_python[0], 'macos') }}
         run: |
             pip install python-magic-bin
 

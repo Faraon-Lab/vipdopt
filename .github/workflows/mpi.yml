@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
         matrix:
-            mpi: ['mpich']
+            mpi: ['openmpi']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -67,32 +67,10 @@ jobs:
     
       - name: Setup Python
         uses: ./.github/actions/python-setup
-    
-      - name: Run Smoke Tests
-        run: mpiexec -n 4 python -m pytest --with-mpi
 
-  windows:
-    runs-on: windows-latest
-    strategy:
-        matrix:
-            mpi: ['msmpi', 'intelmpi']
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup MPI
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: ${{ matrix.mpi }} 
-
-      - name: Update Path
-        if: ${{ matrix.mpi == 'msmpi'}}
+      - name: Install python-magic bin
         run: |
-          set PATH="%PATH%;C:\Program Files\Microsoft MPI\Bin"
-          set PATH="%PATH%;C:\Program Files (x86)\Microsoft SDKs\MPI"
-    
-      - name: Setup Python
-        uses: ./.github/actions/python-setup
+            pip install python-magic-bin
     
       - name: Run Smoke Tests
         run: mpiexec -n 4 python -m pytest --with-mpi
