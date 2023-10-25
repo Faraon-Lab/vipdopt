@@ -99,7 +99,8 @@ max-complexity = 15
 [tool.pytest.ini_options]
  markers = [
     "smoke: these tests should always run to check for regressions quickly",
-    "slow: mark tests as slow (only run with full suite)"
+    "slow: mark tests as slow (only run with full suite)",
+    "lumapi: tests that require lumapi to run"
 ]
 
 testpaths = ["tests"]
@@ -112,7 +113,7 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["vipdopt"]
-omit = ["*tests*", "*testing*", "*__main__.py", "vipdopt/manager.py"]
+omit = ["*tests*", "*testing*", "*__main__.py", "vipdopt/manager.py", "vipdopt/simulation.py"]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration

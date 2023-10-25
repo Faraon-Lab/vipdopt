@@ -53,4 +53,4 @@ jobs:
             pip install python-magic-bin
     
       - name: Run Smoke Tests
-        run: pytest -m 'smoke'
+        run: pytest -m 'smoke and not luampi'

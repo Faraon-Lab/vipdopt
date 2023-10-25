@@ -58,4 +58,4 @@ jobs:
             pip install python-magic-bin
     
       - name: Run Tests
-        run: mpiexec -n 4 python -m pytest --with-mpi
+        run: mpiexec -n 4 python -m pytest --with-mpi -m "not lumapi"

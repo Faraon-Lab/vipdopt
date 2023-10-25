@@ -15,7 +15,7 @@ mock_bad_config_data = {
     'reinterpolate_permittivity: False\nreinterpolate_permittivity_factor: 2',
 }
 
-mock_sim_file = """{
+_mock_sim_file_data = """{
     "objects": {
         "source_aperture": {
             "name": "source_aperture",
@@ -42,6 +42,10 @@ mock_sim_file = """{
 }"""
 
 @pytest.fixture()
+def mock_sim_file():
+    return _mock_sim_file_data
+
+@pytest.fixture()
 def _mock_empty_config(mocker):
     """Read a mocked empty config file"""
     mocked_config = mocker.mock_open(
@@ -65,5 +69,5 @@ def _mock_bad_config(mocker):
 def simulation_json(tmpdir_factory):
     fn = tmpdir_factory.mktemp('sim').join('sim.json')
     with open(str(fn), 'w') as f:
-        f.write(mock_sim_file)
+        f.write(_mock_sim_file_data)
     return fn

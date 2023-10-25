@@ -1,7 +1,6 @@
 import pytest
 
 from testing import assert_equal
-from tests.conftest import mock_sim_file
 from vipdopt.simulation import (
     LumericalSimObject,
     LumericalSimObjectType,
@@ -14,6 +13,7 @@ from vipdopt.simulation import (
 
 
 @pytest.mark.smoke()
+@pytest.mark.lumapi()
 def test_load_sim(simulation_json):
     s = LumericalSimulation(fname=simulation_json)
 
@@ -42,7 +42,8 @@ def test_load_sim(simulation_json):
 
 
 @pytest.mark.smoke()
-def test_save_sim(tmp_path):
+@pytest.mark.lumapi()
+def test_save_sim(tmp_path, mock_sim_file):
     path = tmp_path / 'sim.json'
 
     source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.rect)
@@ -70,7 +71,9 @@ def test_save_sim(tmp_path):
     assert len(list(tmp_path.iterdir())) == 1  # Only one file written
     assert_equal(path.read_text(), mock_sim_file)  # Correct contents
 
+
 @pytest.mark.smoke()
+@pytest.mark.lumapi()
 def test_new_object():
     s = LumericalSimulation(fname=None)
     props = {

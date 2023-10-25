@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+from collections import OrderedDict
 from collections.abc import Callable
 from enum import StrEnum
 from typing import Any
@@ -20,8 +21,7 @@ if __name__ == '__main__':
     path = os.path.join(path, '..')
     sys.path.insert(0, path)
 
-
-# TODO: Handle import for lumapi
+from vipdopt import lumapi
 
 
 class ISimulation(abc.ABC):
@@ -43,9 +43,6 @@ class ISimulation(abc.ABC):
     def save(self, fname: str):
         """Save simulation data to a file."""
 
-    # def update_obj(self, objname: str, properties: dict[str, Any]) -> Any:
-    #     """Update a simulation object."""
-
 
 class LumericalSimObjectType(StrEnum):
     """Types of simulation objects in Lumerical."""
@@ -62,19 +59,13 @@ class LumericalSimObjectType(StrEnum):
 
     def get_add_function(self) -> Callable:
         """Get the corerct lumapi function to add an object."""
-        return lambda o: o
-        # TODO: ADD the following
-        # match self.value
-        #     case LumericalSimObjectType.fdtd:
-        #     case LumericalSimObjectType.mesh:
-        #     case LumericalSimObjectType.gaussian:
-        #     case LumericalSimObjectType.tfsf:
-        #     case LumericalSimObjectType.dipole:
-        #     case LumericalSimObjectType.power:
-        #     case LumericalSimObjectType.profile:
-        #     case LumericalSimObjectType.lum_index:
-        #     case LumericalSimObjectType.lum_import:
-        #     case LumericalSimObjectType.rect:
+        match self.value:
+            case LumericalSimObjectType.lum_index:
+                return lumapi.FDTD.addindex
+            case LumericalSimObjectType.lum_import:
+                return lumapi.FDTD.addimport
+            case _:
+                return getattr(lumapi.FDTD, f'add{self.value}')
 
 
 class LumericalEncoder(json.JSONEncoder):
@@ -98,13 +89,13 @@ class LumericalSimObject:
     Attributes:
         name (str): name of the object
         obj_type (LumericalSimObjectType): the type of object
-        properties (dict[str, Any]): Map of named properties and their values
+        properties (OrderedDict[str, Any]): Map of named properties and their values
     """
     def __init__(self, name: str, obj_type: LumericalSimObjectType) -> None:
         """Crearte a LumericalSimObject."""
         self.name = name
         self.obj_type = obj_type
-        self.properties: dict[str, Any] = {}
+        self.properties: OrderedDict[str, Any] = OrderedDict()
 
     def __str__(self) -> str:
         """Return string representation of object."""
@@ -143,7 +134,7 @@ class LumericalSimulation(ISimulation):
     Attributes:
         config (vipdopt.Config): configuration object
         fdtd (lumapi.FDTD): Lumerical session
-        objects (dict[str, LumericalSimObject]): The objects within
+        objects (OrderedDict[str, LumericalSimObject]): The objects within
             the simulation
     """
 
@@ -154,7 +145,8 @@ class LumericalSimulation(ISimulation):
             fname (str): optional filename to load the simulation from
         """
         self.fdtd = None
-        self.objects: dict[str, LumericalSimObject] = {}
+        self.connect()
+        self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
         if fname:
             self.load(fname)
 
@@ -169,21 +161,24 @@ class LumericalSimulation(ISimulation):
 
     @override
     def connect(self) -> None:
+        logging.info('Attempting to connect to Lumerical servers...')
+
         # This loop handles the problem of
         # "Failed to start messaging, check licenses..." that Lumerical often has.
         while self.fdtd is None:
             try:
-                # TODO: self.fdtd = lumapi.FDTD()
-                pass
+                self.fdtd = lumapi.FDTD(hide=True)
             except Exception:
                 logging.exception('Licensing server error - can be ignored.')
                 continue
+
         logging.info('Verified license with Lumerical servers.')
+        self.fdtd.newproject()
 
     @override
     def load(self, fname: str):
         self.fdtd = None
-        self.objects = {}
+        self.objects = OrderedDict()
         with open(fname) as f:
             sim = json.load(f)
             for obj in sim['objects'].values():
@@ -227,7 +222,7 @@ class LumericalSimulation(ISimulation):
             self.objects[obj.name] = obj
             return
 
-        obj.obj_type.get_add_function()(properties=obj.properties)
+        obj.obj_type.get_add_function()(self.fdtd, properties=obj.properties)
         self.objects[obj.name] = obj
 
     def update_object(self, name: str, properties: dict):
@@ -251,10 +246,11 @@ class LumericalSimulation(ISimulation):
 
 if __name__ == '__main__':
     with LumericalSimulation(fname=None) as sim:
-        props1 = {'width': 2, 'height': 5}
+        props1 = {'x': 2, 'y': 5}
         obj1 = sim.new_object('obj1', LumericalSimObjectType.mesh, props1)
         props2 = {'x span': 10, 'y span': 7, 'simulation time': 300}
         obj2 = sim.new_object('obj2', LumericalSimObjectType.fdtd, props2)
         sim.save('testout.json')
 
-    sim2 = LumericalSimulation('testout.json')
+    with LumericalSimulation('testout.json') as sim:
+        sim.save('testout2.json')
