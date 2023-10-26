@@ -265,15 +265,22 @@ def construct_sim_objects():
 	return sim_objects
 
 
-def construct_design_regions():
+def construct_device_regions():
 	'''Create dictionary to duplicate device regions as dictionaries for saving out'''
 	# This dictionary captures the states of all FDTD objects in the simulation, and has the advantage that it can be saved out or exported.
 	# The dictionary will be our master record, and is continually updated for every change in FDTD.
-	design_regions = {}
-	design_regions['DEVICE_INFO'] = {
+	device_regions = {}
+	device_regions['DEVICE_INFO'] = {
 				'name': 'SonyBayerFilter',
 				'path': '',
-				'coordinates': None
+				'coordinates': {'x': np.linspace(-0.5 * cfg.pv.device_size_lateral_bordered_um, 0.5 * cfg.pv.device_size_lateral_bordered_um, cfg.pv.device_voxels_lateral_bordered),
+								'y': np.linspace(-0.5 * cfg.pv.device_size_lateral_bordered_um, 0.5 * cfg.pv.device_size_lateral_bordered_um, cfg.pv.device_voxels_lateral_bordered),
+								'z': np.linspace(cfg.cv.device_vertical_minimum_um, cfg.pv.device_vertical_maximum_um, cfg.pv.device_voxels_vertical)
+							},					# Coordinates of each voxel can be regular or irregular. Gives the most freedom for feature generation down the road
+				'size_voxels': np.array( [cfg.pv.device_voxels_lateral_bordered, cfg.pv.device_voxels_lateral_bordered, cfg.pv.device_voxels_vertical] ),
+				'feature_dimensions': 1,
+				'permittivity_constraints': [cfg.pv.min_device_permittivity, cfg.pv.max_device_permittivity]
+		# other_arguments
 	}
 
 	#! This script should describe all objects without any sort of partitioning for E-field stitching later on. 
@@ -283,17 +290,19 @@ def construct_design_regions():
 	design_import = {}
 	design_import['name'] = 'design_import'
 	design_import['type'] = 'Import'
+	design_import['dev_id'] = 0				# ID keeps track of which device this belongs to.
 	design_import['x span'] = cfg.pv.device_size_lateral_bordered_um * 1e-6
 	design_import['y span'] = cfg.pv.device_size_lateral_bordered_um * 1e-6
 	design_import['z max'] = cfg.pv.device_vertical_maximum_um * 1e-6
 	design_import['z min'] = cfg.cv.device_vertical_minimum_um * 1e-6
 
 	# design_import = fdtd_update_object(fdtd_hook, design_import, create_object=True)
-	design_regions['design_import'] = design_import
+	device_regions['design_import'] = design_import
 
 	device_mesh = {}
 	device_mesh['name'] = 'device_mesh'
 	device_mesh['type'] = 'Mesh'
+	device_mesh['dev_id'] = 0
 	device_mesh['x'] = 0
 	device_mesh['x span'] = cfg.pv.fdtd_region_size_lateral_um * 1e-6
 	device_mesh['y'] = 0
@@ -305,13 +314,14 @@ def construct_design_regions():
 	device_mesh['dz'] = cfg.cv.mesh_spacing_um * 1e-6
  
 	# device_mesh = fdtd_update_object(fdtd_hook, device_mesh, create_object=True)
-	design_regions['device_mesh'] = device_mesh
+	device_regions['device_mesh'] = device_mesh
 
 	# Add device index monitor
 	design_index_monitor = {}
 	design_index_monitor['name'] = 'design_index_monitor'
 	design_index_monitor['type'] = 'IndexMonitor'
 	design_index_monitor['monitor type'] = '3D'
+	design_index_monitor['dev_id'] = 0
 	design_index_monitor['x span'] = cfg.pv.device_size_lateral_bordered_um * 1e-6
 	design_index_monitor['y span'] = cfg.pv.device_size_lateral_bordered_um * 1e-6
 	design_index_monitor['z max'] = cfg.pv.device_vertical_maximum_um * 1e-6
@@ -319,7 +329,7 @@ def construct_design_regions():
 	design_index_monitor['spatial interpolation'] = 'nearest mesh cell'
 
 	# design_index_monitor = fdtd_update_object(fdtd_hook, design_index_monitor, create_object=True)
-	design_regions['design_index_monitor'] = design_index_monitor
+	device_regions['design_index_monitor'] = design_index_monitor
 
 	# Set up the volumetric electric field monitor inside the design region.  We will need this to compute the adjoint gradient
 	design_efield_monitor = {}
@@ -327,6 +337,7 @@ def construct_design_regions():
 	design_efield_monitor['type'] = 'DFTMonitor'
 	design_efield_monitor['power_monitor'] = False
 	design_efield_monitor['monitor type'] = '3D'
+	design_efield_monitor['dev_id'] = 0
 	design_efield_monitor['x span'] = cfg.pv.device_size_lateral_bordered_um * 1e-6
 	design_efield_monitor['y span'] = cfg.pv.device_size_lateral_bordered_um * 1e-6
 	design_efield_monitor['z max'] = cfg.pv.device_vertical_maximum_um * 1e-6
@@ -340,11 +351,14 @@ def construct_design_regions():
 	design_efield_monitor['output Hz'] = 0
 
 	# design_efield_monitor = fdtd_update_object(fdtd_hook, design_efield_monitor, create_object=True)
-	design_regions['design_efield_monitor'] = design_efield_monitor
+	device_regions['design_efield_monitor'] = design_efield_monitor
 
-	return design_regions
+	# Put in list format in case there are multiple devices
+	device_regions = [device_regions]
+	return device_regions
+
 
 
 if __name__ == "__main__":
 	sim_objects = construct_sim_objects()
-	design_regions = construct_design_regions()
+	design_regions = construct_device_regions()

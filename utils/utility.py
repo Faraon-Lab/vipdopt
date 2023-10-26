@@ -11,6 +11,8 @@
 import sys
 import os
 import copy
+import json
+import yaml
 import numpy as np
 import logging
 import traceback
@@ -95,7 +97,7 @@ def backup_all_vars(dict_vars, savefile_name=None):
 		if key not in ['my_shelf']: #, 'forward_e_fields']:
 			try:
 				my_shelf[key] = dict_vars[key]
-				logging.info(f'{key} shelved.')
+				logging.debug(f'{key} shelved.')
 			except Exception as ex:
 				# # __builtins__, my_shelf, and imported modules can not be shelved.
 				# logging.error('ERROR shelving: {0}'.format(key))
@@ -128,7 +130,7 @@ def load_backup_vars(loadfile_name):
 		if key not in do_not_overwrite:
 			try:
 				dict_vars[key]=my_shelf[key]
-				logging.info(f'{key} retrieved.')
+				logging.debug(f'{key} retrieved.')
 			except Exception as ex:
 				logging.exception('ERROR retrieving shelf: {0}'.format(key))
 				logging.error("An exception of type {0} occurred. Arguments:\n{1!r}".format(type(ex).__name__, ex.args))
@@ -142,6 +144,18 @@ def load_backup_vars(loadfile_name):
 	logging.info("Successfully loaded backup.")
 	return dict_vars
 
+def write_dict_to_file(dict, name, folder='', serialization='yaml', indent=4):
+
+	full_filepath = os.path.join(os.getcwd(), *[folder, name])	
+ 
+	if serialization in ['yaml']:
+		with open(rf'{full_filepath}.yaml', 'w') as file:
+			yaml.dump(dict, file)
+	elif serialization in ['json']:
+		with open(rf'{full_filepath}.json', "w") as outfile:
+			outfile.write(json.dumps(dict, indent=indent))
+
+	logging.info(f'Written file {name}.{serialization} to {folder}.')
 
 
 #* HPC & Multithreading
@@ -178,23 +192,23 @@ def del_by_path(root, items):
 #######################################
 
 class bidict(dict):
-    def __init__(self, *args, **kwargs):
-        super(bidict, self).__init__(*args, **kwargs)
-        self.inverse = {}
-        for key, value in self.items():
-            self.inverse.setdefault(value, []).append(key) 
+	def __init__(self, *args, **kwargs):
+		super(bidict, self).__init__(*args, **kwargs)
+		self.inverse = {}
+		for key, value in self.items():
+			self.inverse.setdefault(value, []).append(key) 
 
-    def __setitem__(self, key, value):
-        if key in self:
-            self.inverse[self[key]].remove(key) 
-        super(bidict, self).__setitem__(key, value)
-        self.inverse.setdefault(value, []).append(key)        
+	def __setitem__(self, key, value):
+		if key in self:
+			self.inverse[self[key]].remove(key) 
+		super(bidict, self).__setitem__(key, value)
+		self.inverse.setdefault(value, []).append(key)        
 
-    def __delitem__(self, key):
-        self.inverse.setdefault(self[key], []).remove(key)
-        if self[key] in self.inverse and not self.inverse[self[key]]: 
-            del self.inverse[self[key]]
-        super(bidict, self).__delitem__(key)
+	def __delitem__(self, key):
+		self.inverse.setdefault(self[key], []).remove(key)
+		if self[key] in self.inverse and not self.inverse[self[key]]: 
+			del self.inverse[self[key]]
+		super(bidict, self).__delitem__(key)
 
 def rescale_vector(x, min0, max0, min1, max1):
 	return (max1-min1)/(max0-min0) * (x-min0) + min1

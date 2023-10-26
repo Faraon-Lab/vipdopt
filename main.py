@@ -43,6 +43,7 @@ import configs.yaml_to_params as cfg
 # Gets all parameters from config file - store all those variables within the namespace. Editing cfg edits it for all modules accessing it
 # See https://docs.python.org/3/faq/programming.html#how-do-i-share-global-variables-across-modules
 from utils import utility
+from utils import Device
 
 #* Are we running it locally or on SLURM or on AWS or?
 workload_manager = cfg.workload_manager
@@ -113,13 +114,7 @@ create_folder_structure(cfg.python_src_directory, cfg.projects_directory_locatio
 
 #* Utility Functions that must be located in this module
 
-# monitor_to_region_map = [  [2,3,5,6],   [3,6],    [4,5,6],    [7,8]  ]
-# region_to_monitor_map = [ blah blah inverse of that ]
 
-bd = utility.bidict({'a': 1, 'b': 2})
-bd = utility.bidict({'a': 1, 'b': 1, 'c': 2})
-bd = utility.bidict({1: 'a', 2: 'c'})
-print(3)
 
 
 #* Step 0: Set up simulation conditions and environment.
@@ -142,56 +137,113 @@ for simulation in simulations:
 	simulator.open()
 	simulation = simulator.import_obj(simulation, create_object_=True)
 	simulation['SIM_INFO']['path'] = DATA_FOLDER
+	simulator.disable_all_sources(simulation)		# disabling all sources sets it up for creating forward and adjoint-sourced sims later
 	simulator.save(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name'])
-
-## disable_all_sources()
 
 logging.info("Completed Step 0: Lumerical environment setup complete.")
 utility.backup_all_vars(globals(), cfg.cv.shelf_fn)
+utility.write_dict_to_file(simulations, 'simulations', folder=OPTIMIZATION_INFO_FOLDER)
 
-
-designs = simulator.partition_objs(env_constr.construct_design_regions(), (1,))
-for design in designs:
-    simulation = simulations[0] # design['simulation']	# Map design region to simulation region. Probably using a tuple is the way to go?
-    # todo: ok, need to figure out the way to map these things ASAP.
-    simulator.open(os.path.join(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name']))
-    design = simulator.import_obj(design, create_object_=True)
-    simulator.save(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name'])
 
 #* Step 1: Design Region(s) + Constraints
 # e.g. feature sizes, bridging/voids, permittivity constraints, corresponding E-field monitor regions
+logging.info("Beginning Step 1: Design Regions Setup")
 
-# # Create instances of devices to store permittivity values
-# devices = []
-# for num_region, region in enumerate(region_list):
-# 	devices[num_region] = Device.Device(
-# 		voxel_array_size,
-# 		feature_dimensions,
-# 		permittivity_constraints,
-# 		region_coordinates,
-# 		other_arguments
-# 	)
-	
-# 	for simulation in simulations:
-# 		# check coordinates of device region. Does it fit in this simulation?
-# 		# If yes, construct all or part of region and mesh in simulation
-# 		simulation.create_device_region(region)
-# 		simulation.create_device_region_mesh(region)
-
-		
-		
+device_objs = env_constr.construct_device_regions()
+# todo: should we keep devices and subdevices separate? Maybe we can just deal with subdevices as the things we assign gradients to.
+# Since it's more or less general, it should be simple to swap things around. Or combine things back later on.
+design_objs = simulator.assign_devices_to_simulations(simulations, device_objs)
 #! Must keep track of which devices correspond to which regions and vice versa.
+# Check coordinates of device region. Does it fit in this simulation? If yes, split into subdevices (designs) and store in this simulation.
 #? What is the best method to keep track of maps? Try: https://stackoverflow.com/a/21894086
-device_to_region_map = bidict(devices)
-# For each region, create a field_shape variable to store the E- and H-fields for adjoint calculation.
+design_to_device_map, design_to_simulation_map = simulator.construct_sim_device_hashtable(simulations, design_objs)
+device_to_simulation_map = simulator.get_device_to_simulation_map(design_to_device_map, design_to_simulation_map)
+simulation_to_device_map = simulator.get_simulation_to_device_map(design_to_device_map, design_to_simulation_map)
 
-#! Shape Check! Check the mesh for the E-field monitors and adjust each field_shape variable for each device to match.
-# Instead of a lookup table approach, probably should just directly pull from the simulator - we can always interpolate anyway.
+# For each subdevice (design) region, create a field_shape variable to store the E- and H-fields for adjoint calculation.
+field_shapes = []
+# Open simulation files and create subdevice (design) regions as well as attached meshes and monitors.
+for design_obj in design_objs:
+	simulation = simulations[design_obj['DEVICE_INFO']['simulation']]	# Access simulation region containing design region.
+	simulator.open(os.path.join(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name']))
+	design_obj = simulator.import_obj(design_obj, create_object_=True)
+	simulator.save(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name'])
+
+	#! Shape Check! Check the mesh for the E-field monitors and adjust each field_shape variable for each design to match.
+	# Instead of a lookup table approach, probably should just directly pull from the simulator - we can always interpolate anyway.
+	# Pull the array shape of the design region's corresponding index monitor, squeezing as we do so.
+	field_shape = np.squeeze(simulator.fdtd_hook.getresult(design_obj['design_index_monitor']['name'], 'index preview')['index_x']).shape
+	field_shapes.append(field_shape)
+
+
+# Create instances of Device class objects to store permittivity values and attached filters.
+designs = [None] * len(design_objs)
+for num_design, design_obj in enumerate(design_objs):
+	
+	voxel_array_size = design_obj['DEVICE_INFO']['size_voxels']
+	feature_dimensions = design_obj['DEVICE_INFO']['feature_dimensions']
+	permittivity_constraints = design_obj['DEVICE_INFO']['permittivity_constraints']
+	region_coordinates = design_obj['DEVICE_INFO']['coordinates']
+	design_name = design_obj['DEVICE_INFO']['name']
+	design_obj['DEVICE_INFO']['path'] = os.path.abspath(OPTIMIZATION_INFO_FOLDER)
+	design_save_path = design_obj['DEVICE_INFO']['path']
+	# other_arguments
+	
+	designs[num_design] = Device.Device(
+		voxel_array_size,
+		feature_dimensions,
+		permittivity_constraints,
+		region_coordinates,
+		name=design_name,
+		folder=design_save_path
+		#other_arguments
+	)
 
 
 logging.info("Completed Step 1: Design regions setup complete.")
 utility.backup_all_vars(globals(), cfg.cv.shelf_fn)
 
+
+#* Step 2: Set up figure of merit. Determine monitors from which E-fields, Poynting fields, and transmission data will be drawn.
+# Handle all processing of weighting and functions that go into the figure of merit
+
+def overall_figure_of_merit( indiv_foms, weights ):
+	return 3
+
+weights = configs.weights
+indiv_foms = configs.indiv_foms
+
+# # Add the forward sources
+# for i in range(0, len(angle_phi)):
+#     opt.add_tsfs_input('north', angle_theta = imaging_angle, angle_phi = angle_phi[i], polarization_angle=-angle_phi[i])
+# opt.add_tsfs_input('north', angle_theta = 0, angle_phi = 0)
+
+# # Define the overall output monitor (i.e. overall detector plane)
+# output_y = -focal_length
+# output_monitor = opt.add_2D_power_monitor('output_monitor', 0, output_y, 0, opt.simset_obj.sim_x, opt.simset_obj.sim_z)
+
+fom_monitors = []
+for indiv_fom in indiv_foms:
+	
+	#! Add dipole or adjoint sources, and their monitors.
+	# Adjoint monitors and what data to obtain should be included in indiv_fom.
+	# todo: alternatively, create fwd_src, adj_src, then link them together using an "FoM" class, which can then store E_fwd and E_adj gradients?
+	# todo: might be a more elegant solution. We can also then just return a gradient by doing FoM.E_fwd * FoM.E_adj
+	fom_monitor = create_monitor_dict(indiv_fom)
+	adj_srcs = create_adjoint_sources(indiv_fom)
+
+	for simulation in simulations:
+		# check coordinates of monitor region. Does it fit in this simulation?
+		# If yes, construct all or part of region and mesh in simulation
+		simulation.create_monitors(fom_monitor)
+		simulation.add_adj_srcs(adj_srcs)
+	
+fom_to_monitor_map = bidict( indiv_foms, fom_monitors)
+# During the optimization we would disable and enable monitors depending on which adjoint simulation
+
+
+logging.info("Completed Step 2: Figure of Merit setup complete.")
+utility.backup_all_vars(globals(), cfg.cv.shelf_fn)
 
 # utility.backup_all_vars(globals(), cfg.cv.shelf_fn)
 # globals().update(utility.load_backup_vars(cfg.cv.shelf_fn))
