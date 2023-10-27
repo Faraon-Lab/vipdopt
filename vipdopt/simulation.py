@@ -79,7 +79,9 @@ class LumericalEncoder(json.JSONEncoder):
         if isinstance(o, LumericalSimObjectType):
             return {'__type__': str(o)}
         if isinstance(o, LumericalSimObject):
-            return o.__dict__
+            d = o.__dict__.copy()
+            del d['lumapi_obj']
+            return d
         return super().default(o)
 
 
@@ -96,6 +98,7 @@ class LumericalSimObject:
         self.name = name
         self.obj_type = obj_type
         self.properties: OrderedDict[str, Any] = OrderedDict()
+        self.lumapi_obj = None
 
     def __str__(self) -> str:
         """Return string representation of object."""
@@ -105,27 +108,25 @@ class LumericalSimObject:
             ensure_ascii=True,
         )
 
-    def __setitem__(self, key: str, val: Any) -> Any:
+    def __setitem__(self, key: str, val: Any) -> None:
         """Set the value of a property of the object."""
-        old_val = self.properties.get(key)
         self.properties[key] = val
-        return old_val
+        self.lumapi_obj[key] = val
 
     def __getitem__(self, key: str) -> Any:
         """Retrieve a property from an object."""
         return self.properties[key]
 
-    def update(self, vals: dict):
+    def update(self, **vals):
         """Update properties with values in a dictionary."""
         self.properties.update(vals)
 
     def __eq__(self, __value: object) -> bool:
         """Test equality of LumericalSimObjects."""
         if isinstance(__value, LumericalSimObject):
-            return self.name == __value.name and \
-                self.obj_type == __value.obj_type and \
+            return self.obj_type == __value.obj_type and \
                 self.properties == __value.properties
-        return False
+        return super.__eq__(__value)
 
 
 class LumericalSimulation(ISimulation):
@@ -138,7 +139,7 @@ class LumericalSimulation(ISimulation):
             the simulation
     """
 
-    def __init__(self, fname: str | None) -> None:
+    def __init__(self, fname: str | None=None) -> None:
         """Create a LumericalSimulation.
 
         Arguments:
@@ -146,7 +147,7 @@ class LumericalSimulation(ISimulation):
         """
         self.fdtd = None
         self.connect()
-        self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
+        self._clear_objects()
         if fname:
             self.load(fname)
 
@@ -168,24 +169,29 @@ class LumericalSimulation(ISimulation):
         while self.fdtd is None:
             try:
                 self.fdtd = lumapi.FDTD(hide=True)
-            except Exception:
-                logging.exception('Licensing server error - can be ignored.')
+            except (AttributeError, lumapi.LumApiError) as e:
+                logging.exception(
+                    'Licensing server error - can be ignored.',
+                    exc_info=e,
+                )
                 continue
 
-        logging.info('Verified license with Lumerical servers.')
-        self.fdtd.newproject()
+        logging.info('Verified license with Lumerical servers.\n')
 
     @override
     def load(self, fname: str):
-        self.fdtd = None
-        self.objects = OrderedDict()
+        logging.info(f'Loading simulation from {fname}...')
+        self._clear_objects()
         with open(fname) as f:
             sim = json.load(f)
             for obj in sim['objects'].values():
-                self.new_object(obj['name'], obj['obj_type'], obj['properties'])
+                self.new_object(obj['name'], LumericalSimObjectType[obj['obj_type']], **obj['properties'])
+
+        logging.info(f'Succesfully loaded {fname}\n')
 
     @override
     def save(self, fname: str):
+        logging.info(f'Saving simulation to {fname}...')
         with open(fname, 'w', encoding='utf-8') as f:
             json.dump(
                 {'objects': self.objects},
@@ -194,12 +200,18 @@ class LumericalSimulation(ISimulation):
                 ensure_ascii=True,
                 cls=LumericalEncoder,
             )
+        logging.info(f'Succesfully saved simulation to {fname}.\n')
+    
+    def _clear_objects(self):
+        """Clear all existing objects and create a new project."""
+        self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
+        self.fdtd.newproject()
 
     def new_object(
         self,
         obj_name: str,
         obj_type: LumericalSimObjectType,
-        properties: dict[str, Any] | None=None
+        **properties,
     ) -> LumericalSimObject:
         """Create a new object and add it to the simulation.
 
@@ -209,10 +221,9 @@ class LumericalSimulation(ISimulation):
             properties (dict[str, Any]): optional dictionary to populate
                 the new object with
         """
-        if properties is None:
-            properties = {}
+        logging.debug(f'Creating new object: \'{obj_name}\'...')
         obj = LumericalSimObject(obj_name, obj_type)
-        obj.update(properties)
+        obj.update(**properties)
         self.add_object(obj)
         return obj
 
@@ -222,10 +233,11 @@ class LumericalSimulation(ISimulation):
             self.objects[obj.name] = obj
             return
 
-        obj.obj_type.get_add_function()(self.fdtd, properties=obj.properties)
+        lumapi_obj = LumericalSimObjectType.get_add_function(obj.obj_type)(self.fdtd, **obj.properties)
+        obj.lumapi_obj = lumapi_obj
         self.objects[obj.name] = obj
 
-    def update_object(self, name: str, properties: dict):
+    def update_object(self, name: str, **properties):
         """Update lumerical object with new property values."""
         obj = self.objects[name]
         assert self.fdtd is not None
@@ -233,24 +245,39 @@ class LumericalSimulation(ISimulation):
         for key, val in properties.items():
             lum_obj[key] = val
         obj.update(properties)
+    
+    def close(self):
+        """Close fdtd conenction."""
+        if self.fdtd is not None:
+            logging.info('Closing connection with Lumerical...')
+            self.fdtd.close()
+            logging.info('Succesfully closed connection with Lumerical.')
+
+    
+    def __eq__(self, __value: object) -> bool:
+        if isinstance(__value, LumericalSimulation):
+            return self.objects == __value.objects
+        return super().__eq__(__value)
 
     def __enter__(self):
         """Startup for context manager usage."""
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Cleanup after exiting a context."""
-        if self.fdtd:
-            self.fdtd.close()
+        self.close()
 
 
 if __name__ == '__main__':
-    with LumericalSimulation(fname=None) as sim:
-        props1 = {'x': 2, 'y': 5}
-        obj1 = sim.new_object('obj1', LumericalSimObjectType.mesh, props1)
-        props2 = {'x span': 10, 'y span': 7, 'simulation time': 300}
-        obj2 = sim.new_object('obj2', LumericalSimObjectType.fdtd, props2)
-        sim.save('testout.json')
+    logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+    sim1 = LumericalSimulation()
+    props1 = {'x': 2, 'y': 5}
+    obj1 = sim1.new_object('obj1', LumericalSimObjectType.mesh, **props1)
+    props2 = {'x span': 10, 'y span': 7, 'simulation time': 300}
+    obj2 = sim1.new_object('obj2', LumericalSimObjectType.fdtd, **props2)
+    sim1.save('testout.json')
 
     with LumericalSimulation('testout.json') as sim:
-        sim.save('testout2.json')
+        assert sim == sim1
+    
+    sim1.close()
