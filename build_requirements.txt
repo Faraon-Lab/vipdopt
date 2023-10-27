@@ -8,3 +8,4 @@ types-PyYAML
 python-magic
 mpi4py
 dill
+Jinja2

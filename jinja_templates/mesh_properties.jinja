@@ -1,0 +1,4 @@
+#* Derived Mesh Properties
+{% set min_feature_size_voxels = min_feature_size_um / geometry_spacing_lateral_um  %}
+min_feature_size_voxels: {{ min_feature_size_voxels }}
+blur_half_width_voxels: {{ ((min_feature_size_voxels - 1) / 2) | round(method='ceil') | int }}

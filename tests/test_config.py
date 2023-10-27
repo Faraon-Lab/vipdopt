@@ -11,7 +11,7 @@ import pytest
 from testing import assert_close, assert_equal
 from vipdopt.configuration import Config, SonyBayerConfig
 
-TEST_YAML_PATH = 'config.yml.example'
+TEST_YAML_PATH = 'config_example.yml'
 
 @pytest.mark.smoke()
 @pytest.mark.usefixtures('_mock_empty_config')
