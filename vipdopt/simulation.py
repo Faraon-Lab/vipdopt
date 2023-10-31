@@ -111,7 +111,8 @@ class LumericalSimObject:
     def __setitem__(self, key: str, val: Any) -> None:
         """Set the value of a property of the object."""
         self.properties[key] = val
-        self.lumapi_obj[key] = val
+        if self.lumapi_obj is not None:
+            self.lumapi_obj[key] = val
 
     def __getitem__(self, key: str) -> Any:
         """Retrieve a property from an object."""
@@ -120,6 +121,8 @@ class LumericalSimObject:
     def update(self, **vals):
         """Update properties with values in a dictionary."""
         self.properties.update(vals)
+        if self.lumapi_obj is not None:
+            self.lumapi_obj.update(vals)
 
     def __eq__(self, __value: object) -> bool:
         """Test equality of LumericalSimObjects."""

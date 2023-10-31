@@ -8,10 +8,10 @@ import yaml
 from yaml.constructor import SafeConstructor
 
 
-def get_config_loader(config_format) -> Callable[[str], dict]:
+def get_config_loader(config_format: str) -> Callable[[str], dict]:
     """Return a configuration file loader depending on the format."""
-    match config_format:
-        case 'yaml':
+    match config_format.lower():
+        case '.yaml' | '.yml':
             return _yaml_loader
         case _:
             msg = f'{config_format} file loading not yet supported.'
@@ -57,7 +57,7 @@ class Config:
         """Set the value of an attribute, creating it if it doesn't already exist."""
         self.__dict__[name] = value
 
-    def read_file(self, filename: str, cfg_format: str='yaml'):
+    def read_file(self, filename: str, cfg_format: str='.yaml'):
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
         config_loader = get_config_loader(cfg_format)

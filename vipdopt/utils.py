@@ -2,6 +2,7 @@
 
 import importlib.util as imp
 from typing import TypeVar
+import logging
 
 import numpy as np
 import numpy.typing as npt
@@ -18,7 +19,13 @@ def sech(z: npt.ArrayLike | Number) -> npt.ArrayLike | Number:
 
 def import_lumapi(loc: str):
     """Import the Lumerical python api from a specified location."""
-    spec_lin = imp.spec_from_file_location('lumapi', loc)
-    lumapi = imp.module_from_spec(spec_lin)
-    spec_lin.loader.exec_module(lumapi)
-    return lumapi
+    try:
+        spec_lin = imp.spec_from_file_location('lumapi', loc)
+        lumapi = imp.module_from_spec(spec_lin)
+        spec_lin.loader.exec_module(lumapi)
+        return lumapi
+    except FileNotFoundError:
+        logging.exception('lumapi not found. Using dummy values\n')
+        lumapi = object()
+        return lumapi
+
