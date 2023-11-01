@@ -129,7 +129,7 @@ class LumericalSimObject:
         if isinstance(__value, LumericalSimObject):
             return self.obj_type == __value.obj_type and \
                 self.properties == __value.properties
-        return super.__eq__(__value)
+        return super().__eq__(__value)
 
 
 class LumericalSimulation(ISimulation):
@@ -188,7 +188,11 @@ class LumericalSimulation(ISimulation):
         with open(fname) as f:
             sim = json.load(f)
             for obj in sim['objects'].values():
-                self.new_object(obj['name'], LumericalSimObjectType[obj['obj_type']], **obj['properties'])
+                self.new_object(
+                    obj['name'],
+                    LumericalSimObjectType[obj['obj_type']],
+                    **obj['properties'],
+                )
 
         logging.info(f'Succesfully loaded {fname}\n')
 
@@ -204,7 +208,7 @@ class LumericalSimulation(ISimulation):
                 cls=LumericalEncoder,
             )
         logging.info(f'Succesfully saved simulation to {fname}.\n')
-    
+
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
         self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
@@ -224,7 +228,7 @@ class LumericalSimulation(ISimulation):
             properties (dict[str, Any]): optional dictionary to populate
                 the new object with
         """
-        logging.debug(f'Creating new object: \'{obj_name}\'...')
+        logging.debug(f"Creating new object: '{obj_name}'...")
         obj = LumericalSimObject(obj_name, obj_type)
         obj.update(**properties)
         self.add_object(obj)
@@ -236,7 +240,10 @@ class LumericalSimulation(ISimulation):
             self.objects[obj.name] = obj
             return
 
-        lumapi_obj = LumericalSimObjectType.get_add_function(obj.obj_type)(self.fdtd, **obj.properties)
+        lumapi_obj = LumericalSimObjectType.get_add_function(obj.obj_type)(
+            self.fdtd,
+            **obj.properties,
+        )
         obj.lumapi_obj = lumapi_obj
         self.objects[obj.name] = obj
 
@@ -247,8 +254,8 @@ class LumericalSimulation(ISimulation):
         lum_obj = self.fdtd.getnamed(obj.name)
         for key, val in properties.items():
             lum_obj[key] = val
-        obj.update(properties)
-    
+        obj.update(**properties)
+
     def close(self):
         """Close fdtd conenction."""
         if self.fdtd is not None:
@@ -256,8 +263,9 @@ class LumericalSimulation(ISimulation):
             self.fdtd.close()
             logging.info('Succesfully closed connection with Lumerical.')
 
-    
+
     def __eq__(self, __value: object) -> bool:
+        """Test equality  of simulations."""
         if isinstance(__value, LumericalSimulation):
             return self.objects == __value.objects
         return super().__eq__(__value)
@@ -282,5 +290,5 @@ if __name__ == '__main__':
 
     with LumericalSimulation('testout.json') as sim:
         assert sim == sim1
-    
+
     sim1.close()

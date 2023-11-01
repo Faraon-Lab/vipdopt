@@ -26,7 +26,7 @@ class SonyBayerConfig(Config):
         self.__dict__[name] = value
 
     @override
-    def read_file(self, filename: str, cfg_format: str = 'yaml'):
+    def read_file(self, filename: str, cfg_format: str='auto'):
         super().read_file(filename, cfg_format)
         self._validate()
 

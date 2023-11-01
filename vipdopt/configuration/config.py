@@ -4,29 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-import yaml
-from yaml.constructor import SafeConstructor
-
-
-def get_config_loader(config_format: str) -> Callable[[str], dict]:
-    """Return a configuration file loader depending on the format."""
-    match config_format.lower():
-        case '.yaml' | '.yml':
-            return _yaml_loader
-        case _:
-            msg = f'{config_format} file loading not yet supported.'
-            raise NotImplementedError(msg)
-
-
-def _yaml_loader(filepath: str) -> dict:
-    """Config file loader for YAML files."""
-    # Allow the safeloader to convert sequences to tuples
-    SafeConstructor.add_constructor(  # type: ignore
-        'tag:yaml.org,2002:python/tuple',
-        lambda self, x: tuple(SafeConstructor.construct_sequence(self, x))
-    )
-    with open(filepath, 'rb') as stream:
-        return yaml.safe_load(stream)
+from vipdopt.utils import read_config_file
 
 
 class Config:
@@ -57,11 +35,10 @@ class Config:
         """Set the value of an attribute, creating it if it doesn't already exist."""
         self.__dict__[name] = value
 
-    def read_file(self, filename: str, cfg_format: str='.yaml'):
+    def read_file(self, filename: str, cfg_format: str='auto'):
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
-        config_loader = get_config_loader(cfg_format)
-        config = config_loader(filename)
+        config = read_config_file(filename, cfg_format)
         logging.debug(f'Loaded config file:\n {config}')
 
         # Create an attribute for each of the parameters in the config file

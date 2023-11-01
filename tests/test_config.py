@@ -11,13 +11,13 @@ import pytest
 from testing import assert_close, assert_equal
 from vipdopt.configuration import Config, SonyBayerConfig
 
-TEST_YAML_PATH = 'config_example.yml'
+TEST_YAML_PATH = 'vipdopt/configuration/config_example.yml'
 
 @pytest.mark.smoke()
 @pytest.mark.usefixtures('_mock_empty_config')
 def test_load_empty_yaml():
     cfg = Config()
-    cfg.read_file('fakefile')
+    cfg.read_file('fakefile.yaml')
 
     with pytest.raises(AttributeError):
         _ = cfg.fixed_layers  # Accessing a property that doesn't exist

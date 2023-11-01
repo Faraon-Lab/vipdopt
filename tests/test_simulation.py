@@ -85,5 +85,5 @@ def test_new_object():
     with LumericalSimulation(fname=None) as s:
         s.new_object('device_mesh', LumericalSimObjectType.mesh, **props)
 
-        assert 'device_mesh' in s.objects.keys()
+        assert 'device_mesh' in s.objects
         assert_equal(s.objects['device_mesh'], correct_mesh)
