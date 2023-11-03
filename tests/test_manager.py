@@ -1,3 +1,4 @@
+"""Tests for vipdopt.manager"""
 import numpy as np
 import pytest
 

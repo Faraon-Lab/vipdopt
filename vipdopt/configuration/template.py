@@ -9,6 +9,7 @@ import numpy.typing as npt
 from jinja2 import Environment, FileSystemLoader, Undefined
 
 from vipdopt.configuration.config import read_config_file
+from vipdopt.utils import setup_logger
 
 
 class TemplateRenderer:
@@ -66,7 +67,7 @@ if __name__ == '__main__':
     log_level = logging.DEBUG if args.verbose \
         else logging.WARNING if args.quiet \
             else logging.INFO
-    logging.getLogger().setLevel(log_level)
+    logger = setup_logger('template_logger', log_level)
 
     rndr = TemplateRenderer(args.src_directory)
     rndr.register_filter('linspace', np.linspace)
@@ -79,9 +80,9 @@ if __name__ == '__main__':
 
     data = read_config_file(args.data_file)
     output = rndr.render(data=data, pi=np.pi, trim_blocks=True, lstrip_blocks=True)
-    logging.info(f'Rendered Output:\n{output}')
+    logger.info(f'Rendered Output:\n{output}')
 
     with open(args.output, 'w') as f:
         f.write(output)
 
-    logging.info(f'Succesfully saved output to {args.output}')
+    logger.info(f'Succesfully saved output to {args.output}')

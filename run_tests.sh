@@ -3,10 +3,10 @@
 #SBATCH --time=0:05:00   # walltime
 
 #SBATCH --nodes=1   # number of nodes
-#SBATCH --ntasks-per-node=2  # number of processor cores (i.e. tasks)
+#SBATCH --ntasks-per-node=8  # number of processor cores (i.e. tasks)
 #SBATCH --mem=1G
 
-#SBATCH -J "lumerical-connect"   # job name
+#SBATCH -J "run pytest"   # job name
 
 #SBATCH --mail-user=nmcnichols@caltech.edu
 #SBATH --qos=debug
@@ -20,4 +20,4 @@ source /home/${USER}/.bashrc
 source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
 conda activate vipdopt-dev
 
-xvfb-run --server-args="-screen 0 1280x1024x24" pytest -m "lumapi"
+xvfb-run --server-args="-screen 0 1280x1024x24" pytest -n $SLURM_NPROCS --cov=vipdopt --cov-report=term-missing

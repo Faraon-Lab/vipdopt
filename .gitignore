@@ -1,6 +1,11 @@
 # Developer files
 *.out
 *.log
+*.json
+*.yaml
+*.yml
+!vipdopt/configuration/config_example.yml
+!environment.yml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

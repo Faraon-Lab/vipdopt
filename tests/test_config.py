@@ -1,4 +1,3 @@
-
 """Tests for filter.py"""
 
 import re

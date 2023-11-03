@@ -36,10 +36,14 @@ To see full output, run with -vv or check {self.log_file}\n"""
         return msg
 
 
-def setup_logger(level: int=logging.INFO, log_file: str='dev.log') -> None:
+def setup_logger(
+        name: str,
+        level: int=logging.INFO,
+        log_file: str='dev.log',
+    ) -> logging.Logger:
     """Setup logger to use across the program."""
-    logger = logging.getLogger()
-    logger.setLevel(level)
+    logger = logging.Logger(name)
+    logger.setLevel(logging.DEBUG)
     logger.propagate = False
 
 
@@ -47,6 +51,7 @@ def setup_logger(level: int=logging.INFO, log_file: str='dev.log') -> None:
     # Only prints messages with no additional info.
     shandler = logging.StreamHandler()
     shandler.setFormatter(TruncateFormatter(fmt='%(message)s', log_file=log_file))
+    shandler.setLevel(level)
 
     # Create a handler for putting info into a .log file. Includes time stamps etc.
     # Will write EVERYTHING to the log (i.e. level = debug)
@@ -54,10 +59,10 @@ def setup_logger(level: int=logging.INFO, log_file: str='dev.log') -> None:
     fhandler.setFormatter(
         logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     )
-    fhandler.setLevel(logging.DEBUG)
 
     logger.addHandler(shandler)
     logger.addHandler(fhandler)
+    return logger
 
 
 def sech(z: npt.ArrayLike | Number) -> npt.ArrayLike | Number:

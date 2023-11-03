@@ -1,3 +1,4 @@
+"""Tests for vipdopt.simulation"""
 import pytest
 
 from testing import assert_equal
