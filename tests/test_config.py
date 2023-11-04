@@ -10,8 +10,6 @@ import pytest
 from testing import assert_close, assert_equal
 from vipdopt.configuration import Config, SonyBayerConfig
 
-TEST_YAML_PATH = 'vipdopt/configuration/config_example.yml'
-
 @pytest.mark.smoke()
 @pytest.mark.usefixtures('_mock_empty_config')
 def test_load_empty_yaml():
@@ -23,9 +21,10 @@ def test_load_empty_yaml():
 
 
 @pytest.mark.smoke()
+@pytest.mark.usefixtures('_mock_example_config')
 def test_load_yaml():
     cfg = Config()
-    cfg.read_file(TEST_YAML_PATH)
+    cfg.read_file('fakefile.yaml')
 
     expected_pairs = [
         ('fixed_layers', [1, 3]),
@@ -43,6 +42,7 @@ def test_load_yaml():
     assert_equal(cfg.adam_betas, (0.9, 0.999))
 
 
+@pytest.mark.usefixtures('_mock_example_config')
 @pytest.mark.parametrize(
         'func, value',
         [
@@ -190,7 +190,7 @@ def test_load_yaml():
 )
 def test_cascading_params(func, value: Any):
     cfg = SonyBayerConfig()
-    cfg.read_file(TEST_YAML_PATH)
+    cfg.read_file('fakefile.yaml')
 
     assert_close(func.__get__(cfg), value, err=1e-5)
 
