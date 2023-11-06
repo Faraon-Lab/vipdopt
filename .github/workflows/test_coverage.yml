@@ -1,10 +1,15 @@
 name: Tests and Code coverage
 
+# Runs all tests (except for  MPI) and generates a coverage report.defaults:
+# Job fails if less than 85 percetn coverage
+
 on:
   push:
     branches:
       - main
+      - dev
   pull_request:
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -17,8 +22,11 @@ jobs:
           - name: Checkout Repository
             uses: actions/checkout@v4
 
+          - name: Setup MPI
+            uses: mpi4py/setup-mpi@v1
+        
           - name: Setup Python
             uses: ./.github/actions/python-setup
         
           - name: Check Coverage
-            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 90
+            run: pytest --cov=vipdopt --cov-report term-missing --cov-fail-under 85

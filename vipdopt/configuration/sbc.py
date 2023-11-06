@@ -231,19 +231,19 @@ class SonyBayerConfig(Config):
         if self.safe_get('add_pdaf'):
             dvl = self.safe_get(SonyBayerConfig.device_voxels_lateral)
             if dvl is None or dvl % 2 != 0:
-               raise ValueError(("Expected 'device_voxels_lateral' to be even for"
+               raise ValueError("Expected 'device_voxels_lateral' to be even for"
                                 ' PDAF implementation ease, got '
-                                f'\'{dvl}\'.'))
+                                f"'{dvl}'.")
 
             if self.safe_get('add_infrared'):
                raise ValueError("'add_pdaf and 'add_infrared' are not compatible.")
 
 
-        if self.safe_get('reinterpolate_permittivity') == False and \
+        if self.safe_get('reinterpolate_permittivity') is False and \
             self.safe_get('reinterpolate_permittivity_factor') != 1:
-               raise ValueError(("Expected 'reinterpolate_permittivity_factor' to be 1 if not"
-                                ' reinterpolating permittivity,'
-                                f' got \'{self.reinterpolate_permittivity_factor}\'.'))
+               raise ValueError("Expected 'reinterpolate_permittivity_factor' to be 1"
+                                ' if not reinterpolating permittivity,'
+                                f" got '{self.reinterpolate_permittivity_factor}'.")
 
         self._derive_params()
 

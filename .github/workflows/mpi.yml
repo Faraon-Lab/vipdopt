@@ -1,0 +1,61 @@
+name: MPI Tests
+
+# This file is intended for running all tests that require MPI
+# Runs on all available MPI implementations for each OS
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+
+jobs:
+  test-with-mpi:
+    strategy:
+      matrix:
+        os_mpi:
+          - [ubuntu-latest, 'mpich']
+          - [ubuntu-latest, 'openmpi']
+          - [ubuntu-latest, 'intelmpi']
+          - [macos-latest, 'mpich']
+          - [macos-latest, 'openmpi']
+    runs-on: ${{ matrix.os_mpi[0]}}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.os_mpi[1] }} 
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+    
+      - name: Install Dependencies
+        run: |
+            for file in *requirements.txt
+            do
+                pip install --no-cache-dir -r $file
+            done
+
+      - name: Install python-magic bin
+        if: ${{ matrix.os_mpi[0] == 'macos-latest'}}
+        run: |
+            pip install python-magic-bin
+    
+      - name: Run Tests
+        run: mpiexec -n 4 python -m pytest --with-mpi
