@@ -21,10 +21,6 @@ class SonyBayerConfig(Config):
         """Initialize SonyBayerConfig object."""
         super().__init__()
 
-    def __setattr__(self, name: str, value: Any) -> Any:
-        """Set the value of an attribute, creating it if it doesn't already exist."""
-        self.__dict__[name] = value
-
     @override
     def read_file(self, filename: str, cfg_format: str='auto'):
         super().read_file(filename, cfg_format)

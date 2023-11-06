@@ -16,26 +16,25 @@ class Config:
         Creates an attribute for each parameter in a provided config file.
         """
         self._files = set()
+        self._parameters: dict[str, Any] = {}
 
     def __str__(self):
         """Return shorter string version of the Config object."""
-        return f'Config object for {self._files}'
+        return f'Config object for {self._files} with parameters {self._parameters}'
 
+    def safe_get(self, prop: str) -> Any | None:
+        """Get parameter and return None if it doesn't exist."""
+        return getattr(self, prop, None)
 
-    def safe_get(self, name: str | Callable) -> Any | None:
-        """Get attribute and return None if it doesn't exist."""
-        if isinstance(name, str):
-            return getattr(self, name, None)
-        try:
-            return name.__get__(self)
-        except AttributeError:
-            return None
+    def __getitem__(self, name: str) -> Any:
+        """Get value of a parameter."""
+        return self._parameters[name]
 
-    def __setattr__(self, name: str, value: Any) -> Any:
+    def __setitem__(self, name: str, value: Any) -> None:
         """Set the value of an attribute, creating it if it doesn't already exist."""
-        self.__dict__[name] = value
+        self._parameters[name] = value
 
-    def read_file(self, filename: str, cfg_format: str='auto'):
+    def read_file(self, filename: str, cfg_format: str='auto') -> None:
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
         config = read_config_file(filename, cfg_format)
@@ -43,7 +42,7 @@ class Config:
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
-            self.__dict__.update(config)
+            self._parameters.update(config)
 
         self._files.add(filename)
         logging.info(f'\nSuccesfully loaded configuration from {filename}')

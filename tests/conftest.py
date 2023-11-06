@@ -3,7 +3,7 @@
 import pytest
 import numpy as np
 
-from vipdopt.configuration.template import TemplateRenderer, newaxis
+from vipdopt.configuration.template import SonyBayerRenderer
 
 TEST_YAML_PATH = 'vipdopt/configuration/config_example.yml'
 TEST_TEMPLATE_PATH = 'jinja_templates/derived_simulation_properties.j2'
@@ -149,12 +149,7 @@ def mock_sim_file():
 
 @pytest.fixture(scope='session')
 def template_renderer():
-    rndr = TemplateRenderer('jinja_templates/')
-    rndr.register_filter('linspace', np.linspace)
-    rndr.register_filter('sin', np.sin)
-    rndr.register_filter('arcsin', np.arcsin)
-    rndr.register_filter('argmin', np.argmin)
-    rndr.register_filter('newaxis', newaxis)
+    rndr = SonyBayerRenderer('jinja_templates/')
 
     rndr.set_template('derived_simulation_properties.j2')
 
