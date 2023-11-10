@@ -23,6 +23,7 @@ def _import_mpi(quiet=False, use_dill=False):  # noqa: FBT002
     global MPI  # noqa: PLW0603
     try:
         from mpi4py import MPI as _MPI
+        from mpi4py.futures import MPIPoolExecutor
         if use_dill:
             import dill  # type: ignore
             _MPI.pickle.__init__(dill.dumps, dill.loads, dill.HIGHEST_PROTOCOL)
@@ -36,8 +37,7 @@ def _import_mpi(quiet=False, use_dill=False):  # noqa: FBT002
 MPI = None
 ROOT = 0
 
-# TODO: Allow multiple processes per job
-class MPIPool:
+class MPIPool():
     """A Job Pool for use with MPI.
 
     Splits into a manager/worker dynamic. The manager process is indicated by
