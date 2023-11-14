@@ -3,11 +3,13 @@ import sys
 import threading
 from collections import deque as Deque
 from typing import Any, Callable, Iterable
-from concurrent.futures import Future, as_completed
+from concurrent.futures import Future, as_completed, wait
 import time
 import logging
+from copy import deepcopy
 
 
+import numpy as np
 from mpi4py import MPI
 
 from vipdopt.utils import R, T
@@ -20,6 +22,36 @@ MAIN_RUN_NAME = '__worker__'
 _setup_threads_lock = threading.Lock()
 _tls = threading.local()
 SLEEP_TIME = 0.001
+
+
+def identity(x: Any) -> Any:
+    return x
+
+class Task:
+    """Wrapper for pool tasks and associated data."""
+    def __init__(self, func: Callable, *args: Any, callback: Callable=identity, **kwargs):
+        self._func = func
+        self._args = args
+        self._kwargs = kwargs
+        self._callback = callback
+    
+    def __str__(self) -> str:
+        return f'"Task: {self._func.__name__}({self._args}, {self._kwargs})"'
+
+    def __call__(self) -> tuple[Any | None, None | BaseException]:
+        logging.debug(f'Calling Task {self._func}({self._args}, {self._kwargs})')
+        try:
+            res = self._func(*self._args, **self._kwargs)
+            self._callback(res)
+            return (res, None)
+        except BaseException as e:
+            return (None, e)
+
+    def __iter__(self) -> Iterable:
+        yield self._func
+        yield self._args
+        yield self._kwargs
+    
 
 def get_max_workers():
     max_workers = os.environ.get('MAX_WORKERS')
@@ -49,7 +81,6 @@ def initialize(options):
         except BaseException:
             return False
     return True
-
 
 def import_main(mod_name: str, mod_path: str, init_globals: dict, run_name: str):
     import types
@@ -181,28 +212,30 @@ class Executor:
     def is_manager(self):
         return self._comm.Get_rank() == self._root
     
-    def submit(self, fn: Callable, *args, **kwargs) -> Future:
+    def submit(self, fn: Callable, *args, num_workers=1, callback: Callable[[list], Any]=identity, **kwargs) -> Future:
+        if num_workers > self.num_workers:
+            raise ValueError('Cannot request more workers for a task than are available')
         with self._lock:
             if self._shutdown:
                 raise RuntimeError('Cannot submit jobs after shutdown')
             self._bootstrap()
             future = Future()
-            task = (fn, args, kwargs)
+            task = Task(fn, *args, callback=callback, **kwargs)
             logging.debug(f'Pushed new task {task} to pool')
             self._pool.push((future, task))
             return future
     
     def map(self,
             fn: Callable[..., R],
-            *iterables: Iterable,
+            *iterable: Iterable,
             ordered: bool=True,
             timeout: float | None=None,
     ) -> Iterable[R]:
-        return self.starmap(fn, zip(*iterables), ordered, timeout)
+        return self.starmap(fn, zip(*iterable), ordered, timeout)
     
     def starmap(self,
                 fn: Callable[..., R],
-                iterable: Iterable,
+                iterables: Iterable[Iterable],
                 ordered: bool=True,
                 timeout: float | None=None,
     ) -> Iterable[R]:
@@ -210,7 +243,7 @@ class Executor:
             timer = time.monotonic
             end_time = timeout + timer()
 
-        futures = [self.submit(fn, *args) for args in iterable]
+        futures = [self.submit(fn, *args) for args in iterables]
         if not ordered:
             futures = set(futures)
 
@@ -281,7 +314,7 @@ class Pool:
 
     def __init__(self, executor: Executor, comm: MPI.Comm=None, sync: bool=True, *args) -> None:
         self.size = None
-        self.queue: Deque[tuple[Future, ...]] = Deque()
+        self.queue: Deque[tuple[Future, Task]] = Deque()
 
         self.event = threading.Event()
 
@@ -290,7 +323,7 @@ class Pool:
         self.thread.daemon = not hasattr(threading, '_register_atexit')
         self.thread.start()
 
-    def setup_queue(self, n) -> Deque[tuple[Future, ...]]:
+    def setup_queue(self, n) -> Deque[tuple[Future, Task]]:
         self.size = n
         self.event.set()
         return self.queue
@@ -472,47 +505,36 @@ class ServerWorker:
         status = MPI.Status()
 
         while True:
-            task = self.recv(comm, MPI.ANY_TAG, status)
+            task: Task = self.recv(comm, MPI.ANY_TAG, status)
             if task is None:
                 logging.debug(f'Worker {comm.Get_rank()}: Received End signal')
                 break
             logging.debug(f'Executing task {task} on rank ({MPI.COMM_WORLD.Get_rank()}, {comm.Get_rank()})')
-            res = ServerWorker.call(task)
+            res = task()
             self.send(comm, status, res)
 
     @serialized
-    def recv(self, comm: MPI.Intercomm, tag: int, status: MPI.Status):
+    def recv(self, comm: MPI.Intercomm, tag: int, status: MPI.Status) -> Task | BaseException:
         logging.debug(f'Worker {comm.rank}: Waiting for work...')
         while not comm.iprobe(MPI.ANY_SOURCE, MPI.ANY_TAG, status):
             time.sleep(SLEEP_TIME)
 
         id, tag = status.source, status.tag
         try:
-            task = comm.recv(None, id, tag, status)
+            task: Task = comm.recv(None, source=id, tag=tag, status=status)
             logging.debug(f'Worker {comm.rank}: Received task {task}')
         except BaseException as e:
             task = e
         return task
     
-    @staticmethod
-    def call(task: tuple[Callable, Iterable, dict]) -> tuple[Any | None , None | BaseException]:
-        if isinstance(task, BaseException):
-            return (None, task)
-        func, args, kwargs = task
-        try:
-            res = func(*args, **kwargs)
-            return (res, None)
-        except BaseException as e:
-            return (None, e)
-    
-    def send(self, comm: MPI.Intercomm, status: MPI.Status, task: tuple[Any | None, None | BaseException]):
+    def send(self, comm: MPI.Intercomm, status: MPI.Status, result: tuple[Any | None, None | BaseException]):
         id, tag = status.source, status.tag
-        logging.debug(f'Worker {comm.rank}: Sending completed {task}')
+        logging.debug(f'Worker {comm.rank}: Sending completed {result}')
         try:
-            request = comm.issend(task, id, tag)
+            request = comm.issend(result, id, tag)
         except BaseException as e: 
-            task = (None, e)
-            request = comm.issend(task, id, tag)
+            result = (None, e)
+            request = comm.issend(result, id, tag)
         while not request.test()[0]:
             time.sleep(SLEEP_TIME)
 
@@ -525,7 +547,7 @@ class ClientWorker:
     def __init__(self):
         logging.debug(f'Creating ClientWorker on rank {MPI.COMM_WORLD.Get_rank()}')
         self.workers = set()
-        self.pending: dict[int, tuple[Future, MPI.Request]] = dict()
+        self.pending: dict[int, tuple[Future, list[MPI.Request]]] = dict()
     
     def intialize(self, comm: MPI.Intercomm, options):
         keys = ('initializer', 'initargs', 'initkwargs')
@@ -588,7 +610,7 @@ class ClientWorker:
 
         return comm
     
-    def execute(self, comm: MPI.Intercomm, options: dict, tag: int, workers: set[int], tasks: Deque):
+    def execute(self, comm: MPI.Intercomm, options: dict, tag: int, workers: set[int], tasks: Deque[tuple[Future, Task]]):
         self.workers = workers
         status = MPI.Status()
 
@@ -598,6 +620,8 @@ class ClientWorker:
                 logging.debug(f'Stop the loop? {stop}')
                 if stop:
                     break
+            # if self.pending:
+            #     logging.debug('Pending is not empty!')
             if self.pending and self.iprobe(comm, tag, status):
                 self.recv(comm, tag, status)
             time.sleep(SLEEP_TIME)
@@ -620,6 +644,7 @@ class ClientWorker:
         return comm.issend(obj, dest, tag)
     
     def recv(self, comm: MPI.Intercomm, tag: int, status: MPI.Status):
+        logging.debug(f'Waiting for completed task...')
         try:
             task = serialized(MPI.Comm.recv)(comm, None, MPI.ANY_SOURCE, tag, status)
         except BaseException as e:
@@ -631,6 +656,7 @@ class ClientWorker:
 
         future, request = self.pending.pop(source_id)
         logging.debug(f'Num pending after receipt: {len(self.pending)}')
+        
         serialized(MPI.Request.Free)(request)
         res, exception = task
         if exception is None:
@@ -638,28 +664,29 @@ class ClientWorker:
         else:
             future.set_exception(exception)
         
-        del res, exception, future, task
+        # del res, exception, future, task
     
-    def send(self, comm: MPI.Intercomm, tag: int, tasks: Deque[tuple[Future, MPI.Request]]) -> bool:
-        try:
-            worker_id = self.workers.pop()
-        except IndexError:
-            return False
-        
+    def send(self, comm: MPI.Intercomm, tag: int, tasks: Deque[tuple[Future, Task]]) -> bool:
+        logging.debug(f'tasks before send: {tasks}, {len(tasks)}')
+        logging.debug(f'pending before send: {self.pending}, {len(self.pending)}')
         try:
             item = tasks.pop()
         except LookupError:
-            self.workers.add(worker_id)
+            logging.debug('1')
             return False
-        
+
         if item is None:
-            self.workers.add(worker_id)
+            logging.debug('2')
             return True
-        
+
         future, task = item
+
         if not future.set_running_or_notify_cancel():
-            self.workers.add(worker_id)
+            logging.debug('3')
+            tasks.appendleft(item)
             return False
+        
+        worker_id = self.workers.pop()
         
         try:
             logging.debug(f'Client {comm.Get_rank()}: Sending task {task} to rank {worker_id}')
@@ -670,6 +697,9 @@ class ClientWorker:
             future.set_exception(e)
         
         del future, task, item
+        logging.debug(f'tasks after send: {tasks}, {len(tasks)}')
+        logging.debug(f'pending after send: {self.pending}, {len(self.pending)}')
+        logging.debug('5')
         return False
     
     @serialized
@@ -677,7 +707,6 @@ class ClientWorker:
         size = comm.Get_remote_size()
         requests = [self.issend(comm, obj, s, tag) for s in range(size)]
         MPI.Request.waitall(requests)
-
     
     def stop(self, comm: MPI.Intercomm):
         logging.debug('Stopping Client')
@@ -693,7 +722,12 @@ if __name__ == '__main__':
         logging.debug(f'Number of workers: {ex.num_workers}')
         logging.debug(f'Maximum workers: {get_max_workers()}')
 
-        results = ex.map(abs, (-1, -2, 3, 4, -5, 6), ordered=True, timeout=10)
-        for res in results:
+        for res in ex.map(abs, (-1, -2, 3, 4, -5, 6), ordered=True, timeout=5):
             print(res)
+        
+        for res in ex.starmap(sum, ((range(3),), (range(6),), (range(9),)), timeout=5):
+            print(res)
+        
+        future = ex.submit(max, range(3), default=0)
+        print(future.result())
     
