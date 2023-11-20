@@ -1,16 +1,23 @@
+from __future__ import annotations
+from collections.abc import Iterable, Iterator
 import os
 import sys
 import threading
 from collections import deque as Deque
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Generator
 from concurrent.futures import Future, as_completed, wait
 import time
 import logging
 from copy import deepcopy
+import abc
+from enum import Enum
+import subprocess
 
 
 import numpy as np
 from mpi4py import MPI
+from mpi4py.run import set_abort_status
+from overrides import override
 
 from vipdopt.utils import R, T
 
@@ -24,20 +31,47 @@ _tls = threading.local()
 SLEEP_TIME = 0.001
 
 
-def identity(x: Any) -> Any:
-    return x
+def do_nothing(x: Any):
+    return 
+
+class TaskType(Enum):
+    FUNCTION = 0
+    EXECUTABLE = 1
 
 class Task:
     """Wrapper for pool tasks and associated data."""
-    def __init__(self, func: Callable, *args: Any, callback: Callable=identity, **kwargs):
-        self._func = func
-        self._args = args
-        self._kwargs = kwargs
-        self._callback = callback
-    
-    def __str__(self) -> str:
-        return f'"Task: {self._func.__name__}({self._args}, {self._kwargs})"'
+    def __init__(self, type: TaskType, **options):
+        self.type = type
 
+        if type == TaskType.FUNCTION:
+            self._callback = None
+            logging.debug(f'Creating function task')
+            self._func = options['function']
+            self._args = options.pop('args', tuple())
+            self._kwargs = options.pop('kwargs', {})
+            self._callback = options.pop('callback', do_nothing)
+        else:
+            logging.debug(f'Creating executable task')
+            num_workers = options.pop('num_workers', 1)
+            if num_workers < 1:
+                raise ValueError(f'num_workers must be a positive integer; got {num_workers}')
+            self.num_workers = num_workers
+            exe = options.pop('exe')
+            args = options.pop('args', None)
+            args = [] if args is None else list(args)
+            args = ['-m', __spec__.parent + '.file_executor', exe, *args]
+            # args.insert(0, exe)
+            self.args = args
+            self.mpi_info: dict = options.pop('mpi_info', dict())
+
+            # # Create dummy ecxecutable 
+            # self.pyexe = sys.executable
+
+            # self.pyargs = []
+            # self.pyargs.extend(['-m', __spec__.parent + '.server', '1', 'python', exe, *args])
+
+        logging.debug('...successfully created new task')
+            
     def __call__(self) -> tuple[Any | None, None | BaseException]:
         logging.debug(f'Calling Task {self._func}({self._args}, {self._kwargs})')
         try:
@@ -46,13 +80,33 @@ class Task:
             return (res, None)
         except BaseException as e:
             return (None, e)
+ 
 
-    def __iter__(self) -> Iterable:
-        yield self._func
-        yield self._args
-        yield self._kwargs
+# class Task:
+#     """Wrapper for pool tasks and associated data."""
+#     def __init__(self, func: Callable, *args: Any, callback: Callable=identity, **kwargs):
+#         self._func = func
+#         self._args = args
+#         self._kwargs = kwargs
+#         self._callback = callback
     
+#     def __str__(self) -> str:
+#         return f'"Task: {self._func.__name__}({self._args}, {self._kwargs})"'
 
+#     def __call__(self) -> tuple[Any | None, None | BaseException]:
+#         logging.debug(f'Calling Task {self._func}({self._args}, {self._kwargs})')
+#         try:
+#             res = self._func(*self._args, **self._kwargs)
+#             self._callback(res)
+#             return (res, None)
+#         except BaseException as e:
+#             return (None, e)
+
+#     def __iter__(self) -> Iterable:
+#         yield self._func
+#         yield self._args
+#         yield self._kwargs
+    
 def get_max_workers():
     max_workers = os.environ.get('MAX_WORKERS')
     if max_workers is not None:
@@ -150,9 +204,8 @@ def comm_split(comm: MPI.Intracomm, root: int) -> tuple[MPI.Intercomm, MPI.Intra
         intracomm.Free()
     return intercomm, intracomm
 
-class Executor:
-    """Job executor."""
-
+class Executor(abc.ABC):
+    """Abstract Executor Class"""
     def __init__(self, comm: MPI.Intracomm=None, root: int=0, max_workers: int=None, initializer=None, initargs=(), **kwargs) -> None:
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -177,22 +230,68 @@ class Executor:
         self._shutdown = False
         self._lock = threading.Lock()
         self._pool = None
+
+    def is_manager(self):
+        return self._comm.Get_rank() == self._root
+    
+    @abc.abstractmethod
+    def setup(self):
+        pass
+
+    def __enter__(self):
+        ex = self if self.is_manager() else None
+        self.setup()
+        self._executor = ex
+
+        return ex
+    
+    def __exit__(self, *args):
+        ex = self._executor
+        self._executor = None
+
+        if ex is not None:
+            self.shutdown(wait=True)
+            return False
+        return True
+    
+    def shutdown(self, wait: bool=True, cancel_futures: bool=False):
+        with self._lock:
+            if not self._shutdown:
+                self._shutdown = True
+                if self._pool is not None:
+                    self._pool.done()
+            if cancel_futures:
+                if self._pool is not None:
+                    self._pool.cancel()
+            pool = None
+            if wait:
+                pool = self._pool
+                self._pool = None
+        if pool is not None:
+            pool.join()
+
+
+class FunctionExecutor(Executor):
+    """Job executor for function jobs."""
+    def __init__(self, comm: MPI.Intracomm=None, root: int=0, max_workers: int=None, initializer=None, initargs=(), **kwargs) -> None:
+        super().__init__(comm, root, max_workers, initializer, initargs, **kwargs)
     
     def _bootstrap(self):
         if self._pool is None:
-            self._pool = Pool(self)
+            self._pool = Pool(self, manager_function)
     
     def bootup(self, wait=True):
         with self._lock:
             if self._shutdown:
-                raise RuntimeError('Cannot bootu pafter shutdown')
+                raise RuntimeError('Cannot boot up after shutdown')
             if wait:
                 self._pool.wait()
             return self
     
+    @override
     def setup(self):
         if self.is_manager():
-            self._pool = Pool(self, self._comm, False, self._root)
+            self._pool = Pool(self, manager_function, self._comm, False, self._root)
         else:
             comm, intracomm = comm_split(self._comm, self._root)
             logging.debug(f'Seting up worker thread {comm.Get_rank()}')
@@ -209,10 +308,7 @@ class Executor:
             self._pool.wait()
             return self._pool.size
 
-    def is_manager(self):
-        return self._comm.Get_rank() == self._root
-    
-    def submit(self, fn: Callable, *args, num_workers=1, callback: Callable[[list], Any]=identity, **kwargs) -> Future:
+    def submit(self, fn: Callable, *args, num_workers=1, callback: Callable[[list], Any]=do_nothing, **kwargs) -> Future:
         if num_workers > self.num_workers:
             raise ValueError('Cannot request more workers for a task than are available')
         with self._lock:
@@ -220,19 +316,19 @@ class Executor:
                 raise RuntimeError('Cannot submit jobs after shutdown')
             self._bootstrap()
             future = Future()
-            task = Task(fn, *args, callback=callback, **kwargs)
+            task = Task(TaskType.FUNCTION, function=fn, args=args, callback=callback, kwargs=kwargs)
             logging.debug(f'Pushed new task {task} to pool')
             self._pool.push((future, task))
             return future
-    
+
     def map(self,
-            fn: Callable[..., R],
-            *iterable: Iterable,
-            ordered: bool=True,
-            timeout: float | None=None,
+        fn: Callable[..., R],
+        *iterable: Iterable,
+        ordered: bool=True,
+        timeout: float | None=None,
     ) -> Iterable[R]:
         return self.starmap(fn, zip(*iterable), ordered, timeout)
-    
+
     def starmap(self,
                 fn: Callable[..., R],
                 iterables: Iterable[Iterable],
@@ -271,38 +367,49 @@ class Executor:
             while futures:
                 futures.pop().cancel()
 
-    
-    def __enter__(self):
-        ex = self if self.is_manager() else None
-        self.setup()
-        self._executor = ex
 
-        return ex
-    
-    def __exit__(self, *args):
-        ex = self._executor
-        self._executor = None
+class FileExecutor(Executor):
+    def __init__(self, comm: MPI.Intracomm = None, root: int = 0, max_workers: int = None, initializer=None, initargs=(), **kwargs) -> None:
+        super().__init__(comm, root, max_workers, initializer, initargs, **kwargs)
 
-        if ex is not None:
-            self.shutdown(wait=True)
-            return False
-        return True
-    
-    def shutdown(self, wait: bool=True, cancel_futures: bool=False):
+    @override
+    def setup(self):
+        if self.is_manager():
+            self._pool = Pool(self, manager_file, self._comm, False, self._root)
+        else:
+            # comm, intracomm = comm_split(self._comm, self._root)
+            # logging.debug(f'Seting up worker thread {comm.Get_rank()}')
+            # set_comm_server(intracomm)
+            # ServerWorker(comm, sync=False)
+            # intracomm.Free()
+            exit()
+
+    def _bootstrap(self):
+        if self._pool is None:
+            self._pool = Pool(self, target=manager_file)
+
+    @property
+    def num_workers(self):
         with self._lock:
-            if not self._shutdown:
-                self._shutdown = True
-                if self._pool is not None:
-                    self._pool.done()
-            if cancel_futures:
-                if self._pool is not None:
-                    self._pool.cancel()
-            pool = None
-            if wait:
-                pool = self._pool
-                self._pool = None
-        if pool is not None:
-            pool.join()
+            if self._shutdown:
+                return 0
+            self._bootstrap()
+            self._pool.wait()
+            return self._pool.size
+    
+    def submit(self, exe: str, exe_args: list[str]=[], num_workers=1, mpi_info: dict={}) -> Future:
+        if num_workers > self.num_workers:
+            raise ValueError('Cannot request more workers for a task than are available')
+        with self._lock:
+            if self._shutdown:
+                raise RuntimeError('Cannot submit jobs after shutdown')
+            self._bootstrap()
+            future = Future()
+            task = Task(TaskType.EXECUTABLE, exe=exe, args=exe_args, num_workers=num_workers, mpi_info=mpi_info)
+            logging.debug(f'Pushed new task {task} to pool')
+            self._pool.push((future, task))
+            return future
+
 
 def barrier(comm: MPI.Intercomm):
     request = comm.Ibarrier()
@@ -312,13 +419,13 @@ def barrier(comm: MPI.Intercomm):
 class Pool:
     """Worker pool, handles job assignment etc."""
 
-    def __init__(self, executor: Executor, comm: MPI.Comm=None, sync: bool=True, *args) -> None:
+    def __init__(self, executor: Executor, target: Callable, comm: MPI.Comm=None, sync: bool=True, *args) -> None:
         self.size = None
         self.queue: Deque[tuple[Future, Task]] = Deque()
 
         self.event = threading.Event()
 
-        self.thread = threading.Thread(target=manager, args=(self, executor._options, comm, sync, *args))
+        self.thread = threading.Thread(target=target, args=(self, executor._options, comm, sync, *args))
         self.setup_threads()
         self.thread.daemon = not hasattr(threading, '_register_atexit')
         self.thread.start()
@@ -369,10 +476,10 @@ class Pool:
                 future.set_running_or_notify_cancel()
             del future, item, task
 
-def manager(pool: Pool, options: dict, comm: MPI.Intracomm=None, sync=True, *args):
+def manager_function(pool: Pool, options: dict, intracomm: MPI.Intracomm=None, sync=True, *args):
     client = ClientWorker()
 
-    if comm is None:
+    if intracomm is None:
         pyexe = options.pop('python_exe')
         args = options.pop('python_args')
         nprocs = options.pop('num_workers')
@@ -380,14 +487,14 @@ def manager(pool: Pool, options: dict, comm: MPI.Intracomm=None, sync=True, *arg
 
         comm = client.spawn(pyexe, args, nprocs, mpi_info)
     else:
-        logging.debug(f'comm provided; size={comm.Get_size()}')
-        if comm.Get_size() == 1:
+        logging.debug(f'comm provided; size={intracomm.Get_size()}')
+        if intracomm.Get_size() == 1:
             options['num_workers'] = 1
             set_comm_server(MPI.COMM_SELF)
             manager_thread(pool, options)
             return
         root = args[0]
-        comm, _ = serialized(comm_split)(comm, root)
+        comm, _ = serialized(comm_split)(intracomm, root)
 
     # Synchronize comm
     client.sync(comm, options, sync)
@@ -451,6 +558,242 @@ def manager_thread(pool: Pool, options: dict):
     queue.pop()
 
 
+def manager_file(pool: Pool, options: dict, intracomm: MPI.Intracomm=None, sync=True, *args):
+    manager = RemoteWorker()
+
+    comm = MPI.COMM_WORLD
+
+    size = get_max_workers()
+    queue = pool.setup_queue(size)
+    workers = WorkerSet(range(size))
+    logging.debug(f'Created pool of size {size} with workers: {workers}')
+    manager.execute(comm, options, workers, queue)
+    manager.stop(comm)
+
+
+class WorkerSet:
+    def __init__(self, ids: Iterable[int] | None=None) -> None:
+        self.ids = set(ids) if ids is not None else set()
+    
+    def __len__(self) -> int:
+        return len(self.ids)
+    
+    def pop(self, n: int=1) -> Generator[int, None, None] | int:
+        if n < 1 or n > len(self):
+            raise TypeError(f'Expected n in [1, ..., {len(self)}], got {n}')
+        if n > 1:
+            for _ in range(n):
+                yield self.ids.pop()
+        else:
+            return self.ids.pop()
+    
+    def add(self, n: int):
+        self.ids.add(n)
+    
+    def union(self, *s: Iterable[int]) -> WorkerSet[int]:
+        return WorkerSet(self.ids.union(s))
+    
+    def __iter__(self) -> Iterator:
+        return self.ids.__iter__()
+
+    def __repr__(self) -> str:
+        return f'WorkerSet({self})'
+    
+    def __str__(self) -> str:
+        return '{' + ', '.join(str(id) for id in self) + '}'
+
+    def __hash__(self) -> int:
+        return str(self).__hash__()
+    
+    def __bool__(self) -> bool:
+        return len(self) > 0
+    
+    
+
+class RemoteWorker:
+    """Class for spawning and running remote jobs."""
+    def __init__(self):
+        logging.debug(f'Creating RemoteWorker on rank {MPI.COMM_WORLD.Get_rank()}')
+        self.workers = WorkerSet()
+        self.pending: dict[WorkerSet, tuple[Future, MPI.Request, MPI.Intercomm]] = dict()
+        self.job_id = 0
+    
+    def get_next_job_id(self) -> int:
+        id = self.job_id
+        self.job_id += 1
+        return id
+
+    def execute(self, comm: MPI.Intercomm, options: dict, workers: WorkerSet, tasks: Deque[tuple[Future, Task]]):
+        self.workers = workers
+        status = MPI.Status()
+
+        while True:
+            if len(tasks) > 0 and workers:
+                stop = self.spawn(comm, tasks)
+                logging.debug(f'Stop the loop? {stop}')
+                if stop:
+                    break
+            idx, flag = self.testany(status)
+            # comm.iprobe(status=status)
+            if self.pending and flag:
+                logging.debug('Job finished!')
+                self.wait(idx)
+            time.sleep(SLEEP_TIME)
+        logging.debug(f'Done sending tasks. Waiting on {len(self.pending)} jobs...')
+        self.waitall()
+    
+    @serialized
+    def iprobe(self, comm: MPI.Intercomm, tag: int, status: MPI.Status) -> bool:
+        return comm.iprobe(MPI.ANY_SOURCE, tag, status)
+
+    def get_all_requests(self) -> list[list[MPI.Request]]:
+        return [req for _, req, _ in self.pending.values()]
+    
+    def _any_index(self, l: list[bool]) -> tuple[int, bool]:
+        for i, val in enumerate(l):
+            if val:
+                return (i, True)
+        return (-1, False)
+
+    @serialized
+    def testany(self, status: MPI.Status) -> tuple[int, bool]:
+        # reqs_list = self.get_all_requests()
+        # List of all requests combined into one "request" per pending job
+        # collapsed_list = [flag for flag, _ in map(reqs_list, MPI.Request.testall)]
+        # idx, flag = self._any_index(collapsed_list)
+        idx, flag, status = MPI.Request.testany(self.get_all_requests(), status)
+        # print(idx, flag, status)
+        return idx, flag
+    
+    def create_bash_script(self, task: Task) -> str:
+        job_id = self.get_next_job_id()
+        filename = f'temp/script_{job_id}.sh'
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        with open(filename, "w") as f:
+            arg_str = ' '.join(task.args)
+            f.writelines([
+                '#!/bin/bash\n',
+                # 'unset | grep "PMIX_.*\n',
+                # 'unset | grep "OMPI_.*\n',
+                # 'set PMIX_MCA_gds=hash\n',
+                'waiter() {\n',
+                '\trv=$?\n',
+                # '\techo $rv\n',
+                # '\techo $em\n',
+                f'\techo done running "{task.args[0]}"\n',
+                '\tpython -m vipdopt.waiter $rv $*\n',
+                # f'\tmpirun -n {task.num_workers} python -m vipdopt.waiter $rv $*\n',
+                '\texit 0\n',
+                '}\n',
+                'trap "waiter" EXIT\n',
+                # f'{arg_str} > err_$OMPI_COMM_WORLD_RANK.log 2>&1',
+                f'echo running "{task.args[0]}"\n',
+                f'mpirun -n {task.num_workers} {arg_str}',
+                # f'mpirun -n {task.num_workers} {arg_str} > err_$OMPI_COMM_WORLD_RANK.log 2>&1',
+                # f'em=$(mpirun -n {task.num_workers} {arg_str}2>&1)\n',
+                # 'echo $em\n',
+                # 'exit 0',
+            ])
+        return filename
+    
+    def waitall(self, status: MPI.Status | None=None):
+        for idx in range(len(self.pending)):
+            self.wait(idx, status)
+
+    def wait(self, idx: int, status: MPI.Status | None=None):
+        key = list(self.pending.keys())[idx]
+        future, req, intercomm = self.pending.pop(key)
+
+        status = serialized(MPI.Request.wait)(req, status=status)
+        logging.debug(f'RemoteWorker passed barrier!')
+
+        # errcodes = intercomm.bcast(None, root=0)
+        # errcodes = np.zeros(intercomm.Get_remote_size())
+        # errcodes = intercomm.scatter(errcodes, root=0)
+        logging.debug(f'manager rank: {intercomm.Get_rank()}')
+        errcodes = intercomm.gather(0, root=MPI.ROOT)
+        logging.debug(f'errcodes={errcodes}')
+
+        self.workers = self.workers.union(key)
+        # serialized(MPI.Request.Free)(req)
+
+        future.set_result(int(any(code != 0 for code in errcodes)))
+        #     future.set_result(0)
+        # else:
+        #     future.set_exception(RuntimeError('Error encountered running file'))
+        
+        del future
+
+    def waitany(self, status: MPI.Status):
+        idx, status = MPI.Request.waitany(self.get_all_requests(), status)
+        future, req, errcodes = self.pending.pop(self.pending.keys()[idx])
+        print(future, req, errcodes)
+        pass
+    
+    @serialized
+    def spawn(self, comm: MPI.Intercomm, tasks: Deque[tuple[Future, Task]]) -> bool:
+        logging.debug(f'tasks before spawn: {tasks}, {len(tasks)}')
+        logging.debug(f'pending before spawn: {self.pending}, {len(self.pending)}')
+        try:
+            item = tasks.pop()
+        except LookupError:
+            logging.debug('1')
+            return False
+
+        if item is None:
+            logging.debug('2')
+            return True
+
+        future, task = item
+
+        if not future.set_running_or_notify_cancel():
+            logging.debug('3')
+            tasks.appendleft(item)
+            return False
+        
+        nprocs = task.num_workers
+
+        if nprocs > len(self.workers):
+            logging.debug('4')
+            tasks.appendleft(item)
+            return False
+        
+        # ids = {self.workers.pop() for _ in range(nprocs)}
+        ids = WorkerSet(self.workers.pop(n=nprocs))
+        # key = ''.join(str(id) for id in ids)
+        # exe = self.create_bash_script(task)
+
+        try:
+            logging.debug(f'Client {comm.Get_rank()}: Sending distributed task {task} to ranks {ids}')
+            intercomm = MPI.COMM_SELF.Spawn(sys.executable, task.args, maxprocs=nprocs)
+            # requests = [self.issend(comm, task, id, tag) for id in ids]
+            # requests = [intercomm.irecv(None, i) for i in range(intercomm.Get_remote_size())]
+            request = intercomm.Ibarrier()
+            self.pending[ids] = (future, request, intercomm)
+        except BaseException as e:
+            logging.exception('ERROR IN MULTI SEND CODE!!')
+            self.workers = self.workers.union(ids)
+            future.set_exception(e)
+
+        del future, task, item
+        logging.debug(f'tasks after send: {tasks}, {len(tasks)}')
+        logging.debug(f'pending after send: {self.pending}, {len(self.pending)}')
+        logging.debug('5')
+        return False
+    
+    @serialized
+    def send_to_all(self, comm: MPI.Intercomm, obj: Any, tag=0):
+        size = comm.Get_remote_size()
+        # requests = [self.issend(comm, obj, s, tag) for s in range(size)]
+        # MPI.Request.waitall(requests)
+    
+    def stop(self, comm: MPI.Intercomm):
+        logging.debug('Stopping Client')
+        # self.send_to_all(comm, None)
+        if comm != MPI.COMM_WORLD:
+            serialized(MPI.Comm.Disconnect)(comm)
+
+
 class ServerWorker:
     """Class for running jobs server-side."""
 
@@ -510,8 +853,77 @@ class ServerWorker:
                 logging.debug(f'Worker {comm.Get_rank()}: Received End signal')
                 break
             logging.debug(f'Executing task {task} on rank ({MPI.COMM_WORLD.Get_rank()}, {comm.Get_rank()})')
-            res = task()
-            self.send(comm, status, res)
+            match task.type:
+                case TaskType.FUNCTION:
+                    self._execute_function(comm, task, status)
+                case TaskType.EXECUTABLE:
+                    self._execute_executable(comm, task, status)
+
+    def _execute_function(self, comm: MPI.Intercomm, task: Task, status: MPI.Status):
+        logging.debug(f'Executing task {task} on rank ({MPI.COMM_WORLD.Get_rank()}, {comm.Get_rank()})')
+
+        res = task()
+        self.send(comm, status, res)
+
+    def _execute_executable(self, comm_parent: MPI.Intercomm, task: Task, status: MPI.Status):
+        # logging.debug(f'MPI File {task.exe} on rank ({MPI.COMM_WORLD.Get_rank()}, {comm_parent.Get_rank()})')
+
+        # logging.debug(f'Worker {comm_parent.Get_rank()}: Creating group...')
+        workers: set = task.worker_ids
+        # group = comm_parent.Get_group().Incl(workers)
+        # comm_group: MPI.Intracomm = comm_parent.Create(group)
+        # group.Free()
+
+        # comm_world = MPI.COMM_WORLD
+        comm_world = MPI.COMM_WORLD
+        comm_world = _tls.comm_server
+
+        size = len(workers)
+        logging.debug(workers)
+        root = min(workers)
+        rank = comm_world.Get_rank()
+
+        # mpi_info = comm_parent.recv(None, 0, tag=MPI.ANY_TAG, status=status)
+
+        info = MPI.Info.Create()
+        info.update(task.mpi_info)
+        
+        logging.debug(f'Worker {comm_parent.Get_rank()}: Ready to run file...')
+        logging.debug(f'size: {size}, root: {root}, task: {task}')
+        # comm_world.Barrier()
+
+        # Call the other MPI program and sum the error codes
+        try:
+            # logging.debug(f'Worker {rank}: Running {command} {args}...')
+            intercomm = MPI.COMM_SELF.Spawn(sys.executable, task.args, maxprocs=size, info=info)
+            # err = subprocess.call(['python', *task.args])
+            err = 0
+            intercomm.Free()
+        except BaseException as e:
+            logging.exception()
+            # set_abort_status(0)
+            err = 1
+
+        logging.debug(f'Worker {rank}: done computing MPI file!')
+        # comm_world.Barrier()
+
+        if rank == root:
+            combined_err = 0
+            for id in workers.difference([root]):
+                logging.debug(f'Worker {rank}: Receiving err from {id}')
+                id_err = comm_world.recv(None, id, MPI.ANY_TAG)
+                combined_err += id_err
+            res = (0, None) if combined_err == 0 else (1, RuntimeError('Error in one or more processes'))
+            self.send(comm_parent, status, res)
+        else:
+            logging.debug(f'Worker {rank}: Sending err to root worker {root}')
+            comm_world.ssend(err, root)
+        # combined_err = comm_world.reduce(err, op=MPI.SUM, root=0)
+        # logging.debug(f'Worker {rank}: Done reducing result!')
+
+        # if rank == 0:
+        #     # comm_parent.send(combined_err > 0, 0, tag=tag)
+        
 
     @serialized
     def recv(self, comm: MPI.Intercomm, tag: int, status: MPI.Status) -> Task | BaseException:
@@ -540,6 +952,7 @@ class ServerWorker:
 
     def stop(self, comm: MPI.Intercomm):
         comm.Disconnect()
+        exit()
 
 class ClientWorker:
     """Class for running jobs; client-side."""
@@ -596,7 +1009,7 @@ class ClientWorker:
         pyargs = [] if python_args is None else list(python_args)
         
         # Add vipdopt.server module to be run
-        pyargs.extend(['-m', __spec__.parent + '.server'])
+        pyargs.extend(['-m', __spec__.parent + '.server', '0'])
 
         # Create MPI.Info object
         info = MPI.Info()
@@ -627,9 +1040,8 @@ class ClientWorker:
             time.sleep(SLEEP_TIME)
         logging.debug(f'Done sending tasks. Waiting on {len(self.pending)} jobs...')
         while self.pending:
-            logging.debug('Client waiting for results...')
-            self.probe()
-            self.recv()
+            self.recv(comm, tag, status)
+    
 
     def probe(self, comm: MPI.Intercomm, tag: int, status: MPI.Status):
         while not self.iprobe(comm, tag, status):
@@ -654,17 +1066,21 @@ class ClientWorker:
         self.workers.add(source_id)
         logging.debug(f'Received completed task: {task} from worker {source_id}')
 
-        future, request = self.pending.pop(source_id)
+        if source_id not in self.pending:
+            return
+        future, requests = self.pending.pop(source_id)
         logging.debug(f'Num pending after receipt: {len(self.pending)}')
         
-        serialized(MPI.Request.Free)(request)
+        for request in requests:
+            serialized(MPI.Request.Free)(request)
+
         res, exception = task
         if exception is None:
             future.set_result(res)
         else:
             future.set_exception(exception)
         
-        # del res, exception, future, task
+        del res, exception, future, task
     
     def send(self, comm: MPI.Intercomm, tag: int, tasks: Deque[tuple[Future, Task]]) -> bool:
         logging.debug(f'tasks before send: {tasks}, {len(tasks)}')
@@ -686,16 +1102,41 @@ class ClientWorker:
             tasks.appendleft(item)
             return False
         
-        worker_id = self.workers.pop()
-        
-        try:
-            logging.debug(f'Client {comm.Get_rank()}: Sending task {task} to rank {worker_id}')
-            request = self.issend(comm, task, worker_id, tag)
-            self.pending[worker_id] = (future, request)
-        except BaseException as e:
-            self.workers.add(worker_id)
-            future.set_exception(e)
-        
+        if task.type == TaskType.FUNCTION:
+            worker_id = self.workers.pop()
+            
+            try:
+                logging.debug(f'Client {comm.Get_rank()}: Sending task {task} to rank {worker_id}')
+                request = [self.issend(comm, task, worker_id, tag)]
+                self.pending[worker_id] = (future, request)
+            except BaseException as e:
+                self.workers.add(worker_id)
+                future.set_exception(e)
+        else:
+            nprocs = task.num_workers
+
+            if nprocs > len(self.workers):
+                logging.debug('4')
+                tasks.appendleft(item)
+                return False
+            
+            ids = [self.workers.pop() for _ in range(nprocs)]
+            task.worker_ids = set(ids)
+
+            # Create dummy ecxecutable to call vipdopt/server.py
+            # pyexe = sys.executable
+            # pyargs = []
+            # pyargs.extend(['-m', __spec__.parent + '.server'])
+            try:
+                logging.debug(f'Client {comm.Get_rank()}: Sending distributed task {task} to ranks {ids}')
+                intercomm = MPI.COMM_SELF.Spawn(sys.executable, task.args, maxprocs=nprocs)
+                requests = [self.issend(comm, task, id, tag) for id in ids]
+                self.pending[ids[0]] = (future, requests)
+            except BaseException as e:
+                logging.exception('ERROR IN MULTI SEND CODE!!')
+                self.workers = self.workers.union(ids)
+                future.set_exception(e)
+
         del future, task, item
         logging.debug(f'tasks after send: {tasks}, {len(tasks)}')
         logging.debug(f'pending after send: {self.pending}, {len(self.pending)}')
@@ -715,19 +1156,23 @@ class ClientWorker:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     rank = MPI.COMM_WORLD.Get_rank()
 
-    with Executor() as ex:
-        logging.debug(f'Number of workers: {ex.num_workers}')
-        logging.debug(f'Maximum workers: {get_max_workers()}')
+    # with FunctionExecutor() as ex:
+    #     logging.debug(f'Number of workers: {ex.num_workers}')
+    #     logging.debug(f'Maximum workers: {get_max_workers()}')
 
-        for res in ex.map(abs, (-1, -2, 3, 4, -5, 6), ordered=True, timeout=5):
-            print(res)
+    #     for res in ex.map(abs, (-1, -2, 3, 4, -5, 6), ordered=True, timeout=5):
+    #         print(res)
         
-        for res in ex.starmap(sum, ((range(3),), (range(6),), (range(9),)), timeout=5):
-            print(res)
+    #     for res in ex.starmap(sum, ((range(3),), (range(6),), (range(9),)), timeout=5):
+    #         print(res)
         
-        future = ex.submit(max, range(3), default=0)
-        print(future.result())
+    #     future = ex.submit(max, range(3), default=0)
+    #     print(future.result())
+
+    with FileExecutor() as ex:
+        res = ex.submit('python', ['mpitest.py'], num_workers=2)
+        logging.info(f'Result of running mpitest.py: {res.result()}')
     
