@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterable, Iterator
 import os
+import shutil
 import sys
 import threading
 from collections import deque as Deque
@@ -12,6 +13,7 @@ from copy import deepcopy
 import abc
 from enum import Enum
 import subprocess
+from itertools import starmap
 
 
 import numpy as np
@@ -19,6 +21,15 @@ from mpi4py import MPI
 from mpi4py.run import set_abort_status
 from overrides import override
 
+if __name__ == '__main__':
+    #  Here so that running this script directly doesn't blow up
+    f = sys.modules[__name__].__file__
+    if not f:
+        raise ModuleNotFoundError('SHOULD NEVER REACH HERE')
+
+    path = os.path.dirname(f)
+    path = os.path.join(path, '..')
+    sys.path.insert(0, path)
 from vipdopt.utils import R, T
 
 
@@ -59,7 +70,8 @@ class Task:
             exe = options.pop('exe')
             args = options.pop('args', None)
             args = [] if args is None else list(args)
-            args = ['-m', __spec__.parent + '.file_executor', exe, *args]
+            args = [exe, *args]
+            # args = ['-m', __spec__.parent + '.file_executor', exe, *args]
             # args.insert(0, exe)
             self.args = args
             self.mpi_info: dict = options.pop('mpi_info', dict())
@@ -615,7 +627,7 @@ class RemoteWorker:
     def __init__(self):
         logging.debug(f'Creating RemoteWorker on rank {MPI.COMM_WORLD.Get_rank()}')
         self.workers = WorkerSet()
-        self.pending: dict[WorkerSet, tuple[Future, MPI.Request, MPI.Intercomm]] = dict()
+        self.pending: dict[WorkerSet, tuple[Future, str]] = dict()
         self.job_id = 0
     
     def get_next_job_id(self) -> int:
@@ -625,7 +637,7 @@ class RemoteWorker:
 
     def execute(self, comm: MPI.Intercomm, options: dict, workers: WorkerSet, tasks: Deque[tuple[Future, Task]]):
         self.workers = workers
-        status = MPI.Status()
+        # status = MPI.Status()
 
         while True:
             if len(tasks) > 0 and workers:
@@ -633,85 +645,121 @@ class RemoteWorker:
                 logging.debug(f'Stop the loop? {stop}')
                 if stop:
                     break
-            idx, flag = self.testany(status)
+            idx, flag = self.testany()
             # comm.iprobe(status=status)
             if self.pending and flag:
                 logging.debug('Job finished!')
-                self.wait(idx)
+                self.read(idx)
             time.sleep(SLEEP_TIME)
         logging.debug(f'Done sending tasks. Waiting on {len(self.pending)} jobs...')
-        self.waitall()
+        self.readall()
     
     @serialized
     def iprobe(self, comm: MPI.Intercomm, tag: int, status: MPI.Status) -> bool:
         return comm.iprobe(MPI.ANY_SOURCE, tag, status)
 
-    def get_all_requests(self) -> list[list[MPI.Request]]:
-        return [req for _, req, _ in self.pending.values()]
+    def _get_all_out_files(self) -> list[tuple[WorkerSet, str]]:
+        return [(key, outname) for key, (_, outname) in self.pending.items()]
     
     def _any_index(self, l: list[bool]) -> tuple[int, bool]:
         for i, val in enumerate(l):
             if val:
                 return (i, True)
         return (-1, False)
+    
+    @serialized
+    def test(self, workers: WorkerSet, job_dir: str) -> bool:
+        out_dir = os.path.join(job_dir, 'out')
+        if not os.path.exists(out_dir):
+            return False
+        num_files = len([name for name in os.listdir(out_dir) if os.path.isfile(os.path.join(out_dir, name))])
+        return num_files == len(workers)
+
 
     @serialized
-    def testany(self, status: MPI.Status) -> tuple[int, bool]:
+    def testany(self) -> tuple[int, bool]:
         # reqs_list = self.get_all_requests()
         # List of all requests combined into one "request" per pending job
         # collapsed_list = [flag for flag, _ in map(reqs_list, MPI.Request.testall)]
         # idx, flag = self._any_index(collapsed_list)
-        idx, flag, status = MPI.Request.testany(self.get_all_requests(), status)
+        # idx, flag, status = MPI.Request.testany(self.get_all_requests(), status)
         # print(idx, flag, status)
-        return idx, flag
+        job_dir_list = self._get_all_out_files()
+        exists = list(starmap(self.test, job_dir_list))
+        return self._any_index(exists)
+        # return idx, flag
     
-    def create_bash_script(self, task: Task) -> str:
+    def create_bash_script(self, task: Task) -> tuple[str, str]:
         job_id = self.get_next_job_id()
-        filename = f'temp/script_{job_id}.sh'
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        with open(filename, "w") as f:
+        job_dir = f'tmp/{job_id}'
+        shutil.rmtree(job_dir, ignore_errors=True)
+        os.makedirs(job_dir, exist_ok=True)
+        exe_subdir = job_dir + 'exe'
+        exe_subdir = os.path.join(job_dir, 'exe')
+        out_subdir = os.path.join(job_dir, 'out')
+        os.makedirs(exe_subdir, exist_ok=True)
+        os.makedirs(out_subdir, exist_ok=True)
+        exename = os.path.join(exe_subdir, 'exe.sh')
+        os.makedirs(os.path.dirname(exename), exist_ok=True)
+
+        with open(exename, "w") as f:
             arg_str = ' '.join(task.args)
             f.writelines([
                 '#!/bin/bash\n',
                 # 'unset | grep "PMIX_.*\n',
                 # 'unset | grep "OMPI_.*\n',
                 # 'set PMIX_MCA_gds=hash\n',
-                'waiter() {\n',
-                '\trv=$?\n',
-                # '\techo $rv\n',
-                # '\techo $em\n',
-                f'\techo done running "{task.args[0]}"\n',
-                '\tpython -m vipdopt.waiter $rv $*\n',
-                # f'\tmpirun -n {task.num_workers} python -m vipdopt.waiter $rv $*\n',
-                '\texit 0\n',
-                '}\n',
-                'trap "waiter" EXIT\n',
+                # 'waiter() {\n',
+                # '\trv=$?\n',
+                # # '\techo $rv\n',
+                # # '\techo $em\n',
+                # f'\techo done running "{task.args[0]}"\n',
+                # '\t./waiter.out $rv $*\n',
+                # # '\tpython -m vipdopt.waiter $rv $*\n',
+                # # f'\tmpirun -n {task.num_workers} python -m vipdopt.waiter $rv $*\n',
+                # '\texit 0\n',
+                # '}\n',
+                # 'trap "./waiter.out" EXIT\n',
                 # f'{arg_str} > err_$OMPI_COMM_WORLD_RANK.log 2>&1',
                 f'echo running "{task.args[0]}"\n',
-                f'mpirun -n {task.num_workers} {arg_str}',
+                # f'mpirun -n {task.num_workers} {arg_str} : -n 2 python vipdopt/waiter.py $*\n',
+                f'{arg_str}\n',
+                f'echo "$?" >> "{out_subdir}/$OMPI_COMM_WORLD_RANK.err"\n',
+                f'echo errcode from $OMPI_COMM_WORLD_RANK saved\n',
+                # f'{task.num_workers} {arg_str}',
                 # f'mpirun -n {task.num_workers} {arg_str} > err_$OMPI_COMM_WORLD_RANK.log 2>&1',
                 # f'em=$(mpirun -n {task.num_workers} {arg_str}2>&1)\n',
                 # 'echo $em\n',
                 # 'exit 0',
             ])
-        return filename
+        return exename, job_dir
     
-    def waitall(self, status: MPI.Status | None=None):
+    def readall(self):
         for idx in range(len(self.pending)):
-            self.wait(idx, status)
+            self.read(idx)
 
-    def wait(self, idx: int, status: MPI.Status | None=None):
+    def read(self, idx: int):
         key = list(self.pending.keys())[idx]
-        future, req, intercomm = self.pending.pop(key)
+        future, job_dir = self.pending.pop(key)
+        assert os.path.exists(job_dir)
 
-        status = serialized(MPI.Request.wait)(req, status=status)
-        logging.debug(f'RemoteWorker passed barrier!')
+        out_dir = job_dir + '/out'
+
+        err_files = next(os.walk(out_dir), (None, None, []))[2]
+        errcodes = [None] * len(key)
+        for i, fname in enumerate(err_files):
+            with open(os.path.join(out_dir, fname), 'r') as f:
+                errcodes[i] = int(f.readline().rstrip())
+
+        # status = serialized(MPI.Request.wait)(req, status=status)
+        # logging.debug(f'RemoteWorker passed barrier!')
+        
 
         # errcodes = intercomm.bcast(None, root=0)
         # errcodes = np.zeros(intercomm.Get_remote_size())
         # errcodes = intercomm.scatter(errcodes, root=0)
-        logging.debug(f'manager rank: {intercomm.Get_rank()}')
-        errcodes = intercomm.gather(0, root=MPI.ROOT)
+        # logging.debug(f'manager rank: {intercomm.Get_rank()}')
+        # errcodes = intercomm.gather(0, root=MPI.ROOT)
         logging.debug(f'errcodes={errcodes}')
 
         self.workers = self.workers.union(key)
@@ -761,15 +809,17 @@ class RemoteWorker:
         # ids = {self.workers.pop() for _ in range(nprocs)}
         ids = WorkerSet(self.workers.pop(n=nprocs))
         # key = ''.join(str(id) for id in ids)
-        # exe = self.create_bash_script(task)
+        exename, job_dir = self.create_bash_script(task)
+
 
         try:
             logging.debug(f'Client {comm.Get_rank()}: Sending distributed task {task} to ranks {ids}')
-            intercomm = MPI.COMM_SELF.Spawn(sys.executable, task.args, maxprocs=nprocs)
+            MPI.COMM_SELF.Spawn(exename, maxprocs=nprocs)
+            # intercomm = MPI.COMM_SELF.Spawn(sys.executable, task.args, maxprocs=nprocs)
             # requests = [self.issend(comm, task, id, tag) for id in ids]
             # requests = [intercomm.irecv(None, i) for i in range(intercomm.Get_remote_size())]
-            request = intercomm.Ibarrier()
-            self.pending[ids] = (future, request, intercomm)
+            # request = intercomm.Ibarrier()
+            self.pending[ids] = (future, job_dir)
         except BaseException as e:
             logging.exception('ERROR IN MULTI SEND CODE!!')
             self.workers = self.workers.union(ids)
@@ -1157,6 +1207,9 @@ class ClientWorker:
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+
+    logging.debug(MPI.Get_library_version())
+
     rank = MPI.COMM_WORLD.Get_rank()
 
     # with FunctionExecutor() as ex:

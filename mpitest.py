@@ -1,12 +1,18 @@
 import numpy as np
 import logging
 import time
+import sys
+
 import mpi4py
-# mpi4py.rc.initialize = False
-# mpi4py.rc.finalize = False
+mpi4py.rc.initialize = True 
+mpi4py.rc.finalize = True
+try:
+    from mpi4py import MPI
+except:
+    print('yeet')
 
 if __name__ == '__main__':
-    from mpi4py import MPI
+
     comm_world = MPI.COMM_WORLD
     rank = comm_world.Get_rank()
     size = comm_world.Get_size()
@@ -17,9 +23,16 @@ if __name__ == '__main__':
     send_buf = np.array(rank, dtype=np.intc)
 
     rank_sum = comm_world.allreduce(send_buf, op=MPI.SUM)
+    rank_sum = sum(range(rank + 1))
+    # rank_sum += 1
 
     print('got rank sum')
 
-    assert rank_sum == sum(range(size))
-    print('Rank sum equal! Exiting as normal...')
+    if rank_sum == sum(range(size)):
+        print('Rank sum equal! Exiting as normal...')
+    else:
+        print('Rank sum unequal! Exiting with error code 1...')
+        sys.exit(1)
+    
+
 

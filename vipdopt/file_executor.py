@@ -4,13 +4,13 @@
 import logging
 import sys
 import subprocess
-# from mpi4py import MPI
 import numpy as np
 
 
 if __name__ == '__main__':
+    from mpi4py import MPI
     logging.basicConfig(level=logging.DEBUG)
-    # parent = MPI.Comm.Get_parent()
+    parent = MPI.Comm.Get_parent()
 
     # logging.debug(f'Parent communicator: {parent}')
     # logging.debug(f'Worker {parent.Get_rank()}: Total size: {parent.Get_size() + parent.Get_remote_size()}...')
