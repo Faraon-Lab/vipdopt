@@ -193,11 +193,7 @@ def test_cascading_params(func, value: Any):
     cfg = SonyBayerConfig()
     cfg.read_file(TEST_YAML_PATH)
 
-<<<<<<< HEAD
-    assert_close(func.__get__(cfg), value)
-=======
     assert_close(func.__get__(cfg), value, err=1e-5)
->>>>>>> 60eda3f226c5fb62656ee7cf6e5ac5c710e8de84
 
 
 @pytest.mark.smoke()

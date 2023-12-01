@@ -13,6 +13,9 @@ ignore = [
     "ANN",  # Type hints / annotations; handled by mypy
     "COM812",  # "Trailing Comma Missing"
     "TRY003",  # "Avoid specifying long messages outside the exception class"
+    "PLR0913",  # Too many arguments to function call
+    "FBT001",  # Boolean-typed positional argument in function definitions
+    "FBT002",  # Boolean default positional argument in function definitions
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
@@ -41,6 +44,7 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "tmp",
 ]
 
 # Same as Black.
@@ -59,6 +63,17 @@ target-version = "py311"
 
 # Ignore import order in __main__.py
 "**/__main__.py" = ["E402"]
+
+
+"**/pool.py" = [
+    "SLF001",  # Ignore private member access in pool.py
+    "A001",  # Ignore shadowing builtin functions
+    "BLE001",  # Ignore catching BaseException
+    "PLW0602",
+    "PLW0603",  # Ignore global problems
+    "ARG001",  # Ignore unused function arguments
+    "ARG002",
+]
 
 # Ignore docstrings for properties in SonyBayerFilter config
 "**/configuration/sbc.py" = ["D"]

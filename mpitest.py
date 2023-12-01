@@ -1,10 +1,9 @@
-import numpy as np
-import logging
-import time
 import sys
 
 import mpi4py
-mpi4py.rc.initialize = True 
+import numpy as np
+
+mpi4py.rc.initialize = True
 mpi4py.rc.finalize = True
 try:
     from mpi4py import MPI
@@ -24,7 +23,6 @@ if __name__ == '__main__':
 
     rank_sum = comm_world.allreduce(send_buf, op=MPI.SUM)
     rank_sum = sum(range(rank + 1))
-    # rank_sum += 1
 
     print('got rank sum')
 
@@ -33,6 +31,6 @@ if __name__ == '__main__':
     else:
         print('Rank sum unequal! Exiting with error code 1...')
         sys.exit(1)
-    
+
 
 
