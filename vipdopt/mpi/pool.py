@@ -5,6 +5,7 @@ import abc
 import logging
 import os
 import shutil
+import stat
 import sys
 import threading
 import time
@@ -14,6 +15,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from concurrent.futures import Future, as_completed
 from enum import Enum
 from itertools import starmap
+from pathlib import Path
 from typing import Any
 
 from mpi4py import MPI
@@ -851,7 +853,7 @@ class FileManager:
         """Initialize a FileManager."""
         logging.debug(f'Creating FileManager on rank {MPI.COMM_WORLD.Get_rank()}')
         self.workers = WorkerSet()
-        self.pending: dict[WorkerSet, tuple[Future, str, Task]] = {}
+        self.pending: dict[WorkerSet, tuple[Future, Path, Task]] = {}  # type: ignore
         self.job_id = 0
 
     def get_next_job_id(self) -> int:
@@ -876,6 +878,7 @@ class FileManager:
             tasks (WorkQueue): Queue of tasks to be executed.
         """
         self.workers = workers
+        self.root_dir: Path = Path(options.pop('root_dir', './tmp'))
 
         while True:
             # If there are tasks left to be done and workers to assign, do so
@@ -893,7 +896,7 @@ class FileManager:
         logging.debug(f'Done sending tasks. Waiting on {len(self.pending)} jobs...')
         self.readall()  # Wait for all remaining pending jobs to complete.
 
-    def _get_all_out_files(self) -> list[tuple[WorkerSet, str, Task]]:
+    def _get_all_out_files(self) -> list[tuple[WorkerSet, Path, Task]]:
         """Return all pending tasks, their assigned workers, and work directories."""
         return [
             (workers, outname, task)
@@ -918,7 +921,7 @@ class FileManager:
         return (-1, False)
 
     @serialized
-    def test(self, workers: WorkerSet, job_dir: str, task: Task) -> bool:
+    def test(self, workers: WorkerSet, job_dir: Path, task: Task) -> bool:
         """Test to see if a task is completed.
 
         Completion is indicated by the scratch directory containing a file for each
@@ -933,17 +936,17 @@ class FileManager:
         Returns:
             (bool): Whether the task is complete.
         """
-        out_dir = os.path.join(job_dir, 'out')
+        out_dir = job_dir / 'out'
 
         # If output directory doesn't exist then the job is certainly not finished yet.
-        if not os.path.exists(out_dir):
+        if not out_dir.exists():
             return False
 
         # Check if the number of exit code files is equal to the number of workers
         num_files = len(
             [
                 name for name in os.listdir(out_dir)
-                if os.path.isfile(os.path.join(out_dir, name))
+                if (out_dir / name).is_file()
         ])
         return num_files == len(workers)
 
@@ -954,7 +957,7 @@ class FileManager:
         exists = list(starmap(self.test, job_dir_list))
         return self._any_index(exists)
 
-    def create_bash_script(self, task: Task) -> tuple[str, str]:
+    def create_bash_script(self, task: Task) -> tuple[Path, Path]:
         """Setup a scratch work directory and create a wrapper executable.
 
         This wrapper executable simply calls the original executable and outputs the
@@ -976,18 +979,14 @@ class FileManager:
         """
         # Make job directory for the task
         job_id = self.get_next_job_id()
-        job_dir = f'./tmp/{job_id}'
+        job_dir = self.root_dir / f'{job_id}'
         shutil.rmtree(job_dir, ignore_errors=True)
         os.makedirs(job_dir, exist_ok=True)
 
-        # Create subdirectories for the exitcode outputs and for the wrapper executable
-        exe_subdir = job_dir + 'exe'
-        exe_subdir = os.path.join(job_dir, 'exe')
-        out_subdir = os.path.join(job_dir, 'out')
-        os.makedirs(exe_subdir, exist_ok=True)
+        # Create subdirectory for the exitcode outputs
+        out_subdir = job_dir / 'out'
         os.makedirs(out_subdir, exist_ok=True)
-        exename = os.path.join(exe_subdir, 'exe.sh')
-        os.makedirs(os.path.dirname(exename), exist_ok=True)
+        exename = job_dir / 'exe.sh'
 
         # If in debug mode, add echo lines to the wrapper executable
         verbose = logging.getLogger().level <= logging.DEBUG
@@ -1009,6 +1008,8 @@ class FileManager:
                     f'{arg_str}\n',
                     f'echo "$?" >> "{out_subdir}/$OMPI_COMM_WORLD_RANK.err"\n',
                 ])
+
+        exename.chmod(exename.stat().st_mode | stat.S_IEXEC)
         return exename, job_dir
 
     def readall(self):
@@ -1026,7 +1027,7 @@ class FileManager:
         workers = list(self.pending.keys())[idx]
         future, job_dir, task = self.pending.pop(workers)
 
-        assert os.path.exists(job_dir)
+        assert job_dir.exists()
 
         logging.info(
             f"...Done executing 'mpirun -n {task.num_workers}"
@@ -1034,12 +1035,12 @@ class FileManager:
         )
 
         # Read out all exit codes in the job scratch directory
-        out_dir = job_dir + '/out'
+        out_dir = job_dir / 'out'
 
-        err_files: list = next(os.walk(out_dir), (None, None, []))[2]
+        err_files = out_dir.iterdir()
         errcodes = [1] * len(workers)
         for i, fname in enumerate(err_files):
-            with open(os.path.join(out_dir, fname)) as f:
+            with open(fname) as f:
                 errcodes[i] = int(f.readline().rstrip())
 
         logging.debug(f'errcodes={errcodes}')
@@ -1105,7 +1106,7 @@ class FileManager:
                 f'Sending distributed task {task} to ranks {ids}'
             )
             logging.info(f'Executing \'mpirun -n {nprocs} {" ".join(task.args)}\'...\n')
-            MPI.COMM_SELF.Spawn(exename, maxprocs=nprocs)
+            MPI.COMM_SELF.Spawn(str(exename), maxprocs=nprocs)
             self.pending[ids] = (future, job_dir, task)
         except BaseException as e:
             logging.exception('ERROR OCCURRED DURING SPAWN!!')
@@ -1263,7 +1264,7 @@ class FunctionManager:
         """Initialize a FunctionManager."""
         logging.debug(f'Creating FunctionManager on rank {MPI.COMM_WORLD.Get_rank()}')
         self.workers = set()
-        self.pending: dict[int, tuple[Future, MPI.Request]] = {}
+        self.pending: dict[int, tuple[Future, MPI.Request]] = {}  # type: ignore
 
     def intialize(self, comm: MPI.Intercomm, options):
         """Send initializer options to all worker processes."""

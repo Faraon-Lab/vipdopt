@@ -1,10 +1,10 @@
 """Common utility functions for use throughout the project."""
 
-from typing import Any, Callable
 import functools
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 
 from vipdopt.utils import Number
 
@@ -33,8 +33,7 @@ def catch_exits(func: Callable) -> Callable:
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            res = func(*args, **kwargs)
-            return res
+            return func(*args, **kwargs)
         except SystemExit as e:
             assert e.code == 0
     return wrapper
