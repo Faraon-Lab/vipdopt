@@ -976,7 +976,7 @@ class FileManager:
         """
         # Make job directory for the task
         job_id = self.get_next_job_id()
-        job_dir = f'tmp/{job_id}'
+        job_dir = f'./tmp/{job_id}'
         shutil.rmtree(job_dir, ignore_errors=True)
         os.makedirs(job_dir, exist_ok=True)
 
