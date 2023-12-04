@@ -74,7 +74,7 @@ def test_submit_file(tmpdir):
 def test_submit_one_worker(tmpdir):
     """Should still work when "mpirun-ing" a file with only one process"""
     p = tmpdir.mkdir('work')
-    with FileExecutor(root_dor=p) as ex:
+    with FileExecutor(root_dir=p) as ex:
         res = ex.submit('python', ['testing/mpitest.py'], num_workers=1).result()
         assert_equal(res, 0)
 
@@ -94,3 +94,16 @@ def test_multiple_files(tmpdir):
 
         assert_equal(res1, 0)
         assert_equal(res2, 1)
+
+@catch_exits
+@pytest.mark.mpi(min_size=1)
+def test_multiple_executors(tmpdir):
+    """Ensure everything works when creating an executor in multiple contexts."""
+    p = tmpdir.mkdir('work')
+    with FileExecutor(root_dir=p) as ex:
+        res = ex.submit('python', ['testing/mpitest.py'], num_workers=2).result()
+        assert_equal(res, 1)
+
+    with FileExecutor(root_dir=p) as ex:
+        res = ex.submit('python', ['testing/mpitest.py'], num_workers=2).result()
+        assert_equal(res, 1)
