@@ -17,6 +17,7 @@ from enum import Enum
 from itertools import starmap
 from pathlib import Path
 from typing import Any
+import uuid
 
 from mpi4py import MPI
 from overrides import override
@@ -518,8 +519,8 @@ class FileExecutor(Executor):
         if self.is_manager():
             self._pool = Pool(self, manager_file, self._comm, self._root)
         else:
-            pass
-            # sys.exit(0)
+            # pass
+            sys.exit(0)
 
     def _bootstrap(self):
         """Create a pool if it doesn't yet exist."""
@@ -855,13 +856,10 @@ class FileManager:
         logging.debug(f'Creating FileManager on rank {MPI.COMM_WORLD.Get_rank()}')
         self.workers = WorkerSet()
         self.pending: dict[WorkerSet, tuple[Future, Path, Task]] = {}  # type: ignore
-        self.job_id = 0
 
     def get_next_job_id(self) -> int:
         """Get a unique id number for a job."""
-        id = self.job_id
-        self.job_id += 1
-        return id
+        return uuid.uuid4()
 
     def execute(
             self,
@@ -982,11 +980,11 @@ class FileManager:
         job_id = self.get_next_job_id()
         job_dir = self.root_dir / f'{job_id}'
         shutil.rmtree(job_dir, ignore_errors=True)
-        os.makedirs(job_dir, exist_ok=True)
+        job_dir.mkdir(parents=True, exist_ok=True)
 
         # Create subdirectory for the exitcode outputs
         out_subdir = job_dir / 'out'
-        os.makedirs(out_subdir, exist_ok=True)
+        out_subdir.mkdir(exist_ok=True)
         exename = job_dir / 'exe.sh'
 
         # If in debug mode, add echo lines to the wrapper executable
