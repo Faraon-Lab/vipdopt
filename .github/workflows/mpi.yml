@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - dev
+      - mpi-workflows
   pull_request:
 
 

@@ -9,7 +9,7 @@ from overrides import override
 from vipdopt.configuration.config import Config
 
 # A lookup table that adds additional vertical mesh cells depending on layers
-LOOKUP_MESH_CELLS = LOOKUP_MESH_CELLS = {1:3, 2:3, 3:2, 4:3, 5:2, 6:2, 8:3, 10:2,
+LOOKUP_MESH_CELLS = {1:3, 2:3, 3:2, 4:3, 5:2, 6:2, 8:3, 10:2,
                                     15:2, 20:2, 30:2, 40:2}
 
 VERTICAL_LAYERS = 10
