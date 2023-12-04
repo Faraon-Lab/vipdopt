@@ -518,7 +518,8 @@ class FileExecutor(Executor):
         if self.is_manager():
             self._pool = Pool(self, manager_file, self._comm, self._root)
         else:
-            sys.exit(0)
+            pass
+            # sys.exit(0)
 
     def _bootstrap(self):
         """Create a pool if it doesn't yet exist."""
