@@ -58,5 +58,5 @@ jobs:
         run: |
             pip install python-magic-bin
     
-      - name: Run Tests
-        run: mpiexec -n 1 python -m pytest tests/test_pool.py --with-mpi -v
+      - name: Run MPI Tests
+        run: mpiexec -n 4 python -m pytest tests/test_pool.py --with-mpi -v

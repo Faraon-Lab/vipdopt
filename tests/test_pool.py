@@ -61,7 +61,7 @@ def test_timeout():
 #
 
 @catch_exits
-@pytest.mark.mpi(min_size=1)
+@pytest.mark.mpi(min_size=3)
 def test_submit_file(tmpdir):
     p = tmpdir / 'work'
     with FileExecutor(root_dir=p) as ex:
@@ -70,7 +70,7 @@ def test_submit_file(tmpdir):
 
 
 @catch_exits
-@pytest.mark.mpi(min_size=1)
+@pytest.mark.mpi(min_size=2)
 def test_submit_one_worker(tmpdir):
     """Should still work when "mpirun-ing" a file with only one process"""
     p = tmpdir / 'work'
@@ -80,23 +80,27 @@ def test_submit_one_worker(tmpdir):
 
 
 @catch_exits
-@pytest.mark.mpi(min_size=1)
+@pytest.mark.mpi(min_size=4)
 def test_multiple_files(tmpdir):
     p = tmpdir / 'work'
     with FileExecutor(root_dir=p) as ex:
         fut1 = ex.submit('python', ['testing/mpitest.py'], num_workers=1)
         fut2  = ex.submit('python', ['testing/mpitest.py'], num_workers=2)
 
+        print('waiting...')
         wait([fut1, fut2])
+        print('DONE!')
 
         res1 = fut1.result()
+        print(f'res1: {res1}')
         res2 = fut2.result()
+        print(f'res2: {res2}')
 
         assert_equal(res1, 0)
         assert_equal(res2, 1)
 
 @catch_exits
-@pytest.mark.mpi(min_size=1)
+@pytest.mark.mpi(min_size=3)
 def test_multiple_executors(tmpdir):
     """Ensure everything works when creating an executor in multiple contexts."""
     p = tmpdir / 'work'

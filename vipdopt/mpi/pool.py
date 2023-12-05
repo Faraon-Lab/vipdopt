@@ -881,7 +881,7 @@ class FileManager:
 
         while True:
             # If there are tasks left to be done and workers to assign, do so
-            if len(tasks) > 0 and workers:
+            if len(tasks) > 0 and self.workers:
                 stop = self.spawn(comm, tasks)
                 logging.debug(f'Stop the loop? {stop}')
                 if stop:
@@ -895,6 +895,7 @@ class FileManager:
         logging.debug(f'Done sending tasks. Waiting on {len(self.pending)} jobs...')
         self.readall()  # Wait for all remaining pending jobs to complete.
 
+    @serialized
     def _get_all_out_files(self) -> list[tuple[WorkerSet, Path, Task]]:
         """Return all pending tasks, their assigned workers, and work directories."""
         return [
@@ -1011,6 +1012,7 @@ class FileManager:
         exename.chmod(exename.stat().st_mode | stat.S_IEXEC)
         return exename, job_dir
 
+    @serialized
     def readall(self):
         """Read all remaining pending jobs."""
         while self.pending:
@@ -1054,9 +1056,7 @@ class FileManager:
         # Delete temporary work directory unless in debug mode
         if logging.getLogger().level > logging.DEBUG:
             shutil.rmtree(job_dir)
-
-        del future, task
-
+        
     @serialized
     def spawn(self, comm: MPI.Intercomm, tasks: WorkQueue) -> bool:
         """Spawn worker processes to run a task.
@@ -1368,7 +1368,7 @@ class FunctionManager:
 
         while True:
             # If there are tasks to do and workers available send a job
-            if len(tasks) > 0 and workers:
+            if len(tasks) > 0 and self.workers:
                 stop = self.send(comm, tag, tasks)
                 logging.debug(f'Stop the loop? {stop}')
                 if stop:
