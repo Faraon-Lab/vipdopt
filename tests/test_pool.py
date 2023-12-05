@@ -14,14 +14,14 @@ from vipdopt.mpi import FileExecutor, FunctionExecutor
 def square(n):
     return n ** 2
 
-@pytest.mark.mpi(min_size=2)
+@pytest.mark.mpi(min_size=1)
 def test_submit_func():
     with FunctionExecutor() as ex:
         res = ex.submit(square, 4).result()
         assert_equal(res, 16)
 
 
-@pytest.mark.mpi(min_size=2)
+@pytest.mark.mpi(min_size=1)
 def test_map():
     with FunctionExecutor() as ex:
         res = list(ex.map(square, range(10)))
@@ -51,7 +51,7 @@ def long_wait(x: int):
     return x
 
 
-@pytest.mark.mpi(min_size=2)
+@pytest.mark.mpi(min_size=1)
 def test_timeout():
     with FunctionExecutor() as ex, pytest.raises(TimeoutError):
         list(ex.map(long_wait, range(3), timeout=1))
@@ -69,41 +69,41 @@ def test_submit_file(tmpdir):
         assert_equal(res, 1)
 
 
-# @catch_exits
-# @pytest.mark.mpi(min_size=1)
-# def test_submit_one_worker(tmpdir):
-#     """Should still work when "mpirun-ing" a file with only one process"""
-#     p = tmpdir / 'work'
-#     with FileExecutor(root_dir=p) as ex:
-#         res = ex.submit('python', ['testing/mpitest.py'], num_workers=1).result()
-#         assert_equal(res, 0)
+@catch_exits
+@pytest.mark.mpi(min_size=1)
+def test_submit_one_worker(tmpdir):
+    """Should still work when "mpirun-ing" a file with only one process"""
+    p = tmpdir / 'work'
+    with FileExecutor(root_dir=p) as ex:
+        res = ex.submit('python', ['testing/mpitest.py'], num_workers=1).result()
+        assert_equal(res, 0)
 
 
-# @catch_exits
-# @pytest.mark.mpi(min_size=1)
-# def test_multiple_files(tmpdir):
-#     p = tmpdir / 'work'
-#     with FileExecutor(root_dir=p) as ex:
-#         fut1 = ex.submit('python', ['testing/mpitest.py'], num_workers=1)
-#         fut2  = ex.submit('python', ['testing/mpitest.py'], num_workers=2)
+@catch_exits
+@pytest.mark.mpi(min_size=1)
+def test_multiple_files(tmpdir):
+    p = tmpdir / 'work'
+    with FileExecutor(root_dir=p) as ex:
+        fut1 = ex.submit('python', ['testing/mpitest.py'], num_workers=1)
+        fut2  = ex.submit('python', ['testing/mpitest.py'], num_workers=2)
 
-#         wait([fut1, fut2])
+        wait([fut1, fut2])
 
-#         res1 = fut1.result()
-#         res2 = fut2.result()
+        res1 = fut1.result()
+        res2 = fut2.result()
 
-#         assert_equal(res1, 0)
-#         assert_equal(res2, 1)
+        assert_equal(res1, 0)
+        assert_equal(res2, 1)
 
-# @catch_exits
-# @pytest.mark.mpi(min_size=1)
-# def test_multiple_executors(tmpdir):
-#     """Ensure everything works when creating an executor in multiple contexts."""
-#     p = tmpdir / 'work'
-#     with FileExecutor(root_dir=p) as ex:
-#         res = ex.submit('python', ['testing/mpitest.py'], num_workers=2).result()
-#         assert_equal(res, 1)
+@catch_exits
+@pytest.mark.mpi(min_size=1)
+def test_multiple_executors(tmpdir):
+    """Ensure everything works when creating an executor in multiple contexts."""
+    p = tmpdir / 'work'
+    with FileExecutor(root_dir=p) as ex:
+        res = ex.submit('python', ['testing/mpitest.py'], num_workers=2).result()
+        assert_equal(res, 1)
 
-#     with FileExecutor(root_dir=p) as ex:
-#         res = ex.submit('python', ['testing/mpitest.py'], num_workers=2).result()
-#         assert_equal(res, 1)
+    with FileExecutor(root_dir=p) as ex:
+        res = ex.submit('python', ['testing/mpitest.py'], num_workers=2).result()
+        assert_equal(res, 1)
