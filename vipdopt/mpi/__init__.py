@@ -1,5 +1,5 @@
 """Sub package containing all MPI related code."""
 
-from vipdopt.mpi.pool import FileExecutor, FunctionExecutor
+from vipdopt.mpi.pool import BrokenExecutorError, FileExecutor, FunctionExecutor
 
-__all__ = ['FileExecutor', 'FunctionExecutor']
+__all__ = ['FileExecutor', 'FunctionExecutor', 'BrokenExecutorError']
