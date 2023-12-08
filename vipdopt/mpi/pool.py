@@ -637,7 +637,6 @@ class Pool:
         Arguments:
             executor (Executor): The executor that created this pool.
             target (Callable): Function to call to setup the manager process.
-            comm (MPI.Comm): The MPI communicator to use.
             *args: Arguments to be passed to `target`.
         """
         self.executor = executor
@@ -690,7 +689,7 @@ class Pool:
         self.thread.join()
 
     def broken(self, message: str):
-        """Handle Errors happening within the pool execution."""
+        """Handle errors happening within the pool execution."""
         lock = None
         ex = self.executor
         if ex is not None:
@@ -709,8 +708,8 @@ class Pool:
                 self.cancel(handler)
 
 
-    def cancel(self, handler=None):
-        """Cancel all incomplete jobs in the pool."""
+    def cancel(self, handler: Callable[[Future], None] | None=None):
+        """Cancel all incomplete jobs in the pool, calling a handler if provided."""
         while True:
             try:
                 item = self.queue.pop()
@@ -773,7 +772,7 @@ def manager_function(
     queue = pool.setup_queue(size)
     workers = set(range(size))
     logging.debug(f'Created pool of size {size} with workers: {workers}')
-    manager.execute(comm, options, 0, workers, queue)
+    manager.execute(comm, 0, workers, queue)
     manager.stop(comm)
 
 def manager_thread(pool: Pool, options: dict):
@@ -1330,7 +1329,7 @@ class FunctionManager:
         serialized(MPI.Comm.Allreduce)(comm, sbuf, rbuf, op=MPI.LAND)
         return bool(rbuf[0])
 
-    def _sync_data(self, options):
+    def _sync_data(self, options: dict) -> dict:
         """Get synchronization data."""
         main = sys.modules['__main__']
         sys.modules.setdefault(MAIN_RUN_NAME, main)
@@ -1372,7 +1371,7 @@ class FunctionManager:
 
         Arguments:
             python_exe (str): Python executable target.
-            python_args (str): Arguments to pass to python call. Will always add
+            python_args (str): Arguments to pass to python call. Will always prepend
                 '-m vipdopt.server'.
             nprocs (int): Number of worker processes to spawn. Will attempt to calculate
                 from environment variables if None.
@@ -1412,7 +1411,6 @@ class FunctionManager:
     def execute(
             self,
             comm: MPI.Intercomm,
-            options: dict,
             tag: int,
             workers: set[int],
             tasks: WorkQueue,
@@ -1485,8 +1483,6 @@ class FunctionManager:
             future.set_result(res)
         else:
             future.set_exception(exception)
-
-        del res, exception, future, item
 
     def send(
             self,
