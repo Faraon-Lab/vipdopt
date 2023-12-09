@@ -1,6 +1,8 @@
 # Developer files
 *.out
 *.log
+temp/
+tmp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

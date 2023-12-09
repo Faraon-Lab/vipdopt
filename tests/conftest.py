@@ -1,5 +1,6 @@
 """Fixtures for use in multiple tests."""
 
+
 import pytest
 
 _mock_bad_config_data = {
@@ -28,11 +29,9 @@ def _open_bad_config(m):
         return m.mock_open(read_data=_mock_bad_config_data[fname])
 
 
-
 @pytest.fixture()
 def _mock_bad_config(mocker):
     """Read a config file with disallowed settings"""
     def open_mock(fname, *args):
         return mocker.mock_open(read_data=_mock_bad_config_data[fname]).return_value
     mocker.patch('builtins.open', open_mock)
-
