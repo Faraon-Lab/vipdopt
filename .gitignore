@@ -6,6 +6,8 @@
 *.yml
 !vipdopt/configuration/config_example.yml
 !environment.yml
+temp/
+tmp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

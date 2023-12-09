@@ -1,5 +1,6 @@
 """Fixtures for use in multiple tests."""
 
+
 import pytest
 import numpy as np
 
