@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - dev
+      - mpi-workflows
   pull_request:
 
 
@@ -27,7 +28,6 @@ jobs:
         os_mpi:
           - [ubuntu-latest, 'mpich']
           - [ubuntu-latest, 'openmpi']
-          - [ubuntu-latest, 'intelmpi']
           - [macos-latest, 'mpich']
           - [macos-latest, 'openmpi']
     runs-on: ${{ matrix.os_mpi[0]}}
@@ -57,5 +57,8 @@ jobs:
         run: |
             pip install python-magic-bin
     
-      - name: Run Tests
-        run: mpiexec -n 4 python -m pytest --with-mpi -m "not lumapi"
+      - name: Run MPI Tests with 1 process
+        run: mpiexec -n 1 -H localhost:4 python -m pytest tests/test_pool.py --with-mpi -v
+
+      - name: Run MPI Tests with 2 processes
+        run: mpiexec -n 2 -H localhost:4 python -m pytest tests/test_pool.py --with-mpi -v

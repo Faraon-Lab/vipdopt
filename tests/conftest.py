@@ -1,5 +1,6 @@
 """Fixtures for use in multiple tests."""
 
+
 import pytest
 
 mock_bad_config_data = {
