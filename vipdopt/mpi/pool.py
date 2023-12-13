@@ -548,6 +548,9 @@ class FileExecutor(Executor):
             self._pool = Pool(self, manager_file)
         else:
             # pass
+            if self._comm != MPI.COMM_WORLD and self._comm is not None:
+                logging.debug('Worker process freeing communicaotr...')
+                self._comm.Free()
             sys.exit(0)
 
     def _bootstrap(self):
@@ -830,6 +833,8 @@ def manager_file(pool: Pool, options: dict):
     queue = pool.setup_queue(size)
     workers = WorkerSet(range(size))
     logging.debug(f'Created pool of size {size} with workers: {workers}')
+    time.sleep(2)
+    logging.debug(f'COMM WORLD SIZE: {MPI.COMM_WORLD.Get_size()}')
     manager.execute(options, workers, queue)
     manager.stop()
 
@@ -1562,21 +1567,21 @@ if __name__ == '__main__':
 
     logging.debug(MPI.Get_library_version())
 
-    rank = MPI.COMM_WORLD.Get_rank()
+    # rank = MPI.COMM_WORLD.Get_rank()
 
-    with FunctionExecutor() as ex:
-        logging.debug(f'Number of workers: {ex.num_workers}')
-        logging.debug(f'Maximum workers: {get_max_workers()}')
+    # with FunctionExecutor() as ex:
+    #     logging.debug(f'Number of workers: {ex.num_workers}')
+    #     logging.debug(f'Maximum workers: {get_max_workers()}')
 
-        for res in ex.map(abs, (-1, -2, 3, 4, -5, 6), ordered=True, timeout=5):
-            logging.info(res)
+    #     for res in ex.map(abs, (-1, -2, 3, 4, -5, 6), ordered=True, timeout=5):
+    #         logging.info(res)
 
-        for res in ex.starmap(sum, ((range(3),), (range(6),), (range(9),)), timeout=5):
-            logging.info(res)
+    #     for res in ex.starmap(sum, ((range(3),), (range(6),), (range(9),)), timeout=5):
+    #         logging.info(res)
 
-    with FunctionExecutor(max_workers=3) as ex:
-        future = ex.submit(max, range(3), default=0)
-        logging.info(future.result())
+    # with FunctionExecutor(max_workers=3) as ex:
+    #     future = ex.submit(max, range(3), default=0)
+    #     logging.info(future.result())
 
     with FileExecutor() as ex:
         res = ex.submit(
