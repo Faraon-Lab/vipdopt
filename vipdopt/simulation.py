@@ -12,15 +12,6 @@ from typing import Any
 
 from overrides import override
 
-if __name__ == '__main__':
-    f = sys.modules[__name__].__file__
-    if not f:
-        raise ModuleNotFoundError('SHOULD NEVER REACH HERE')
-
-    path = os.path.dirname(f)
-    path = os.path.join(path, '..')
-    sys.path.insert(0, path)
-
 from vipdopt import lumapi
 
 

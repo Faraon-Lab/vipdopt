@@ -40,6 +40,7 @@ class SonyBayerRenderer(TemplateRenderer):
         super().__init__(src_directory)
         self.register_filter('linspace', np.linspace)
         self.register_filter('sin', np.sin)
+        self.register_filter('tan', np.tan)
         self.register_filter('arcsin', np.arcsin)
         self.register_filter('argmin', np.argmin)
         self.register_filter('newaxis', SonyBayerRenderer._newaxis)
