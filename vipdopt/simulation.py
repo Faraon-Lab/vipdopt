@@ -9,10 +9,12 @@ from collections import OrderedDict
 from collections.abc import Callable
 from enum import StrEnum
 from typing import Any
+from argparse import ArgumentParser
 
 from overrides import override
 
 from vipdopt import lumapi
+from vipdopt.utils import setup_logger
 
 
 class ISimulation(abc.ABC):
@@ -33,6 +35,10 @@ class ISimulation(abc.ABC):
     @abc.abstractmethod
     def save(self, fname: str):
         """Save simulation data to a file."""
+    
+    @abc.abstractmethod
+    def run(self):
+        """Run the simulation."""
 
 
 class LumericalSimObjectType(StrEnum):
@@ -89,6 +95,8 @@ class LumericalSimObject:
         self.name = name
         self.obj_type = obj_type
         self.properties: OrderedDict[str, Any] = OrderedDict()
+        if obj_type != LumericalSimObjectType.fdtd:
+            self.properties['name'] = name
         self.lumapi_obj = None
 
     def __str__(self) -> str:
@@ -190,7 +198,8 @@ class LumericalSimulation(ISimulation):
     @override
     def save(self, fname: str):
         logging.info(f'Saving simulation to {fname}...')
-        with open(fname, 'w', encoding='utf-8') as f:
+        self.fdtd.save(fname)
+        with open(f'{fname}.json', 'w', encoding='utf-8') as f:
             json.dump(
                 {'objects': self.objects},
                 f,
@@ -199,6 +208,13 @@ class LumericalSimulation(ISimulation):
                 cls=LumericalEncoder,
             )
         logging.info(f'Succesfully saved simulation to {fname}.\n')
+    
+    @override
+    def run(self):
+        self.fdtd.run()
+
+    def set_resource(self, resource_num: int, property: str, value: Any):
+        self.fdtd.setresource('FDTD', resource_num, property, value)
 
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
@@ -270,16 +286,55 @@ class LumericalSimulation(ISimulation):
         self.close()
 
 
+def setup_sim_resources(sim: LumericalSimulation, **kwargs):
+    sim.set_resource(1, 'mpi no default options', '1')
+
+    mpi_exe = kwargs.pop('mpi_exe', '/central/software/mpich/4.0.0/bin/mpirun')
+    sim.set_resource(1, 'mpi executable', mpi_exe)
+
+    nprocs = kwargs.pop('nprocs', 8)
+    hostfile = kwargs.pop('hostfile', None)
+    mpi_opt = f'-n {nprocs}'
+    if hostfile is not None:
+        mpi_opt += f' --hostfile {hostfile}'
+    sim.set_resource(1, 'mpi extra command line options', mpi_opt)
+    
+    solver_exe = kwargs.pop('solver_exe', '/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem')
+    sim.set_resource(1, 'solver executable', solver_exe)
+
+    sim.set_resource(
+        1,
+        'submission script',
+        '#!/bin/sh\n'
+        f'{mpi_exe} {mpi_opt} {solver_exe} {{PROJECT_FILE_PATH}}\n'
+        'exit 0',
+    )
+    logging.debug('Updated simulation resources:')
+    for resource in sim.fdtd.setresource('FDTD', 1).splitlines():
+        logging.debug(f'{resource}: {sim.fdtd.getresource("FDTD", 1, resource)}')
+
+
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(message)s')
-    sim1 = LumericalSimulation()
-    props1 = {'x': 2, 'y': 5}
-    obj1 = sim1.new_object('obj1', LumericalSimObjectType.mesh, **props1)
-    props2 = {'x span': 10, 'y span': 7, 'simulation time': 300}
-    obj2 = sim1.new_object('obj2', LumericalSimObjectType.fdtd, **props2)
-    sim1.save('testout.json')
+    parser = ArgumentParser()
+    parser.add_argument(
+        'simulation_json',
+        type=str, 
+        help='Simulation JSON to create a simulation from',
+    )
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help='Enable verbose output.')
 
-    with LumericalSimulation('testout.json') as sim:
-        assert sim == sim1
+    args = parser.parse_args()
 
-    sim1.close()
+    # Set verbosity
+    level = logging.DEBUG if args.verbose else logging.INFO
+    # setup_logger('default logger', level=level)
+    logging.basicConfig(level=level)
+
+    with LumericalSimulation(args.simulation_json) as sim:
+        setup_sim_resources(sim)
+
+        logging.info('Saving Simulation')
+        sim.save('test_sim')
+        logging.info('Running simulation')
+        sim.run()

@@ -23,7 +23,7 @@
                 "angle theta": {{ data.source_angle_theta_deg }},
                 "angle phi": {{ data.source_angle_phi_deg }},
                 "polarization angle": {{ data.xy_phi_rotations[i] }},
-                "direction" : "Backward",
+                "direction": "Backward",
                 "x span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
                 "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
                 "z": {{ data.src_maximum_vertical_um * 1e-6 }},
@@ -40,7 +40,7 @@
                 "angle theta": {{ data.source_angle_theta_deg }},
                 "angle phi": {{ data.source_angle_phi_deg }},
                 "polarization angle": {{ data.xy_phi_rotations[i] }},
-                "direction" : "Backward",
+                "direction": "Backward",
                 "x span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
                 "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
                 "z max": {{ data.src_maximum_vertical_um * 1e-6 }},
@@ -127,10 +127,10 @@
             }
         },
         {#- Install Aperture that blocks off source -#}
-        {% if data.use_source_aperture -%}
+        {%- if data.use_source_aperture %}
         "PEC_screen": {
             "name": "PEC_screen",
-            "obj_type": "rectangle",
+            "obj_type": "rect",
             "properties": {
                 "x": 0,
                 "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
@@ -143,7 +143,7 @@
         },
         "source_aperture": {
             "name": "source_aperture",
-            "obj_type": "rectangle",
+            "obj_type": "rect",
             "properties": {
                 "x": 0,
                 "x span": {{ data.device_size_lateral_um * 1e-6 }},
@@ -160,7 +160,7 @@
         {%- set name = "sidewall_%d" | format(idx) -%}
         "{{ name }}": {
             "name": "{{ name }}",
-            "obj_type": "rectangle",
+            "obj_type": "rect",
             "properties": {
                 "x": {{ data.sidewall_x_positions_um[idx] * 1e-6 }},
                 "x span": {{ data.sidewall_xspan_positions_um[idx] * 1e-6 }},
@@ -204,7 +204,6 @@
             "name": "design_import",
             "obj_type": "lum_import",
             "properties": {
-                "dev_id": 0,
                 "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
                 "y span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
                 "z min": {{ data.device_vertical_minimum_um * 1e-6 }},
@@ -215,7 +214,6 @@
             "name": "design_mesh",
             "obj_type": "mesh",
             "properties": {
-                "dev_id": 0,
                 "x": 0,
                 "x span": {{ data.fdtd_region_size_lateral_um * 1e-6 }},
                 "y": 0,
@@ -232,7 +230,6 @@
             "obj_type": "lum_index",
             "properties": {
                 "monitor type": "3D",
-                "dev_id": 0,
                 "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
                 "y span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
                 "z min": {{ data.device_vertical_minimum_um * 1e-6 }},
@@ -245,7 +242,6 @@
             "obj_type": "profile",
             "properties": {
                 "monitor type": "3D",
-                "dev_id": 0,
                 "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
                 "y span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
                 "z min": {{ data.device_vertical_minimum_um * 1e-6 }},
