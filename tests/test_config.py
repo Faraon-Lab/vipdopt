@@ -37,10 +37,6 @@ def test_load_yaml():
     for (k, v) in expected_pairs:
         assert_equal(cfg[k], v)
 
-    # assert_equal(cfg.fixed_layers, [1, 3])
-    # assert_equal(cfg.do_rejection, False)
-    # assert_equal(cfg.start_from_step, 0)
-    # assert_equal(cfg.adam_betas, (0.9, 0.999))
 
 
 @pytest.mark.usefixtures('_mock_example_config')

@@ -87,7 +87,7 @@ def import_lumapi(loc: str):
     return lumapi
 
 
-def read_config_file(filename: Path, cfg_format: str='auto') -> dict[str, Any]:
+def read_config_file(filename: str | Path, cfg_format: str='auto') -> dict[str, Any]:
     """Read a configuration file."""
     filename = ensure_path(filename)
     if cfg_format == 'auto':
@@ -118,7 +118,7 @@ def _yaml_loader(filepath: Path) -> dict:
         return yaml.safe_load(stream)
 
 
-def ensure_path(path) -> Path:
+def ensure_path(path: str | Path) -> Path:
     """Ensure that a Path is a Path object."""
     if not isinstance(path, Path):
         return Path(path)

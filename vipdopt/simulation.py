@@ -138,7 +138,7 @@ class LumericalSimulation(ISimulation):
         Arguments:
             fname (str): optional filename to load the simulation from
         """
-        self.fdtd = None
+        self.fdtd: lumapi.FDTD = None
         self.connect()
         self._clear_objects()
         if fname:
@@ -210,7 +210,7 @@ class LumericalSimulation(ISimulation):
 
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
-        self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
+        self.objects = OrderedDict()
         self.fdtd.newproject()
 
     def new_object(

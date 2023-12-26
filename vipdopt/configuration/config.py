@@ -15,7 +15,7 @@ class Config:
         Creates an attribute for each parameter in a provided config file.
         """
         self._files = set()
-        self._parameters: dict[str, Any] = {}
+        self._parameters = {}
 
     def __str__(self):
         """Return shorter string version of the Config object."""

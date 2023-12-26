@@ -33,7 +33,7 @@ jobs:
       - name: Lint with ruff
         uses: chartboost/ruff-action@v1
         with:
-          src: 'vipdopt tests'
+          src: '.'
           args: --config pyproject.toml
 
   smoke-test:
