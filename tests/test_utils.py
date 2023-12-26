@@ -2,12 +2,13 @@
 
 import logging
 import re
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from testing import assert_close, assert_equal
-from vipdopt.utils import sech, setup_logger
+from vipdopt.utils import read_config_file, sech, setup_logger
 
 TEST_YAML_PATH = 'vipdopt/configuration/config_example.yml'
 
@@ -23,7 +24,8 @@ LOG_REGEX = \
             (logging.WARNING, "cOmPleX MeSSage with \\ weird ' characters '"),
             (logging.ERROR, 'message with\nnew lines\n'),
             (logging.WARNING, ''),
-            (logging.CRITICAL, 'OHME OH MY\n\n\n')
+            (logging.CRITICAL, 'OHME OH MY\n\n\n'),
+            (logging.WARNING, 'o' * 1000),
         ]
 )
 @pytest.mark.smoke()
@@ -91,3 +93,31 @@ def test_logger_setup(capsys, tmp_path, level: int, msg: str):
 @pytest.mark.smoke()
 def test_sech(x: float, y: float):
     assert_close(sech(x), y)
+
+
+@pytest.mark.parametrize(
+        'fname, exception', [
+            ('not_a_path_obj.yaml', False),
+            ('bad_non_path_obj.html', True),
+            (Path('file.yml'), False),
+            (Path('file.yaml'), False),
+            (Path('bad_extension.json'), True),
+            (Path('bad_extension.yl'), True),
+        ]
+)
+@pytest.mark.smoke()
+@pytest.mark.usefixtures('_mock_example_config')
+def test_yaml_loader(
+    fname: str | Path,
+    exception: bool,
+):
+    if exception:
+        with pytest.raises(
+            NotImplementedError,
+            match=r'.* file loading not yet supported.',
+        ):
+            cfg = read_config_file(fname)
+    else:
+        cfg = read_config_file(fname)
+        assert_equal(cfg['do_rejection'], False)
+

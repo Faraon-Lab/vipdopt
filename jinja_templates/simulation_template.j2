@@ -202,7 +202,7 @@
         {#- Add device region and create device permittivity -#}
         "design_import": {
             "name": "design_import",
-            "obj_type": "lum_import",
+            "obj_type": "import",
             "properties": {
                 "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
                 "y span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
@@ -227,7 +227,7 @@
         },
         "design_index_monitor": {
             "name": "design_index_monitor",
-            "obj_type": "lum_index",
+            "obj_type": "index",
             "properties": {
                 "monitor type": "3D",
                 "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},

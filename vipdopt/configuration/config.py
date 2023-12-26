@@ -1,7 +1,6 @@
 """Module for handling configuration parameters."""
 
 import logging
-from collections.abc import Callable
 from typing import Any
 
 from vipdopt.utils import read_config_file

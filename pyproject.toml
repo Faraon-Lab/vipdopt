@@ -3,6 +3,7 @@
 #
 
 [tool.ruff]
+include = ["vipdopt/*", "tests/*"]
 fix = true
 show-fixes = true
 
@@ -45,6 +46,8 @@ exclude = [
     "node_modules",
     "venv",
     "tmp",
+    "*.yml",
+    "*.yaml",
 ]
 
 # Same as Black.
@@ -112,7 +115,7 @@ max-complexity = 15
 #
 
 [tool.pytest.ini_options]
- markers = [
+markers = [
     "smoke: these tests should always run to check for regressions quickly",
     "slow: mark tests as slow (only run with full suite)",
     "lumapi: tests that require lumapi to run"
@@ -128,7 +131,7 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["vipdopt"]
-omit = ["*tests*", "*testing*", "*__main__.py", "vipdopt/mpi*", "vipdopt/simulation.py"]
+omit = ["*tests*", "*testing*", "*__main__.py", "vipdopt/mpi/*", "vipdopt/configuration/sbc.py"]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
@@ -155,6 +158,8 @@ exclude_also = [
     ]
 
 ignore_errors = true
+show_missing = true
+fail_under = 80
 
 #
 # mypy Settings

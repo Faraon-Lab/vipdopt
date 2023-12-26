@@ -20,4 +20,4 @@ source /home/${USER}/.bashrc
 source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
 conda activate vipdopt-dev
 
-xvfb-run --server-args="-screen 0 1280x1024x24" pytest -n $SLURM_NPROCS --cov=vipdopt --cov-report=term-missing
+xvfb-run --server-args="-screen 0 1280x1024x24" pytest -n $SLURM_NPROCS --cov-config=pyproject.toml --cov

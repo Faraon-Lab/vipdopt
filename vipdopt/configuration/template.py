@@ -3,40 +3,44 @@
 import logging
 from argparse import ArgumentParser
 from collections.abc import Callable, Iterable
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 from jinja2 import Environment, FileSystemLoader, Undefined
 
 from vipdopt.configuration.config import read_config_file
-from vipdopt.configuration.sbc import SonyBayerConfig
-from vipdopt.utils import setup_logger
+from vipdopt.utils import ensure_path, setup_logger
 
 
 class TemplateRenderer:
     """Class for rendering Jinja Templates."""
 
-    def __init__(self, src_directory: str) -> None:
+    def __init__(self, src_directory: Path) -> None:
         """Initialize and TemplateRenderer."""
-        self.env = Environment(loader=FileSystemLoader(src_directory))
+        p = ensure_path(src_directory)
+        self.env = Environment(loader=FileSystemLoader(str(p)))
 
     def render(self, **kwargs) -> str:
         """Render template with provided data values."""
         return self.template.render(**kwargs)
 
-    def set_template(self, template: str) -> None:
+    def set_template(self, template: Path) -> None:
+        """Set the active template for the renderer."""
+        p = ensure_path(template)
         """Set the current template to render."""
-        self.template = self.env.get_template(template)
+        self.template = self.env.get_template(p.name)
 
     def register_filter(self, name: str, func: Callable) -> None:
         """Add or reassign a filter to use in the environment."""
         self.env.filters[name] = func
-    
+
 
 class SonyBayerRenderer(TemplateRenderer):
     """TemplateRenderer including various filters for ease of writing templates."""
 
-    def __init__(self, src_directory: str) -> None:
+    def __init__(self, src_directory: Path) -> None:
+        """Initialize a SonyBayerRenderer."""
         super().__init__(src_directory)
         self.register_filter('linspace', np.linspace)
         self.register_filter('sin', np.sin)
@@ -44,21 +48,24 @@ class SonyBayerRenderer(TemplateRenderer):
         self.register_filter('arcsin', np.arcsin)
         self.register_filter('argmin', np.argmin)
         self.register_filter('newaxis', SonyBayerRenderer._newaxis)
-    
+
+    @staticmethod
     def _newaxis(iterable: Iterable | Undefined) -> npt.ArrayLike:
         """Return the itertable as a NumPy array with an additional axis."""
         if iterable is None or isinstance(iterable, Undefined):
             return iterable
         return np.array(iterable)[:, np.newaxis]
-    
+
+    @staticmethod
     def _explicit_band_centering(num_points, dplpb, shuffle_green):
         """Determine the wavelengths that will be directed to each focal area.
 
         Arguments:
-            num_points (int): The number of deisgn frequency points 
+            num_points (int): The number of deisgn frequency points
             dplpb (float): Desired Peak Location Per Band
             shuffle_green (bool): Whether to shuffle green channel
-        
+
+
         Returns:
             (np.array): 2D Array with shape (4 x num_points) containing the weights
                 for each individual wavelength by quad.
@@ -153,24 +160,20 @@ class SonyBayerRenderer(TemplateRenderer):
         self.spectral_focal_plane_map_directional_weights = \
             spectral_focal_plane_map_directional_weights
 
-
-
-
-
 if __name__ == '__main__':
     parser = ArgumentParser('Create a simulation YAML file from a template.')
-    parser.add_argument('template', type=str,
+    parser.add_argument('template', type=Path,
                         help='Jinja2 template file to use')
-    parser.add_argument('data_file', type=str,
+    parser.add_argument('data_file', type=Path,
                         help='File containing values to substitute into template'
     )
-    parser.add_argument('output', type=str,
+    parser.add_argument('output', type=Path,
                         help='File to output rendered template to.',
     )
     parser.add_argument(
         '-s',
         '--src-directory',
-        type=str,
+        type=Path,
         default='jinja_templates/',
         help='Directory to search for the jinja template.'
         ' Defaults to "jinja_templates/"',
@@ -187,7 +190,6 @@ if __name__ == '__main__':
             else logging.INFO
     logger = setup_logger('template_logger', log_level)
 
-    # rndr = TemplateRenderer(args.src_directory)
     rndr = SonyBayerRenderer(args.src_directory)
 
     rndr.set_template(args.template)

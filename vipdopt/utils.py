@@ -14,6 +14,7 @@ from yaml.constructor import SafeConstructor
 
 Number = int | float | complex
 
+
 # Generic types for type hints
 T = TypeVar('T')
 R = TypeVar('R')
@@ -86,16 +87,17 @@ def import_lumapi(loc: str):
     return lumapi
 
 
-def read_config_file(filename: str, cfg_format: str='auto') -> dict[str, Any]:
+def read_config_file(filename: Path, cfg_format: str='auto') -> dict[str, Any]:
     """Read a configuration file."""
+    filename = ensure_path(filename)
     if cfg_format == 'auto':
-        cfg_format = Path(filename).suffix
+        cfg_format = filename.suffix
 
     config_loader = _get_config_loader(cfg_format)
     return config_loader(filename)
 
 
-def _get_config_loader(config_format: str) -> Callable[[str], dict]:
+def _get_config_loader(config_format: str) -> Callable[[Path], dict]:
     """Return a configuration file loader depending on the format."""
     match config_format.lower():
         case '.yaml' | '.yml':
@@ -105,7 +107,7 @@ def _get_config_loader(config_format: str) -> Callable[[str], dict]:
             raise NotImplementedError(msg)
 
 
-def _yaml_loader(filepath: str) -> dict:
+def _yaml_loader(filepath: Path) -> dict:
     """Config file loader for YAML files."""
     # Allow the safeloader to convert sequences to tuples
     SafeConstructor.add_constructor(  # type: ignore
@@ -114,3 +116,10 @@ def _yaml_loader(filepath: str) -> dict:
     )
     with open(filepath, 'rb') as stream:
         return yaml.safe_load(stream)
+
+
+def ensure_path(path) -> Path:
+    """Ensure that a Path is a Path object."""
+    if not isinstance(path, Path):
+        return Path(path)
+    return path

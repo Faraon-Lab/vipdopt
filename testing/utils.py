@@ -23,8 +23,8 @@ def assert_close(
         err: Number=1e-3
 ) -> None:
     """Assert two numbers are close to equal, within some error bound."""
-    if not isinstance(n1, np.ndarray | Number) or not \
-        isinstance(n2, np.ndarray | Number):
+    if not isinstance(n1, Number | list | np.ndarray) or \
+       not isinstance(n2, Number | list | np.ndarray):
         assert_equal(n1, n2)
         return
     assert np.allclose(n1, n2, rtol=err)

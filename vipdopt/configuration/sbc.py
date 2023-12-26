@@ -1,7 +1,6 @@
 """Configuration manager for SonyBayerFilter."""
 
 import logging
-from typing import Any
 
 import numpy as np
 from overrides import override

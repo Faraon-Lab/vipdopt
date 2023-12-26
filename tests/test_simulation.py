@@ -16,8 +16,9 @@ from vipdopt.simulation import (
 @pytest.mark.lumapi()
 def test_load_sim(simulation_json):
 
-    source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.rect)
+    source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.RECT)
     source_aperture.update(**{
+        'name': 'source_aperture',
         'x': 0,
         'x span': 1.5e-6,
         'y': 0,
@@ -25,8 +26,9 @@ def test_load_sim(simulation_json):
         'index': 0.3e-6,
     })
 
-    device_mesh = LumericalSimObject('device_mesh', LumericalSimObjectType.mesh)
+    device_mesh = LumericalSimObject('device_mesh', LumericalSimObjectType.MESH)
     device_mesh.update(**{
+        'name': 'device_mesh',
         'x': 0,
         'x span': 1.5e-6,
         'y': 0,
@@ -45,8 +47,9 @@ def test_load_sim(simulation_json):
 def test_save_sim(tmp_path, mock_sim_file):
     path = tmp_path / 'sim.json'
 
-    source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.rect)
+    source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.RECT)
     source_aperture.update(**{
+        'name': 'source_aperture',
         'x': 0,
         'x span': 1.5e-6,
         'y': 0,
@@ -54,8 +57,9 @@ def test_save_sim(tmp_path, mock_sim_file):
         'index': 0.3e-6,
     })
 
-    device_mesh = LumericalSimObject('device_mesh', LumericalSimObjectType.mesh)
+    device_mesh = LumericalSimObject('device_mesh', LumericalSimObjectType.MESH)
     device_mesh.update(**{
+        'name': 'device_mesh',
         'x': 0,
         'x span': 1.5e-6,
         'y': 0,
@@ -67,24 +71,25 @@ def test_save_sim(tmp_path, mock_sim_file):
         s.add_object(device_mesh)
         s.save(path)
 
-    assert len(list(tmp_path.iterdir())) == 1  # Only one file written
+    assert len(list(tmp_path.iterdir())) == 2  # noqa: PLR2004 Only two files written
     assert_equal(path.read_text(), mock_sim_file)  # Correct contents
 
 
 @pytest.mark.lumapi()
 def test_new_object():
     props = {
+        'name': 'device_mesh',
         'x': 0,
         'x span': 1.5e-6,
         'y': 0,
         'y span': 1.5e-6,
     }
 
-    correct_mesh = LumericalSimObject('correct_mesh', LumericalSimObjectType.mesh)
+    correct_mesh = LumericalSimObject('correct_mesh', LumericalSimObjectType.MESH)
     correct_mesh.update(**props)
 
     with LumericalSimulation(fname=None) as s:
-        s.new_object('device_mesh', LumericalSimObjectType.mesh, **props)
+        s.new_object('device_mesh', LumericalSimObjectType.MESH, **props)
 
         assert 'device_mesh' in s.objects
         assert_equal(s.objects['device_mesh'], correct_mesh)

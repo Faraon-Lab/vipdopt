@@ -1,13 +1,14 @@
 """Fixtures for use in multiple tests."""
 
+from pathlib import Path
 
-import pytest
 import numpy as np
+import pytest
 
 from vipdopt.configuration.template import SonyBayerRenderer
 
-TEST_YAML_PATH = 'vipdopt/configuration/config_example.yml'
-TEST_TEMPLATE_PATH = 'jinja_templates/derived_simulation_properties.j2'
+TEST_YAML_PATH = Path('vipdopt/configuration/config_example.yml')
+TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')
 
 mock_bad_config_data = {
     'bad_config_1.yml': 'border_optimization: true\nuse_smooth_blur: true',
@@ -28,6 +29,7 @@ _mock_sim_file_data = """{
             "name": "source_aperture",
             "obj_type": "rect",
             "properties": {
+                "name": "source_aperture",
                 "x": 0,
                 "x span": 1.5e-06,
                 "y": 0,
@@ -39,6 +41,7 @@ _mock_sim_file_data = """{
             "name": "device_mesh",
             "obj_type": "mesh",
             "properties": {
+                "name": "device_mesh",
                 "x": 0,
                 "x span": 1.5e-06,
                 "y": 0,
@@ -136,8 +139,10 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
     ],
     'desired_peak_location_per_band':
             np.argmin(
-                np.power(np.linspace(0.375, 0.725, 3 * 20)[:, np.newaxis] - [0.45, 0.54, 0.65],
-                        2,
+                np.power(
+                    np.linspace(0.375, 0.725, 3 * 20)[:, np.newaxis] -\
+                          [0.45, 0.54, 0.65],
+                    2,
                 ),
                 axis = 0,
             )
@@ -190,7 +195,7 @@ def example_derived_properties():
 def _mock_bad_config(mocker):
     """Read a config file with disallowed settings"""
     def open_mock(fname, *args):
-        return mocker.mock_open(read_data=mock_bad_config_data[fname]).return_value
+        return mocker.mock_open(read_data=mock_bad_config_data[str(fname)]).return_value
     mocker.patch('builtins.open', open_mock)
 
 

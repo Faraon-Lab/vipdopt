@@ -3,25 +3,23 @@
 import abc
 import json
 import logging
-import os
-import sys
+from argparse import ArgumentParser
 from collections import OrderedDict
 from collections.abc import Callable
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
-from argparse import ArgumentParser
 
 from overrides import override
 
 from vipdopt import lumapi
-from vipdopt.utils import setup_logger
 
 
 class ISimulation(abc.ABC):
     """Abstract class for an FDTD simulation."""
 
     @abc.abstractmethod
-    def __init__(self, fname: str | None) -> None:
+    def __init__(self, fname: Path | None) -> None:
         """Create simulation object."""
 
     @abc.abstractmethod
@@ -29,13 +27,13 @@ class ISimulation(abc.ABC):
         """Create hook to simulation software."""
 
     @abc.abstractmethod
-    def load(self, fname: str):
+    def load(self, fname: Path):
         """Load simulation from a file."""
 
     @abc.abstractmethod
-    def save(self, fname: str):
+    def save(self, fname: Path):
         """Save simulation data to a file."""
-    
+
     @abc.abstractmethod
     def run(self):
         """Run the simulation."""
@@ -43,27 +41,20 @@ class ISimulation(abc.ABC):
 
 class LumericalSimObjectType(StrEnum):
     """Types of simulation objects in Lumerical."""
-    fdtd = 'fdtd'
-    mesh = 'mesh'
-    gaussian = 'gaussian'
-    tfsf = 'tfsf'
-    dipole = 'dipole'
-    power = 'power'
-    profile = 'profile'
-    lum_index = 'lum_index'
-    lum_import = 'lum_import'
-    rect = 'rect'
+    FDTD = 'fdtd'
+    MESH = 'mesh'
+    GAUSSIAN = 'gaussian'
+    TFSF = 'tfsf'
+    DIPOLE = 'dipole'
+    POWER = 'power'
+    PROFILE = 'profile'
+    INDEX = 'index'
+    IMPORT = 'import'
+    RECT = 'rect'
 
     def get_add_function(self) -> Callable:
         """Get the corerct lumapi function to add an object."""
-        match self.value:
-            case LumericalSimObjectType.lum_index:
-                return lumapi.FDTD.addindex
-            case LumericalSimObjectType.lum_import:
-                return lumapi.FDTD.addimport
-            case _:
-                return getattr(lumapi.FDTD, f'add{self.value}')
-
+        return getattr(lumapi.FDTD, f'add{self.value}')
 
 class LumericalEncoder(json.JSONEncoder):
     """Encodes LumericalSim objects in JSON format."""
@@ -74,7 +65,7 @@ class LumericalEncoder(json.JSONEncoder):
             del d['fdtd']
             return d
         if isinstance(o, LumericalSimObjectType):
-            return {'__type__': str(o)}
+            return {'obj_type': str(o)}
         if isinstance(o, LumericalSimObject):
             d = o.__dict__.copy()
             del d['lumapi_obj']
@@ -95,7 +86,7 @@ class LumericalSimObject:
         self.name = name
         self.obj_type = obj_type
         self.properties: OrderedDict[str, Any] = OrderedDict()
-        if obj_type != LumericalSimObjectType.fdtd:
+        if obj_type != LumericalSimObjectType.FDTD:
             self.properties['name'] = name
         self.lumapi_obj = None
 
@@ -141,7 +132,7 @@ class LumericalSimulation(ISimulation):
             the simulation
     """
 
-    def __init__(self, fname: str | None=None) -> None:
+    def __init__(self, fname: Path | None=None) -> None:
         """Create a LumericalSimulation.
 
         Arguments:
@@ -181,7 +172,7 @@ class LumericalSimulation(ISimulation):
         logging.info('Verified license with Lumerical servers.\n')
 
     @override
-    def load(self, fname: str):
+    def load(self, fname: Path):
         logging.info(f'Loading simulation from {fname}...')
         self._clear_objects()
         with open(fname) as f:
@@ -189,17 +180,17 @@ class LumericalSimulation(ISimulation):
             for obj in sim['objects'].values():
                 self.new_object(
                     obj['name'],
-                    LumericalSimObjectType[obj['obj_type']],
+                    LumericalSimObjectType(obj['obj_type']),
                     **obj['properties'],
                 )
 
         logging.info(f'Succesfully loaded {fname}\n')
 
     @override
-    def save(self, fname: str):
+    def save(self, fname: Path):
         logging.info(f'Saving simulation to {fname}...')
-        self.fdtd.save(fname)
-        with open(f'{fname}.json', 'w', encoding='utf-8') as f:
+        self.fdtd.save(str(fname.with_suffix('')))
+        with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             json.dump(
                 {'objects': self.objects},
                 f,
@@ -208,13 +199,14 @@ class LumericalSimulation(ISimulation):
                 cls=LumericalEncoder,
             )
         logging.info(f'Succesfully saved simulation to {fname}.\n')
-    
+
     @override
     def run(self):
         self.fdtd.run()
 
-    def set_resource(self, resource_num: int, property: str, value: Any):
-        self.fdtd.setresource('FDTD', resource_num, property, value)
+    def set_resource(self, resource_num: int, resource: str, value: Any):
+        """Set the specified job manager resource for this simulation."""
+        self.fdtd.setresource('FDTD', resource_num, resource, value)
 
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
@@ -285,40 +277,60 @@ class LumericalSimulation(ISimulation):
         """Cleanup after exiting a context."""
         self.close()
 
+    def get_hpc_resources(self) -> dict:
+        """Return a dictionary containing all job manager resources."""
+        resources = {}
+        for resource in self.fdtd.setresource('FDTD', 1).splitlines():
+            resources[resource] = self.fdtd.getresource('FDTD', 1, resource)
+        return resources
 
-def setup_sim_resources(sim: LumericalSimulation, **kwargs):
-    sim.set_resource(1, 'mpi no default options', '1')
+    def setup_hpc_resources(self, **kwargs):
+        """Set the job manager resources for runnign this simulation.
 
-    mpi_exe = kwargs.pop('mpi_exe', '/central/software/mpich/4.0.0/bin/mpirun')
-    sim.set_resource(1, 'mpi executable', mpi_exe)
+        **kwargs:
+            mpi_exe (Path): Path to the mpi executable to use
+            nprocs (int): The number of processes to run the simulation with
+            hostfile (Path | None): Path to a hostfile for running distributed jobs
+            solver_exe (Path): Path to the fdtd-solver to run
+        """
+        self.set_resource(1, 'mpi no default options', '1')
 
-    nprocs = kwargs.pop('nprocs', 8)
-    hostfile = kwargs.pop('hostfile', None)
-    mpi_opt = f'-n {nprocs}'
-    if hostfile is not None:
-        mpi_opt += f' --hostfile {hostfile}'
-    sim.set_resource(1, 'mpi extra command line options', mpi_opt)
-    
-    solver_exe = kwargs.pop('solver_exe', '/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem')
-    sim.set_resource(1, 'solver executable', solver_exe)
+        mpi_exe = kwargs.pop(
+            'mpi_exe',
+            Path('/central/software/mpich/4.0.0/bin/mpirun'),
+        )
+        self.set_resource(1, 'mpi executable', str(mpi_exe))
 
-    sim.set_resource(
-        1,
-        'submission script',
-        '#!/bin/sh\n'
-        f'{mpi_exe} {mpi_opt} {solver_exe} {{PROJECT_FILE_PATH}}\n'
-        'exit 0',
-    )
-    logging.debug('Updated simulation resources:')
-    for resource in sim.fdtd.setresource('FDTD', 1).splitlines():
-        logging.debug(f'{resource}: {sim.fdtd.getresource("FDTD", 1, resource)}')
+        nprocs = kwargs.pop('nprocs', 8)
+        hostfile = kwargs.pop('hostfile', None)
+        mpi_opt = f'-n {nprocs}'
+        if hostfile is not None:
+            mpi_opt += f' --hostfile {hostfile}'
+        self.set_resource(1, 'mpi extra command line options', mpi_opt)
+
+        solver_exe = kwargs.pop(
+            'solver_exe',
+            Path('/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem'),
+        )
+        self.set_resource(1, 'solver executable', str(solver_exe))
+
+        self.set_resource(
+            1,
+            'submission script',
+            '#!/bin/sh\n'
+            f'{mpi_exe} {mpi_opt} {solver_exe} {{PROJECT_FILE_PATH}}\n'
+            'exit 0',
+        )
+        logging.debug('Updated simulation resources:')
+        for resource, value in self.get_hpc_resources().items():
+            logging.debug(f'\t"{resource}" = {value}')
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument(
         'simulation_json',
-        type=str, 
+        type=str,
         help='Simulation JSON to create a simulation from',
     )
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
@@ -328,13 +340,12 @@ if __name__ == '__main__':
 
     # Set verbosity
     level = logging.DEBUG if args.verbose else logging.INFO
-    # setup_logger('default logger', level=level)
     logging.basicConfig(level=level)
 
-    with LumericalSimulation(args.simulation_json) as sim:
-        setup_sim_resources(sim)
+    with LumericalSimulation(Path(args.simulation_json)) as sim:
+        sim.setup_hpc_resources()
 
         logging.info('Saving Simulation')
-        sim.save('test_sim')
+        sim.save(Path('test_sim'))
         logging.info('Running simulation')
         sim.run()
