@@ -131,7 +131,7 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["vipdopt"]
-omit = ["*tests*", "*testing*", "*__main__.py", "vipdopt/mpi/*", "vipdopt/configuration/sbc.py"]
+omit = ["*tests*", "*testing*", "*__main__.py", "vipdopt/simulation.py", "vipdopt/configuration/sbc.py"]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
