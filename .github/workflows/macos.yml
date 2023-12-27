@@ -33,7 +33,7 @@ jobs:
       - name: Lint with ruff
         uses: chartboost/ruff-action@v1
         with:
-          src: 'vipdopt tests'
+          src: '.'
           args: --config pyproject.toml
 
   smoke-test:
@@ -53,4 +53,4 @@ jobs:
             pip install python-magic-bin
     
       - name: Run Smoke Tests
-        run: pytest -m 'smoke'
+        run: pytest -m 'smoke and not luampi'

@@ -1,4 +1,4 @@
-"""Tests for filter.py"""
+"""Tests for Sigmoid in vipdopt.filter"""
 
 import numpy.typing as npt
 import pytest

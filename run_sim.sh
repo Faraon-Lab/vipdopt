@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH -A Faraon_Computing
-#SBATCH --time=0:05:00   # walltime
+#SBATCH --time=0:30:00   # walltime
 
-#SBATCH --nodes=2   # number of nodes
+#SBATCH --nodes=1   # number of nodes
 #SBATCH --ntasks-per-node=8  # number of processor cores (i.e. tasks)
-#SBATCH --mem=1G
+#SBATCH --mem=16G
 
-#SBATCH -J "test-pool"   # job name
+#SBATCH -J "lumerical sim"   # job name
 
 #SBATCH --mail-user=nmcnichols@caltech.edu
 #SBATH --qos=debug
@@ -17,10 +17,7 @@
 
 ## Load relevant modules
 source /home/${USER}/.bashrc
-##source activate vipdopt-dev
 source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
 conda activate vipdopt-dev
-##python -c "import vipdopt; print(vipdopt.__path__);"
 
-##time srun -n $SLURM_NPROCS python -m mpi4py.futures vipdopt/manager_new.py
-time srun -n $SLURM_NPROCS python vipdopt/manager.py
+xvfb-run --server-args="-screen 0 1280x1024x24" python -m vipdopt.simulation sim.json -v 
