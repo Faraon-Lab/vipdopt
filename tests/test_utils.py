@@ -26,12 +26,15 @@ LOG_REGEX = \
             (logging.WARNING, ''),
             (logging.CRITICAL, 'OHME OH MY\n\n\n'),
             (logging.WARNING, 'o' * 1000),
+            (logging.DEBUG, 'o' * 1000),
+            (logging.INFO, 'o' * 2000),
         ]
 )
 @pytest.mark.smoke()
 def test_logger_setup(capsys, tmp_path, level: int, msg: str):
     log_file = tmp_path / 'test.log'
     logger = setup_logger(name='test_log', level=level, log_file=log_file)
+    max_length = logger.handlers[0].formatter.max_length
 
     # call the logger with every log level
     messages = tuple(f'{s} {msg}'
@@ -55,7 +58,13 @@ def test_logger_setup(capsys, tmp_path, level: int, msg: str):
     should_log = [i >= level for i in range(logging.DEBUG, logging.CRITICAL + 1, 10)]
 
     captured = capsys.readouterr()
-    expected_output = ''.join([messages[i] + '\n' for i in range(5) if should_log[i]])
+    truncated_suffix = f"""...\nOutput truncated.
+To see full output, run with -vv or check {log_file}\n\n"""
+    expected_output = ''.join([
+        messages[i][:max_length] + truncated_suffix if
+        level > logging.DEBUG and len(messages[i]) > max_length
+        else messages[i] + '\n' for i in range(5) if should_log[i]
+    ])
     assert_equal(captured.err, expected_output)
 
     # Make sure everything was written to the log file (since it has level debug)

@@ -23,7 +23,16 @@ class TemplateRenderer:
 
     def render(self, **kwargs) -> str:
         """Render template with provided data values."""
-        return self.template.render(**kwargs)
+        return self.template.render(trim_blocks=True, lstrip_blocks=True, **kwargs)
+
+    def render_to_file(self, fname: Path | str, **kwargs):
+        """Render template with provided data values and save to file."""
+        output = self.render(**kwargs)
+
+        with open(fname, 'w') as f:
+            f.write(output)
+
+        logger.debug(f'Succesfully rendered and saved output to {fname}')
 
     def set_template(self, template: Path) -> None:
         """Set the active template for the renderer."""
@@ -195,7 +204,7 @@ if __name__ == '__main__':
     rndr.set_template(args.template)
 
     data = read_config_file(args.data_file)
-    output = rndr.render(data=data, pi=np.pi, trim_blocks=True, lstrip_blocks=True)
+    output = rndr.render(data=data, pi=np.pi)
     logger.info(f'Rendered Output:\n{output}')
 
     with open(args.output, 'w') as f:

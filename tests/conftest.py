@@ -17,7 +17,7 @@ mock_bad_config_data = {
     'bad_config_4.yml':
         'add_pdaf: true\ndevice_size_lateral_um: 3\ngeometry_spacing_lateral_um: 1',
     'bad_config_5.yml':
-        'add_pdaf: true\ndevice_size_lateral_um: 4\n'
+        'add_pdaf: true\ndevice_voxels_lateral_um: 4\n'
         'geometry_spacing_lateral_um: 1\nadd_infrared: true',
     'bad_config_6.yml':
     'reinterpolate_permittivity: False\nreinterpolate_permittivity_factor: 2',

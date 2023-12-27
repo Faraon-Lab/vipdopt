@@ -28,8 +28,6 @@ def test_render_example_config(
     output = template_renderer.render(
         data=data,
         pi=np.pi,
-        trim_blocks=True,
-        lstrip_blocks=True,
     )
 
     rendered_data = yaml.safe_load(output)

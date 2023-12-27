@@ -21,17 +21,24 @@ R = TypeVar('R')
 
 
 class TruncateFormatter(logging.Formatter):
-    """Loggign formatter for truncating large output."""
-    def __init__(self, max_length: int=300, log_file: str='dev.log', **kwargs):
+    """Logging formatter for truncating large output."""
+    def __init__(
+            self,
+            max_length: int=300,
+            log_file: str='dev.log',
+            level: int=logging.WARNING,
+            **kwargs,
+        ):
         """Initialize a TruncateFormatter."""
         super().__init__(**kwargs)
         self.max_length = max_length
         self.log_file = log_file
+        self.level = level
 
     def format(self, record):  # noqa: A003
         """Format the record. Truncates long messages if not DEBUG level."""
         msg = super().format(record)
-        if len(msg) > self.max_length and logging.getLogger().level > logging.DEBUG:
+        if len(msg) > self.max_length and self.level > logging.DEBUG:
             return f"""{msg[:self.max_length]}...\nOutput truncated.
 To see full output, run with -vv or check {self.log_file}\n"""
         return msg
@@ -51,7 +58,11 @@ def setup_logger(
     # Handle stream output by truncating long messages.
     # Only prints messages with no additional info.
     shandler = logging.StreamHandler()
-    shandler.setFormatter(TruncateFormatter(fmt='%(message)s', log_file=log_file))
+    shandler.setFormatter(TruncateFormatter(
+        fmt='%(message)s',
+        log_file=log_file,
+        level=level,
+    ))
     shandler.setLevel(level)
 
     # Create a handler for putting info into a .log file. Includes time stamps etc.
