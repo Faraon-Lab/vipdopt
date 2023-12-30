@@ -279,7 +279,7 @@ if processor_rank == 0:
 	
  
 				def scale_step_size(epoch_start_design_change_min, epoch_start_design_change_max, 
-                        			epoch_end_design_change_min, epoch_end_design_change_max):
+									epoch_end_design_change_min, epoch_end_design_change_max):
 					'''Begin scaling of step size so that the design change stays within epoch_design_change limits in config.'''
 					return 3
 

@@ -321,6 +321,9 @@ class LumericalFDTD:
 
 		logging.info(f'Saved out {filename} to directory {os.path.abspath(filepath)}.')
 
+	def fdtd_update_object( self, simDict, create_object=False):
+		return fdtd_update_object(self.fdtd_hook, simDict, create_object)
+
 	def import_obj(self, sim_objects, create_object_=False):
 		'''Takes dictionary of simulation objects (already partitioned).'''
 
@@ -330,6 +333,20 @@ class LumericalFDTD:
 				sim_objects[obj_key] = obj
 
 		return sim_objects	# return a list because there might be multiple simulations (e.g. for E-field stitching)
+
+	def import_nk_material(self, design_obj_dict, cur_index, device_region_import_x, device_region_import_y, device_region_import_z):
+		self.fdtd_hook.select(design_obj_dict['design_import']['name'])
+		self.fdtd_hook.importnk2( cur_index, device_region_import_x, 
+										device_region_import_y, device_region_import_z )
+  
+	def get_efield( self, monitor_name ):
+		return get_efield(self.fdtd_hook, monitor_name)
+
+	def get_transmission_magnitude( self, monitor_name ):
+		return get_transmission_magnitude(self.fdtd_hook, monitor_name)
+  
+	def switch_to_layout(self):
+		self.fdtd_hook.switchtolayout()
 
 	def disable_all_sources(self, fdtd_objects):
 		disable_all_sources(self.fdtd_hook, self.lumapi, fdtd_objects)
@@ -342,6 +359,7 @@ class LumericalFDTD:
 		# todo: partitioning code
 		# check coordinates values of initial_objects
 		# split accordingly according to size - this gives length of the final list
+		# todo: you need to also assign each object a sim_id so things can be tracked accordingly.
 
 		simulations = []
 		# simulations is a list of Simulations objects.

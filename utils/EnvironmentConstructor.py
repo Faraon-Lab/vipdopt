@@ -13,6 +13,9 @@ import configs.yaml_to_params as cfg
 # See https://docs.python.org/3/faq/programming.html#how-do-i-share-global-variables-across-modules
 from utils import utility
 
+# NOTE: It seems most expedient to straight up define everything in this class, i.e. let it be a "script" for not just the Lumerical
+# objects, but also the forward sources, adjoint sources, how each FoM is set up etc.
+
 def construct_sim_objects():
 	'''Create dictionary to duplicate FDTD SimObjects as dictionaries for saving out'''
 	# This dictionary captures the states of all FDTD objects in the simulation, and has the advantage that it can be saved out or exported.
@@ -54,7 +57,8 @@ def construct_sim_objects():
 			
 			forward_src = {}
 			forward_src['name'] = 'forward_src_' + cfg.cv.xy_names[xy_idx]
-			forward_src['type'] = 'GaussianSource'
+			forward_src['type'] = 'GaussianSource'			
+			forward_src['attached_monitor'] = xy_idx
 			forward_src['angle theta'] = cfg.pv.source_angle_theta_deg
 			forward_src['angle phi'] = cfg.cv.source_angle_phi_deg
 			forward_src['polarization angle'] = cfg.cv.xy_phi_rotations[xy_idx]
@@ -97,11 +101,12 @@ def construct_sim_objects():
 	adjoint_sources = []
 
 	for adj_src_idx in range(0, cfg.pv.num_adjoint_sources):
-		adjoint_sources.append([])
+		# adjoint_sources.append([])
 		for xy_idx in range(0, 2):
 			adj_src = {}
 			adj_src['name'] = f'adj_src_{adj_src_idx}' + cfg.cv.xy_names[xy_idx]
 			adj_src['type'] = 'DipoleSource'
+			adj_src['attached_monitor'] = adj_src_idx
 			adj_src['x'] = cfg.pv.adjoint_x_positions_um[adj_src_idx] * 1e-6
 			adj_src['y'] = cfg.pv.adjoint_y_positions_um[adj_src_idx] * 1e-6
 			adj_src['z'] = cfg.pv.adjoint_vertical_um * 1e-6
@@ -112,32 +117,34 @@ def construct_sim_objects():
 			
 			# adj_src = fdtd_update_object(fdtd_hook, adj_src, create_object=True)
 			sim_objects[adj_src['name']] = adj_src
-			adjoint_sources[adj_src_idx].append(adj_src)
+			# adjoint_sources[adj_src_idx].append(adj_src)
+			adjoint_sources.append(adj_src)
 	sim_objects['adjoint_sources'] = adjoint_sources
+	#! todo: change this around. numpy array????
 
 	# Set up adjoint point monitors to get electric field strength at focus spots.  This will allow us to
 	# compute the figure of merit as well as weight the adjoint simulations properly in calculation of the
 	# gradient.
-	focal_monitors = []
+	adjoint_monitors = []
 
 	for adj_src in range(0, cfg.pv.num_adjoint_sources):
-		focal_monitor = {}
-		focal_monitor['name'] = f'focal_monitor_{adj_src}'
-		focal_monitor['type'] = 'DFTMonitor'
-		focal_monitor['power_monitor'] = True
-		focal_monitor['monitor type'] = 'point'
-		focal_monitor['x'] = cfg.pv.adjoint_x_positions_um[adj_src] * 1e-6
-		focal_monitor['y'] = cfg.pv.adjoint_y_positions_um[adj_src] * 1e-6
-		focal_monitor['z'] = cfg.pv.adjoint_vertical_um * 1e-6
-		focal_monitor['override global monitor settings'] = 1
-		focal_monitor['use wavelength spacing'] = 1
-		focal_monitor['use source limits'] = 1
-		focal_monitor['frequency points'] = cfg.pv.num_design_frequency_points
+		adjoint_monitor = {}
+		adjoint_monitor['name'] = f'focal_monitor_{adj_src}'
+		adjoint_monitor['type'] = 'DFTMonitor'
+		adjoint_monitor['power_monitor'] = True
+		adjoint_monitor['monitor type'] = 'point'
+		adjoint_monitor['x'] = cfg.pv.adjoint_x_positions_um[adj_src] * 1e-6
+		adjoint_monitor['y'] = cfg.pv.adjoint_y_positions_um[adj_src] * 1e-6
+		adjoint_monitor['z'] = cfg.pv.adjoint_vertical_um * 1e-6
+		adjoint_monitor['override global monitor settings'] = 1
+		adjoint_monitor['use wavelength spacing'] = 1
+		adjoint_monitor['use source limits'] = 1
+		adjoint_monitor['frequency points'] = cfg.pv.num_design_frequency_points
 		
 		# focal_monitor = fdtd_update_object(fdtd_hook, focal_monitor, create_object=True)
-		sim_objects[focal_monitor['name']] = focal_monitor
-		focal_monitors.append(focal_monitor)
-	sim_objects['focal_monitors'] = focal_monitors
+		sim_objects[adjoint_monitor['name']] = adjoint_monitor
+		adjoint_monitors.append(adjoint_monitor)
+	sim_objects['adjoint_monitors'] = adjoint_monitors
 
 	transmission_monitors = []
 
@@ -358,7 +365,81 @@ def construct_device_regions():
 	return device_regions
 
 
+def construct_fwd_srcs_and_monitors(sim_objects):
+	forward_sources = sim_objects.get('forward_sources')
+	forward_monitors = sim_objects.get('forward_monitors')
+	#! They should be matched to each other in the list arrangement
+
+	if forward_monitors is None:		# catch the case where there are no monitors
+		forward_monitors = [None] * len(forward_sources)
+	return forward_sources, forward_monitors
+
+def construct_adj_srcs_and_monitors(sim_objects):
+	adj_sources = [value for key, value in sim_objects.items() if 'adj_src' in key.lower()]
+
+	adj_sources = sim_objects.get('adjoint_sources')
+	adj_monitors = sim_objects.get('adjoint_monitors')
+	#! They should be matched to each other in the list arrangement
+ 
+	# todo: also turn adj_monitors to nothing? Probably not
+	if cfg.cv.use_autograd:
+		adj_sources = []
+	
+	if adj_monitors is None:			# catch the case where there are no monitors
+		adj_monitors = [None] * len(adj_sources)
+ 
+	return adj_sources, adj_monitors
+
+f_bin_all = range(len(cfg.pv.lambda_values_um))
+fom_dict = [{'fwd': [0], 'adj': [0], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []},
+			{'fwd': [1], 'adj': [1], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []},
+			{'fwd': [0], 'adj': [2], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []},
+			{'fwd': [1], 'adj': [7], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []},
+			{'fwd': [0], 'adj': [4], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []},
+			{'fwd': [1], 'adj': [5], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []}
+			]
+weights = [1] * len(fom_dict)
+
+def overall_combine_function( fom_objs, weights, property_str):
+	'''calculate figure of merit / adjoint gradient as a weighted sum, the instructions of which are written here'''
+	#! The spectral parts must be handled separately, i.e. here.
+	# todo: insert a spectral weight vector.
+	#! TODO: What about dispersion? Is that an additional dimension on top of everything?
+
+	quantity_numbers = 0
+
+	for f_idx, f in enumerate(fom_objs):
+		# TODO:
+		# First decide: how many entries do you want in the list of true_fom??
+		# Second: weights[f_idx] needs to be a spectral vector of some description
+		# Or some slice of the wavelength must be pre-determined!
+
+		quantity_numbers += weights[f_idx] * np.squeeze(getattr(f, property_str))
+
+	return quantity_numbers
+
+def overall_figure_of_merit( indiv_foms, weights ):
+	'''calculate figure of merit according to weights and FoM instructions, which are written here'''
+
+	figures_of_merit_numbers = overall_combine_function( indiv_foms, weights, 'true_fom' )
+	return figures_of_merit_numbers
+
+def overall_adjoint_gradient( indiv_foms, weights ):
+	'''Calculate gradient according to weights and individual adjoints, the instructions will be written here'''	
+	# if nothing is different, then this should take the exact same form as the function overall_figure_of_merit()
+	# but there might be some subtleties
+
+	device_gradient = overall_combine_function( indiv_foms, weights, 'gradient' )
+	return device_gradient
 
 if __name__ == "__main__":
+
+	# todo: probably the way forward is to define everything in construct_sim_objects().
+	# todo: Should assign things like sim_objects['device_monitors'] = design_index_monitor, design_Efield_monitor
+	# todo: then, the other methods should be pulling from those keys.
+	# todo: e.g. construct_device_regions should just return sim_objects['device_monitors']['design_index_monitor'] or something.
+
 	sim_objects = construct_sim_objects()
 	design_regions = construct_device_regions()
+	forward_srcs, forward_monitors = construct_fwd_srcs_and_monitors(sim_objects)
+	adjoint_srcs, adj_monitors = construct_adj_srcs_and_monitors(sim_objects)

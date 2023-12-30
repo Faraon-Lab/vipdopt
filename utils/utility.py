@@ -99,7 +99,7 @@ def backup_all_vars(dict_vars, savefile_name=None):
 				my_shelf[key] = dict_vars[key]
 				logging.debug(f'{key} shelved.')
 			except Exception as ex:
-				# # __builtins__, my_shelf, and imported modules can not be shelved.
+				# __builtins__, my_shelf, and imported modules can not be shelved.
 				# logging.error('ERROR shelving: {0}'.format(key))
 				# template = "An exception of type {0} occurred. Arguments:\n{1!r}"
 				# message = template.format(type(ex).__name__, ex.args)
@@ -154,9 +154,25 @@ def write_dict_to_file(dict, name, folder='', serialization='yaml', indent=4):
 	elif serialization in ['json']:
 		with open(rf'{full_filepath}.json', "w") as outfile:
 			outfile.write(json.dumps(dict, indent=indent))
+	elif serialization in ['npy']:
+		np.save(rf'{full_filepath}.npy', dict, allow_pickle=True)
 
 	logging.info(f'Written file {name}.{serialization} to {folder}.')
 
+def load_dict_from_file(name, folder='', serialization='yaml', indent=4):
+	full_filepath = os.path.join(os.getcwd(), *[folder, name])	
+ 
+	if serialization in ['yaml']:
+		with open(rf'{full_filepath}.yaml') as f:
+			loaded_dict = yaml.safe_load(f)
+	elif serialization in ['json']:
+		with open(rf'{full_filepath}.json') as outfile:
+			loaded_dict = json.load(outfile)
+	elif serialization in ['npy']:
+		loaded_dict = np.load(rf'{full_filepath}.npy', allow_pickle=True)
+
+	logging.info(f'Loaded file {name}.{serialization} from {folder}.')
+	return loaded_dict
 
 #* HPC & Multithreading
 
@@ -210,6 +226,18 @@ class bidict(dict):
 			del self.inverse[self[key]]
 		super(bidict, self).__delitem__(key)
 
+def partition_iterations(iteration, epoch_list):
+	'''This function places the current iteration according to the epoch_list and returns the current epoch that the optimization 
+		is supposed to be in.
+		Args: epoch_list: list of numbers saying which iterations mark the beginning and end of new epochs. Usually linearly spaced.
+		'''
+	
+	difference = iteration - np.array(epoch_list)
+	smallest_positive_difference = min(n for n in difference if n>=0)
+	closest_epoch_floor = int( np.where(difference==smallest_positive_difference)[-1] )
+ 
+	return closest_epoch_floor
+
 def rescale_vector(x, min0, max0, min1, max1):
 	return (max1-min1)/(max0-min0) * (x-min0) + min1
 
@@ -224,6 +252,7 @@ def binarize(variable_in):
 	return 1.0 * np.greater_equal(variable_in, 0.5)
 
 def compute_binarization( input_variable, set_point=0.5 ):
+	# todo: rewrite for multiple materials
 	total_shape = np.prod( input_variable.shape )
 	return ( 2. / total_shape ) * np.sum( np.sqrt( ( input_variable - set_point )**2 ) )
 

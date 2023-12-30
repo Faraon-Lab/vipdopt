@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 from utils import utility
 
 class SLURM:
@@ -13,6 +14,8 @@ class SLURM:
         self.num_cpus_per_node = int(os.getenv('SLURM_NTASKS_PER_NODE'))	# should equal 8 or --ntasks-per-node in batch script. Could also get this SLURM_CPUS_ON_NODE or SLURM_JOB_CPUS_PER_NODE?
         # logging.info(f'There are {len(cluster_hostnames)} nodes available.')
         logging.info(f'There are {self.num_nodes_available} nodes available, with {self.num_cpus_per_node} CPUs per node. Cluster hostnames are: {self.cluster_hostnames}')
+    
+        self.max_wait_time = 3600 #seconds
     
     def get_slurm_node_list( self, slurm_job_env_variable=None ):
         if slurm_job_env_variable is None:

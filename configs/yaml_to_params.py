@@ -86,6 +86,8 @@ def get_config_vars(param_dict):
 	lumapi_filepath_local = get_check_none(param_dict, "lumapi_filepath_local")
 	lumapi_filepath_hpc = get_check_none(param_dict, "lumapi_filepath_hpc")
 	simulator_name = get_check_none(param_dict, "simulator_name")
+	simulator_max_wait_time = get_check_none(param_dict, "simulator_max_wait_time")
+	use_autograd = get_check_none(param_dict, "use_autograd")
 	convert_existing = get_check_none(param_dict, "convert_existing")
 	mesh_spacing_um = get_check_none(param_dict, "mesh_spacing_um")
 	geometry_spacing_lateral_um = get_check_none(param_dict, "geometry_spacing_lateral_um")
@@ -141,6 +143,8 @@ def get_config_vars(param_dict):
 	weight_by_quadrant_transmission = get_check_none(param_dict, "weight_by_quadrant_transmission")
 	num_epochs = get_check_none(param_dict, "num_epochs")
 	num_iterations_per_epoch = get_check_none(param_dict, "num_iterations_per_epoch")
+	total_num_iterations = get_check_none(param_dict, "total_num_iterations")
+	epoch_list = get_check_none(param_dict, "epoch_list")
 	optimizer_algorithm = get_check_none(param_dict, "optimizer_algorithm")
 	adam_betas = get_check_none(param_dict, "adam_betas")
 	use_fixed_step_size = get_check_none(param_dict, "use_fixed_step_size")
@@ -210,12 +214,18 @@ else:
 if workload_manager_name in ['SLURM']:
 # if workload_manager_name not in ['SLURM']:
 	workload_manager = WorkloadManager.SLURM()
+	workload_manager.max_wait_time = cv.simulator_max_wait_time
 else:	
     workload_manager = None
 
 if cv.simulator_name in ['LumericalFDTD']:
     from utils import LumericalUtils as lm
     simulator = lm.LumericalFDTD(lumapi_filepath)
+
+
+#* Create instances of FoMs
+weights = 1		# todo: this part
+indiv_foms = []
 
 
 #* Process variables
