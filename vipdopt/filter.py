@@ -27,8 +27,8 @@ class Filter(abc.ABC):
         Variable can either be a single number or an array of numbers.
         """
         return bool(
-            (np.min(variable) >= self._bounds[0])
-            and (np.max(variable) <= self._bounds[1])
+            (np.min(np.array(variable)) >= self._bounds[0])
+            and (np.max(np.array(variable)) <= self._bounds[1])
         )
 
     @abc.abstractmethod
@@ -90,7 +90,7 @@ class Sigmoid(Filter):
         values below, projected to 0. This is Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y.
         """
         numerator = np.tanh(self.beta * self.eta) + \
-            np.tanh(self.beta * (np.copy(x) - self.eta))
+            np.tanh(self.beta * (np.copy(np.array(x)) - self.eta))
         return numerator / self._denominator
 
     @override  # type: ignore
@@ -108,7 +108,8 @@ class Sigmoid(Filter):
         """
         del deriv_out, var_out  # not needed for sigmoid filter
 
-        numerator = self.beta * np.power(sech(self.beta * (var_in - self.eta)), 2)
+        numerator = self.beta * \
+            np.power(sech(self.beta * (var_in - self.eta)), 2) # type: ignore
         return numerator / self._denominator
 
     @override

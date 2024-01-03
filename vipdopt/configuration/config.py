@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from vipdopt.utils import PathLike, read_config_file, ensure_path
+from vipdopt.utils import PathLike, ensure_path, read_config_file
 
 
 class Config:

@@ -1,5 +1,7 @@
 """Module for Device class and any subclasses."""
 
+from __future__ import annotations
+
 import pickle
 from numbers import Number, Rational, Real
 
@@ -10,7 +12,9 @@ from vipdopt.filter import Filter
 from vipdopt.utils import PathLike, ensure_path
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
+GAUSSIAN_SCALE = 0.27
 
+# TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
 class Device:
     """An optical device / object that can be optimized.
 
@@ -22,8 +26,10 @@ class Device:
             the device.
         name (str): Name of the device; defaults to 'device'.
         init_density (float): The initial density to use in the device; defaults to 0.5.
-        init_seed (None | int): The random seed to use when initializing; defaults to
-            None, in which case all design variable values will be init_density.
+        randomize (bool): Whether to initialize with random values; Defaults to False.
+        init_seed (None | int): The random seed to use when initializing.
+        symmetric (bool): Whether to initialize with symmetric design vairables;
+            defaults to False. Does nothing if `randomize` is False.
         iteration (int): The current iteration in optimization; defaults to 0.
         filters (list[Filter]): Filters to initialize the device with.
         w (npt.NDArray[np.complex128]): The w variable for the device;
@@ -37,9 +43,12 @@ class Device:
             coords: tuple[Rational, Rational, Rational],
             name: str='device',
             init_density: float=0.5,
+            randomize: bool=False,
             init_seed: None | int=None,
+            symmetric: bool=False,
             iteration: int=0,
             filters: list[Filter] | None=None,
+            **kwargs
     ):
         """Initialize Device object."""
         if filters is None:
@@ -72,11 +81,15 @@ class Device:
         # Optional arguments
         self.name = name
         self.init_density = init_density
+        self.randomize = randomize
         self.init_seed = init_seed
+        self.symmetric = symmetric
         self.iteration = iteration
         self.filters = filters
+        self.__dict__.update(kwargs)
 
         self._init_variables()
+        self.update_density()
 
     def _init_variables(self):
         """Creates the w variable for the device.
@@ -86,32 +99,62 @@ class Device:
         through the corresponding number of filters. The first entry / array is the
         design variable, and the last entry / array is the updated density.
         """
-        n_var = len(self.filters) + 1
+        n_var = self.num_filters() + 1
 
         w = np.zeros((*self.size, n_var), dtype=np.complex128)
+        if self.randomize:
+            rng = np.random.default_rng(self.init_seed)
+            w[:] = rng.normal(self.init_density, GAUSSIAN_SCALE, size=w.shape)
+
+            if self.symmetric:
+                w[..., 0] = np.tril(w[..., 0]) + np.triu(w[..., 0].T, 1)
+                w[..., 0] = np.flip(w[..., 0], axis=1)
+
         w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w
 
-    # TODO Figure out how to save device since pickling numpy arrays is bad. MyPy is mad
-    def save_device(self, folder: PathLike):
+    def save(self, folder: PathLike):
         """Save device as pickled bytes.
 
         Attributes:
             folder (PathLike): The folder to save the device to. Anything after the
                 directory name will be stripped. Defaults to root directory.
         """
-        raise NotImplementedError
         path_folder = ensure_path(folder).parent
+        path_folder.mkdir(exist_ok=True)
+        w_path = path_folder / (self.name + '_w.npy')
+        self.w_path = w_path
         data = vars(self)
-        with (path_folder / self.name / '.pkl').open('wb') as f:
+        w = data.pop('w', None)
+        with w_path.open('wb') as f:
+            np.save(f, w)
+        with (path_folder / (self.name + '.pkl')).open('wb') as f:
             pickle.dump(data, f)
+        del self.w_path
 
-    def load_device(self, fname: PathLike):
-        """Load a device from a pickled file."""
-        raise NotImplementedError
-        fpath = ensure_path(fname)
-        with fpath.open('rb') as f:
-            vars(self).update(pickle.load(f))
+    def load(self, folder: PathLike):
+        """Load device data from a directory."""
+        fpath = ensure_path(folder).parent
+        obj_file = fpath.glob('*.pkl').__next__()
+        with obj_file.open('rb') as f:
+            data = pickle.load(f)
+            self.__dict__.update(data)
+        with self.w_path.open('rb') as f:
+            self.w = np.load(f)
+        del self.w_path
+
+    @classmethod
+    def fromfile(cls, folder: PathLike) -> Device:
+        """Create a new device by loading from a saved directory."""
+        fpath = ensure_path(folder).parent
+        obj_file = fpath.glob('*.pkl').__next__()
+        with obj_file.open('rb') as f:
+            data = pickle.load(f)
+        d = cls(**data)
+        with data['w_path'].open('rb') as f:
+            d.w = np.load(f)
+        del d.w_path
+        return d
 
     def get_design_variable(self) -> npt.NDArray[np.complex128]:
         """Return the design variable of the device region (i.e. first layer)."""
@@ -121,6 +164,10 @@ class Device:
         """Set the first layer of the device region to specifieed values."""
         self.w[..., 0] = value.copy()
         self.update_density()
+
+    def num_filters(self):
+        """Return the number of filters in this device."""
+        return len(self.filters)
 
     def get_density(self):
         """Return the density of the device region (i.e. last layer)."""
@@ -133,7 +180,7 @@ class Device:
 
     def update_density(self):
         """Pass each layer of density through the devices filters."""
-        for i in range(len(self.filters)):
+        for i in range(self.num_filters()):
             var_in = self.w[..., i]
             var_out = self.filters[i].forward(var_in)
             self.w[..., i + 1] = var_out
@@ -155,11 +202,22 @@ class Device:
         Returns:
             (npt.NDArray | Number): The density after passing theough filters.
         """
-        y = np.copy(x)
-        for i in range(len(self.filters)):
-            y = self.filters[i].fabricate(y) if binarize else self.filters[i].forward(y)
+        y = np.copy(np.array(x))
+        for i in range(self.num_filters()):
+            y = self.filters[i].fabricate(y) if binarize \
+                else self.filters[i].forward(y)  # type: ignore
         return y
 
+    def backpropogate(self, gradient):
+        """Backpropogate a gradient to be applied to pre-filtered design variables."""
+        grad = np.copy(gradient)
+        for i in range(self.num_filters(), -1, -1):
+            filt = self.filters[i]
+            y = self.w[..., i]
+            x = self.w[..., i - 1]
 
+            grad = filt.chain_rule(grad, y, x)
 
+        return grad
 
+    # TODO: Optimization steps (will need to to be interfaceable with the Optimizer)

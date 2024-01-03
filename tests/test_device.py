@@ -88,6 +88,47 @@ def test_init_vars():
     assert_equal(device.w[..., 0], x)
     assert_equal(device.w.shape, (3, 3, 3))
 
+@pytest.mark.smoke()
+def test_init_random():
+    d1 = Device(
+        (3, 3),
+        (0, 1),
+        (0, 0, 0),
+        init_density=INITIAL_DENSITY,
+        filters=FILTER_LIST,
+        randomize=True,
+        init_seed=0,
+    )
+    d2 = Device(
+        (3, 3),
+        (0, 1),
+        (0, 0, 0),
+        init_density=INITIAL_DENSITY,
+        filters=FILTER_LIST,
+        randomize=True,
+        init_seed=0,
+    )
+
+    assert_close(d1.w, d2.w)
+
+@pytest.mark.smoke()
+def test_init_symmetric():
+    device = Device(
+        (3, 3),
+        (0, 1),
+        (0, 0, 0),
+        init_density=INITIAL_DENSITY,
+        filters=FILTER_LIST,
+        randomize=True,
+        init_seed=0,
+        symmetric=True,
+    )
+
+    # check symmetry
+    w = device.w
+    a = w[..., 0] = np.flip(w[..., 0], axis=1)
+    assert np.allclose(a, a.T, rtol=1e-5, atol=1e-8)
+
 
 @pytest.mark.smoke()
 def test_update_density():
@@ -128,3 +169,21 @@ def test_pass_through_filters():
 
     # Original should not be modified
     assert_equal(x_og, x_copy)
+
+
+@pytest.mark.smoke()
+def test_save_load(tmpdir):
+    p = tmpdir / 'device'
+    dev1 = Device((4, 4), (0, 1), (0, 0, 0))
+    dev1.save(p)
+
+    dev2 = Device((10, 10), (0, 1), (0, 1, 2))
+    dev2.load(p)
+
+    for attr in dev1.__dict__:
+        assert_equal(dev1.__getattribute__(attr), dev1.__getattribute__(attr))
+
+    Device.fromfile(p)
+
+    for attr in dev1.__dict__:
+        assert_equal(dev1.__getattribute__(attr), dev1.__getattribute__(attr))
