@@ -5,6 +5,7 @@ import sys
 from argparse import ArgumentParser
 
 from mpi4py import MPI
+from vipdopt.simulation import LumericalSimulation
 
 f = sys.modules[__name__].__file__
 if not f:
@@ -50,18 +51,20 @@ if __name__ == '__main__':
 
 
     # Load Simulations...
+    sim = LumericalSimulation()
+    sim.load('sim.json')
+    sim.run()
 
     # Setup Simulation environment and connect with Lumerical API...
+            
 
-    # with MPIPool(comm_world) as pool:
-        # MPIPool allows distributing work between available processes using MPI
-        # if pool.ismanager():
-
-            # While optimize:
-                # Run simulations in parallel
-                # Combine results from simulations
-                # Compute gradient & run optimizer
-                # Update simulation values
+    # Create Optimization
+    # Optimization.run():
+        # While optimize:
+            # Run simulations in parallel
+            # Combine results from simulations
+            # Compute gradient & run optimizer
+            # Update simulation values
 
     # Extract final data from optimization
     # Evaluate device and generate plots (could also be parallelized if needed)

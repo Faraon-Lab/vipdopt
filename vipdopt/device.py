@@ -208,8 +208,8 @@ class Device:
                 else self.filters[i].forward(y)  # type: ignore
         return y
 
-    def backpropogate(self, gradient):
-        """Backpropogate a gradient to be applied to pre-filtered design variables."""
+    def backpropagate(self, gradient):
+        """Backpropagate a gradient to be applied to pre-filtered design variables."""
         grad = np.copy(gradient)
         for i in range(self.num_filters(), -1, -1):
             filt = self.filters[i]
