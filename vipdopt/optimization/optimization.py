@@ -15,13 +15,13 @@ class Optimization:
     def __init__(
             self,
             sim: ISimulation,
-            fom: list[FoM],
+            foms: list[FoM],
             device: Device,
             optimizer: Optimizer,
     ):
         """Initialize Optimzation object."""
         self.sim = sim
-        self.fom = fom
+        self.foms = foms
         self.device = device
         self.optimizer = optimizer
     
@@ -31,7 +31,7 @@ class Optimization:
             max_epochs: int,
     ):
         """Run this optimization."""
-        self.optimizer.run()
+        self.optimizer.run(self.device, self.sim, self.foms)
 
         final_fom = self.optimizer.fom_hist[-1]
         logging.info(f'Final FoM: {final_fom}')
@@ -59,7 +59,7 @@ class Optimizer:
         self.iteration = start_from
         self.max_iter = max_iter
         self.fom_func = fom_func
-        self.grad_func = fom_func
+        self.grad_func = grad_func
 
 
     def add_callback(self, func: Callable):
@@ -74,7 +74,7 @@ class Optimizer:
 
         # self.device.set_design_variable(x)
     
-    def run(self):
+    def run(self, device: Device):
         """Run an optimization."""
         for callback in self._callbacks:
             callback()

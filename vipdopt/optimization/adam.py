@@ -3,16 +3,19 @@
 from typing import Callable, Sequence
 
 import numpy as np
+import numpy.typing as npt
 
 from vipdopt.device import Device
 from vipdopt.utils import Number
 from vipdopt.optimization.optimization import Optimizer
+from vipdopt.optimization.fom import BayerFilterFoM, FoM
+from vipdopt.simulation import ISimulation
 
 class AdamOptimizer(Optimizer):
 
     def __init__(
             self,
-            moments: tuple[float, float],
+            moments: npt.ArrayLike,
             step_size: float,
             betas: tuple[float, float]=(0.9, 0.999),
             eps: float=1e-8,
@@ -30,7 +33,7 @@ class AdamOptimizer(Optimizer):
     def step(
             self,
             device: Device,
-            gradient,
+            gradient: npt.ArrayLike,
             *args,
             **kwargs
     ):
@@ -40,11 +43,12 @@ class AdamOptimizer(Optimizer):
         grad = device.backpropagate(gradient)
 
         b1, b2 = self.betas
-        m, v = self.moments
+        m = self.moments[0, ...]
+        v = self.moments[1, ...]
 
         m = b1 * m + (1 - b1) * grad
         v = b2 * v + (1 - b2) * grad ** 2
-        self.moments = (m, v)
+        self.moments = np.array([m, v])
 
         m_hat = m / (1 - b1 ** (self.iteration + 1))
         v_hat = v / (1 - b2 ** (self.iteration + 1))
@@ -53,7 +57,7 @@ class AdamOptimizer(Optimizer):
         # Apply changes
         device.set_design_variable(np.maximum(np.minimum(w_hat, 1), 0))
     
-    def run(self, device: Device):
+    def run(self, device: Device, sim: ISimulation, foms: list[FoM]):
         while self.iteration < self.max_iter:
             for callback in self._callbacks:
                 callback()
@@ -61,12 +65,19 @@ class AdamOptimizer(Optimizer):
             # TODO:
             # For sim in sims:
             #     call sim.run()
+            sim.save(f'test_sim_step_{self.iteration}')
+            sim.run()
             
             # device should have access to it's necessary monitors in the simulations
-            fom = self.fom_func(device)
+            fom = self.fom_func(foms)
+            self.fom_hist.append(fom)
 
             # Likewise for gradient
-            gradient = self.grad_func(device)
+            gradient = self.grad_func(foms)
 
             # Step with the gradient
+            self.param_hist.append(device.get_design_variable())
             self.step(device, gradient)
+            self.iteration += 1
+
+            break
