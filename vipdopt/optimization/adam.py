@@ -15,10 +15,10 @@ class AdamOptimizer(Optimizer):
 
     def __init__(
             self,
-            moments: npt.ArrayLike,
             step_size: float,
             betas: tuple[float, float]=(0.9, 0.999),
             eps: float=1e-8,
+            moments: tuple[float, float]| npt.ArrayLike=(0.0, 0.0),
             **kwargs,
     ) -> None:
         super().__init__(**kwargs)

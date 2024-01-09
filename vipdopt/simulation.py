@@ -378,7 +378,7 @@ class LumericalSimulation(ISimulation):
         f = self.fdtd.getresult('focal_monitor_0', 'f')
         return self.fdtd.sourcepower(f)
     
-    def get_overall_power(self, monitor_name):
+    def get_overall_power(self, monitor_name) -> npt.ArrayLike:
         source_power = self.get_source_power()
         T = self.get_transimission_magnitude(monitor_name)
         return source_power * T.T

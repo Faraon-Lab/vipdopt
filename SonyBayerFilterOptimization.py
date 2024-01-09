@@ -98,13 +98,15 @@ if __name__ == '__main__':
             cfg['lambda_values_um'],
         ) for i, j in zip(range(2), range(4))
     ]
+    weights = np.ones(len(foms))
+    full_fom = sum(np.multiply(weights, foms))
 
 
     adam_moments = np.zeros((2,) + bayer_filter.size)
     optimizer = AdamOptimizer(
-        adam_moments,
-        cfg['fixed_step_size'],
-        cfg['adam_betas'],
+        step_size=cfg['fixed_step_size'],
+        betas=cfg['adam_betas'],
+        moments=adam_moments,
         fom_func=lambda foms: sum(f[1] for f in map(BayerFilterFoM.compute, foms)),
         grad_func=lambda foms: sum(map(BayerFilterFoM.gradient, foms)),
     )
@@ -119,7 +121,9 @@ if __name__ == '__main__':
 
     logger.info('Beginning Step 3: Run Optimization')
 
-    optimization.run(cfg['num_iterations_per_epoch'] * cfg['num_epochs'], cfg['num_epochs'])
+    max_epochs = cfg['num_epochs']
+    max_iter = cfg['num_iterations_per_epoch'] * max_epochs
+    optimization.run(max_iter, max_epochs)
 
     logger.info('Completed Step 3: Run Optimization')
 
