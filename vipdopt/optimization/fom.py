@@ -14,8 +14,8 @@ from vipdopt.source import Source
 class FoM:
     def __init__(
             self,
-            fwd_srcs: list[Source],
-            adj_srcs: list[Source],
+            fom_srcs: list[Source],
+            grad_srcs: list[Source],
             fom_func,
             gradient_func,
             polarization: str,
@@ -23,13 +23,13 @@ class FoM:
             opt_ids: Sequence[int]=None,
             **kwargs,
     ) -> None:
-        self.fwd_srcs = fwd_srcs
-        self.adj_srcs = adj_srcs
+        self.grad_srcs = fom_srcs
+        self.fom_srcs = grad_srcs
         self.fom_func = fom_func
         self.gradient_func = gradient_func
         self.polarization = polarization
         self.freq = freq
-        self.opt_ids = list(range(len(adj_srcs))) if opt_ids is None else opt_ids
+        self.opt_ids = list(range(len(grad_srcs))) if opt_ids is None else opt_ids
         vars(self).update(kwargs)
 
     def compute(self, *args, **kwargs) -> npt.ArrayLike:
@@ -53,8 +53,8 @@ class FoM:
 
         if isinstance(second, Number):
             return FoM(
-                first.fwd_srcs,
-                first.adj_srcs,
+                first.grad_srcs,
+                first.fom_srcs,
                 lambda *args, **kwargs: func(first.compute(*args, **kwargs), second),
                 lambda *args, **kwargs: func(first.gradient(*args, **kwargs), second),
                 first.polarization,
@@ -63,8 +63,8 @@ class FoM:
             )
         elif isinstance(first, Number):
             return FoM(
-                second.fwd_srcs,
-                second.adj_srcs,
+                second.fom_srcs,
+                second.grad_srcs,
                 lambda *args, **kwargs: func(first, second.compute(*args, **kwargs)),
                 lambda *args, **kwargs: func(first, second.gradient(*args, **kwargs)),
                 second.polarization,
@@ -72,6 +72,7 @@ class FoM:
                 second.opt_ids,
             )
         
+        assert isinstance(first, FoM)
         assert isinstance(second, FoM)
 
         if first.polarization != second.polarization:
@@ -94,8 +95,8 @@ class FoM:
             )
         
         return FoM(
-            first.fwd_srcs + second.fwd_srcs,
-            first.adj_srcs + second.adj_srcs,
+            first.grad_srcs + second.grad_srcs,
+            first.fom_srcs + second.fom_srcs,
             new_compute,
             new_gradient,
             first.polarization,
@@ -152,16 +153,16 @@ class BayerFilterFoM(FoM):
 
     def __init__(
             self,
-            fwd_srcs: list[Source], 
-            adj_srcs: list[Source],
+            fom_srcs: list[Source], 
+            grad_srcs: list[Source],
             polarization: str,
             freq: Sequence[Number],
             opt_ids: Sequence[int]=None,
             **kwargs,
     ) -> None:
         super().__init__(
-            fwd_srcs,
-            adj_srcs,
+            fom_srcs,
+            grad_srcs,
             self._bayer_fom,
             self._bayer_gradient,
             polarization,
@@ -171,9 +172,9 @@ class BayerFilterFoM(FoM):
         )
     
     def _bayer_fom(self):
-        total_tfom = np.zeros(self.adj_srcs[0].shape) # FoM for transmission monitor
-        total_ffom = np.zeros(self.adj_srcs[0].shape) # FoM for focal monitor
-        for source in self.adj_srcs:
+        total_tfom = np.zeros(self.fom_srcs[0].shape) # FoM for transmission monitor
+        total_ffom = np.zeros(self.fom_srcs[0].shape) # FoM for focal monitor
+        for source in self.fom_srcs:
             T = source.transmission_magnitude()
             total_tfom += T[..., self.opt_ids]
 
@@ -183,8 +184,8 @@ class BayerFilterFoM(FoM):
         return total_tfom, total_ffom
 
     def _bayer_gradient(self):
-        E_fwd = self.fwd_srcs[0].E()
-        E_adj = self.adj_srcs[0].E()
+        E_fwd = self.grad_srcs[0].E()
+        E_adj = self.fom_srcs[0].E()
         df_dev = np.real(np.sum(E_fwd * E_adj, axis=0))
         grad = df_dev[..., self.opt_ids]
         

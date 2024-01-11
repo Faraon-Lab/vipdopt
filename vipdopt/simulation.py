@@ -360,10 +360,10 @@ class LumericalSimulation(ISimulation):
         return fields
 
     def get_hfield(self, monitor_name: str) -> npt.ArrayLike:
-        return self.get_efield(monitor_name, 'H')
+        return self.get_field(monitor_name, 'H')
 
     def get_efield(self, monitor_name: str) -> npt.ArrayLike:
-        return self.get_efield(monitor_name, 'E')
+        return self.get_field(monitor_name, 'E')
     
     def get_pfield(self, monitor_name: str) -> npt.ArrayLike:
         """Returns power as a function of space and wavelength, with xyz components."""

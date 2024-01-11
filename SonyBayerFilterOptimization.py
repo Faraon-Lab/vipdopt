@@ -18,11 +18,11 @@ sys.path.insert(0, path)
 
 import numpy as np
 
-from vipdopt.filter import Sigmoid
+from vipdopt.optimization.filter import Sigmoid
 from vipdopt.source import Source
 from vipdopt.configuration import SonyBayerConfig
 from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer
-from vipdopt.device import Device
+from vipdopt.optimization.device import Device
 
 ROOT = 0  # Index of root process
 
@@ -37,7 +37,6 @@ if __name__ == '__main__':
 
     subparsers = parser.add_subparsers()
     opt_parser = subparsers.add_parser('optimize')
-    # eval_parser = subparsers.add_parser('evaluate')
 
     opt_parser.add_argument(
         'config',
@@ -57,22 +56,27 @@ if __name__ == '__main__':
     level = logging.DEBUG if args.verbose else logging.INFO
     logger = setup_logger(level)
 
-    # opt_args = opt_parser.parse_args()
-
+    #
+    # Step 0
+    #
     logger.info('Beginnning Step 0: Lumerical Setup')
+
     # Load configuration file
     cfg = SonyBayerConfig()
     cfg.read_file(args.config)
 
-
-    logger.info(f'Loading simulation from {args.simulation_json}...')
+    # TODO: Need a way to enable / disable sources mid optimization
     # Load Simulations...
+    logger.info(f'Loading simulation from {args.simulation_json}...')
     sim = LumericalSimulation(args.simulation_json)
     logger.info('...succesfully loaded simulation!')
     sim.setup_hpc_resources()
 
     logger.info('Completed Step 0: Lumerical Setup')
 
+    #
+    # Step 1
+    #
     logger.info('Beginning Step 1: Design Region Setup')
 
     bayer_filter = Device(
@@ -83,12 +87,17 @@ if __name__ == '__main__':
         init_seed=0,
         filters=[Sigmoid(0.5, 1.0), Sigmoid(0.5, 1.0)],
     )
+    # TODO: Add reinterpolation of the device
     logger.info('Completed Step 1: Design Region Setup')
 
+    #
+    # Step 2:
+    #
+    # TODO: FIX THIS to use fom_srcs and grad_srcs, and to get the good stuff
     logger.info('Beginning Step 2: Optimization Setup')
 
     # Create sources and figures of merit (FoMs)
-    fwd_srcs = [Source(sim, f'forward_monitor_{i}') for i in range(2)]
+    fwd_srcs = [Source(sim, f'transmission_monitor_{i}') for i in range(2)]
     adj_srcs = [Source(sim, f'focal_monitor_{i}') for i in range(4)]
     foms = [
         BayerFilterFoM(
@@ -101,8 +110,9 @@ if __name__ == '__main__':
     weights = np.ones(len(foms))
     full_fom = sum(np.multiply(weights, foms))
 
-
+    # Create optimizer
     adam_moments = np.zeros((2,) + bayer_filter.size)
+
     optimizer = AdamOptimizer(
         step_size=cfg['fixed_step_size'],
         betas=cfg['adam_betas'],
@@ -110,23 +120,36 @@ if __name__ == '__main__':
         fom_func=lambda foms: sum(f[1] for f in map(BayerFilterFoM.compute, foms)),
         grad_func=lambda foms: sum(map(BayerFilterFoM.gradient, foms)),
     )
+
+    # Create optimization
+    max_epochs = cfg['num_epochs']
+    max_iter = cfg['num_iterations_per_epoch'] * max_epochs
+
     optimization = Optimization(
         sim,
-        foms,
         bayer_filter,
+        full_fom,
         optimizer,
+        max_iter,
+        max_epochs,
+        start_iter=0,
+        start_epoch=0,
     )
 
     logger.info('Completed Step 2: Optimization Setup')
 
+    #
+    # Step 3
+    #
     logger.info('Beginning Step 3: Run Optimization')
 
-    max_epochs = cfg['num_epochs']
-    max_iter = cfg['num_iterations_per_epoch'] * max_epochs
-    optimization.run(max_iter, max_epochs)
+    optimization.run()
 
     logger.info('Completed Step 3: Run Optimization')
 
+    #
+    # Cleanup
+    #
     sim.save('test_sim_after_opt')
     sim.close()
 

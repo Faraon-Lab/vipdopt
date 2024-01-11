@@ -6,7 +6,7 @@ import numpy.typing as npt
 import pytest
 
 from testing import assert_close, assert_equal
-from vipdopt.filter import Sigmoid
+from vipdopt.optimization.filter import Sigmoid
 
 # Generic values for instantiating Sigmoid filters
 ETA = 0.5

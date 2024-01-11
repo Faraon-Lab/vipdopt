@@ -14,7 +14,7 @@ __all__ = ['assert_equal', 'assert_close', 'catch_exits', 'sleep_and_raise']
 
 def assert_equal(result: Any, expected: Any) -> None:
     """Assert the two inputs are equivalent."""
-    assert np.array_equal(result, expected, equal_nan=True)
+    assert np.array_equal(result, expected)
 
 
 def assert_close(

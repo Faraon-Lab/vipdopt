@@ -4,7 +4,9 @@ from __future__ import annotations
 from typing import Callable
 import logging
 
-from vipdopt.device import Device
+
+from vipdopt.optimization.device import Device
+from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.simulation import ISimulation
 from vipdopt.optimization.fom import FoM
 
@@ -15,66 +17,53 @@ class Optimization:
     def __init__(
             self,
             sim: ISimulation,
-            foms: list[FoM],
             device: Device,
-            optimizer: Optimizer,
+            fom: FoM,
+            optimizer: GradientOptimizer,
+            max_iter: int,
+            max_epochs: int,
+            start_iter: int=0,
+            start_epoch: int=0,
     ):
         """Initialize Optimzation object."""
         self.sim = sim
-        self.foms = foms
+        self.fom = fom
         self.device = device
         self.optimizer = optimizer
-    
-    def run(
-            self,
-            max_iter: int,
-            max_epochs: int,
-    ):
-        """Run this optimization."""
-        self.optimizer.run(self.device, self.sim, self.foms)
+        self.fom_hist = []
+        self.param_hist = []
+        self._callbacks = []
+        self.max_iter = max_iter
+        self.max_epochs = max_epochs
+        self.iteration = start_iter
+        self.epoch = start_epoch
+
+    def add_callback(self, func: Callable):
+        """Register a callback function to call after each iteration."""
+        self._callbacks.apend(func)
+        
+    def run(self):
+        while self.epoch < self.max_epoch:
+            while self.iteration < self.max_iter:
+                for callback in self._callbacks:
+                    callback()
+
+                self.sim.save(f'_sim_epoch_{self.epoch}_iter_{self.iteration}')
+                self.sim.run()
+                
+                fom = self.fom.compute()
+                self.fom_hist.append(fom)
+
+                gradient = self.fom.gradient()
+
+                # Step with the gradient
+                self.param_hist.append(self.device.get_design_variable())
+                self.optimizer.step(self.device, gradient)
+            
+                self.iteration += 1
+            self.epoch += 1
 
         final_fom = self.optimizer.fom_hist[-1]
         logging.info(f'Final FoM: {final_fom}')
         final_params = self.optimizer.param_hist[-1]
         logging.info(f'Final Parameters: {final_params}')
-        return final_fom, final_params
-    
-        
-
-class Optimizer:
-    """Abstraction class for all optimizers."""
-    # TODO: SHOULD NOT BE JUST GRADIENT BASED (e.g. genetic algorithms)
-
-    def __init__(
-            self,
-            max_iter: int=100,
-            start_from: int=0,
-            fom_func: Callable=None,
-            grad_func: Callable=None,
-    ) -> None:
-        """Initialize an Optimizer object."""
-        self.fom_hist = []
-        self.param_hist = []
-        self._callbacks = []
-        self.iteration = start_from
-        self.max_iter = max_iter
-        self.fom_func = fom_func
-        self.grad_func = grad_func
-
-
-    def add_callback(self, func: Callable):
-        """Register a callback function to call after each iteration."""
-        self._callbacks.apend(func)
-
-    def step(self, device: Device, *args, **kwargs):
-        """Step forward one iteration in the optimization process."""
-        # grad = self.device.backpropagate(gradient)
-
-        # x = some_func(x)
-
-        # self.device.set_design_variable(x)
-    
-    def run(self, device: Device):
-        """Run an optimization."""
-        for callback in self._callbacks:
-            callback()

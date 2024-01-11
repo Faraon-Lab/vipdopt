@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 
 from testing import assert_close, assert_equal
-from vipdopt.device import Device
-from vipdopt.filter import Sigmoid
+from vipdopt.optimization.device import Device
+from vipdopt.optimization.filter import Sigmoid
 
 ETA = 0.5
 BETA = 1

@@ -9,19 +9,19 @@ from vipdopt.optimization import FoM
 from testing.utils import assert_close, assert_equal
 
 
-def fom_func(*args, **kwargs) -> npt.ArrayLike:
-    return np.square(args[0])
+def fom_func(n) -> npt.ArrayLike:
+    return np.square(n)
 
 
-def gradient_func(*args, **kwargs) -> npt.ArrayLike:
-    return 2 * args[0]
+def gradient_func(n) -> npt.ArrayLike:
+    return 2 * n
 
 
 INPUT_ARRAY = np.reshape(range(0, 9), (3,3))
 SQUARED_ARRAY = np.array([[0, 1, 4], [9, 16, 25], [36, 49, 64]])
 GRADIENT_ARRAY = np.array([[0, 2, 4], [6, 8, 10], [12, 14, 16]])
 BASE_FOM = FoM([], [], fom_func, gradient_func, '', [])
-DIV_ARRAY = np.array([[np.nan, 1, 1], [1, 1, 1], [1, 1, 1]])
+DIV_ARRAY = np.ones((3, 3))
 
 
 @pytest.mark.smoke()
@@ -40,13 +40,14 @@ def test_compute_fom():
             (BASE_FOM + BASE_FOM, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
             (BASE_FOM - BASE_FOM, 0 * SQUARED_ARRAY, 0 * GRADIENT_ARRAY),
             (BASE_FOM * BASE_FOM, SQUARED_ARRAY ** 2, GRADIENT_ARRAY ** 2),
-            (BASE_FOM / BASE_FOM, DIV_ARRAY, DIV_ARRAY),
             (2 * BASE_FOM, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
             (BASE_FOM * 2, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
             (1 - BASE_FOM, 1 - SQUARED_ARRAY, 1 - GRADIENT_ARRAY),
             (BASE_FOM - 1, SQUARED_ARRAY - 1, GRADIENT_ARRAY - 1),
             (BASE_FOM / 2, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
             (0.5 * BASE_FOM, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
+            # Adding one to prevent divide by zero
+            ((BASE_FOM + 1) / (BASE_FOM + 1), DIV_ARRAY, DIV_ARRAY),
             # Distributive property / linearity
             (BASE_FOM * (2 + 3), 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),
             ((2 + 3) * BASE_FOM, 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),

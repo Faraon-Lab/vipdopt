@@ -8,7 +8,7 @@ from numbers import Number, Rational, Real
 import numpy as np
 import numpy.typing as npt
 
-from vipdopt.filter import Filter
+from vipdopt.optimization.filter import Filter
 from vipdopt.utils import PathLike, ensure_path
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
@@ -219,5 +219,3 @@ class Device:
             grad = filt.chain_rule(grad, y, x)
 
         return grad
-
-    # TODO: Optimization steps (will need to to be interfaceable with the Optimizer)
