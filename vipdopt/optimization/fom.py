@@ -14,8 +14,8 @@ from vipdopt.source import Source
 class FoM:
     def __init__(
             self,
-            fom_srcs: list[Source],
-            grad_srcs: list[Source],
+            fom_srcs: Sequence[Source],
+            grad_srcs: Sequence[Source],
             fom_func,
             gradient_func,
             polarization: str,
@@ -23,13 +23,13 @@ class FoM:
             opt_ids: Sequence[int]=None,
             **kwargs,
     ) -> None:
-        self.grad_srcs = fom_srcs
-        self.fom_srcs = grad_srcs
+        self.fom_srcs = tuple(fom_srcs)
+        self.grad_srcs = tuple(grad_srcs)
         self.fom_func = fom_func
         self.gradient_func = gradient_func
         self.polarization = polarization
         self.freq = freq
-        self.opt_ids = list(range(len(grad_srcs))) if opt_ids is None else opt_ids
+        self.opt_ids = list(range(len(freq))) if opt_ids is None else opt_ids
         vars(self).update(kwargs)
 
     def compute(self, *args, **kwargs) -> npt.ArrayLike:
@@ -40,7 +40,7 @@ class FoM:
         """Compute gradient of FoM."""
         return self.gradient_func(*args, **kwargs)
     
-    def _math_helper(first, second: Any, operator: str) -> FoM:
+    def _math_helper(first: FoM | Number, second: FoM | Number, operator: str) -> FoM:
         match operator:
             case '+':
                 func = np.add
@@ -53,8 +53,8 @@ class FoM:
 
         if isinstance(second, Number):
             return FoM(
-                first.grad_srcs,
                 first.fom_srcs,
+                first.grad_srcs,
                 lambda *args, **kwargs: func(first.compute(*args, **kwargs), second),
                 lambda *args, **kwargs: func(first.gradient(*args, **kwargs), second),
                 first.polarization,
@@ -108,7 +108,7 @@ class FoM:
         return FoM._math_helper(self, second, '+')
     
     def __radd__(self, first: Any) -> FoM:
-        return FoM._math_helper(first, self, '+')
+        return FoM._math_helper(self, first, '+')
 
     def __iadd__(self, second: Any) -> FoM:
         combined_FoM = FoM._math_helper(self, second, '+')
@@ -147,14 +147,16 @@ class FoM:
         combined_FoM = FoM._math_helper(self, second, '/')
         vars(self).update(vars(combined_FoM))
         return self
+
+FOM_ZERO = FoM([], [], lambda *args, **kwargs: 0, lambda *args, **kwargs: 0, '', [])
     
 
 class BayerFilterFoM(FoM):
 
     def __init__(
             self,
-            fom_srcs: list[Source], 
-            grad_srcs: list[Source],
+            fom_srcs: Sequence[Source], 
+            grad_srcs: Sequence[Source],
             polarization: str,
             freq: Sequence[Number],
             opt_ids: Sequence[int]=None,
@@ -185,7 +187,7 @@ class BayerFilterFoM(FoM):
 
     def _bayer_gradient(self):
         E_fwd = self.grad_srcs[0].E()
-        E_adj = self.fom_srcs[0].E()
+        E_adj = self.grad_srcs[1].E()
         df_dev = np.real(np.sum(E_fwd * E_adj, axis=0))
         grad = df_dev[..., self.opt_ids]
         

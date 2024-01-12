@@ -1,15 +1,15 @@
 #!/bin/bash
 #SBATCH -A Faraon_Computing
-#SBATCH --time=0:30:00   # walltime
+#SBATCH --time=2:00:00   # walltime
 
-#SBATCH --nodes=1   # number of nodes
+#SBATCH --nodes=10   # number of nodes
 #SBATCH --ntasks-per-node=8  # number of processor cores (i.e. tasks)
-#SBATCH --mem=16G
+#SBATCH --mem-per-cpu=8G
 
-#SBATCH -J "lumerical sim"   # job name
+#SBATCH -J "Sony full sweep"   # job name
 
 #SBATCH --mail-user=nmcnichols@caltech.edu
-#SBATH --qos=debug
+#SBATH --qos=normal
 
 ## /SBATCH -p general # partition (queue)
 ## /SBATCH -o slurm.%N.%j.out # STDOUT

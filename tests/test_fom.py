@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 import numpy.typing as npt
 
-from vipdopt.optimization import FoM
+from vipdopt.optimization import FoM, FOM_ZERO
 
 from testing.utils import assert_close, assert_equal
 
@@ -83,7 +83,11 @@ def test_weights():
     n = 10
     weights = np.linspace(0.0, 1.0, num=n)
     foms = [BASE_FOM] * n
-    combined_fom = sum(np.multiply(weights, foms))
+    combined_fom = sum(np.multiply(weights, foms), FOM_ZERO)
+
+    assert isinstance(combined_fom, FoM)
+    assert not isinstance(combined_fom, int)
+
     output = combined_fom.compute(INPUT_ARRAY)
     assert_close(output, sum(weights) * SQUARED_ARRAY)
     output = combined_fom.gradient(INPUT_ARRAY)

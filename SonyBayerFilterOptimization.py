@@ -21,10 +21,8 @@ import numpy as np
 from vipdopt.optimization.filter import Sigmoid
 from vipdopt.source import Source
 from vipdopt.configuration import SonyBayerConfig
-from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer
+from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer, FOM_ZERO
 from vipdopt.optimization.device import Device
-
-ROOT = 0  # Index of root process
 
 
 if __name__ == '__main__':
@@ -54,6 +52,7 @@ if __name__ == '__main__':
 
     # Set verbosity
     level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=level)
     logger = setup_logger(level)
 
     #
@@ -65,12 +64,24 @@ if __name__ == '__main__':
     cfg = SonyBayerConfig()
     cfg.read_file(args.config)
 
-    # TODO: Need a way to enable / disable sources mid optimization
     # Load Simulations...
-    logger.info(f'Loading simulation from {args.simulation_json}...')
-    sim = LumericalSimulation(args.simulation_json)
-    logger.info('...succesfully loaded simulation!')
-    sim.setup_hpc_resources()
+    logger.info(f'Loading base simulation from {args.simulation_json}...')
+    base_sim = LumericalSimulation(args.simulation_json)
+    logger.info('...succesfully loaded base simulation!')
+    base_sim.setup_hpc_resources()
+
+    # Create all different versions of simulation that are run
+    base_sim.disable_all_sources()
+    fwd_srcs = [f'forward_src_{d}' for d in 'xy']
+    adj_srcs = [f'adj_src_{n}{d}' for n in range(cfg['num_adjoint_sources']) for d in 'xy']
+
+    logger.info('Creating forward simulations...')
+    fwd_sims = [base_sim.enabled([src]) for src in fwd_srcs]
+
+    logger.info('Creating adjoint simulations...')
+    adj_sims = [base_sim.enabled([src]) for src in adj_srcs]
+
+    all_sims = fwd_sims + adj_sims
 
     logger.info('Completed Step 0: Lumerical Setup')
 
@@ -87,28 +98,38 @@ if __name__ == '__main__':
         init_seed=0,
         filters=[Sigmoid(0.5, 1.0), Sigmoid(0.5, 1.0)],
     )
-    # TODO: Add reinterpolation of the device
     logger.info('Completed Step 1: Design Region Setup')
 
     #
     # Step 2:
     #
-    # TODO: FIX THIS to use fom_srcs and grad_srcs, and to get the good stuff
     logger.info('Beginning Step 2: Optimization Setup')
 
     # Create sources and figures of merit (FoMs)
-    fwd_srcs = [Source(sim, f'transmission_monitor_{i}') for i in range(2)]
-    adj_srcs = [Source(sim, f'focal_monitor_{i}') for i in range(4)]
+    fom_srcs = [(Source(fwd_sims[i], f'focal_monitor_{i}'),) for i in range(2)]
+
+    grad_fwd_srcs = [Source(sim, f'design_efield_monitor') for sim in fwd_sims]
+    grad_adj_srcs = [Source(sim, f'design_efield_monitor') for sim in adj_sims]
+    source_pairs = list(zip([0, 1] * 4, range(8)))  # [(0, 0), (1, 1), (0, 2), (1, 3), ...]
+    grad_srcs = [(grad_fwd_srcs[i], grad_adj_srcs[j]) for i, j in source_pairs]
+
     foms = [
         BayerFilterFoM(
-            [fwd_srcs[i]],
-            [adj_srcs[j]],
+            fom_srcs[i],
+            grad_srcs[j],
             'TE',
             cfg['lambda_values_um'],
-        ) for i, j in zip(range(2), range(4))
+        ) for i, j in source_pairs
     ]
+
+    # Add weighted FoMs
+    start = FOM_ZERO
+    start.polarization = 'TE'
+    start.freq = cfg['lambda_values_um']
+    start.opt_ids = list(range(len(start.freq)))
+
     weights = np.ones(len(foms))
-    full_fom = sum(np.multiply(weights, foms))
+    full_fom = sum(np.multiply(weights, foms), start)
 
     # Create optimizer
     adam_moments = np.zeros((2,) + bayer_filter.size)
@@ -117,16 +138,16 @@ if __name__ == '__main__':
         step_size=cfg['fixed_step_size'],
         betas=cfg['adam_betas'],
         moments=adam_moments,
-        fom_func=lambda foms: sum(f[1] for f in map(BayerFilterFoM.compute, foms)),
-        grad_func=lambda foms: sum(map(BayerFilterFoM.gradient, foms)),
     )
 
     # Create optimization
-    max_epochs = cfg['num_epochs']
-    max_iter = cfg['num_iterations_per_epoch'] * max_epochs
+    # max_epochs = cfg['num_epochs']
+    # max_iter = cfg['num_iterations_per_epoch'] * max_epochs
+    max_epochs = 1
+    max_iter = 2
 
     optimization = Optimization(
-        sim,
+        all_sims,
         bayer_filter,
         full_fom,
         optimizer,
@@ -135,6 +156,8 @@ if __name__ == '__main__':
         start_iter=0,
         start_epoch=0,
     )
+
+    # TODO: Add reinterpolation of the device
 
     logger.info('Completed Step 2: Optimization Setup')
 
@@ -150,7 +173,8 @@ if __name__ == '__main__':
     #
     # Cleanup
     #
-    sim.save('test_sim_after_opt')
-    sim.close()
+    for i in range(len(all_sims)):
+        all_sims[i].save(f'sim{i}_after_opt')
+        all_sims[i].close()
 
     

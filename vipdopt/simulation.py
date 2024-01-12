@@ -1,6 +1,7 @@
 """FDTD Simulation Interface Code."""
-from functools import partial
+from __future__ import annotations
 
+from functools import partial
 import time
 import abc
 import json
@@ -117,7 +118,8 @@ class LumericalSimObject:
         """Update properties with values in a dictionary."""
         self.properties.update(vals)
         if self.lumapi_obj is not None:
-            self.lumapi_obj.update(vals)
+            for k, v in vals.items():
+                self.lumapi_obj[k] = v
 
     def __eq__(self, __value: object) -> bool:
         """Test equality of LumericalSimObjects."""
@@ -175,7 +177,7 @@ class LumericalSimulation(ISimulation):
                 continue
 
         logging.info('Verified license with Lumerical servers.\n')
-
+    
     @override
     def load(self, fname: PathLike):
         logging.info(f'Loading simulation from {fname}...')
@@ -218,6 +220,48 @@ class LumericalSimulation(ISimulation):
         """Clear all existing objects and create a new project."""
         self.objects = OrderedDict()
         self.fdtd.newproject()
+    
+    def copy(self) -> LumericalSimulation:
+        """Return a copy of this simulation."""
+        new_sim = LumericalSimulation()
+        for obj_name, obj in self.objects.items():
+            new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
+        
+        return new_sim
+
+    def enable(self, objs: list[str]):
+        """Enable all objects in provided list."""
+        self.fdtd.switchtolayout()
+        for obj in objs:
+            self.update_object(obj, enabled=1)
+
+    def enabled(self, objs: list[str]) -> LumericalSimulation:
+        """Return copy of this simulation with all objects in objs enabled."""
+        new_sim = self.copy()
+        new_sim.enable(objs)
+        return new_sim
+
+    def disable(self, objs: list[str]):
+        """Disable all objects in provided list."""
+        self.fdtd.switchtolayout()
+        for obj in objs:
+            self.update_object(obj, enabled=0)
+
+    def disabled(self, objs: list[str]) -> LumericalSimulation:
+        """Return copy of this simulation with all objects in objs disabled."""
+        new_sim = self.copy()
+        new_sim.disable(objs)
+        return new_sim
+    
+    def disable_all_sources(self):
+        """Disable all sources in this simulation."""
+        to_disable = []
+
+        for obj_name, obj in self.objects.items():
+            if obj.obj_type in [LumericalSimObjectType.DIPOLE, LumericalSimObjectType.TFSF, LumericalSimObjectType.GAUSSIAN]:
+                to_disable.append(obj_name)
+        
+        self.disable(to_disable)
 
     def new_object(
         self,
@@ -256,9 +300,8 @@ class LumericalSimulation(ISimulation):
         """Update lumerical object with new property values."""
         obj = self.objects[name]
         assert self.fdtd is not None
-        lum_obj = self.fdtd.getnamed(obj.name)
         for key, val in properties.items():
-            lum_obj[key] = val
+            self.fdtd.setnamed(obj.name, key, val)
         obj.update(**properties)
 
     def close(self):

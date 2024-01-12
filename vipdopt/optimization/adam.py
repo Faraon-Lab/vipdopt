@@ -8,8 +8,6 @@ import numpy.typing as npt
 from vipdopt.optimization.device import Device
 from vipdopt.utils import Number
 from vipdopt.optimization.optimizer import GradientOptimizer
-from vipdopt.optimization.fom import BayerFilterFoM, FoM
-from vipdopt.simulation import ISimulation
 
 class AdamOptimizer(GradientOptimizer):
 
@@ -27,7 +25,7 @@ class AdamOptimizer(GradientOptimizer):
         self.betas = betas
         self.eps = eps
 
-    def step(self, device: Device, gradient: npt.ArrayLike):
+    def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Take gradient step using Adam algorithm."""
         grad = device.backpropagate(gradient)
 
@@ -39,8 +37,8 @@ class AdamOptimizer(GradientOptimizer):
         v = b2 * v + (1 - b2) * grad ** 2
         self.moments = np.array([m, v])
 
-        m_hat = m / (1 - b1 ** (self.iteration + 1))
-        v_hat = v / (1 - b2 ** (self.iteration + 1))
+        m_hat = m / (1 - b1 ** (iteration + 1))
+        v_hat = v / (1 - b2 ** (iteration + 1))
         w_hat = device.w - self.step_size * m_hat / np.sqrt(v_hat + self.eps)
 
         # Apply changes

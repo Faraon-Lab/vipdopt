@@ -10,5 +10,5 @@ class GradientOptimizer(abc.ABC):
     """Abstraction class for all gradient-based optimizers."""
 
     @abc.abstractmethod
-    def step(self, device: Device, gradient: npt.ArrayLike):
+    def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
