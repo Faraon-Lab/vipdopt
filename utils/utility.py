@@ -14,6 +14,7 @@ import copy
 import json
 import yaml
 import numpy as np
+from scipy import interpolate
 import logging
 import traceback
 import shelve
@@ -307,3 +308,92 @@ def snellRefrOffset(src_angle_incidence, object_list):
 		r_offset = r_offset + h_i*s_i/np.sqrt(1-s_i**2)
 
 	return [input_theta, r_offset]
+
+def import_cur_index(design, design_obj, simulator, 
+                    reinterpolate_permittivity_factor=1, reinterpolate_permittivity=False,
+                    binary_design=False):
+	"""Reinterpolate and import cur_index into design regions"""
+
+	if reinterpolate_permittivity_factor != 1:
+		reinterpolate_permittivity = True
+
+	# Get current density of bayer filter after being passed through current extant filters.
+	# TODO: Might have to rewrite this to be performed on the entire device and NOT the subdesign / device. In which case
+	# todo: partitioning must happen after reinterpolating and converting to index.
+	cur_density = design.get_density()							# Here cur_density will have values between 0 and 1
+
+	# Reinterpolate
+	if reinterpolate_permittivity:
+		cur_density_import = np.repeat( np.repeat( np.repeat( cur_density, 
+													int(np.ceil(reinterpolate_permittivity_factor)), axis=0 ),
+												int(np.ceil(reinterpolate_permittivity_factor)), axis=1 ),
+											int(np.ceil(reinterpolate_permittivity_factor)), axis=2 )
+
+		# Create the axis vectors for the reinterpolated 3D density region
+		design_region_reinterpolate_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], len(design.coords['x']) * reinterpolate_permittivity_factor)
+		design_region_reinterpolate_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], len(design.coords['y']) * reinterpolate_permittivity_factor)
+		design_region_reinterpolate_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], len(design.coords['z']) * reinterpolate_permittivity_factor)
+		# Create the 3D array for the 3D density region for final import
+		design_region_import_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], 300)
+		design_region_import_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], 300)
+		design_region_import_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], 306)
+		design_region_import = np.array( np.meshgrid(
+					design_region_import_x, design_region_import_y, design_region_import_z,
+				indexing='ij')
+			).transpose((1,2,3,0))
+
+		# Perform reinterpolation so as to fit into Lumerical mesh.
+		# NOTE: The imported array does not need to have the same size as the Lumerical mesh. Lumerical will perform its own reinterpolation (params. of which are unclear.)
+		cur_density_import_interp = interpolate.interpn( ( design_region_reinterpolate_x, 
+															design_region_reinterpolate_y, 
+															design_region_reinterpolate_z ), 
+								cur_density_import, design_region_import, 
+								method='linear' )
+
+	else:	
+		cur_density_import_interp = copy.deepcopy(cur_density)
+  
+		design_region_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], cur_density_import_interp.shape[0])
+		design_region_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], cur_density_import_interp.shape[1])
+		design_region_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], cur_density_import_interp.shape[2])
+
+		design_region_import_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], design.field_shape[0])
+		design_region_import_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], design.field_shape[1])
+		try:
+			design_region_import_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], design.field_shape[2])
+		except IndexError as err:	# 2D case
+			design_region_import_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], 3)
+		design_region_import = np.array( np.meshgrid(
+					design_region_import_x, design_region_import_y, design_region_import_z,
+				indexing='ij')
+			).transpose((1,2,3,0))
+
+		cur_density_import_interp = interpolate.interpn( ( design_region_x, 
+															design_region_y, 
+															design_region_z ), 
+								cur_density_import_interp, design_region_import, 
+								method='linear' )
+  
+	# # IF YOU WANT TO BINARIZE BEFORE IMPORTING:
+	if binary_design:
+		cur_density_import_interp = binarize(cur_density_import_interp)
+
+	for dispersive_range_idx in range(0, 1):		# todo: Add dispersion. Account for dispersion by using the dispersion_model
+		# dispersive_max_permittivity = dispersion_model.average_permittivity( dispersive_ranges_um[ dispersive_range_idx ] )
+		dispersive_max_permittivity = design.permittivity_constraints[-1] # max_device_permittivity
+		dispersive_max_index = index_from_permittivity( dispersive_max_permittivity )
+
+		# Convert device to permittivity and then index
+		cur_permittivity = design.density_to_permittivity(cur_density_import_interp, design.permittivity_constraints[0], dispersive_max_permittivity)
+		cur_index = index_from_permittivity(cur_permittivity)
+		
+		#?:	maybe todo: cut cur_index by region
+		# Import to simulation
+		simulator.import_nk_material(design_obj, cur_index,
+						design_region_import_x, design_region_import_y, design_region_import_z)
+		# Disable device index monitor to save memory
+		design_obj['design_index_monitor']['enabled'] = False
+		design_obj['design_index_monitor'] = simulator.fdtd_update_object( 
+										design_obj['design_index_monitor'], create_object=False )
+
+		return cur_density, cur_permittivity

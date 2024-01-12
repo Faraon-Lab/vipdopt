@@ -10,6 +10,7 @@
 import os
 import numpy as np
 from utils import utility
+from utils import Filter
 
 def permittivity_to_density(eps, eps_min, eps_max):
 	return (eps - eps_min) / (eps_max - eps_min)
@@ -42,13 +43,15 @@ class Device:
 		self.symmetric = False
 		self.iteration = iteration										# current iteration of optimization
 		
-		self.num_filters = 0											# todo: could this be also an input argument? a dictionary or array of dicts, perhaps e.g. [{'sigmoid':{'strength': 3}, {'bridges':{}}]
+		self.num_filters = 1											# todo: could this be also an input argument? a dictionary or array of dicts, perhaps e.g. [{'sigmoid':{'strength': 3}, {'bridges':{}}]
 		self.num_variables = self.num_filters + 1
 
 		self.minimum_design_value = 0
 		self.maximum_design_value = 1	
 
 		self.init_variables()
+		self.update_filters(epoch=0)
+		self.update_density()
 		self.save_device()
 		
 
@@ -82,8 +85,6 @@ class Device:
 					# check symmetry
 					a = np.flip((self.w[0][:,:,layer]), axis=1)
 					assert np.allclose(a, a.T, rtol=1e-5, atol=1e-8), f"Layer {layer} is not symmetric."
-    
-		self.update_density()
 
 	def get_design_variable(self):
 		return self.w[0]
@@ -95,12 +96,15 @@ class Device:
 	def get_density(self):
 		return self.w[-1]
 
+	def density_to_permittivity(self, density, eps_min, eps_max):
+		return density_to_permittivity(density, eps_min, eps_max)
+
 	def get_permittivity(self):
 		density = self.w[-1]
 		eps_min = self.permittivity_constraints[0]
 		eps_max = self.permittivity_constraints[1]
 		
-		return density_to_permittivity(density, eps_min, eps_max)
+		return self.density_to_permittivity(density, eps_min, eps_max)
 	
 	def update_density(self):
 		'''Passes each layer of the density through filters.'''
@@ -113,9 +117,12 @@ class Device:
 	def update_filters(self, epoch):
 		self.epoch = epoch
 		self.sigmoid_beta = 0.0625 * (2**epoch)
+		self.sigmoid_eta = 0.5
 		print(f'Epoch {self.epoch}: Sigmoid strength is beta={self.sigmoid_beta:.2f}')
 
 		# todo: FILTER UPDATING CODE
+		self.identity = Filter.Identity()
+		self.sigmoid_1 = Filter.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
 
 		# self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
 		# self.sigmoid_3 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
@@ -133,7 +140,10 @@ class Device:
 		# if gp.cv.use_smooth_blur:
 		# 	self.filters = [ self.layering_z_0, self.sigmoid_1, self.max_blur_xy_2, self.sigmoid_3, self.scale_4 ]
 
-		self.filters = []
+		self.filters = [self.sigmoid_1]
+		# self.filters = [self.identity]
+		self.num_filters = len(self.filters)											# todo: could this be also an input argument? a dictionary or array of dicts, perhaps e.g. [{'sigmoid':{'strength': 3}, {'bridges':{}}]
+		self.num_variables = self.num_filters + 1
 
 
 	def pass_through_pipeline(self, variable_in, binary_filters=False):
@@ -168,16 +178,33 @@ class Device:
 	def control_average_permittivity():
 		return 3
 
-	def proposed_design_step(self, gradient, step_size):
+	def proposed_design_step(self, optimizer, args):
+		'''Takes a gradient and updates refractive index (design variable) accordingly.'''
+		gradient = self.backpropagate(gradient)
+
+		# todo: figure out optimizer
+		proposed_design_variable = optimizer.step(self.w[0], gradient, step_size)
+		proposed_design_variable = np.maximum(                             # Has to be between minimum_design_value and maximum_design_value
+												np.minimum(proposed_design_variable, self.maximum_design_value),
+												self.minimum_design_value)
+
+		return proposed_design_variable
+		
+
+	def proposed_design_step_simple(self, gradient, step_size):
 		'''Takes a gradient and updates refractive index (design variable) accordingly.'''
 		gradient = self.backpropagate(gradient)
 
 		# Eq. S2 of Optica Paper Supplement, https://doi.org/10.1364/OPTICA.384228
 		# minus sign here because it was fed the negative of the gradient so (-1)*(-1) = +1
 		proposed_design_variable = self.w[0] - np.multiply(step_size, gradient)
+		# todo:
+		# proposed_design_variable = Optimizer.step(self.w[0], gradient, step_size)
 		proposed_design_variable = np.maximum(                             # Has to be between minimum_design_value and maximum_design_value
 												np.minimum(proposed_design_variable, self.maximum_design_value),
 												self.minimum_design_value)
+
+
 
 		return proposed_design_variable
 
@@ -213,9 +240,10 @@ class Device:
 
 	def step(self, gradient, step_size):
 		# In the step function, we should update the permittivity with update_permittivity
-		self.w[0] = self.proposed_design_step(gradient, step_size)
+		self.w[0] = self.proposed_design_step_simple(gradient, step_size)
 		# Update the variable stack including getting the permittivity at the w[-1] position
 		self.update_density()
+		self.save_device()
 
 	def step_adam(self, iteration, gradient, moments, step_size, betas=(0.9, 0.999), eps=1e-8):
 		self.w[0] = self.proposed_design_step_adam(iteration, gradient, moments, step_size, betas, eps)

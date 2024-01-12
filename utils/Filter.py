@@ -10,21 +10,24 @@
 
 import numpy as np
 
+SIGMOID_BOUNDS = (0.0, 1.0)
+
+def sech(z):
+    """Hyperbolic Secant."""
+    return 1.0 / np.cosh(np.asanyarray(z))
+
 class Filter:
 
-	def __init__(self, variable_bounds):
+	def __init__(self, variable_bounds=SIGMOID_BOUNDS):
 		self.variable_bounds = variable_bounds
 
 	def verify_bounds(self, variable):
 		'''Checks if the variable passed as argument is within the pre-defined bounds of this filter. Variable can be a single float, or a list / array.'''
-		min_value = np.minimum(variable)
-		max_value = np.maximum(variable)
-
-		if ((min_value < self.variable_bounds[0]) or (max_value > self.variable_bounds[1])):
-			return False
-
-		return True
-
+		
+		return bool(
+			(np.min(np.array(variable)) >= self.variable_bounds[0])
+			and (np.max(np.array(variable)) <= self.variable_bounds[1])
+		)
 
 	def forward(self, variable_in):
 		'''Propagate the variable_in through the filter and return the result. NOTE: NOT IMPLEMENTED.'''
@@ -33,3 +36,90 @@ class Filter:
 	def chain_rule(self, derivative_out, variable_out, variable_in):
 		'''Apply the chain rule to this filter to propagate the derivative back one step. NOTE: NOT IMPLEMENTED.'''
 		raise NotImplementedError()
+
+class Identity(Filter):
+    '''Applies an identity filter which should not perturb the density at all. For testing purposes'''
+    
+    def forward(self, variable_in):
+        return variable_in
+    
+    def chain_rule(self, derivative_out, variable_out, variable_in):
+        return derivative_out
+
+class Sigmoid(Filter):
+	"""Applies a sigmoidal projection filter to binarize an input.
+
+	Takes an input auxiliary density p(x) ranging from 0 to 1 and applies a sigmoidal
+	projection filter to binarize / push it to either extreme. This depends on the
+	strength of the filter. See OPTICA paper supplement Section IIA,
+	https://doi.org/10.1364/OPTICA.384228,  for details. See also Eq. (9) of
+	https://doi.org/10.1007/s00158-010-0602-y.
+
+	Attributes:
+		eta (Number): The center point of the sigmoid. Must be in range [0, 1].
+		beta (Number): The strength of the sigmoid
+		_bounds (tuple[Number]): The bounds of the filter. Always equal to (0, 1)
+		_denominator (Number | npt.NDArray): The denominator used in various methods;
+			for reducing re-computation.
+	"""
+
+	def __init__(self, beta, eta, variable_bounds=SIGMOID_BOUNDS):
+		"""Initialize a sigmoid filter based on eta and beta values."""
+		self.variable_bounds = variable_bounds
+
+		if not self.verify_bounds(eta):
+			raise ValueError('Eta must be in the range [0, 1]')
+
+		self.eta  = eta
+		self.beta = beta
+
+		# Calculate denominator for use in methods
+		self._denominator = np.tanh(beta * eta) + np.tanh(beta * (1 - eta))
+
+	def __repr__(self):
+		"""Return a string representation of the filter."""
+		return f'Sigmoid filter with eta={self.eta:0.3f} and beta={self.beta:0.3f}'
+
+	# @override
+	def forward(self, x):
+		"""Propagate x through the filter and return the result.
+		All input values of x above the threshold eta, are projected to 1, and the
+		values below, projected to 0. This is Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y.
+		"""
+		numerator = np.tanh(self.beta * self.eta) + \
+			np.tanh(self.beta * (np.copy(np.array(x)) - self.eta))
+		return numerator / self._denominator
+
+	# @override  # type: ignore
+	def chain_rule(
+		self,
+		deriv_out,
+		var_out,
+		var_in	):
+		"""Apply the chain rule and propagate the derivative back one step.
+
+		Returns the first argument, multiplied by the direct derivative of forward()
+		i.e. Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y, with respect to
+		\\tilde{p_i}.
+		"""
+		del  var_out  # not needed for sigmoid filter
+
+		numerator = self.beta * \
+			np.power(sech(self.beta * (var_in - self.eta)), 2) # type: ignore
+		return deriv_out * numerator / self._denominator
+
+	# @override
+	def fabricate(self, x):
+		"""Apply filter to input as a hard step-function instead of sigmoid.
+
+		Returns:
+			_bounds[0] where x <= eta, and _bounds[1] otherwise
+		"""
+		fab = np.array(x)
+		fab[fab <= self.eta] = self._bounds[0]
+		fab[fab > self.eta] = self._bounds[1]
+		if isinstance(x, Number):  # type: ignore
+			return fab.item()
+		return fab
+	
+	

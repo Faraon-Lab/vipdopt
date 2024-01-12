@@ -49,6 +49,61 @@ running_on_local_machine = False
 slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
 if slurm_job_env_variable is None:
 	running_on_local_machine = True
+ 
+def create_folder_structure(python_src_directory, projects_directory_location, running_on_local_machine):
+	global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
+	global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
+	
+	#* Output / Save Paths 
+	DATA_FOLDER = projects_directory_location
+	SAVED_SCRIPTS_FOLDER = os.path.join(DATA_FOLDER, 'saved_scripts')
+	OPTIMIZATION_INFO_FOLDER = os.path.join(DATA_FOLDER, 'opt_info')
+	OPTIMIZATION_PLOTS_FOLDER = os.path.join(OPTIMIZATION_INFO_FOLDER, 'plots')
+	DEBUG_COMPLETED_JOBS_FOLDER = 'ares_test_dev'
+	PULL_COMPLETED_JOBS_FOLDER = DATA_FOLDER
+	# if running_on_local_machine:
+	# 	PULL_COMPLETED_JOBS_FOLDER = DEBUG_COMPLETED_JOBS_FOLDER
+
+	EVALUATION_FOLDER = os.path.join(DATA_FOLDER, 'lumproc_' + os.path.basename(python_src_directory))
+	EVALUATION_CONFIG_FOLDER = os.path.join(EVALUATION_FOLDER, 'configs')
+	EVALUATION_UTILS_FOLDER = os.path.join(EVALUATION_FOLDER, 'utils')
+
+	# parameters['MODEL_PATH'] = os.path.join(DATA_FOLDER, 'model.pth')
+	# parameters['OPTIMIZER_PATH'] = os.path.join(DATA_FOLDER, 'optimizer.pth')
+
+
+	# #* Save out the various files that exist right before the optimization runs for debugging purposes.
+	# # If these files have changed significantly, the optimization should be re-run to compare to anything new.
+
+	if not os.path.isdir( SAVED_SCRIPTS_FOLDER ):
+		os.mkdir( SAVED_SCRIPTS_FOLDER )
+	if not os.path.isdir( OPTIMIZATION_INFO_FOLDER ):
+		os.mkdir( OPTIMIZATION_INFO_FOLDER )
+	if not os.path.isdir( OPTIMIZATION_PLOTS_FOLDER ):
+		os.mkdir( OPTIMIZATION_PLOTS_FOLDER )
+
+	try:
+		shutil.copy2( python_src_directory + "/slurm_vis10lyr.sh", SAVED_SCRIPTS_FOLDER + "/slurm_vis10lyr.sh" )
+	except Exception as ex:
+		pass
+	# shutil.copy2( cfg.python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
+	# shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
+	# 			 os.path.join(SAVED_SCRIPTS_FOLDER, os.path.basename(yaml_filename)) )
+	# shutil.copy2( python_src_directory + "/configs/SonyBayerFilterParameters.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterParameters.py" )
+	# # TODO: et cetera... might have to save out various scripts from each folder
+
+	#  Create convenient folder for evaluation code
+	if os.path.exists(EVALUATION_CONFIG_FOLDER):
+		shutil.rmtree(EVALUATION_CONFIG_FOLDER)
+	shutil.copytree(os.path.join(python_src_directory, "configs"), EVALUATION_CONFIG_FOLDER)
+
+	if os.path.exists(EVALUATION_UTILS_FOLDER):
+		shutil.rmtree(EVALUATION_UTILS_FOLDER)
+	shutil.copytree(os.path.join(python_src_directory, "utils"), EVALUATION_UTILS_FOLDER)
+
+	#shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
+
+create_folder_structure(python_src_directory, projects_directory_location, running_on_local_machine)
 
 
 #* Debug Options
@@ -216,11 +271,11 @@ if workload_manager_name in ['SLURM']:
 	workload_manager = WorkloadManager.SLURM()
 	workload_manager.max_wait_time = cv.simulator_max_wait_time
 else:	
-    workload_manager = None
+	workload_manager = None
 
 if cv.simulator_name in ['LumericalFDTD']:
-    from utils import LumericalUtils as lm
-    simulator = lm.LumericalFDTD(lumapi_filepath)
+	from utils import LumericalUtils as lm
+	simulator = lm.LumericalFDTD(lumapi_filepath)
 
 
 #* Create instances of FoMs

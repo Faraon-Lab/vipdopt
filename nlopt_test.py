@@ -17,7 +17,8 @@
 #* Import all modules
 
 # Math and Autograd
-import numpy as np
+import autograd.numpy as np
+from autograd import grad
 import scipy
 # from scipy.ndimage import gaussian_filter
 # from scipy import optimize as scipy_optimize
@@ -162,27 +163,74 @@ for num_design, design_obj in enumerate(design_objs):
 		#other_arguments
 	)
 
-def function_4( optimization_variable_, grad):
-		'''f(x) = Σ(abs(0.5-x))'''
-		figure_of_merit_total = 0.0
+def gauss(x,y, mu_x=0, mu_y=0, sigma_x=0.3, sigma_y=0.3):
+	return 1/(2*np.pi*sigma_x*sigma_y) * np.exp(
+		-1*(((x-mu_x)**2)/(2*sigma_x**2) +((y-mu_y)**2)/(2*sigma_y**2))
+	)
+
+def gauss_square(z):
+	'''z is a 2D array.'''
+
+	x = np.linspace(-1.0, 1.0, z.shape[0])
+	y = np.linspace(-1.0, 1.0, z.shape[1])
+	X,Y = np.meshgrid(x, y) # grid of point
+	Z = gauss(X, Y) # evaluation of the function on the grid
+	# plt.imshow(Z)
+	# plt.colorbar()
+	# plt.show()
+	# plt.close()
+
+	return Z
+
+def gauss_cube(z):
+	'''z is a 3D array. This function applies gauss_square() to each z-layer.'''
+	for i in range(0, z.shape[2]):
+		z[:,:,i] = gauss_square(z[:,:,i])
+	return z
+
+def function_3( optimization_variable_ ):
+	'''f(x) = Σ(abs(g(x)-x)) where g(x) is the 2D Gaussian function'''
+
+	figure_of_merit_total = 0.0
+
+	for i in range(0, optimization_variable_.shape[2]):
+		figure_of_merit_total = figure_of_merit_total + np.sum(np.abs(
+    		gauss_square(optimization_variable_[...,i]) - optimization_variable_[...,i]
+    	))
+
+	return figure_of_merit_total
+	
 		
-		figure_of_merit_total = np.abs(0.5 - optimization_variable_)
-		grad[:] = -1 * (0.5 - optimization_variable_) / np.abs(0.5 - optimization_variable_)
+def function_4( optimization_variable_, grad):
+	'''f(x) = Σ(abs(y-x))'''
+	y_const = 0.7
+	figure_of_merit_total = 0.0
+	
+	figure_of_merit_total = np.abs(y_const- optimization_variable_)
+	grad[:] = -1 * (y_const - optimization_variable_) / np.abs(y_const - optimization_variable_)
 
-		gc.collect()
+	gc.collect()
 
-		logging.info(f'N={i} - Figure of Merit: {np.sum(figure_of_merit_total)}')
-		return np.sum(figure_of_merit_total)
+	logging.info(f'N={i} - Figure of Merit: {np.sum(figure_of_merit_total)}')
+	return np.sum(figure_of_merit_total)
 
 N=100
 for i in np.arange(0,N):
+	
+	if i==80:
+		print(3)
 
-	cur_design_variable = designs[0].get_design_variable()
+	designs[0].update_filters(epoch=int(i/10))
+
+	# cur_design_variable = designs[0].get_design_variable()
+	cur_design_variable = designs[0].get_density()
 	last_design_variable = copy.deepcopy(cur_design_variable)
-	grad = np.zeros(cur_design_variable.shape)
-
-	designs[0].true_fom = function_4(cur_design_variable, grad)
-	designs[0].gradient = grad
+	# gradient = np.zeros(cur_design_variable.shape)
+	# designs[0].true_fom = function_4(cur_design_variable, gradient)
+	# designs[0].gradient = gradient
+	designs[0].true_fom = function_3(cur_design_variable)
+	designs[0].gradient = grad(function_3)(cur_design_variable)
+	logging.info(f'N={i} - Figure of Merit: {designs[0].true_fom}')
 	# plt.imshow(grad[..., 20])
 	plt.imshow(cur_design_variable[..., 20])
 	plt.colorbar()
@@ -191,7 +239,14 @@ for i in np.arange(0,N):
 	plt.close()
 	# plt.show()
 
+# x = designs[0].get_design_variable()
+# y = designs[0].get_density()
+# plt.imshow(x[..., 20])
+# plt.colorbar()
+# plt.clim(vmin=0, vmax=1)
+
 	designs[0].step(designs[0].gradient, 0.01)	# Minimize
+	designs[0].update_density()
 
 
 print(3)

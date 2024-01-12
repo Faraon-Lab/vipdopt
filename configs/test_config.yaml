@@ -10,7 +10,7 @@
 
 #* Debug
 
-start_from_step: 6          # 0 if running entire file in one shot
+start_from_step: 3          # 0 if running entire file in one shot
 shelf_fn: 'save_state'
 
 restart_epoch: 0            # Both 0 if not restarting
@@ -77,13 +77,13 @@ sidewall_vertical_minimum_um: -0.765    # only needed if sidewall_extend_focalpl
 #* Spectral
 
 add_infrared: False
-lambda_min_um: 0.375
-lambda_max_um: 0.725
-lambda_min_eval_um: 0.375
-lambda_max_eval_um: 0.725
+lambda_min_um: 0.55 # 0.375
+lambda_max_um: 0.65 # 0.725
+lambda_min_eval_um: 0.55 # 0.375
+lambda_max_eval_um: 0.65 # 0.725
 
 num_bands: 3
-num_points_per_band: 20 #15
+num_points_per_band: 5 # 20 #15
 
 num_dispersive_ranges: 1
 
@@ -122,7 +122,7 @@ use_source_aperture: True
 
 #* Adjoint Source
 
-num_focal_spots: 4
+num_focal_spots: 2
 
 # Determine which adjoint source goes to each dispersive range
 # Each dispersive range itself contains a map for how the wavelength buckets correspond to which specific adjoint sources on the focal plane.
@@ -149,8 +149,8 @@ weight_by_quadrant_transmission: True
 num_epochs: 10
 num_iterations_per_epoch: 30
 
-total_num_iterations: 300
-epoch_list: [0,30,60,90,120,150,180,210,240,270,300]
+total_num_iterations: 80 #300
+epoch_list: [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80] #[0,30,60,90,120,150,180,210,240,270,300]
 
 optimizer_algorithm: 'ADAM' #'Gradient Descent'
 adam_betas: [0.9, 0.999]                # actually needs to be a tuple but we just convert it in the code
@@ -167,8 +167,8 @@ fom_types: ['transmission', 'intensity']
 optimization_fom: 'intensity'    # Has to be one from the fom_types list
 
 #! new-------
-reinterpolate_permittivity: False # True
-reinterpolate_permittivity_factor: 1 # 15 #8 #1#5   # Must be 1 if reinterpolate_permittivity is False
+reinterpolate_permittivity: True # True
+reinterpolate_permittivity_factor: 2 # 15 #8 #1#5   # Must be 1 if reinterpolate_permittivity is False
 reinterpolate_type: 'nearest' #'linear'   #NOTE: In the end we implement both anyway. Deprecated
 
 
