@@ -11,6 +11,8 @@ dependencies:
   - PyYAML
   - types-PyYAML
   - python-magic
+  - dill
+  - Jinja2
   - pip
   # For Linting
   - ruff=0.0.287

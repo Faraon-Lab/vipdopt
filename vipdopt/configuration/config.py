@@ -1,26 +1,9 @@
 """Module for handling configuration parameters."""
 
 import logging
-from collections.abc import Callable
 from typing import Any
 
-import yaml
-
-
-def get_config_loader(config_format) -> Callable[[str], dict]:
-    """Return a configuration file loader depending on the format."""
-    match config_format:
-        case 'yaml':
-            return _yaml_loader
-        case _:
-            msg = f'{config_format} file loading not yet supported.'
-            raise NotImplementedError(msg)
-
-
-def _yaml_loader(filepath: str) -> dict:
-    """Config file loader for YAML files."""
-    with open(filepath, 'rb') as stream:
-        return yaml.safe_load(stream)
+from vipdopt.utils import PathLike, ensure_path, read_config_file
 
 
 class Config:
@@ -32,32 +15,34 @@ class Config:
         Creates an attribute for each parameter in a provided config file.
         """
         self._files = set()
+        self._parameters = {}
 
     def __str__(self):
         """Return shorter string version of the Config object."""
-        return f'Config object for {self._files}'
+        return f'Config object for {self._files} with parameters {self._parameters}'
 
-    def __getattr__(self, name: str) -> Any:
-        """Get an attrbitute of the Config object."""
-        try:
-            return self.__dict__[name]
-        except KeyError as e:
-            msg = f"'{type(self).__name__}' has no attribute '{name}'"
-            raise KeyError(msg) from e
+    def safe_get(self, prop: str) -> Any | None:
+        """Get parameter and return None if it doesn't exist."""
+        return self._parameters.get(prop, None)
 
-    def __setattr__(self, name: str, value: Any) -> Any:
+    def __getitem__(self, name: str) -> Any:
+        """Get value of a parameter."""
+        return self._parameters[name]
+
+    def __setitem__(self, name: str, value: Any) -> None:
         """Set the value of an attribute, creating it if it doesn't already exist."""
-        self.__dict__[name] = value
+        self._parameters[name] = value
 
-    def read_file(self, filename: str, cfg_format: str='yaml'):
+    def read_file(self, fname: PathLike, cfg_format: str='auto') -> None:
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
-        config_loader = get_config_loader(cfg_format)
-        config = config_loader(filename)
+        fpath = ensure_path(fname)
+        config = read_config_file(fpath, cfg_format)
+        logging.debug(f'Loaded config file:\n {config}')
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
-            self.__dict__.update(config)
+            self._parameters.update(config)
 
-        self._files.add(filename)
-        logging.info(f'\nSuccesfully loaded configuration from {filename}')
+        self._files.add(fpath)
+        logging.info(f'\nSuccesfully loaded configuration from {fpath}')

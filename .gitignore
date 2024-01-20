@@ -1,6 +1,17 @@
 # Developer files
 *.out
 *.log
+*.json
+*.yaml
+*.yml
+!vipdopt/configuration/config_example.yml
+!environment.yml
+temp/
+tmp/
+
+# Lumerical files
+*.lsf
+*.fsp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -10,6 +21,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Misc. Files
+*.pkl
+*.npy
+*.npz
 
 # Distribution / packaging
 .Python

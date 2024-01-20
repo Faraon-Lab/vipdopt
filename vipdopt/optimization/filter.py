@@ -1,51 +1,54 @@
 """Module for the abstract Filter class and all its implementations."""
 
 import abc
-from typing import get_args
+from numbers import Number, Rational
 
 import numpy as np
 import numpy.typing as npt
 from overrides import override
 
-from vipdopt.utils import Number, sech
+from vipdopt.utils import sech
 
 SIGMOID_BOUNDS = (0.0, 1.0)
 
 
 # TODO: design a way for different filters to take different arguments in methods
 # TODO: Make code more robust to inputs being arrays iinstead of scalars
-class IFilter(abc.ABC):
+class Filter(abc.ABC):
     """An abstract interface for Filters."""
 
     @abc.abstractproperty
     def _bounds(self):
         pass
 
-    def verify_bounds(self, variable: npt.ArrayLike | Number) -> bool:
+    def verify_bounds(self, variable: npt.NDArray | Number) -> bool:
         """Checks if variable is within bounds of this filter.
 
         Variable can either be a single number or an array of numbers.
         """
         return bool(
-            (np.min(variable) >= self._bounds[0])
-            and (np.max(variable) <= self._bounds[1])
+            (np.min(np.array(variable)) >= self._bounds[0])
+            and (np.max(np.array(variable)) <= self._bounds[1])
         )
 
     @abc.abstractmethod
-    def forward(self, x: npt.ArrayLike | Number) -> npt.ArrayLike | np.number:
+    def forward(self, x: npt.NDArray | Number) -> npt.NDArray | Number:
         """Propogate x through the filter and return the result."""
+
+    @abc.abstractmethod
+    def fabricate(self, x: npt.NDArray | Number) -> npt.NDArray | Number:
+        """Propogate x through the filter and return the result, binarizing values."""
 
     @abc.abstractmethod
     def chain_rule(
         self,
-        deriv_out: npt.ArrayLike | Number,
-        var_out: npt.ArrayLike | Number,
-        var_in: npt.ArrayLike | Number,
-    ) -> npt.ArrayLike | Number:
+        deriv_out: npt.NDArray | Number,
+        var_out: npt.NDArray | Number,
+        var_in: npt.NDArray | Number,
+    ) -> npt.NDArray | Number:
         """Apply the chain rule and propogate the derivative back one step."""
 
-
-class Sigmoid(IFilter):
+class Sigmoid(Filter):
     """Applies a sigmoidal projection filter to binarize an input.
 
     Takes an input auxiliary density p(x) ranging from 0 to 1 and applies a sigmoidal
@@ -58,19 +61,19 @@ class Sigmoid(IFilter):
         eta (Number): The center point of the sigmoid. Must be in range [0, 1].
         beta (Number): The strength of the sigmoid
         _bounds (tuple[Number]): The bounds of the filter. Always equal to (0, 1)
-        _denominator (Number | npt.ArrayLike): The denominator used in various methods;
+        _denominator (Number | npt.NDArray): The denominator used in various methods;
             for reducing re-computation.
     """
     @property
     def _bounds(self):
         return SIGMOID_BOUNDS
 
-    def __init__(self, eta: Number, beta: Number) -> None:
+    def __init__(self, eta: Rational, beta: Rational) -> None:
         """Initialize a sigmoid filter based on eta and beta values."""
         if not self.verify_bounds(eta):
             raise ValueError('Eta must be in the range [0, 1]')
 
-        self.eta = eta
+        self.eta  = eta
         self.beta = beta
 
         # Calculate denominator for use in methods
@@ -81,21 +84,22 @@ class Sigmoid(IFilter):
         return f'Sigmoid filter with eta={self.eta:0.3f} and beta={self.beta:0.3f}'
 
     @override
-    def forward(self, x: npt.ArrayLike | Number) -> npt.ArrayLike | np.number:
+    def forward(self, x: npt.NDArray | Number) -> npt.NDArray | Number:
         """Propogate x through the filter and return the result.
         All input values of x above the threshold eta, are projected to 1, and the
         values below, projected to 0. This is Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y.
         """
-        numerator = np.tanh(self.beta * self.eta) + np.tanh(self.beta * (x - self.eta))
+        numerator = np.tanh(self.beta * self.eta) + \
+            np.tanh(self.beta * (np.copy(np.array(x)) - self.eta))
         return numerator / self._denominator
 
-    @override
+    @override  # type: ignore
     def chain_rule(
         self,
-        deriv_out: npt.ArrayLike | Number,
-        var_out: npt.ArrayLike | Number,
-        var_in: npt.ArrayLike | Number
-    ) -> npt.ArrayLike | Number:
+        deriv_out: npt.NDArray | Number,
+        var_out: npt.NDArray | Number,
+        var_in: npt.NDArray | Number,
+    ) -> npt.NDArray | Number:
         """Apply the chain rule and propogate the derivative back one step.
 
         Returns the first argument, multiplied by the direct derivative of forward()
@@ -104,10 +108,12 @@ class Sigmoid(IFilter):
         """
         del deriv_out, var_out  # not needed for sigmoid filter
 
-        numerator = self.beta * np.power(sech(self.beta * (var_in - self.eta)), 2)
+        numerator = self.beta * \
+            np.power(sech(self.beta * (var_in - self.eta)), 2) # type: ignore
         return numerator / self._denominator
 
-    def fabricate(self, x: npt.ArrayLike | Number) -> npt.ArrayLike | Number:
+    @override
+    def fabricate(self, x: npt.NDArray | Number) -> npt.NDArray | Number:
         """Apply filter to input as a hard step-function instead of sigmoid.
 
         Returns:
@@ -116,6 +122,6 @@ class Sigmoid(IFilter):
         fab = np.array(x)
         fab[fab <= self.eta] = self._bounds[0]
         fab[fab > self.eta] = self._bounds[1]
-        if isinstance(x, get_args(Number)):
+        if isinstance(x, Number):  # type: ignore
             return fab.item()
         return fab

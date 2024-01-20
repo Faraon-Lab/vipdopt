@@ -3,6 +3,7 @@
 #
 
 [tool.ruff]
+include = ["vipdopt/*", "tests/*"]
 fix = true
 show-fixes = true
 
@@ -13,6 +14,9 @@ ignore = [
     "ANN",  # Type hints / annotations; handled by mypy
     "COM812",  # "Trailing Comma Missing"
     "TRY003",  # "Avoid specifying long messages outside the exception class"
+    "PLR0913",  # Too many arguments to function call
+    "FBT001",  # Boolean-typed positional argument in function definitions
+    "FBT002",  # Boolean default positional argument in function definitions
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
@@ -41,6 +45,9 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "tmp",
+    "*.yml",
+    "*.yaml",
 ]
 
 # Same as Black.
@@ -59,6 +66,17 @@ target-version = "py311"
 
 # Ignore import order in __main__.py
 "**/__main__.py" = ["E402"]
+
+
+"**/pool.py" = [
+    "SLF001",  # Ignore private member access in pool.py
+    "A001",  # Ignore shadowing builtin functions
+    "BLE001",  # Ignore catching BaseException
+    "PLW0602",
+    "PLW0603",  # Ignore global problems
+    "ARG001",  # Ignore unused function arguments
+    "ARG002",
+]
 
 # Ignore docstrings for properties in SonyBayerFilter config
 "**/configuration/sbc.py" = ["D"]
@@ -97,9 +115,10 @@ max-complexity = 15
 #
 
 [tool.pytest.ini_options]
- markers = [
+markers = [
     "smoke: these tests should always run to check for regressions quickly",
-    "slow: mark tests as slow (only run with full suite)"
+    "slow: mark tests as slow (only run with full suite)",
+    "lumapi: tests that require lumapi to run"
 ]
 
 testpaths = ["tests"]
@@ -112,7 +131,15 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["vipdopt"]
-omit = ["*tests*", "*testing*", "*__main__.py"]
+omit = [
+    "*tests*",
+    "*testing*",
+    "*__main__.py",
+    "vipdopt/simulation.py",
+    "vipdopt/configuration/sbc.py",
+    "vipdopt/optimization/optimization.py",
+    "vipdopt/source.py"
+]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
@@ -139,6 +166,8 @@ exclude_also = [
     ]
 
 ignore_errors = true
+show_missing = true
+fail_under = 80
 
 #
 # mypy Settings

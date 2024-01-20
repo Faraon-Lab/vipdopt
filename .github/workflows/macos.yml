@@ -3,12 +3,7 @@ name: macOS Continuous Integration
 # This file is intended for testing on macOS platforms, running benchmarks, measuring
 # code coverage, etc.
 
-on:
-  push:
-    branches:
-      - main
-      - cleanup
-  pull_request:
+on: [push, pull_request]
 
 
 permissions:
@@ -55,4 +50,4 @@ jobs:
             pip install python-magic-bin
     
       - name: Run Smoke Tests
-        run: pytest -m 'smoke'
+        run: pytest -m 'smoke and not luampi'
