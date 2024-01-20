@@ -42,9 +42,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
     
-      - name: Setup MPI
-        uses: mpi4py/setup-mpi@v1
-
       - name: Setup Python
         uses: ./.github/actions/python-setup
 
