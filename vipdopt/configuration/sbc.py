@@ -1,6 +1,5 @@
 """Configuration manager for SonyBayerFilter."""
 
-from pathlib import Path
 
 import numpy as np
 import yaml
@@ -8,6 +7,7 @@ from overrides import override
 
 from vipdopt.configuration.config import Config
 from vipdopt.configuration.template import TemplateRenderer
+from vipdopt.utils import PathLike
 
 # A lookup table that adds additional vertical mesh cells depending on layers
 LOOKUP_MESH_CELLS = {1:3, 2:3, 3:2, 4:3, 5:2, 6:2, 8:3, 10:2,
@@ -23,7 +23,7 @@ class SonyBayerConfig(Config):
         super().__init__()
 
     @override
-    def read_file(self, fname: Path | str, cfg_format: str='auto') -> None:
+    def read_file(self, fname: PathLike, cfg_format: str='auto') -> None:
         super().read_file(fname, cfg_format=cfg_format)
         self._validate()
 

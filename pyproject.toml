@@ -131,7 +131,15 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["vipdopt"]
-omit = ["*tests*", "*testing*", "*__main__.py", "vipdopt/simulation.py", "vipdopt/configuration/sbc.py"]
+omit = [
+    "*tests*",
+    "*testing*",
+    "*__main__.py",
+    "vipdopt/simulation.py",
+    "vipdopt/configuration/sbc.py",
+    "vipdopt/optimization/optimization.py",
+    "vipdopt/source.py"
+]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
@@ -159,7 +167,7 @@ exclude_also = [
 
 ignore_errors = true
 show_missing = true
-fail_under = 70
+fail_under = 80
 
 #
 # mypy Settings

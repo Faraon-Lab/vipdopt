@@ -2,8 +2,10 @@
 
 import importlib.util as imp
 import logging
+import os
 from collections.abc import Callable
 from importlib.abc import Loader
+from numbers import Number
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -12,8 +14,7 @@ import numpy.typing as npt
 import yaml
 from yaml.constructor import SafeConstructor
 
-Number = int | float | complex
-
+PathLike = TypeVar('PathLike', str, Path, bytes, os.PathLike)
 
 # Generic types for type hints
 T = TypeVar('T')
@@ -98,14 +99,14 @@ def import_lumapi(loc: str):
     return lumapi
 
 
-def read_config_file(filename: str | Path, cfg_format: str='auto') -> dict[str, Any]:
+def read_config_file(filename: PathLike, cfg_format: str='auto') -> dict[str, Any]:
     """Read a configuration file."""
-    filename = ensure_path(filename)
+    path_filename = ensure_path(filename)
     if cfg_format == 'auto':
-        cfg_format = filename.suffix
+        cfg_format = path_filename.suffix
 
     config_loader = _get_config_loader(cfg_format)
-    return config_loader(filename)
+    return config_loader(path_filename)
 
 
 def _get_config_loader(config_format: str) -> Callable[[Path], dict]:
@@ -129,8 +130,14 @@ def _yaml_loader(filepath: Path) -> dict:
         return yaml.safe_load(stream)
 
 
-def ensure_path(path: str | Path) -> Path:
+def ensure_path(path: PathLike) -> Path:
     """Ensure that a Path is a Path object."""
-    if not isinstance(path, Path):
+    if isinstance(path, Path):
+        return path
+    if isinstance(path, bytes):
+        return Path(path.decode())
+    if isinstance(path, str | os.PathLike):
         return Path(path)
-    return path
+
+    # Input was not a PathLike
+    raise ValueError(f'Argument must be PathLike, got {type(path)}')

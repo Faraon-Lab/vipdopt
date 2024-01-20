@@ -1,11 +1,12 @@
 """Tests for Sigmoid in vipdopt.filter"""
 
+from numbers import Number
+
 import numpy.typing as npt
 import pytest
 
 from testing import assert_close, assert_equal
-from vipdopt.filter import Sigmoid
-from vipdopt.utils import Number
+from vipdopt.optimization.filter import Sigmoid
 
 # Generic values for instantiating Sigmoid filters
 ETA = 0.5
