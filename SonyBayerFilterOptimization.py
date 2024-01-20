@@ -21,7 +21,7 @@ import numpy as np
 from vipdopt.optimization.filter import Sigmoid
 from vipdopt.source import Source
 from vipdopt.configuration import SonyBayerConfig
-from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer, FOM_ZERO
+from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer
 from vipdopt.optimization.device import Device
 
 
@@ -123,13 +123,8 @@ if __name__ == '__main__':
     ]
 
     # Add weighted FoMs
-    start = FOM_ZERO
-    start.polarization = 'TE'
-    start.freq = cfg['lambda_values_um']
-    start.opt_ids = list(range(len(start.freq)))
-
     weights = np.ones(len(foms))
-    full_fom = sum(np.multiply(weights, foms), start)
+    full_fom = sum(np.multiply(weights, foms), BayerFilterFoM.zero(foms[0]))
 
     # Create optimizer
     adam_moments = np.zeros((2,) + bayer_filter.size)

@@ -1,24 +1,24 @@
 """FDTD Simulation Interface Code."""
 from __future__ import annotations
 
-from functools import partial
-import time
 import abc
 import json
 import logging
+import time
 from argparse import ArgumentParser
 from collections import OrderedDict
 from collections.abc import Callable
 from enum import StrEnum
+from functools import partial
 from pathlib import Path
 from typing import Any
 
-from overrides import override
 import numpy as np
 import numpy.typing as npt
+from overrides import override
 
 from vipdopt import lumapi
-from vipdopt.utils import ensure_path, PathLike
+from vipdopt.utils import PathLike, ensure_path
 
 
 class ISimulation(abc.ABC):
@@ -61,6 +61,12 @@ class LumericalSimObjectType(StrEnum):
     def get_add_function(self) -> Callable:
         """Get the corerct lumapi function to add an object."""
         return getattr(lumapi.FDTD, f'add{self.value}')
+
+SOURCE_TYPES = [
+    LumericalSimObjectType.DIPOLE,
+    LumericalSimObjectType.TFSF,
+    LumericalSimObjectType.GAUSSIAN,
+]
 
 class LumericalEncoder(json.JSONEncoder):
     """Encodes LumericalSim objects in JSON format."""
@@ -177,12 +183,13 @@ class LumericalSimulation(ISimulation):
                 continue
 
         logging.info('Verified license with Lumerical servers.\n')
-    
+
     @override
     def load(self, fname: PathLike):
-        logging.info(f'Loading simulation from {fname}...')
+        fpath = ensure_path(fname)
+        logging.info(f'Loading simulation from {fpath}...')
         self._clear_objects()
-        with open(fname) as f:
+        with open(fpath) as f:
             sim = json.load(f)
             for obj in sim['objects'].values():
                 self.new_object(
@@ -191,12 +198,12 @@ class LumericalSimulation(ISimulation):
                     **obj['properties'],
                 )
 
-        logging.info(f'Succesfully loaded {fname}\n')
+        logging.info(f'Succesfully loaded {fpath}\n')
 
     @override
     def save(self, fname: PathLike):
-        logging.info(f'Saving simulation to {fname}...')
         fpath = ensure_path(fname)
+        logging.info(f'Saving simulation to {fpath}...')
         self.fdtd.save(str(fpath.with_suffix('')))
         with open(fpath.with_suffix('.json'), 'w', encoding='utf-8') as f:
             json.dump(
@@ -206,7 +213,7 @@ class LumericalSimulation(ISimulation):
                 ensure_ascii=True,
                 cls=LumericalEncoder,
             )
-        logging.info(f'Succesfully saved simulation to {fname}.\n')
+        logging.info(f'Succesfully saved simulation to {fpath}.\n')
 
     @override
     def run(self):
@@ -220,13 +227,13 @@ class LumericalSimulation(ISimulation):
         """Clear all existing objects and create a new project."""
         self.objects = OrderedDict()
         self.fdtd.newproject()
-    
+
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
         new_sim = LumericalSimulation()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
-        
+
         return new_sim
 
     def enable(self, objs: list[str]):
@@ -252,15 +259,15 @@ class LumericalSimulation(ISimulation):
         new_sim = self.copy()
         new_sim.disable(objs)
         return new_sim
-    
+
     def disable_all_sources(self):
         """Disable all sources in this simulation."""
         to_disable = []
 
         for obj_name, obj in self.objects.items():
-            if obj.obj_type in [LumericalSimObjectType.DIPOLE, LumericalSimObjectType.TFSF, LumericalSimObjectType.GAUSSIAN]:
+            if obj.obj_type in SOURCE_TYPES:
                 to_disable.append(obj_name)
-        
+
         self.disable(to_disable)
 
     def new_object(
@@ -373,17 +380,20 @@ class LumericalSimulation(ISimulation):
         logging.debug('Updated simulation resources:')
         for resource, value in self.get_hpc_resources().items():
             logging.debug(f'\t"{resource}" = {value}')
-    
+
     def get_field_shape(self) -> tuple[int, ...]:
+        """Return the shape of the fields returned from this simulation's monitors."""
         index_prev = self.fdtd.getresult('design_index_monitor', 'index preview')
         return np.squeeze(index_prev['index_x']).shape
-    
-    def get_transimission_magnitude(self, monitor_name: str) -> npt.ArrayLike:
+
+    def get_transimission_magnitude(self, monitor_name: str) -> npt.NDArray:
+        """Return the magnitude of the transmission for a given monitor."""
         # Ensure this is a transmission monitor
         monitor_name = monitor_name.replace('focal', 'transmission')
         return np.abs(self.fdtd.getresult(monitor_name, 'T')['T'])
 
-    def get_field(self, monitor_name: str, field_indicator: str) -> npt.ArrayLike:
+    def get_field(self, monitor_name: str, field_indicator: str) -> npt.NDArray:
+        """Return the E or H field from a monitor."""
         if field_indicator not in 'EH':
             raise ValueError('Expected field_indicator to be "E" or "H";'
                              f' got {field_indicator}')
@@ -393,38 +403,43 @@ class LumericalSimulation(ISimulation):
         logging.debug(f'Getting {polarizations} from monitor "{monitor_name}"')
         fields = np.array(
             map(partial(self.fdtd.getdata(monitor_name)), polarizations),
-            dtype=np.coomplex128,
+            dtype=np.complex128,
         )
-        data_xfer_size_MB = fields.nbytes / (1024 ** 2)
+        data_xfer_size_mb = fields.nbytes / (1024 ** 2)
         elapsed = time.time() - start
 
-        logging.debug(f'Transferred {data_xfer_size_MB} MB')
-        logging.debug(f'Data rate = {data_xfer_size_MB / elapsed} MB/sec')
+        logging.debug(f'Transferred {data_xfer_size_mb} MB')
+        logging.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
         return fields
 
-    def get_hfield(self, monitor_name: str) -> npt.ArrayLike:
+    def get_hfield(self, monitor_name: str) -> npt.NDArray:
+        """Return the H field from a monitor."""
         return self.get_field(monitor_name, 'H')
 
-    def get_efield(self, monitor_name: str) -> npt.ArrayLike:
+    def get_efield(self, monitor_name: str) -> npt.NDArray:
+        """Return the E field from a monitor."""
         return self.get_field(monitor_name, 'E')
-    
-    def get_pfield(self, monitor_name: str) -> npt.ArrayLike:
+
+    def get_pfield(self, monitor_name: str) -> npt.NDArray:
         """Returns power as a function of space and wavelength, with xyz components."""
         return self.fdtd.getresult(monitor_name, 'P')['P']
-    
-    def get_efield_magnitude(self, monitor_name: str) -> npt.ArrayLike:
+
+    def get_efield_magnitude(self, monitor_name: str) -> npt.NDArray:
+        """Return the magnitude of the E field from a monitor."""
         efield = self.get_efield(monitor_name)
         enorm_squared = np.sum(np.square(np.abs(efield)), axis=0)
         return np.sqrt(enorm_squared)
-    
-    def get_source_power(self) -> npt.ArrayLike:
+
+    def get_source_power(self) -> npt.NDArray:
+        """Return the source power of a given monitor."""
         f = self.fdtd.getresult('focal_monitor_0', 'f')
         return self.fdtd.sourcepower(f)
-    
-    def get_overall_power(self, monitor_name) -> npt.ArrayLike:
+
+    def get_overall_power(self, monitor_name) -> npt.NDArray:
+        """Return the overall power from a given monitor."""
         source_power = self.get_source_power()
-        T = self.get_transimission_magnitude(monitor_name)
-        return source_power * T.T
+        t = self.get_transimission_magnitude(monitor_name)
+        return source_power * t.T
 
 if __name__ == '__main__':
     parser = ArgumentParser()

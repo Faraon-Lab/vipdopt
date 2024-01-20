@@ -1,26 +1,27 @@
 """Adam optimizer."""
 
-from typing import Callable, Sequence
 
 import numpy as np
 import numpy.typing as npt
 
 from vipdopt.optimization.device import Device
-from vipdopt.utils import Number
 from vipdopt.optimization.optimizer import GradientOptimizer
 
+
 class AdamOptimizer(GradientOptimizer):
+    """Optimizer implementing the Adaptive Moment Estimation (Adam) algorithm."""
 
     def __init__(
             self,
             step_size: float,
             betas: tuple[float, float]=(0.9, 0.999),
             eps: float=1e-8,
-            moments: tuple[float, float] | npt.ArrayLike=(0.0, 0.0),
+            moments: npt.ArrayLike=(0.0, 0.0),
             **kwargs,
     ) -> None:
+        """Initialize an AdamOptimizer instance."""
         super().__init__(**kwargs)
-        self.moments = moments
+        self.moments = np.array(moments)
         self.step_size = step_size
         self.betas = betas
         self.eps = eps

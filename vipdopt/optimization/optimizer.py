@@ -1,8 +1,9 @@
-from vipdopt.optimization.device import Device
-
+"""Code for representing optimizers."""
+import abc
 
 import numpy.typing as npt
-import abc
+
+from vipdopt.optimization.device import Device
 
 
 # TODO: Add support for otehr types of optimizers

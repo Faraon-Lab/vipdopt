@@ -1,12 +1,10 @@
 
-import pytest
-
 import numpy as np
 import numpy.typing as npt
-
-from vipdopt.optimization import FoM, FOM_ZERO
+import pytest
 
 from testing.utils import assert_close, assert_equal
+from vipdopt.optimization import FoM
 
 
 def fom_func(n) -> npt.ArrayLike:
@@ -17,11 +15,12 @@ def gradient_func(n) -> npt.ArrayLike:
     return 2 * n
 
 
-INPUT_ARRAY = np.reshape(range(0, 9), (3,3))
+INPUT_ARRAY = np.reshape(range(9), (3,3))
 SQUARED_ARRAY = np.array([[0, 1, 4], [9, 16, 25], [36, 49, 64]])
 GRADIENT_ARRAY = np.array([[0, 2, 4], [6, 8, 10], [12, 14, 16]])
 BASE_FOM = FoM([], [], fom_func, gradient_func, '', [])
-DIV_ARRAY = np.ones((3, 3))
+ONES_ARRAY = np.ones((3, 3))
+FOM_ZERO = FoM.zero(BASE_FOM)
 
 
 @pytest.mark.smoke()
@@ -42,12 +41,14 @@ def test_compute_fom():
             (BASE_FOM * BASE_FOM, SQUARED_ARRAY ** 2, GRADIENT_ARRAY ** 2),
             (2 * BASE_FOM, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
             (BASE_FOM * 2, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
+            (1 + BASE_FOM, 1 + SQUARED_ARRAY, 1 + GRADIENT_ARRAY),
             (1 - BASE_FOM, 1 - SQUARED_ARRAY, 1 - GRADIENT_ARRAY),
             (BASE_FOM - 1, SQUARED_ARRAY - 1, GRADIENT_ARRAY - 1),
             (BASE_FOM / 2, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
             (0.5 * BASE_FOM, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
             # Adding one to prevent divide by zero
-            ((BASE_FOM + 1) / (BASE_FOM + 1), DIV_ARRAY, DIV_ARRAY),
+            ((BASE_FOM + 1) / (BASE_FOM + 1), ONES_ARRAY, ONES_ARRAY),
+            (1 / (BASE_FOM + 1), 1 / (SQUARED_ARRAY + 1), 1 / (GRADIENT_ARRAY + 1)),
             # Distributive property / linearity
             (BASE_FOM * (2 + 3), 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),
             ((2 + 3) * BASE_FOM, 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),
@@ -71,7 +72,7 @@ def test_arithmetic(fom: FoM, exp_fom: npt.ArrayLike, exp_grad: npt.ArrayLike):
 @pytest.mark.smoke()
 def test_sum():
     n = 10
-    combined_fom = sum([BASE_FOM] * n)
+    combined_fom = sum([BASE_FOM] * n, FOM_ZERO)
     output = combined_fom.compute(INPUT_ARRAY)
     assert_equal(output, 10 * SQUARED_ARRAY)
     output = combined_fom.gradient(INPUT_ARRAY)
@@ -92,3 +93,98 @@ def test_weights():
     assert_close(output, sum(weights) * SQUARED_ARRAY)
     output = combined_fom.gradient(INPUT_ARRAY)
     assert_close(output, sum(weights) * GRADIENT_ARRAY)
+
+
+@pytest.mark.smoke()
+def test_copy():
+    org_vars = vars(BASE_FOM)
+    copy = BASE_FOM.copy()
+
+    assert_equal(vars(copy), org_vars)
+
+    # Modifying the copy should not affect the original
+    copy = copy + 1
+    assert_equal(vars(BASE_FOM), org_vars)
+    assert_equal(copy.compute(INPUT_ARRAY), SQUARED_ARRAY + 1)
+
+
+@pytest.mark.smoke()
+def test_iadd():
+    fom = BASE_FOM.copy()
+    fom += 1
+    output = fom.compute(INPUT_ARRAY)
+    assert_equal(output, SQUARED_ARRAY + 1)
+
+    output = fom.gradient(INPUT_ARRAY)
+    assert_equal(output, GRADIENT_ARRAY + 1)
+
+
+@pytest.mark.smoke()
+def test_isub():
+    fom = BASE_FOM.copy()
+    fom -= 1
+    output = fom.compute(INPUT_ARRAY)
+    assert_equal(output, SQUARED_ARRAY - 1)
+
+    output = fom.gradient(INPUT_ARRAY)
+    assert_equal(output, GRADIENT_ARRAY - 1)
+
+
+@pytest.mark.smoke()
+def test_imul():
+    fom = BASE_FOM.copy()
+    fom *= 2
+    output = fom.compute(INPUT_ARRAY)
+    assert_equal(output, SQUARED_ARRAY * 2)
+
+    output = fom.gradient(INPUT_ARRAY)
+    assert_equal(output, GRADIENT_ARRAY * 2)
+
+
+@pytest.mark.smoke()
+def test_itruediv():
+    fom = BASE_FOM.copy()
+    fom /= 2
+    output = fom.compute(INPUT_ARRAY)
+    assert_equal(output, SQUARED_ARRAY / 2)
+
+    output = fom.gradient(INPUT_ARRAY)
+    assert_equal(output, GRADIENT_ARRAY / 2)
+
+
+@pytest.mark.smoke()
+def test_bad_op():
+    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for \*\*'):
+        BASE_FOM ** 2
+
+    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for //'):
+        BASE_FOM // 2
+
+    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for %'):
+        BASE_FOM % 2
+
+    fom1 = BASE_FOM.copy()
+    fom2 = BASE_FOM.copy()
+
+    fom2.polarization = 'Hello World'
+    with pytest.raises(
+        TypeError,
+        match=r'unsupported operand type\(s\) for \+: \'FoM\' and \'FoM\' .* equal*',
+    ):
+        fom1 + fom2
+
+    fom2 = BASE_FOM.copy()
+    fom2.opt_ids = list(range(9))
+    with pytest.raises(
+        TypeError,
+        match=r'unsupported operand type\(s\) for \+: \'FoM\' and \'FoM\' .* equal*',
+    ):
+        fom1 + fom2
+
+    fom2 = BASE_FOM.copy()
+    fom2.freq = list(range(9))
+    with pytest.raises(
+        TypeError,
+        match=r'unsupported operand type\(s\) for \+: \'FoM\' and \'FoM\' .* equal*',
+    ):
+        fom1 + fom2

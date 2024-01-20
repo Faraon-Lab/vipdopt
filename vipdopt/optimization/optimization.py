@@ -1,15 +1,17 @@
 """Class for handling optimization setup, running, and saving."""
 
 from __future__ import annotations
-from typing import Callable, Collection
+
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
+import numpy.typing as npt
 
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.optimizer import GradientOptimizer
-from vipdopt.simulation import ISimulation, LumericalSimulation
 from vipdopt.optimization.fom import FoM
+from vipdopt.optimization.optimizer import GradientOptimizer
+from vipdopt.simulation import ISimulation
 
 
 class Optimization:
@@ -17,7 +19,7 @@ class Optimization:
 
     def __init__(
             self,
-            sims: Collection[ISimulation],
+            sims: list[ISimulation],
             device: Device,
             fom: FoM,
             optimizer: GradientOptimizer,
@@ -31,9 +33,9 @@ class Optimization:
         self.fom = fom
         self.device = device
         self.optimizer = optimizer
-        self.fom_hist = []
-        self.param_hist = []
-        self._callbacks = []
+        self.fom_hist: list[npt.NDArray] = []
+        self.param_hist: list[npt.NDArray] = []
+        self._callbacks: list[Callable[[Optimization], None]] = []
         self.max_iter = max_iter
         self.max_epochs = max_epochs
         self.iteration = start_iter
@@ -41,8 +43,8 @@ class Optimization:
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
-        self._callbacks.apend(func)
-    
+        self._callbacks.append(func)
+
     def _simulation_dispatch(self, sim_idx: int):
         """Target for threads to run simulations."""
         sim = self.sims[sim_idx]
@@ -50,14 +52,17 @@ class Optimization:
         sim.save(f'_sim{sim_idx}_epoch_{self.epoch}_iter_{self.iteration}')
         sim.run()
         logging.debug(f'Completed running on thread {sim_idx}')
-        
+
     def run(self):
+        """Run the optimization."""
         while self.epoch < self.max_epochs:
             while self.iteration < self.max_iter:
                 for callback in self._callbacks:
-                    callback()
+                    callback(self)
 
-                logging.debug(f'Epoch {self.epoch}, iter {self.iteration}: Running simulations...')
+                logging.debug(
+                    f'Epoch {self.epoch}, iter {self.iteration}: Running simulations...'
+                )
                 # Run all the simulations
                 n_sims = len(self.sims)
                 with ThreadPoolExecutor() as ex:
@@ -69,13 +74,15 @@ class Optimization:
 
                 gradient = self.fom.gradient()
 
-                logging.debug(f'FoM at epoch {self.epoch}, iter {self.iteration}: {fom}')
-                logging.debug(f'Gradient {self.epoch}, iter {self.iteration}: {gradient}')
+                logging.debug(
+                    f'FoM at epoch {self.epoch}, iter {self.iteration}: {fom}\n'
+                    f'Gradient {self.epoch}, iter {self.iteration}: {gradient}'
+                )
 
                 # Step with the gradient
                 self.param_hist.append(self.device.get_design_variable())
                 self.optimizer.step(self.device, gradient, self.iteration)
-            
+
                 self.iteration += 1
             self.iteration = 0
             self.epoch += 1
