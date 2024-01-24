@@ -8,3 +8,5 @@ types-PyYAML
 python-magic
 dill
 Jinja2
+PySide6==6.6.1
+QtPy==2.4.1
