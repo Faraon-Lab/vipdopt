@@ -44,7 +44,7 @@ def test_load_sim(simulation_json):
 
 
 @pytest.mark.lumapi()
-def test_save_sim(tmp_path, mock_sim_file):
+def test_save_sim(tmp_path, sim_file):
     path = tmp_path / 'sim.json'
 
     source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.RECT)
@@ -72,7 +72,7 @@ def test_save_sim(tmp_path, mock_sim_file):
         s.save(path)
 
     assert len(list(tmp_path.iterdir())) == 2  # noqa: PLR2004 Only two files written
-    assert_equal(path.read_text(), mock_sim_file)  # Correct contents
+    assert_equal(path.read_text(), sim_file)  # Correct contents
 
 
 @pytest.mark.lumapi()

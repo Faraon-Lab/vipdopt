@@ -1,6 +1,7 @@
 """Module containing common functions used throughout the package."""
 
 import importlib.util as imp
+import json
 import logging
 import os
 from collections.abc import Callable
@@ -109,17 +110,24 @@ def read_config_file(filename: PathLike, cfg_format: str='auto') -> dict[str, An
     return config_loader(path_filename)
 
 
-def _get_config_loader(config_format: str) -> Callable[[Path], dict]:
+def _get_config_loader(config_format: str) -> Callable[[PathLike], dict]:
     """Return a configuration file loader depending on the format."""
     match config_format.lower():
         case '.yaml' | '.yml':
             return _yaml_loader
+        case '.json':
+            return _json_loader
         case _:
             msg = f'{config_format} file loading not yet supported.'
             raise NotImplementedError(msg)
 
 
-def _yaml_loader(filepath: Path) -> dict:
+def _json_loader(filepath: PathLike) -> dict:
+    with open(filepath) as stream:
+        return json.load(stream)
+
+
+def _yaml_loader(filepath: PathLike) -> dict:
     """Config file loader for YAML files."""
     # Allow the safeloader to convert sequences to tuples
     SafeConstructor.add_constructor(  # type: ignore

@@ -17,6 +17,7 @@ ignore = [
     "PLR0913",  # Too many arguments to function call
     "FBT001",  # Boolean-typed positional argument in function definitions
     "FBT002",  # Boolean default positional argument in function definitions
+    "FBT003",  # Boolean positional value in function call
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
@@ -48,6 +49,8 @@ exclude = [
     "tmp",
     "*.yml",
     "*.yaml",
+    "*.ui",
+    "*ui_*.py",
 ]
 
 # Same as Black.
@@ -91,13 +94,19 @@ target-version = "py311"
 ]
 
 
+[tool.ruff.flake8-pytest-style]
+parametrize-names-type = "csv"
+parametrize-values-type = "list"
+
 [tool.ruff.flake8-quotes]
 docstring-quotes = "double"
 inline-quotes = "single"
 
-[tool.ruff.flake8-pytest-style]
-parametrize-names-type = "csv"
-parametrize-values-type = "list"
+[tool.ruff.flake8-unused-arguments]
+ignore-variadic-names = true
+
+[tool.ruff.pep8-naming]
+extend-ignore-names = ["setData", "headerData", "rowCount", "columnCount"]
 
 [tool.ruff.pydocstyle]
 # Use Google-style docstrings.

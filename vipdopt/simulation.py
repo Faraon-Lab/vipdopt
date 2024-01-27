@@ -18,7 +18,7 @@ import numpy.typing as npt
 from overrides import override
 
 from vipdopt import lumapi
-from vipdopt.utils import PathLike, ensure_path
+from vipdopt.utils import PathLike, ensure_path, read_config_file
 
 
 class ISimulation(abc.ABC):
@@ -66,6 +66,12 @@ SOURCE_TYPES = [
     LumericalSimObjectType.DIPOLE,
     LumericalSimObjectType.TFSF,
     LumericalSimObjectType.GAUSSIAN,
+]
+
+MONITOR_TYPES = [
+    LumericalSimObjectType.POWER,
+    LumericalSimObjectType.PROFILE,
+    LumericalSimObjectType.INDEX,
 ]
 
 class LumericalEncoder(json.JSONEncoder):
@@ -189,14 +195,13 @@ class LumericalSimulation(ISimulation):
         fpath = ensure_path(fname)
         logging.info(f'Loading simulation from {fpath}...')
         self._clear_objects()
-        with open(fpath) as f:
-            sim = json.load(f)
-            for obj in sim['objects'].values():
-                self.new_object(
-                    obj['name'],
-                    LumericalSimObjectType(obj['obj_type']),
-                    **obj['properties'],
-                )
+        sim = read_config_file(fpath)
+        for obj in sim['objects'].values():
+            self.new_object(
+                obj['name'],
+                LumericalSimObjectType(obj['obj_type']),
+                **obj['properties'],
+            )
 
         logging.info(f'Succesfully loaded {fpath}\n')
 
@@ -269,6 +274,14 @@ class LumericalSimulation(ISimulation):
                 to_disable.append(obj_name)
 
         self.disable(to_disable)
+
+    def sources(self):
+        """Return a list of all source objects."""
+        return [obj for _, obj in self.objects.items() if obj.type in SOURCE_TYPES]
+
+    def monitors(self):
+        """Return a list of all monitors objects."""
+        return [obj for _, obj in self.objects.items() if obj.type in MONITOR_TYPES]
 
     def new_object(
         self,

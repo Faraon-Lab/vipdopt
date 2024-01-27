@@ -110,7 +110,6 @@ def test_sech(x: float, y: float):
             ('bad_non_path_obj.html', True),
             (Path('file.yml'), False),
             (Path('file.yaml'), False),
-            (Path('bad_extension.json'), True),
             (Path('bad_extension.yl'), True),
         ]
 )
@@ -129,4 +128,30 @@ def test_yaml_loader(
     else:
         cfg = read_config_file(fname)
         assert_equal(cfg['do_rejection'], False)
+
+
+@pytest.mark.parametrize(
+        'fname, exception', [
+            ('not_a_path_obj.json', False),
+            ('bad_non_path_obj.html', True),
+            (Path('file.json'), False),
+            (Path('file.JSON'), False),
+            (Path('bad_extension.jsn'), True),
+        ]
+)
+@pytest.mark.smoke()
+@pytest.mark.usefixtures('_mock_sim_json')
+def test_json_loader(
+    fname: str | Path,
+    exception: bool,
+):
+    if exception:
+        with pytest.raises(
+            NotImplementedError,
+            match=r'.* file loading not yet supported.',
+        ):
+            cfg = read_config_file(fname)
+    else:
+        cfg = read_config_file(fname)
+        assert_equal(cfg['objects']['source_aperture']['obj_type'], 'rect')
 

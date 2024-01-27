@@ -1,1 +1,1 @@
-"""Code for managing the graphical user interface (GUI)"""
+"""Code for managing the graphical user interface (GUI)."""

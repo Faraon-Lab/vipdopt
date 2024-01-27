@@ -150,7 +150,7 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
 
 
 @pytest.fixture(scope='session')
-def mock_sim_file():
+def sim_file():
     return _mock_sim_file_data
 
 @pytest.fixture(scope='session')
@@ -206,4 +206,11 @@ def simulation_json(tmpdir_factory):
         f.write(_mock_sim_file_data)
     return fn
 
+
+@pytest.fixture()
+def _mock_sim_json(mocker):
+    mocked_sim =  mocker.mock_open(
+        read_data=_mock_sim_file_data,
+    )
+    mocker.patch('builtins.open', mocked_sim)
 
