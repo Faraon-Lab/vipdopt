@@ -32,7 +32,7 @@ def test_bad_size(size: tuple[Number, ...], match):
         Device(size, (1, 1), (1, 1, 1))
 
 
-pytest.mark.smoke()
+@pytest.mark.smoke()
 @pytest.mark.parametrize(
         'permittivity, match',
         [
