@@ -26,7 +26,7 @@
     <property name="currentIndex">
      <number>0</number>
     </property>
-    <widget class="QWidget" name="tab">
+    <widget class="QWidget" name="config_tab">
      <attribute name="title">
       <string>Configuration</string>
      </attribute>
@@ -50,10 +50,10 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="lineEdit"/>
+          <widget class="QLineEdit" name="config_lineEdit"/>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton">
+          <widget class="QPushButton" name="config_pushButton">
            <property name="text">
             <string>Browse...</string>
            </property>
@@ -62,56 +62,7 @@
         </layout>
        </item>
        <item>
-        <widget class="QTableWidget" name="tableWidget">
-         <property name="autoFillBackground">
-          <bool>false</bool>
-         </property>
-         <property name="rowCount">
-          <number>20</number>
-         </property>
-         <property name="columnCount">
-          <number>2</number>
-         </property>
-         <attribute name="horizontalHeaderCascadingSectionResizes">
-          <bool>false</bool>
-         </attribute>
-         <attribute name="horizontalHeaderDefaultSectionSize">
-          <number>300</number>
-         </attribute>
-         <attribute name="horizontalHeaderStretchLastSection">
-          <bool>true</bool>
-         </attribute>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <row/>
-         <column>
-          <property name="text">
-           <string>Property</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Value</string>
-          </property>
-         </column>
-        </widget>
+        <widget class="QTreeView" name="config_treeView"/>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
@@ -140,7 +91,7 @@
       </layout>
      </widget>
     </widget>
-    <widget class="QWidget" name="tab_4">
+    <widget class="QWidget" name="sim_tab">
      <attribute name="title">
       <string>Simulation</string>
      </attribute>
@@ -164,16 +115,19 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="lineEdit_2"/>
+          <widget class="QLineEdit" name="sim_lineEdit"/>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_2">
+          <widget class="QPushButton" name="sim_pushButton">
            <property name="text">
             <string>Browse...</string>
            </property>
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <widget class="QTreeView" name="sim_treeView"/>
        </item>
        <item>
         <widget class="QLabel" name="label_2">
@@ -183,7 +137,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QTreeWidget" name="treeWidget">
+        <widget class="QTreeWidget" name="sim_config_treeWidget">
          <property name="uniformRowHeights">
           <bool>true</bool>
          </property>
@@ -253,7 +207,7 @@
       </layout>
      </widget>
     </widget>
-    <widget class="QWidget" name="tab_2">
+    <widget class="QWidget" name="fom_tab">
      <attribute name="title">
       <string>Figure of Merit</string>
      </attribute>
@@ -268,7 +222,7 @@
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <layout class="QGridLayout" name="gridLayout_2">
+        <layout class="QGridLayout" name="fom_gridLayout">
          <item row="0" column="3">
           <widget class="QLabel" name="label_18">
            <property name="text">
@@ -385,14 +339,14 @@
           </spacer>
          </item>
          <item>
-          <widget class="QToolButton" name="toolButton">
+          <widget class="QToolButton" name="fom_addrow_toolButton">
            <property name="text">
             <string>Add Row</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QToolButton" name="toolButton_2">
+          <widget class="QToolButton" name="fom_delrow_toolButton">
            <property name="text">
             <string>Remove Row</string>
            </property>
@@ -403,7 +357,7 @@
       </layout>
      </widget>
     </widget>
-    <widget class="QWidget" name="tab_3">
+    <widget class="QWidget" name="opt_tab">
      <attribute name="title">
       <string>Optimization Options</string>
      </attribute>
@@ -442,7 +396,7 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QLineEdit" name="lineEdit_3"/>
+          <widget class="QLineEdit" name="opt_iter_lineEdit"/>
          </item>
          <item row="2" column="0">
           <widget class="QLabel" name="label_6">
@@ -452,7 +406,7 @@
           </widget>
          </item>
          <item row="2" column="1">
-          <widget class="QLineEdit" name="lineEdit_5"/>
+          <widget class="QLineEdit" name="opt_iter_per_epoch_lineEdit"/>
          </item>
          <item row="3" column="0">
           <widget class="QLabel" name="label_5">
@@ -462,7 +416,7 @@
           </widget>
          </item>
          <item row="3" column="1">
-          <widget class="QLineEdit" name="lineEdit_4"/>
+          <widget class="QLineEdit" name="opt_max_epoch_lineEdit"/>
          </item>
          <item row="4" column="0">
           <widget class="QLabel" name="label_7">
@@ -472,7 +426,7 @@
           </widget>
          </item>
          <item row="4" column="1">
-          <widget class="QLineEdit" name="lineEdit_6"/>
+          <widget class="QLineEdit" name="opt_binarfreq_lineEdit"/>
          </item>
          <item row="5" column="0">
           <widget class="QLabel" name="label_11">
@@ -482,7 +436,7 @@
           </widget>
          </item>
          <item row="5" column="1">
-          <widget class="QLineEdit" name="lineEdit_8"/>
+          <widget class="QLineEdit" name="opt_step_size_lineEdit"/>
          </item>
         </layout>
        </item>
@@ -521,7 +475,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="comboBox">
+          <widget class="QComboBox" name="opt_comboBox">
            <item>
             <property name="text">
              <string>Adam</string>
@@ -545,7 +499,7 @@
         </layout>
        </item>
        <item>
-        <layout class="QGridLayout" name="gridLayout">
+        <layout class="QGridLayout" name="opt_optimizer_gridLayout">
          <item row="1" column="2">
           <widget class="QLineEdit" name="lineEdit_10"/>
          </item>
@@ -605,7 +559,7 @@
      <x>0</x>
      <y>0</y>
      <width>819</width>
-     <height>19</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

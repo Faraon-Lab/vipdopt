@@ -1,16 +1,17 @@
 """Entrypoint running the GUI. Mainly for testing right now."""
 import logging
 import sys
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QMainWindow,
-    QTableWidgetItem,
 )
 
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
-from vipdopt.utils import read_config_file
+from vipdopt.utils import read_config_file, PathLike
+from vipdopt.gui.config_editor import ConfigModel
 
 
 class SettingsWindow(QMainWindow, Ui_SettingsWindow):
@@ -20,10 +21,17 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         super().__init__()
         self.setupUi(self)
 
+        self.config_model = ConfigModel()
+        self.config_treeView.setModel(self.config_model)
+        self.sim_model = ConfigModel()
+        self.sim_treeView.setModel(self.sim_model)
+
         self.actionOpen.triggered.connect(self.open_project)
 
-        self.pushButton.clicked.connect(self.load_config)
+        self.config_pushButton.clicked.connect(self.load_yaml)
+        self.sim_pushButton.clicked.connect(self.load_json)
 
+    # General Methods
     def open_project(self):
         """Load optimization project into the GUI."""
         proj_dir = QFileDialog.getExistingDirectory(
@@ -34,8 +42,9 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         )
         logging.info(f'Loaded project from {proj_dir}')
 
-    def load_config(self):
-        """Load a config file into the configuration tab."""
+    # Configuration Tab
+    def load_yaml(self):
+        """Load a yaml config file into the configuration tab."""
         fname, _ = QFileDialog.getOpenFileName(
             self,
             'Select Configuration File',
@@ -43,19 +52,36 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             'YAML (*.yaml *.yml);;All Files(*.*)',
             'YAML (*.yaml *.yml)',
         )
-        cfg = read_config_file(fname)
-        for i, (key, val) in enumerate(cfg.items()):
-            self.tableWidget.setItem(i, 0, QTableWidgetItem(key))
-            self.tableWidget.setItem(i, 1, QTableWidgetItem(val))
+        if fname:
+            cfg = read_config_file(fname)
+            self.config_lineEdit.setText(fname)
+            self.config_model.load(cfg)
+    
+    # Simulation Tab
+    def load_json(self):
+        """Load a yaml config file into the configuration tab."""
+        fname, _ = QFileDialog.getOpenFileName(
+            self,
+            'Select Configuration File',
+            './',
+            'JSON (*.json);;All Files(*.*)',
+            'JSON (*.json)',
+        )
+        if fname:
+            cfg = read_config_file(fname)
+            self.sim_lineEdit.setText(fname)
+            self.sim_model.load(cfg)
+    
+    # FoM Tab
+    def add_fom_row(self):
+        pass
 
+    def remove_fom_row(self):
+        pass
 
-    # def new_project(self):
-    #         self,
-    #         "Select Project Directory",
-    #         "./",
-    #         QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
-    #     if self.settings_window is None:
-
+    # Optimization Tab
+    def load_optimization_settings(self, fname: PathLike):
+        pass
 
 
 if __name__ == '__main__':
