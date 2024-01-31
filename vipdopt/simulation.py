@@ -106,7 +106,6 @@ class LumericalSimObject:
         self.properties: OrderedDict[str, Any] = OrderedDict()
         if obj_type != LumericalSimObjectType.FDTD:
             self.properties['name'] = name
-        self.lumapi_obj = None
 
     def __str__(self) -> str:
         """Return string representation of object."""
@@ -119,19 +118,14 @@ class LumericalSimObject:
     def __setitem__(self, key: str, val: Any) -> None:
         """Set the value of a property of the object."""
         self.properties[key] = val
-        if self.lumapi_obj is not None:
-            self.lumapi_obj[key] = val
 
     def __getitem__(self, key: str) -> Any:
         """Retrieve a property from an object."""
         return self.properties[key]
-
+    
     def update(self, **vals):
         """Update properties with values in a dictionary."""
         self.properties.update(vals)
-        if self.lumapi_obj is not None:
-            for k, v in vals.items():
-                self.lumapi_obj[k] = v
 
     def __eq__(self, __value: object) -> bool:
         """Test equality of LumericalSimObjects."""
@@ -139,6 +133,16 @@ class LumericalSimObject:
             return self.obj_type == __value.obj_type and \
                 self.properties == __value.properties
         return super().__eq__(__value)
+
+def _check_fdtd(func: Callable) -> Callable:
+    def wrapped(self, *args, **kwargs):
+        if self.fdtd is None:
+            raise UnboundLocalError(
+                f'Cannot call {func.__name__} before `fdtd` is instantiated.'
+                ' Has `connect()` been called?'
+            )
+        return func(self, *args, **kwargs)
+    return wrapped
 
 
 class LumericalSimulation(ISimulation):
@@ -157,8 +161,7 @@ class LumericalSimulation(ISimulation):
         Arguments:
             fname (str): optional filename to load the simulation from
         """
-        self.fdtd: lumapi.FDTD = None
-        self.connect()
+        self.fdtd: lumapi.FDTD | None = None
         self._clear_objects()
         if fname:
             self.load(fname)
@@ -189,6 +192,8 @@ class LumericalSimulation(ISimulation):
                 continue
 
         logging.info('Verified license with Lumerical servers.\n')
+        self.fdtd.newproject()
+        self._sync_fdtd()
 
     @override
     def load(self, fname: PathLike):
@@ -205,8 +210,24 @@ class LumericalSimulation(ISimulation):
 
         logging.info(f'Succesfully loaded {fpath}\n')
 
+    @_check_fdtd
+    def _sync_fdtd(self):
+        """Sync local objects with `lumapi.FDTD` objects"""
+        self.fdtd.switchtolayout()
+        for obj_name, obj in self.objects:
+            # Create object if needed
+            if self.fdtd.getnamednumber(obj_name) == 0:
+                LumericalSimObjectType.get_add_function(obj.obj_type)(
+                    self.fdtd,
+                    **obj.properties,
+                )
+            for key, val in obj.properties.items():
+                self.fdtd.setnamed(obj_name, key, val)
+
+
     @override
     def save(self, fname: PathLike):
+        self._sync_fdtd()
         fpath = ensure_path(fname)
         logging.info(f'Saving simulation to {fpath}...')
         self.fdtd.save(str(fpath.with_suffix('')))
@@ -220,10 +241,13 @@ class LumericalSimulation(ISimulation):
             )
         logging.info(f'Succesfully saved simulation to {fpath}.\n')
 
+    @_check_fdtd
     @override
     def run(self):
+        self._sync_fdtd()
         self.fdtd.run()
 
+    @_check_fdtd
     def set_resource(self, resource_num: int, resource: str, value: Any):
         """Set the specified job manager resource for this simulation."""
         self.fdtd.setresource('FDTD', resource_num, resource, value)
@@ -231,7 +255,8 @@ class LumericalSimulation(ISimulation):
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
         self.objects = OrderedDict()
-        self.fdtd.newproject()
+        if self.fdtd is not None:
+            self.fdtd.newproject()
 
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
@@ -243,37 +268,35 @@ class LumericalSimulation(ISimulation):
 
     def enable(self, objs: list[str]):
         """Enable all objects in provided list."""
-        self.fdtd.switchtolayout()
         for obj in objs:
             self.update_object(obj, enabled=1)
 
-    def enabled(self, objs: list[str]) -> LumericalSimulation:
-        """Return copy of this simulation with all objects in objs enabled."""
+    def with_enabled(self, objs: list[str]) -> LumericalSimulation:
+        """Return copy of this simulation with only objects in objs enabled."""
         new_sim = self.copy()
+        new_sim.disable_all_sources()
         new_sim.enable(objs)
         return new_sim
 
     def disable(self, objs: list[str]):
         """Disable all objects in provided list."""
-        self.fdtd.switchtolayout()
         for obj in objs:
             self.update_object(obj, enabled=0)
 
-    def disabled(self, objs: list[str]) -> LumericalSimulation:
-        """Return copy of this simulation with all objects in objs disabled."""
+    def with_disabled(self, objs: list[str]) -> LumericalSimulation:
+        """Return copy of this simulation with only objects in objs disabled."""
         new_sim = self.copy()
+        new_sim.enable_all_sources()
         new_sim.disable(objs)
         return new_sim
 
+    def enable_all_sources(self):
+        """Enable all sources in this simulation."""
+        self.enable(self.sources())
+
     def disable_all_sources(self):
         """Disable all sources in this simulation."""
-        to_disable = []
-
-        for obj_name, obj in self.objects.items():
-            if obj.obj_type in SOURCE_TYPES:
-                to_disable.append(obj_name)
-
-        self.disable(to_disable)
+        self.disable(self.sources())
 
     def sources(self):
         """Return a list of all source objects."""
@@ -305,23 +328,20 @@ class LumericalSimulation(ISimulation):
 
     def add_object(self, obj: LumericalSimObject) -> None:
         """Add an existing object to the simulation."""
-        if self.fdtd is None:
-            self.objects[obj.name] = obj
-            return
-
-        lumapi_obj = LumericalSimObjectType.get_add_function(obj.obj_type)(
-            self.fdtd,
-            **obj.properties,
-        )
-        obj.lumapi_obj = lumapi_obj
+        # Add copy to the lumapi.FDTD
+        if self.fdtd is not None:
+            LumericalSimObjectType.get_add_function(obj.obj_type)(
+                self.fdtd,
+                **obj.properties,
+            )
         self.objects[obj.name] = obj
 
     def update_object(self, name: str, **properties):
         """Update lumerical object with new property values."""
         obj = self.objects[name]
-        assert self.fdtd is not None
-        for key, val in properties.items():
-            self.fdtd.setnamed(obj.name, key, val)
+        if self.fdtd is not None:
+            for key, val in properties.items():
+                self.fdtd.setnamed(obj.name, key, val)
         obj.update(**properties)
 
     def close(self):
@@ -330,31 +350,33 @@ class LumericalSimulation(ISimulation):
             logging.info('Closing connection with Lumerical...')
             self.fdtd.close()
             logging.info('Succesfully closed connection with Lumerical.')
-
+            self.fdtd = None
 
     def __eq__(self, __value: object) -> bool:
-        """Test equality  of simulations."""
+        """Test equality of simulations."""
         if isinstance(__value, LumericalSimulation):
             return self.objects == __value.objects
         return super().__eq__(__value)
 
     def __enter__(self):
         """Startup for context manager usage."""
+        self.connect()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Cleanup after exiting a context."""
         self.close()
 
-    def get_hpc_resources(self) -> dict:
+    @_check_fdtd
+    def get_env_resources(self) -> dict:
         """Return a dictionary containing all job manager resources."""
         resources = {}
         for resource in self.fdtd.setresource('FDTD', 1).splitlines():
             resources[resource] = self.fdtd.getresource('FDTD', 1, resource)
         return resources
 
-    def setup_hpc_resources(self, **kwargs):
-        """Set the job manager resources for runnign this simulation.
+    def setup_env_resources(self, **kwargs):
+        """Configure the environment resources for running this simulation.
 
         **kwargs:
             mpi_exe (Path): Path to the mpi executable to use
@@ -391,20 +413,23 @@ class LumericalSimulation(ISimulation):
             'exit 0',
         )
         logging.debug('Updated simulation resources:')
-        for resource, value in self.get_hpc_resources().items():
+        for resource, value in self.get_env_resources().items():
             logging.debug(f'\t"{resource}" = {value}')
 
+    @_check_fdtd
     def get_field_shape(self) -> tuple[int, ...]:
         """Return the shape of the fields returned from this simulation's monitors."""
         index_prev = self.fdtd.getresult('design_index_monitor', 'index preview')
         return np.squeeze(index_prev['index_x']).shape
 
+    @_check_fdtd
     def get_transimission_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the transmission for a given monitor."""
         # Ensure this is a transmission monitor
         monitor_name = monitor_name.replace('focal', 'transmission')
         return np.abs(self.fdtd.getresult(monitor_name, 'T')['T'])
 
+    @_check_fdtd
     def get_field(self, monitor_name: str, field_indicator: str) -> npt.NDArray:
         """Return the E or H field from a monitor."""
         if field_indicator not in 'EH':
@@ -433,21 +458,25 @@ class LumericalSimulation(ISimulation):
         """Return the E field from a monitor."""
         return self.get_field(monitor_name, 'E')
 
+    @_check_fdtd
     def get_pfield(self, monitor_name: str) -> npt.NDArray:
         """Returns power as a function of space and wavelength, with xyz components."""
         return self.fdtd.getresult(monitor_name, 'P')['P']
 
+    @_check_fdtd
     def get_efield_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the E field from a monitor."""
         efield = self.get_efield(monitor_name)
         enorm_squared = np.sum(np.square(np.abs(efield)), axis=0)
         return np.sqrt(enorm_squared)
 
+    @_check_fdtd
     def get_source_power(self) -> npt.NDArray:
         """Return the source power of a given monitor."""
         f = self.fdtd.getresult('focal_monitor_0', 'f')
         return self.fdtd.sourcepower(f)
 
+    @_check_fdtd
     def get_overall_power(self, monitor_name) -> npt.NDArray:
         """Return the overall power from a given monitor."""
         source_power = self.get_source_power()
@@ -471,7 +500,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
 
     with LumericalSimulation(Path(args.simulation_json)) as sim:
-        sim.setup_hpc_resources()
+        sim.setup_env_resources()
 
         logging.info('Saving Simulation')
         sim.save(Path('test_sim'))

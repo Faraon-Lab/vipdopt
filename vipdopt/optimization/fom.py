@@ -8,7 +8,7 @@ from typing import Any, no_type_check
 import numpy as np
 import numpy.typing as npt
 
-from vipdopt.source import Source
+from vipdopt.monitor import Monitor
 from vipdopt.utils import Number
 
 
@@ -30,8 +30,8 @@ class FoM:
     """
     def __init__(
             self,
-            fom_srcs: Sequence[Source],
-            grad_srcs: Sequence[Source],
+            fom_monitors: Sequence[Monitor],
+            grad_monitors: Sequence[Monitor],
             fom_func: Callable[..., npt.NDArray],
             gradient_func: Callable[..., npt.NDArray],
             polarization: str,
@@ -39,8 +39,8 @@ class FoM:
             opt_ids: Sequence[int] | None=None,
     ) -> None:
         """Initialize an FoM."""
-        self.fom_srcs = tuple(fom_srcs)
-        self.grad_srcs = tuple(grad_srcs)
+        self.fom_monitors = tuple(fom_monitors)
+        self.grad_monitors = tuple(grad_monitors)
         self.fom_func = fom_func
         self.gradient_func = gradient_func
         self.polarization = polarization
@@ -81,8 +81,8 @@ class FoM:
             og_fom_func = first.fom_func
             og_grad_func = first.gradient_func
             return FoM(
-                first.fom_srcs,
-                first.grad_srcs,
+                first.fom_monitors,
+                first.grad_monitors,
                 lambda *args, **kwargs: func(og_fom_func(*args, **kwargs), second),
                 lambda *args, **kwargs: func(og_grad_func(*args, **kwargs), second),
                 first.polarization,
@@ -93,8 +93,8 @@ class FoM:
             og_fom_func = second.fom_func
             og_grad_func = second.gradient_func
             return FoM(
-                second.fom_srcs,
-                second.grad_srcs,
+                second.fom_monitors,
+                second.grad_monitors,
                 lambda *args, **kwargs: func(first, og_fom_func(*args, **kwargs)),
                 lambda *args, **kwargs: func(first, og_grad_func(*args, **kwargs)),
                 second.polarization,
@@ -130,8 +130,8 @@ class FoM:
             )
 
         return FoM(
-            first.grad_srcs + second.grad_srcs,
-            first.fom_srcs + second.fom_srcs,
+            first.grad_monitors + second.grad_monitors,
+            first.fom_monitors + second.fom_monitors,
             new_compute,
             new_gradient,
             first.polarization,
@@ -150,8 +150,8 @@ class FoM:
     def __iadd__(self, second: Any) -> FoM:
         """Implement self += second."""
         combined_fom = FoM._math_helper(self, second, '+')
-        self.fom_srcs = combined_fom.fom_srcs
-        self.grad_srcs = combined_fom.grad_srcs
+        self.fom_monitors = combined_fom.fom_monitors
+        self.grad_monitors = combined_fom.grad_monitors
         self.fom_func = combined_fom.fom_func
         self.gradient_func = combined_fom.gradient_func
         return self
@@ -222,8 +222,8 @@ class FoM:
     def copy(self) -> FoM:
         """Return a copy of this FoM."""
         return FoM(
-            self.fom_srcs,
-            self.grad_srcs,
+            self.fom_monitors,
+            self.grad_monitors,
             self.fom_func,
             self.gradient_func,
             self.polarization,
@@ -237,16 +237,16 @@ class BayerFilterFoM(FoM):
 
     def __init__(
             self,
-            fom_srcs: Sequence[Source],
-            grad_srcs: Sequence[Source],
+            fom_monitors: Sequence[Monitor],
+            grad_monitors: Sequence[Monitor],
             polarization: str,
             freq: Sequence[Number],
             opt_ids: Sequence[int] | None=None,
     ) -> None:
         """Initialize a BayerFilterFoM."""
         super().__init__(
-            fom_srcs,
-            grad_srcs,
+            fom_monitors,
+            grad_monitors,
             self._bayer_fom,
             self._bayer_gradient,
             polarization,
@@ -256,10 +256,10 @@ class BayerFilterFoM(FoM):
 
     def _bayer_fom(self):
         """Compute bayer filter figure of merit."""
-        total_tfom = np.zeros(self.fom_srcs[0].shape) # FoM for transmission monitor
-        total_ffom = np.zeros(self.fom_srcs[0].shape) # FoM for focal monitor
-        for source in self.fom_srcs:
-            transmission = source.transmission_magnitude()
+        total_tfom = np.zeros(self.fom_monitors[0].shape) # FoM for transmission monitor
+        total_ffom = np.zeros(self.fom_monitors[0].shape) # FoM for focal monitor
+        for source in self.fom_monitors:
+            transmission = source.trans_mag()
             total_tfom += transmission[..., self.opt_ids]
 
             efield = source.e()
@@ -269,7 +269,7 @@ class BayerFilterFoM(FoM):
 
     def _bayer_gradient(self):
         """Compute the gradient of the bayer filter figure of merit."""
-        e_fwd = self.grad_srcs[0].e()
-        e_adj = self.grad_srcs[1].e()
+        e_fwd = self.grad_monitors[0].e()
+        e_adj = self.grad_monitors[1].e()
         df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
         return df_dev[..., self.opt_ids]

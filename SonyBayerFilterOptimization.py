@@ -19,7 +19,7 @@ sys.path.insert(0, path)
 import numpy as np
 
 from vipdopt.optimization.filter import Sigmoid
-from vipdopt.source import Source
+from vipdopt.monitor import Monitor
 from vipdopt.configuration import SonyBayerConfig
 from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer
 from vipdopt.optimization.device import Device
@@ -68,18 +68,16 @@ if __name__ == '__main__':
     logger.info(f'Loading base simulation from {args.simulation_json}...')
     base_sim = LumericalSimulation(args.simulation_json)
     logger.info('...succesfully loaded base simulation!')
-    base_sim.setup_hpc_resources()
 
     # Create all different versions of simulation that are run
-    base_sim.disable_all_sources()
     fwd_srcs = [f'forward_src_{d}' for d in 'xy']
     adj_srcs = [f'adj_src_{n}{d}' for n in range(cfg['num_adjoint_sources']) for d in 'xy']
 
     logger.info('Creating forward simulations...')
-    fwd_sims = [base_sim.enabled([src]) for src in fwd_srcs]
+    fwd_sims = [base_sim.with_enabled([src]) for src in fwd_srcs]
 
     logger.info('Creating adjoint simulations...')
-    adj_sims = [base_sim.enabled([src]) for src in adj_srcs]
+    adj_sims = [base_sim.with_enabled([src]) for src in adj_srcs]
 
     all_sims = fwd_sims + adj_sims
 
@@ -106,20 +104,24 @@ if __name__ == '__main__':
     logger.info('Beginning Step 2: Optimization Setup')
 
     # Create sources and figures of merit (FoMs)
-    fom_srcs = [(Source(fwd_sims[i], f'focal_monitor_{i}'),) for i in range(2)]
+    fom_monitors = [(Monitor(fwd_sims[i], f'focal_monitor_{i}'),) for i in range(2)]
 
-    grad_fwd_srcs = [Source(sim, f'design_efield_monitor') for sim in fwd_sims]
-    grad_adj_srcs = [Source(sim, f'design_efield_monitor') for sim in adj_sims]
-    source_pairs = list(zip([0, 1] * 4, range(8)))  # [(0, 0), (1, 1), (0, 2), (1, 3), ...]
-    grad_srcs = [(grad_fwd_srcs[i], grad_adj_srcs[j]) for i, j in source_pairs]
+    grad_fwd_monitors = [Monitor(sim, f'design_efield_monitor') for sim in fwd_sims]
+    grad_adj_monitors = [Monitor(sim, f'design_efield_monitor') for sim in adj_sims]
+    monitor_pairs = list(
+        zip([0, 1] * 4, range(8))  # [(0, 0), (1, 1), (0, 2), (1, 3), ...]
+    )
+    grad_monitors = [
+        (grad_fwd_monitors[i], grad_adj_monitors[j]) for i, j in monitor_pairs
+    ]
 
     foms = [
         BayerFilterFoM(
-            fom_srcs[i],
-            grad_srcs[j],
+            fom_monitors[i],
+            grad_monitors[j],
             'TE',
             cfg['lambda_values_um'],
-        ) for i, j in source_pairs
+        ) for i, j in monitor_pairs
     ]
 
     # Add weighted FoMs
@@ -151,6 +153,10 @@ if __name__ == '__main__':
         start_iter=0,
         start_epoch=0,
     )
+
+    for sim in all_sims:
+        sim.connect()
+        sim.setup_env_resources()
 
     # TODO: Add reinterpolation of the device
 
