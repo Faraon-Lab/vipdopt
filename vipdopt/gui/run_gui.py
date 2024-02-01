@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
+from vipdopt.gui.ui_status import Ui_MainWindow as Ui_StatusWindow
 from vipdopt.utils import read_config_file, PathLike
 from vipdopt.gui.config_editor import ConfigModel
 
@@ -17,7 +18,7 @@ from vipdopt.gui.config_editor import ConfigModel
 class SettingsWindow(QMainWindow, Ui_SettingsWindow):
     """Wrapper class for the settings window."""
     def __init__(self):
-        """Initialize a settigns window."""
+        """Initialize a SettingsWindow."""
         super().__init__()
         self.setupUi(self)
 
@@ -84,11 +85,22 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         pass
 
 
+class StatusWindow(QMainWindow, Ui_StatusWindow):
+    """Wrapper class for the status window."""
+    def __init__(self):
+        """Initialize a StatusWindow."""
+        super().__init__()
+        self.setupUi(self)
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     app = QApplication(sys.argv)
 
-    window = SettingsWindow()
-    window.show()
+    # Create application windows
+    status_window = StatusWindow()
+    status_window.show()
+    settings_window = SettingsWindow()
+    settings_window.show()
     app.exec()
