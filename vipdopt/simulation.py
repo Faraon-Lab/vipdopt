@@ -195,12 +195,12 @@ class LumericalSimulation(ISimulation):
         self.fdtd.newproject()
         self._sync_fdtd()
 
+    @ensure_path
     @override
-    def load(self, fname: PathLike):
-        fpath = ensure_path(fname)
-        logging.info(f'Loading simulation from {fpath}...')
+    def load(self, fname: Path):
+        logging.info(f'Loading simulation from {fname}...')
         self._clear_objects()
-        sim = read_config_file(fpath)
+        sim = read_config_file(fname)
         for obj in sim['objects'].values():
             self.new_object(
                 obj['name'],
@@ -208,7 +208,7 @@ class LumericalSimulation(ISimulation):
                 **obj['properties'],
             )
 
-        logging.info(f'Succesfully loaded {fpath}\n')
+        logging.info(f'Succesfully loaded {fname}\n')
 
     @_check_fdtd
     def _sync_fdtd(self):
@@ -225,13 +225,13 @@ class LumericalSimulation(ISimulation):
                 self.fdtd.setnamed(obj_name, key, val)
 
 
+    @ensure_path
     @override
-    def save(self, fname: PathLike):
+    def save(self, fname: Path):
         self._sync_fdtd()
-        fpath = ensure_path(fname)
-        logging.info(f'Saving simulation to {fpath}...')
-        self.fdtd.save(str(fpath.with_suffix('')))
-        with open(fpath.with_suffix('.json'), 'w', encoding='utf-8') as f:
+        logging.info(f'Saving simulation to {fname}...')
+        self.fdtd.save(str(fname.with_suffix('')))
+        with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             json.dump(
                 {'objects': self.objects},
                 f,
@@ -239,7 +239,7 @@ class LumericalSimulation(ISimulation):
                 ensure_ascii=True,
                 cls=LumericalEncoder,
             )
-        logging.info(f'Succesfully saved simulation to {fpath}.\n')
+        logging.info(f'Succesfully saved simulation to {fname}.\n')
 
     @_check_fdtd
     @override

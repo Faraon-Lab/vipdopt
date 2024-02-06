@@ -8,7 +8,9 @@ from collections.abc import Callable
 from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, ParamSpec, Concatenate
+from typing_extensions import Protocol
+import functools
 
 import numpy as np
 import numpy.typing as npt
@@ -20,6 +22,8 @@ PathLike = TypeVar('PathLike', str, Path, bytes, os.PathLike)
 # Generic types for type hints
 T = TypeVar('T')
 R = TypeVar('R')
+
+P = ParamSpec('P')
 
 
 class TruncateFormatter(logging.Formatter):
@@ -102,7 +106,7 @@ def import_lumapi(loc: str):
 
 def read_config_file(filename: PathLike, cfg_format: str='auto') -> dict[str, Any]:
     """Read a configuration file."""
-    path_filename = ensure_path(filename)
+    path_filename = convert_path(filename)
     if cfg_format == 'auto':
         cfg_format = path_filename.suffix
 
@@ -138,7 +142,7 @@ def _yaml_loader(filepath: PathLike) -> dict:
         return yaml.safe_load(stream)
 
 
-def ensure_path(path: PathLike) -> Path:
+def convert_path(path: PathLike) -> Path:
     """Ensure that a Path is a Path object."""
     if isinstance(path, Path):
         return path
@@ -149,3 +153,17 @@ def ensure_path(path: PathLike) -> Path:
 
     # Input was not a PathLike
     raise ValueError(f'Argument must be PathLike, got {type(path)}')
+
+
+def ensure_path(
+        func: Callable[Concatenate[Any, Path, P], R],
+) -> Callable[Concatenate[Any, PathLike, P], R]:
+    @functools.wraps(func)
+    def wrapper(
+            arg0: Any,
+            path: PathLike,
+            *args: P.args, 
+            **kwargs: P.kwargs,
+    ) -> R:
+        return func(arg0, convert_path(path), *args, **kwargs)
+    return wrapper

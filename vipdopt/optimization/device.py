@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 
 from vipdopt.optimization.filter import Filter
-from vipdopt.utils import PathLike, ensure_path
+from vipdopt.utils import PathLike, convert_path
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
@@ -120,7 +120,7 @@ class Device:
             folder (PathLike): The folder to save the device to. Anything after the
                 directory name will be stripped. Defaults to root directory.
         """
-        path_folder = ensure_path(folder).parent
+        path_folder = convert_path(folder).parent
         path_folder.mkdir(exist_ok=True)
         w_path = path_folder / (self.name + '_w.npy')
         self.w_path = w_path
@@ -134,7 +134,7 @@ class Device:
 
     def load(self, folder: PathLike):
         """Load device data from a directory."""
-        fpath = ensure_path(folder).parent
+        fpath = convert_path(folder).parent
         obj_file = fpath.glob('*.pkl').__next__()
         with obj_file.open('rb') as f:
             data = pickle.load(f)
@@ -146,7 +146,7 @@ class Device:
     @classmethod
     def fromfile(cls, folder: PathLike) -> Device:
         """Create a new device by loading from a saved directory."""
-        fpath = ensure_path(folder).parent
+        fpath = convert_path(folder).parent
         obj_file = fpath.glob('*.pkl').__next__()
         with obj_file.open('rb') as f:
             data = pickle.load(f)

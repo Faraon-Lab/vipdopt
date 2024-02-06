@@ -4,10 +4,11 @@
 import numpy as np
 import yaml
 from overrides import override
+from pathlib import Path
 
 from vipdopt.configuration.config import Config
 from vipdopt.configuration.template import TemplateRenderer
-from vipdopt.utils import PathLike
+from vipdopt.utils import ensure_path
 
 # A lookup table that adds additional vertical mesh cells depending on layers
 LOOKUP_MESH_CELLS = {1:3, 2:3, 3:2, 4:3, 5:2, 6:2, 8:3, 10:2,
@@ -22,11 +23,11 @@ class SonyBayerConfig(Config):
         """Initialize SonyBayerConfig object."""
         super().__init__()
 
+    @ensure_path
     @override
-    def read_file(self, fname: PathLike, cfg_format: str='auto') -> None:
+    def read_file(self, fname: Path, cfg_format: str='auto') -> None:
         super().read_file(fname, cfg_format=cfg_format)
         self._validate()
-
 
     def derive_params(self, renderer: TemplateRenderer):
         """Derive the parameters that depend on the config files."""

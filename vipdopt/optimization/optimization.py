@@ -12,6 +12,7 @@ from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import FoM
 from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.simulation import ISimulation
+from vipdopt.utils import ensure_path, PathLike
 
 
 class Optimization:
@@ -44,6 +45,10 @@ class Optimization:
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
         self._callbacks.append(func)
+    
+    @ensure_path
+    def save(self, directory: PathLike): 
+        pass
 
     def _simulation_dispatch(self, sim_idx: int):
         """Target for threads to run simulations."""

@@ -85,7 +85,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         pass
 
 
-class StatusWindow(QMainWindow, Ui_StatusWindow):
+class StatusDashboard(QMainWindow, Ui_StatusWindow):
     """Wrapper class for the status window."""
     def __init__(self):
         """Initialize a StatusWindow."""
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     # Create application windows
-    status_window = StatusWindow()
+    status_window = StatusDashboard()
     status_window.show()
     settings_window = SettingsWindow()
     settings_window.show()

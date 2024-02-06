@@ -2,8 +2,9 @@
 
 import logging
 from typing import Any
+from pathlib import Path
 
-from vipdopt.utils import PathLike, ensure_path, read_config_file
+from vipdopt.utils import ensure_path, read_config_file
 
 
 class Config:
@@ -33,16 +34,16 @@ class Config:
         """Set the value of an attribute, creating it if it doesn't already exist."""
         self._parameters[name] = value
 
-    def read_file(self, fname: PathLike, cfg_format: str='auto') -> None:
+    @ensure_path
+    def read_file(self, fname: Path, cfg_format: str='auto') -> None:
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
-        fpath = ensure_path(fname)
-        config = read_config_file(fpath, cfg_format)
+        config = read_config_file(fname, cfg_format)
         logging.debug(f'Loaded config file:\n {config}')
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
             self._parameters.update(config)
 
-        self._files.add(fpath)
-        logging.info(f'\nSuccesfully loaded configuration from {fpath}')
+        self._files.add(fname)
+        logging.info(f'\nSuccesfully loaded configuration from {fname}')
