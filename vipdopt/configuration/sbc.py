@@ -175,10 +175,10 @@ class SonyBayerConfig(Config):
     def _derive_params(self):
         """Derive the parameters that depend on the config files."""
 
-        if self.safe_get('border_optimization'):
+        if self.get('border_optimization'):
             self.device_size_lateral_bordered_um = 2 * self.border_size_um
 
-            if self.safe_get('evaluate_bordered_extended'):
+            if self.get('evaluate_bordered_extended'):
                 self.border_size_um = self.device_size_lateral_um
 
             self.device_size_lateral_bordered_um += 2 * self.border_size_um
@@ -194,7 +194,7 @@ class SonyBayerConfig(Config):
            self.device_voxels_simulation_mesh_lateral_bordered = \
             self.device_voxels_simulation_mesh_lateral
 
-        if self.safe_get('use_airy_approximation'):
+        if self.get('use_airy_approximation'):
             self.gaussian_waist_radius_um = self.airy_correction_factor * \
                 self.mid_lambda_um * self.f_number
         else:
@@ -202,51 +202,51 @@ class SonyBayerConfig(Config):
                 ( np.pi * ( 1. / ( 2 * self.f_number ) ) )
         self.gaussian_waist_radius_um *= self.beam_size_multiplier
 
-        if self.safe_get('sidewall_extend_pml'):
+        if self.get('sidewall_extend_pml'):
             self.sidewall_thickness_um = (self.fdtd_region_size_lateral_um - \
                                           self.device_size_lateral_um) / 2
 
-        if self.safe_get('add_infrared'):
+        if self.get('add_infrared'):
            self._add_infrared()
 
-        if self.safe_get('layer_gradient'):
+        if self.get('layer_gradient'):
             if self.num_vertical_layers != VERTICAL_LAYERS:
                raise ValueError(f"Expected 'num_vertical_layers'=={VERTICAL_LAYERS},"
                                 f' got {self.num_vertical_layers}.')
             self._layer_gradient()
 
-        if self.safe_get('explicit_band_centering'):
+        if self.get('explicit_band_centering'):
             self._explicit_band_centering()
 
-        if self.safe_get('do_rejection'):
+        if self.get('do_rejection'):
             self._do_rejection()
 
     def _validate(self):
         """Validate the config file and compute conditional attributes."""
-        if self.safe_get('border_optimization') and self.safe_get('use_smooth_blur'):
+        if self.get('border_optimization') and self.get('use_smooth_blur'):
             msg = ("Combining 'border_optimization' and "
             "'use_smooth_blur' is not supported")
             raise ValueError(msg)
 
-        if self.safe_get('border_optimization') and self.safe_get('num_sidewalls') != 0:
+        if self.get('border_optimization') and self.get('num_sidewalls') != 0:
             msg = ("Combining 'border_optimization' and "
             "'num_sidewalls' > 0 is not supported")
             raise ValueError(msg)
 
 
-        if self.safe_get('add_pdaf'):
-            dvl = self.safe_get('device_voxels_lateral_um')
+        if self.get('add_pdaf'):
+            dvl = self.get('device_voxels_lateral_um')
             if dvl is None or dvl % 2 != 0:
                raise ValueError("Expected 'device_voxels_lateral_um' to be even for"
                                 ' PDAF implementation ease, got '
                                 f"'{dvl}'.")
 
-            if self.safe_get('add_infrared'):
+            if self.get('add_infrared'):
                raise ValueError("'add_pdaf and 'add_infrared' are not compatible.")
 
 
-        if self.safe_get('reinterpolate_permittivity') is False and \
-            self.safe_get('reinterpolate_permittivity_factor') != 1:
+        if self.get('reinterpolate_permittivity') is False and \
+            self.get('reinterpolate_permittivity_factor') != 1:
                raise ValueError("Expected 'reinterpolate_permittivity_factor' to be 1"
                                 ' if not reinterpolating permittivity,'
                                 f" got '{self['reinterpolate_permittivity_factor']}'.")

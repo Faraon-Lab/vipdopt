@@ -8,7 +8,7 @@ from vipdopt.utils import ensure_path, read_config_file
 
 
 class Config:
-    """A generic class for stroing parameters from a configuration file."""
+    """A generic class for storing parameters from a configuration file."""
 
     def __init__(self):
         """Initialize a Config object.
@@ -22,9 +22,9 @@ class Config:
         """Return shorter string version of the Config object."""
         return f'Config object for {self._files} with parameters {self._parameters}'
 
-    def safe_get(self, prop: str) -> Any | None:
+    def get(self, prop: str, default: Any=None) -> Any | None:
         """Get parameter and return None if it doesn't exist."""
-        return self._parameters.get(prop, None)
+        return self._parameters.get(prop, default)
 
     def __getitem__(self, name: str) -> Any:
         """Get value of a parameter."""

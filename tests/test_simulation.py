@@ -36,7 +36,7 @@ def test_load_sim(simulation_json):
     })
 
 
-    with LumericalSimulation(fname=simulation_json) as s:
+    with LumericalSimulation(source=simulation_json) as s:
         assert 'source_aperture' in s.objects
         assert_equal(s.objects['source_aperture'], source_aperture)
         assert 'device_mesh' in s.objects
@@ -66,7 +66,7 @@ def test_save_sim(tmp_path, sim_file):
         'y span': 1.5e-6,
     })
 
-    with LumericalSimulation(fname=None) as s:
+    with LumericalSimulation(source=None) as s:
         s.add_object(source_aperture)
         s.add_object(device_mesh)
         s.save(path)
@@ -88,7 +88,7 @@ def test_new_object():
     correct_mesh = LumericalSimObject('correct_mesh', LumericalSimObjectType.MESH)
     correct_mesh.update(**props)
 
-    with LumericalSimulation(fname=None) as s:
+    with LumericalSimulation(source=None) as s:
         s.new_object('device_mesh', LumericalSimObjectType.MESH, **props)
 
         assert 'device_mesh' in s.objects

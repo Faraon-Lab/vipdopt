@@ -19,13 +19,14 @@ from overrides import override
 
 from vipdopt import lumapi
 from vipdopt.utils import PathLike, ensure_path, read_config_file
+from vipdopt.configuration import Config
 
 
 class ISimulation(abc.ABC):
     """Abstract class for an FDTD simulation."""
 
     @abc.abstractmethod
-    def __init__(self, fname: PathLike | None) -> None:
+    def __init__(self, source: PathLike | dict | None) -> None:
         """Create simulation object."""
 
     @abc.abstractmethod
@@ -33,8 +34,8 @@ class ISimulation(abc.ABC):
         """Create hook to simulation software."""
 
     @abc.abstractmethod
-    def load(self, fname: PathLike):
-        """Load simulation from a file."""
+    def load(self, source: PathLike | dict):
+        """Load simulation from a file or dictionary."""
 
     @abc.abstractmethod
     def save(self, fname: PathLike):
@@ -134,6 +135,7 @@ class LumericalSimObject:
                 self.properties == __value.properties
         return super().__eq__(__value)
 
+
 def _check_fdtd(func: Callable) -> Callable:
     def wrapped(self, *args, **kwargs):
         if self.fdtd is None:
@@ -155,7 +157,7 @@ class LumericalSimulation(ISimulation):
             the simulation
     """
 
-    def __init__(self, fname: PathLike | None=None) -> None:
+    def __init__(self, source: PathLike | dict | None=None) -> None:
         """Create a LumericalSimulation.
 
         Arguments:
@@ -163,8 +165,8 @@ class LumericalSimulation(ISimulation):
         """
         self.fdtd: lumapi.FDTD | None = None
         self._clear_objects()
-        if fname:
-            self.load(fname)
+        if source:
+            self.load(source)
 
     @override
     def __str__(self) -> str:
@@ -195,20 +197,27 @@ class LumericalSimulation(ISimulation):
         self.fdtd.newproject()
         self._sync_fdtd()
 
-    @ensure_path
     @override
-    def load(self, fname: Path):
+    def load(self, source: PathLike | dict):
+        if isinstance(source, dict):
+            self._load_dict(source)
+        else:
+            self._load_file(source)
+
+    def _load_file(self, fname: PathLike):
         logging.info(f'Loading simulation from {fname}...')
-        self._clear_objects()
         sim = read_config_file(fname)
-        for obj in sim['objects'].values():
+        self._load_dict(sim)
+        logging.info(f'Succesfully loaded {fname}\n')
+
+    def _load_dict(self, d: dict):
+        self._clear_objects()
+        for obj in d['objects'].values():
             self.new_object(
                 obj['name'],
                 LumericalSimObjectType(obj['obj_type']),
                 **obj['properties'],
             )
-
-        logging.info(f'Succesfully loaded {fname}\n')
 
     @_check_fdtd
     def _sync_fdtd(self):
