@@ -64,13 +64,19 @@ class FoM:
         """Compute gradient of FoM."""
         return self.gradient_func(*args, **kwargs)
     
-
-    
-    def json(self) -> str:
+    def as_dict(self) -> dict:
+        """Return a dictionary representation of this FoM."""
         data = {}
-        data[name]
-
-
+        data['type'] = type(self).__name__
+        data['fom_monitors'] = [(mon.source_name, mon.monitor_name) for mon in self.fom_monitors]
+        data['grad_monitors'] = [
+            (mon.source_name, mon.monitor_name) for mon in self.grad_monitors
+        ]
+        data['polarization'] = self.polarization
+        data['freq'] = self.freq
+        data['opt_ids'] = self.opt_ids
+    
+        return data
 
     @staticmethod
     @no_type_check

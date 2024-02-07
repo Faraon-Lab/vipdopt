@@ -60,6 +60,11 @@ class Optimization:
         if isinstance(config, dict):
             config = Config(config)
         cfg = copy(config)
+
+        # General Settings
+        self.iteration = cfg.get('current_iteration', 0)
+        self.epoch = cfg.get('current_epoch', 0)
+
         # Setup optimizer
         optimizer: str = cfg.pop('optimizer')
         optimizer_settings: dict = cfg.pop('optimizer_settings')
@@ -135,32 +140,25 @@ class Optimization:
         """Create a JSON config for this optimization's settings."""
         cfg = copy(self.config)
 
-        # Simulation
-        cfg['base_simulation'] = self.base_sim.as_dict()
-
-        # FoMs
-        foms = []
-        for i, fom in enumerate(self.foms):
-            data = {}
-            data['type'] = type(fom).__name__
-            data['fom_monitors'] = [(mon.source_name, mon.monitor_name) for mon in fom.fom_monitors]
-            data['grad_monitors'] = [
-                (mon.source_name, mon.monitor_name) for mon in fom.grad_monitors
-            ]
-            data['polarization'] = fom.polarization
-            data['freq'] = fom.freq
-            data['opt_ids'] = fom.opt_ids
-            data['weight'] = self.weights[i]
-            foms.append(data)
-        cfg['figures_of_merit'] = {fom.name: foms[i] for i, fom in enumerate(self.foms)}
+        # Miscellaneous Settings
+        cfg['current_epoch'] = self.epoch
+        cfg['current_iteration'] = self.iteration
 
         # Optimizer
         cfg['optimizer'] = type(self.optimizer).__name__
         cfg['optimizer_settings'] = vars(self.optimizer)
 
-        # Remaining Settings
-        cfg['epoch'] = self.epoch
-        cfg['iteration'] = self.iteration
+        # FoMs
+        foms = []
+        for i, fom in enumerate(self.foms):
+            data = fom.as_dict()
+            data['weight'] = self.weights[i]
+            foms.append(data)
+        cfg['figures_of_merit'] = {fom.name: foms[i] for i, fom in enumerate(self.foms)}
+
+        # Simulation
+        cfg['base_simulation'] = self.base_sim.as_dict()
+
 
         return cfg
 
