@@ -10,6 +10,9 @@ from vipdopt.optimization.device import Device
 class GradientOptimizer(abc.ABC):
     """Abstraction class for all gradient-based optimizers."""
 
+    def __init__(self, **kwargs):
+        vars(self).update(kwargs.copy())
+
     @abc.abstractmethod
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""

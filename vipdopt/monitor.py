@@ -9,16 +9,25 @@ from vipdopt.simulation import LumericalSimulation
 class Monitor:
     """Class representing the different source monitors in a simulation."""
 
-    def __init__(self, sim: LumericalSimulation, monitor_name: str) -> None:
+    def __init__(self, sim: LumericalSimulation, source_name: str, monitor_name: str) -> None:
         """Initialize a Monitor."""
         self.sim = sim
+        self.source_name = source_name
         self.monitor_name = monitor_name
-        self.shape = self.sim.get_field_shape()
-        
+
         # Initialize field values
+        self._shape = None
         self._e = None
         self._h = None
         self._trans_mag = None
+    
+    @property
+    def shape(self) -> npt.ArrayLike:
+        """Return the shape of the numpy array for this monitor's fields."""
+        if self._shape is None:
+            if self.sim.fdtd is not None:
+                self._shape = self.sim.get_field_shape()
+        return self._shape
 
     @property
     def e(self) -> npt.ArrayLike:

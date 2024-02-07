@@ -6,6 +6,9 @@ import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import sys
+from copy import copy
+from typing import Type
 
 import numpy.typing as npt
 
@@ -13,9 +16,9 @@ from vipdopt.optimization.device import Device
 from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.optimization.fom import FoM, BayerFilterFoM
 from vipdopt.optimization.adam import AdamOptimizer, DEFAULT_ADAM
-from vipdopt.simulation import ISimulation, LumericalSimulation
+from vipdopt.simulation import ISimulation, LumericalSimulation, LumericalEncoder
 from vipdopt.configuration import Config
-from vipdopt.utils import ensure_path
+from vipdopt.utils import ensure_path, save_config_file, read_config_file, PathLike
 from vipdopt.monitor import Monitor
 
 
@@ -24,77 +27,92 @@ class Optimization:
 
     def __init__(
             self,
-            sims: list[ISimulation],
-            device: Device,
-            config: Config,
-            fom: FoM,
-            optimizer: GradientOptimizer,
-            max_iter: int,
-            max_epochs: int,
-            start_iter: int=0,
-            start_epoch: int=0,
+            config: Config | None=None,
     ):
         """Initialize Optimzation object."""
-        self.sims = sims
-        self.fom = fom
-        self.device = device
-
         self.fom_hist: list[npt.NDArray] = []
         self.param_hist: list[npt.NDArray] = []
         self._callbacks: list[Callable[[Optimization], None]] = []
+        self.dir = Path('.')  # Project directory; defaults to root
 
         self.epoch = 0
         self.iteration = 0
+        self.config = Config()
 
-        self._load_config(config)
-        self.config = config
+        if config is not None:
+            self.load_config(config)
+        
+    @classmethod
+    def from_dir(cls: Type[Optimization], project_dir: PathLike) -> Optimization:
+        opt = Optimization()
+        opt.load_project(project_dir)
+        return opt
+    
+    @ensure_path
+    def load_project(self, project_location: Path):
+        """Load settings from a project directory."""
+        self.dir = project_location
+        cfg = Config.from_file(self.dir / 'config.json')
+        self.load_config(cfg)
 
-    def _load_config(self, config: Config):
+    def load_config(self, config: Config | dict):
         """Load and setup optimization from an appropriate JSON config file."""
+        if isinstance(config, dict):
+            config = Config(config)
+        cfg = copy(config)
         # Setup optimizer
-        optimizer: str = config.get('optimizer', 'adam')
-        optimizer_settings: dict = config.get('optimizer_settings', DEFAULT_ADAM)
-        match optimizer.lower():
-            case 'adam':
-                optimizer_type = AdamOptimizer
-            case _:
-                raise NotImplementedError(f'Optimizer {optimizer} not currently supported')
+        optimizer: str = cfg.pop('optimizer')
+        optimizer_settings: dict = cfg.pop('optimizer_settings')
+        try:
+            optimizer_type = getattr(sys.modules[__name__], optimizer)
+        except AttributeError:
+            raise NotImplementedError(f'Optimizer {optimizer} not currently supported')
         self.optimizer = optimizer_type(**optimizer_settings)
 
         # Setup simulations
-        base_sim = LumericalSimulation(config['base_simulation'])
-        base_sim.setup_env_resources(
-            mpi_exe=config['mpi_path'],
-            nprocs=config.get('nprocs'),
-            solver_exe=config['solver_path']
+        base_sim = LumericalSimulation(cfg.pop('base_simulation'))
+        base_sim.promise_env_setup(
+            mpi_exe=cfg['mpi_exe'],
+            nprocs=cfg['nprocs'],
+            solver_exe=cfg['solver_exe'],
         )
-        src_to_sim_map = {src: base_sim.with_enabled([src]) for src in base_sim.sources()}
+        src_to_sim_map = {src: base_sim.with_enabled([src]) for src in base_sim.source_names()}
         self.sims = src_to_sim_map.values()
+        self.base_sim = base_sim
 
         # Setup FoMs
         foms: list[FoM] = []
         weights = []
         fom: dict
-        for fom in config.get('figures_of_merit', []):
-            match fom['type']:
-                case 'bayer_filter':
-                    fom_cls = BayerFilterFoM
-                case _:
-                    raise NotImplementedError
-            foms.append(new_fom = fom_cls(
-                    fom_monitors=[
-                        Monitor(src_to_sim_map[src], mname) for src, mname in fom['fom_monitors']
-                    ],
-                    grad_monitors=[
-                        Monitor(src_to_sim_map[src], mname) for src, mname in fom['grad_monitors']
-                    ],
-                    polarization=fom['polarization'],
-                    freq=fom['freq'],
-                    opt_ids=fom.get('opt_ids', None),
-                ) 
-            )
+        for name, fom in cfg.pop('figures_of_merit').items():
+            fom_cls = getattr(sys.modules[__name__], fom['type'])
+            foms.append(fom_cls(
+                fom_monitors=[
+                    Monitor(
+                        src_to_sim_map[src],
+                        src,
+                        mname,
+                    ) for src, mname in fom['fom_monitors']
+                ],
+                grad_monitors=[
+                    Monitor(
+                        src_to_sim_map[src],
+                        src,
+                        mname,
+                    ) for src, mname in fom['grad_monitors']
+                ],
+                polarization=fom['polarization'],
+                freq=fom['freq'],
+                opt_ids=fom.get('opt_ids', None),
+                name=name,
+            ))
             weights.append(fom['weight'])
         self.foms = foms
+        self.weights = weights
+
+        # TODO Load the Device
+
+        self.config = cfg
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
@@ -103,16 +121,55 @@ class Optimization:
     def save(self):
         """Save this optimization to it's pre-existing project directory."""
         self.save_as(self.config['project_directory'])
-
+    
     @ensure_path
     def save_as(self, project_dir: Path): 
-        pass
+        """Save this optimization to a specified directory, creating it if necessary."""
+        project_dir.mkdir(parents=True, exist_ok=True)
+        cfg = self._generate_config()
+        cfg.save_file(project_dir / 'config.json', cls=LumericalEncoder)
+
+        # TODO Save Device, histories, and plots
+    
+    def _generate_config(self) -> Config:
+        """Create a JSON config for this optimization's settings."""
+        cfg = copy(self.config)
+
+        # Simulation
+        cfg['base_simulation'] = self.base_sim.as_dict()
+
+        # FoMs
+        foms = []
+        for i, fom in enumerate(self.foms):
+            data = {}
+            data['type'] = type(fom).__name__
+            data['fom_monitors'] = [(mon.source_name, mon.monitor_name) for mon in fom.fom_monitors]
+            data['grad_monitors'] = [
+                (mon.source_name, mon.monitor_name) for mon in fom.grad_monitors
+            ]
+            data['polarization'] = fom.polarization
+            data['freq'] = fom.freq
+            data['opt_ids'] = fom.opt_ids
+            data['weight'] = self.weights[i]
+            foms.append(data)
+        cfg['figures_of_merit'] = {fom.name: foms[i] for i, fom in enumerate(self.foms)}
+
+        # Optimizer
+        cfg['optimizer'] = type(self.optimizer).__name__
+        cfg['optimizer_settings'] = vars(self.optimizer)
+
+        # Remaining Settings
+        cfg['epoch'] = self.epoch
+        cfg['iteration'] = self.iteration
+
+        return cfg
+
 
     def _simulation_dispatch(self, sim_idx: int):
         """Target for threads to run simulations."""
         sim = self.sims[sim_idx]
         logging.debug(f'Running simulation on thread {sim_idx}')
-        sim.save(f'_sim{sim_idx}_epoch_{self.epoch}_iter_{self.iteration}')
+        sim.save_lumapi(f'_sim{sim_idx}_epoch_{self.epoch}_iter_{self.iteration}')
         sim.run()
         logging.debug(f'Completed running on thread {sim_idx}')
 
@@ -164,3 +221,17 @@ class Optimization:
         logging.info(f'Final FoM: {final_fom}')
         final_params = self.param_hist[-1]
         logging.info(f'Final Parameters: {final_params}')
+
+if __name__ == '__main__':
+    project_dir = Path('./test_project/')
+    output_dir = Path('./test_output_optimization/')
+
+    opt = Optimization.from_dir(project_dir)
+    opt.save_as(output_dir)
+
+    # Test that the saved format is loadable
+    reload = Optimization.from_dir(output_dir)
+
+    # Also this way
+    reload2 = Optimization()
+    reload2.load_project(output_dir)

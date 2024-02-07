@@ -1,6 +1,7 @@
 """FDTD Simulation Interface Code."""
 from __future__ import annotations
 
+import functools
 import abc
 import json
 import logging
@@ -11,16 +12,39 @@ from collections.abc import Callable
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Concatenate
 
 import numpy as np
 import numpy.typing as npt
 from overrides import override
 
 from vipdopt import lumapi
-from vipdopt.utils import PathLike, ensure_path, read_config_file
+from vipdopt.utils import PathLike, ensure_path, read_config_file, P, R
 from vipdopt.configuration import Config
 
+
+def _check_fdtd(
+        func: Callable[Concatenate[LumericalSimulation, P], R],
+)-> Callable[Concatenate[LumericalSimulation, P], R]:
+    @functools.wraps(func)
+    def wrapped(sim: LumericalSimulation, *args: P.args, **kwargs: P.kwargs):
+        if sim.fdtd is None:
+            raise UnboundLocalError(
+                f'Cannot call {func.__name__} before `fdtd` is instantiated.'
+                ' Has `connect()` been called?'
+            )
+        return func(sim, *args, **kwargs)
+    return wrapped
+
+
+def _sync_fdtd_solver(
+        func: Callable[Concatenate[LumericalSimulation, P], R],
+)-> Callable[Concatenate[LumericalSimulation, P], R]:
+    @functools.wraps(func)
+    def wrapped(sim: LumericalSimulation, *args: P.args, **kwargs: P.kwargs):
+        sim._sync_fdtd()
+        return func(sim, *args, **kwargs)
+    return wrapped
 
 class ISimulation(abc.ABC):
     """Abstract class for an FDTD simulation."""
@@ -87,8 +111,9 @@ class LumericalEncoder(json.JSONEncoder):
             return {'obj_type': str(o)}
         if isinstance(o, LumericalSimObject):
             d = o.__dict__.copy()
-            del d['lumapi_obj']
             return d
+        if isinstance(o, np.ndarray):
+            return o.tolist()
         return super().default(o)
 
 
@@ -136,22 +161,11 @@ class LumericalSimObject:
         return super().__eq__(__value)
 
 
-def _check_fdtd(func: Callable) -> Callable:
-    def wrapped(self, *args, **kwargs):
-        if self.fdtd is None:
-            raise UnboundLocalError(
-                f'Cannot call {func.__name__} before `fdtd` is instantiated.'
-                ' Has `connect()` been called?'
-            )
-        return func(self, *args, **kwargs)
-    return wrapped
-
 
 class LumericalSimulation(ISimulation):
     """Lumerical FDTD Simulation Code.
 
     Attributes:
-        config (vipdopt.Config): configuration object
         fdtd (lumapi.FDTD): Lumerical session
         objects (OrderedDict[str, LumericalSimObject]): The objects within
             the simulation
@@ -165,17 +179,13 @@ class LumericalSimulation(ISimulation):
         """
         self.fdtd: lumapi.FDTD | None = None
         self._clear_objects()
+        self._synced = False  # Flag for whether fdtd needs to be synced
         if source:
             self.load(source)
 
     @override
     def __str__(self) -> str:
-        return json.dumps(
-            dict(self.__dict__),
-            indent=4,
-            ensure_ascii=True,
-            cls=LumericalEncoder,
-        )
+        return self.as_json()
 
     @override
     def connect(self) -> None:
@@ -222,6 +232,8 @@ class LumericalSimulation(ISimulation):
     @_check_fdtd
     def _sync_fdtd(self):
         """Sync local objects with `lumapi.FDTD` objects"""
+        if self._synced:
+            return
         self.fdtd.switchtolayout()
         for obj_name, obj in self.objects:
             # Create object if needed
@@ -232,28 +244,41 @@ class LumericalSimulation(ISimulation):
                 )
             for key, val in obj.properties.items():
                 self.fdtd.setnamed(obj_name, key, val)
+        self._synced = True
 
 
     @ensure_path
     @override
     def save(self, fname: Path):
-        self._sync_fdtd()
         logging.info(f'Saving simulation to {fname}...')
-        self.fdtd.save(str(fname.with_suffix('')))
+        if self.fdtd is not None:
+            self.save_lumapi(fname)
+        content = self.as_json()
         with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
-            json.dump(
-                {'objects': self.objects},
-                f,
-                indent=4,
-                ensure_ascii=True,
-                cls=LumericalEncoder,
-            )
+            f.write(content)
         logging.info(f'Succesfully saved simulation to {fname}.\n')
+    
+    @_sync_fdtd_solver
+    @ensure_path
+    def save_lumapi(self, fname: Path):
+        """Save using Lumerical's simulation file type (.fsp)."""
+        self.fdtd.save(str(fname.with_suffix('')))
+    
+    def as_dict(self) -> dict:
+        return {'objects': self.objects}
 
-    @_check_fdtd
+    def as_json(self) -> str:
+        """Return a JSON representation of thi ssimulation."""
+        return json.dumps(
+            self.as_dict(),
+            indent=4,
+            ensure_ascii=True,
+            cls=LumericalEncoder,
+        )
+
+    @_sync_fdtd_solver
     @override
     def run(self):
-        self._sync_fdtd()
         self.fdtd.run()
 
     @_check_fdtd
@@ -266,6 +291,7 @@ class LumericalSimulation(ISimulation):
         self.objects = OrderedDict()
         if self.fdtd is not None:
             self.fdtd.newproject()
+            self._synced = True
 
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
@@ -301,19 +327,27 @@ class LumericalSimulation(ISimulation):
 
     def enable_all_sources(self):
         """Enable all sources in this simulation."""
-        self.enable(self.sources())
+        self.enable(self.source_names())
 
     def disable_all_sources(self):
         """Disable all sources in this simulation."""
-        self.disable(self.sources())
+        self.disable(self.source_names())
 
-    def sources(self):
+    def sources(self) -> list[LumericalSimObject]:
         """Return a list of all source objects."""
-        return [obj for _, obj in self.objects.items() if obj.type in SOURCE_TYPES]
+        return [obj for _, obj in self.objects.items() if obj.obj_type in SOURCE_TYPES]
+    
+    def source_names(self) -> list[str]:
+        """Return a list of all source object names."""
+        return [obj.name for obj in self.sources()]
 
-    def monitors(self):
-        """Return a list of all monitors objects."""
-        return [obj for _, obj in self.objects.items() if obj.type in MONITOR_TYPES]
+    def monitors(self) -> list[LumericalSimObject]:
+        """Return a list of all monitor objects."""
+        return [obj for _, obj in self.objects.items() if obj.obj_type in MONITOR_TYPES]
+
+    def monitor_names(self) -> list[str]:
+        """Return a list of all montor object names."""
+        return [obj.name for obj in self.monitors()]
 
     def new_object(
         self,
@@ -343,6 +377,8 @@ class LumericalSimulation(ISimulation):
                 self.fdtd,
                 **obj.properties,
             )
+        else:
+            self._synced = False
         self.objects[obj.name] = obj
 
     def update_object(self, name: str, **properties):
@@ -351,6 +387,8 @@ class LumericalSimulation(ISimulation):
         if self.fdtd is not None:
             for key, val in properties.items():
                 self.fdtd.setnamed(obj.name, key, val)
+        else:
+            self._synced = False
         obj.update(**properties)
 
     def close(self):
@@ -360,6 +398,7 @@ class LumericalSimulation(ISimulation):
             self.fdtd.close()
             logging.info('Succesfully closed connection with Lumerical.')
             self.fdtd = None
+            self._synced = False
 
     def __eq__(self, __value: object) -> bool:
         """Test equality of simulations."""
@@ -383,6 +422,12 @@ class LumericalSimulation(ISimulation):
         for resource in self.fdtd.setresource('FDTD', 1).splitlines():
             resources[resource] = self.fdtd.getresource('FDTD', 1, resource)
         return resources
+
+    async def promise_env_setup(self, **kwargs):
+        """Setup the environment settings as soon as the fdtd is instantiated."""
+        while self.fdtd is None:
+            time.sleep(1)
+        await self.setup_env_resources(**kwargs)
 
     def setup_env_resources(self, **kwargs):
         """Configure the environment resources for running this simulation.

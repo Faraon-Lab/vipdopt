@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from typing import Any, no_type_check
+import json
 
 import numpy as np
 import numpy.typing as npt
@@ -19,6 +20,7 @@ class FoM:
     or with scalar values.
 
     Attributes:
+        _COUNTER (int): The current count of FoMs. Used for generating unique names.
         fom_srcs (tuple[Source]): The sources to use for computing the FoM.
         grad_srcs (tuple[Source]): The sources to use for computing the gradient.
         polarization (str): Polarization to use.
@@ -28,6 +30,7 @@ class FoM:
         fom_func (Callable[..., npt.ArrayLike]): The function to compute the FoM.
         grad_func (Callable[..., npt.ArrayLike]): The function to compute the gradient.
     """
+    _COUNTER = 0
     def __init__(
             self,
             fom_monitors: Sequence[Monitor],
@@ -37,6 +40,7 @@ class FoM:
             polarization: str,
             freq: Sequence[Number],
             opt_ids: Sequence[int] | None=None,
+            name: str='',
     ) -> None:
         """Initialize an FoM."""
         self.fom_monitors = tuple(fom_monitors)
@@ -46,6 +50,11 @@ class FoM:
         self.polarization = polarization
         self.freq = freq
         self.opt_ids = list(range(len(freq))) if opt_ids is None else opt_ids
+        if name == '':
+            self.name = f'fom_{FoM._COUNTER}'
+        else:
+            self.name = name
+        FoM._COUNTER += 1
 
     def compute(self, *args, **kwargs) -> npt.NDArray:
         """Compute FoM."""
@@ -54,6 +63,14 @@ class FoM:
     def gradient(self, *args, **kwargs) -> npt.NDArray:
         """Compute gradient of FoM."""
         return self.gradient_func(*args, **kwargs)
+    
+
+    
+    def json(self) -> str:
+        data = {}
+        data[name]
+
+
 
     @staticmethod
     @no_type_check
@@ -229,6 +246,7 @@ class FoM:
             self.polarization,
             self.freq,
             self.opt_ids,
+            self.name,
         )
 
 
@@ -242,6 +260,7 @@ class BayerFilterFoM(FoM):
             polarization: str,
             freq: Sequence[Number],
             opt_ids: Sequence[int] | None=None,
+            name: str='',
     ) -> None:
         """Initialize a BayerFilterFoM."""
         super().__init__(
@@ -252,6 +271,7 @@ class BayerFilterFoM(FoM):
             polarization,
             freq,
             opt_ids,
+            name,
         )
 
     def _bayer_fom(self):

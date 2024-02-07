@@ -39,7 +39,6 @@ class TemplateRenderer:
     @ensure_path
     def set_template(self, template: Path) -> None:
         """Set the active template for the renderer."""
-        """Set the current template to render."""
         self.template = self.env.get_template(template.name)
 
     def register_filter(self, name: str, func: Callable) -> None:

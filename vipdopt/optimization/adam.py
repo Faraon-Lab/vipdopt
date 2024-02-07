@@ -20,18 +20,20 @@ class AdamOptimizer(GradientOptimizer):
 
     def __init__(
             self,
-            step_size: float,
+            step_size: float=0.01,
             betas: tuple[float, float]=(0.9, 0.999),
             eps: float=1e-8,
             moments: npt.ArrayLike=(0.0, 0.0),
             **kwargs,
     ) -> None:
         """Initialize an AdamOptimizer instance."""
-        super().__init__(**kwargs)
-        self.moments = np.array(moments)
-        self.step_size = step_size
-        self.betas = betas
-        self.eps = eps
+        super().__init__(
+            step_size=step_size,
+            betas=betas,
+            eps=eps,
+            moments=np.array(moments),
+            **kwargs,
+        )
 
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Take gradient step using Adam algorithm."""

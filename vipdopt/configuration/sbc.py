@@ -1,5 +1,6 @@
 """Configuration manager for SonyBayerFilter."""
 
+from __future__ import annotations
 
 import numpy as np
 import yaml
@@ -19,14 +20,24 @@ VERTICAL_LAYERS = 10
 class SonyBayerConfig(Config):
     """Config object specifically for use with the Sony bayer filter optimization."""
 
-    def __init__(self):
+    def __init__(self, data: dict | Config | None=None):
         """Initialize SonyBayerConfig object."""
-        super().__init__()
+        super().__init__(data=data)
+    
+    def __copy__(self) -> SonyBayerConfig:
+        new_config = SonyBayerConfig()
+        new_config.update(self)
+        return new_config
 
     @ensure_path
     @override
     def read_file(self, fname: Path, cfg_format: str='auto') -> None:
         super().read_file(fname, cfg_format=cfg_format)
+        self._validate()
+    
+    @override
+    def update(self, new_vals: dict | Config):
+        super().update(new_vals)
         self._validate()
 
     def derive_params(self, renderer: TemplateRenderer):

@@ -104,44 +104,6 @@ def import_lumapi(loc: str):
     return lumapi
 
 
-def read_config_file(filename: PathLike, cfg_format: str='auto') -> dict[str, Any]:
-    """Read a configuration file."""
-    path_filename = convert_path(filename)
-    if cfg_format == 'auto':
-        cfg_format = path_filename.suffix
-
-    config_loader = _get_config_loader(cfg_format)
-    return config_loader(path_filename)
-
-
-def _get_config_loader(config_format: str) -> Callable[[PathLike], dict]:
-    """Return a configuration file loader depending on the format."""
-    match config_format.lower():
-        case '.yaml' | '.yml':
-            return _yaml_loader
-        case '.json':
-            return _json_loader
-        case _:
-            msg = f'{config_format} file loading not yet supported.'
-            raise NotImplementedError(msg)
-
-
-def _json_loader(filepath: PathLike) -> dict:
-    with open(filepath) as stream:
-        return json.load(stream)
-
-
-def _yaml_loader(filepath: PathLike) -> dict:
-    """Config file loader for YAML files."""
-    # Allow the safeloader to convert sequences to tuples
-    SafeConstructor.add_constructor(  # type: ignore
-        'tag:yaml.org,2002:python/tuple',
-        lambda self, x: tuple(SafeConstructor.construct_sequence(self, x))
-    )
-    with open(filepath, 'rb') as stream:
-        return yaml.safe_load(stream)
-
-
 def convert_path(path: PathLike) -> Path:
     """Ensure that a Path is a Path object."""
     if isinstance(path, Path):
@@ -167,3 +129,66 @@ def ensure_path(
     ) -> R:
         return func(arg0, convert_path(path), *args, **kwargs)
     return wrapper
+
+
+def save_config_file(config_data: dict, fname: PathLike, cfg_format: str='auto', **kwargs):
+    """Save a configuration file."""
+    path_filename = convert_path(fname)
+    if cfg_format == 'auto':
+        cfg_format = path_filename.suffix
+    
+    match cfg_format.lower():
+        case '.yaml' | '.yml':
+            with path_filename.open('w') as f:
+                yaml.dump(config_data, f, **kwargs)
+        case '.json':
+            with path_filename.open('w') as f:
+                json.dump(
+                    config_data,
+                    f,
+                    indent=4,
+                    ensure_ascii=True,
+                    **kwargs
+                )
+        case _:
+            msg = f'{cfg_format} file loading not yet supported.'
+            raise NotImplementedError(msg)
+
+
+def read_config_file(fname: PathLike, cfg_format: str='auto') -> dict[str, Any]:
+    """Read a configuration file."""
+    path_filename = convert_path(fname)
+    if cfg_format == 'auto':
+        cfg_format = path_filename.suffix
+
+    config_loader = _get_config_loader(cfg_format)
+    return config_loader(path_filename)
+
+
+def _get_config_loader(cfg_format: str) -> Callable[[PathLike], dict]:
+    """Return a configuration file loader depending on the format."""
+    match cfg_format.lower():
+        case '.yaml' | '.yml':
+            return _yaml_loader
+        case '.json':
+            return _json_loader
+        case _:
+            msg = f'{cfg_format} file loading not yet supported.'
+            raise NotImplementedError(msg)
+
+
+def _json_loader(fname: PathLike) -> dict:
+    with open(fname) as stream:
+        return json.load(stream)
+
+
+def _yaml_loader(fname: PathLike) -> dict:
+    """Config file loader for YAML files."""
+    # Allow the safeloader to convert sequences to tuples
+    SafeConstructor.add_constructor(  # type: ignore
+        'tag:yaml.org,2002:python/tuple',
+        lambda self, x: tuple(SafeConstructor.construct_sequence(self, x))
+    )
+    with open(fname, 'rb') as stream:
+        return yaml.safe_load(stream)
+
