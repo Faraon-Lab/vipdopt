@@ -24,6 +24,7 @@ class SonyBayerConfig(Config):
         """Initialize SonyBayerConfig object."""
         super().__init__(data=data)
     
+    @override
     def __copy__(self) -> SonyBayerConfig:
         new_config = SonyBayerConfig()
         new_config.update(self)

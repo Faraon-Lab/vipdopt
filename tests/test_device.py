@@ -180,10 +180,10 @@ def test_save_load(tmpdir):
     dev2 = Device((10, 10), (0, 1), (0, 1, 2))
     dev2.load(p)
 
-    for attr in dev1.__dict__:
-        assert_equal(dev1.__getattribute__(attr), dev1.__getattribute__(attr))
+    for attr in vars(dev1):
+        assert_equal(dev2.__getattribute__(attr), dev1.__getattribute__(attr))
 
-    Device.fromfile(p)
+    dev3 = Device.fromfile(p)
 
-    for attr in dev1.__dict__:
-        assert_equal(dev1.__getattribute__(attr), dev1.__getattribute__(attr))
+    for attr in vars(dev1):
+        assert_equal(dev3.__getattribute__(attr), dev1.__getattribute__(attr))

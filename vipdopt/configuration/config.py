@@ -49,6 +49,7 @@ class Config:
         self._parameters.update(vals)
     
     def __copy__(self) -> Config:
+        """Return a (shallow) copy of this Config."""
         c = Config()
         c.update(self)
         return c

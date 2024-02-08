@@ -30,7 +30,6 @@ class Device:
         init_seed (None | int): The random seed to use when initializing.
         symmetric (bool): Whether to initialize with symmetric design vairables;
             defaults to False. Does nothing if `randomize` is False.
-        iteration (int): The current iteration in optimization; defaults to 0.
         filters (list[Filter]): Filters to initialize the device with.
         w (npt.NDArray[np.complex128]): The w variable for the device;
             has shape equal to size x (len(filters) + 1).
@@ -46,7 +45,6 @@ class Device:
             randomize: bool=False,
             init_seed: None | int=None,
             symmetric: bool=False,
-            iteration: int=0,
             filters: list[Filter] | None=None,
             **kwargs
     ):
@@ -84,7 +82,6 @@ class Device:
         self.randomize = randomize
         self.init_seed = init_seed
         self.symmetric = symmetric
-        self.iteration = iteration
         self.filters = filters
         self.__dict__.update(kwargs)
 

@@ -6,6 +6,7 @@
 *.yml
 !vipdopt/configuration/config_example.yml
 !environment.yml
+!test_project/config.json
 temp/
 tmp/
 
