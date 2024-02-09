@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import pickle
+import sys
+from pathlib import Path
 from numbers import Number, Rational, Real
+from typing import Type
+from copy import copy
 
 import numpy as np
 import numpy.typing as npt
 
 from vipdopt.optimization.filter import Filter
-from vipdopt.utils import PathLike, convert_path
+from vipdopt.utils import PathLike, ensure_path
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
@@ -83,7 +87,7 @@ class Device:
         self.init_seed = init_seed
         self.symmetric = symmetric
         self.filters = filters
-        self.__dict__.update(kwargs)
+        vars(self).update(kwargs)
 
         self._init_variables()
         self.update_density()
@@ -109,48 +113,78 @@ class Device:
 
         w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w
+    
+    def as_dict(self) -> dict:
+        """Return a dictionary representation of this device, sans `self.w`."""
+        data = copy(vars(self))
 
-    def save(self, folder: PathLike):
-        """Save device as pickled bytes.
+        # Design variable is stored separately
+        del data['w']
 
-        Attributes:
-            folder (PathLike): The folder to save the device to. Anything after the
-                directory name will be stripped. Defaults to root directory.
-        """
-        path_folder = convert_path(folder).parent
-        path_folder.mkdir(exist_ok=True)
-        w_path = path_folder / (self.name + '_w.npy')
-        self.w_path = w_path
-        data = vars(self)
-        w = data.pop('w', None)
-        with w_path.open('wb') as f:
-            np.save(f, w)
-        with (path_folder / (self.name + '.pkl')).open('wb') as f:
-            pickle.dump(data, f)
-        del self.w_path
+        # Add all filters
+        filters: list[Filter] = []
+        for filt in data.pop('filters'):
+            filt_dict = {}
+            filt_dict['type'] = type(filt).__name__
+            filt_dict['parameters'] = filt.init_vars
+            filters.append(filt_dict)
+        data['filters'] = filters
 
-    def load(self, folder: PathLike):
-        """Load device data from a directory."""
-        fpath = convert_path(folder).parent
-        obj_file = fpath.glob('*.pkl').__next__()
-        with obj_file.open('rb') as f:
-            data = pickle.load(f)
-            self.__dict__.update(data)
-        with self.w_path.open('rb') as f:
-            self.w = np.load(f)
-        del self.w_path
+        return data
+    
+    def load_dict(self, device_data: dict):
+        """Load attributes from a dictionary."""
+        vars(self).update(vars(Device._from_dict(device_data)))
 
     @classmethod
-    def fromfile(cls, folder: PathLike) -> Device:
-        """Create a new device by loading from a saved directory."""
-        fpath = convert_path(folder).parent
-        obj_file = fpath.glob('*.pkl').__next__()
-        with obj_file.open('rb') as f:
-            data = pickle.load(f)
-        d = cls(**data)
-        with data['w_path'].open('rb') as f:
-            d.w = np.load(f)
-        del d.w_path
+    def _from_dict(cls, device_data: dict) -> Device:
+        """Create a new device from a dictionary."""
+        data = copy(device_data)
+        filters: list[Filter] = []
+        filt_dict: dict
+        for filt_dict in data.pop('filters'):
+            filter_cls: Type[Filter] = getattr(sys.modules['vipdopt.optimization.filter'], filt_dict['type'])
+            filters.append(filter_cls(
+                **filt_dict['parameters'],
+            ))
+        data['filters'] = filters
+        return cls(**data)
+        
+    @ensure_path
+    def save(self, fname: Path, binarize: bool=False):
+        """Save device to a .npz file."""
+        with fname.open('wb') as f:
+            np.save(f, self.as_dict())
+            if binarize:
+                np.save(f, self.pass_through_filters(self.get_design_variable(), True))
+            else:
+                np.save(f, self.get_design_variable())
+
+    @classmethod
+    def from_source(cls, source: dict | PathLike) -> Device:
+        """Create a new device from a dictionary or load a saved .npy file."""
+        if isinstance(source, dict):
+            return Device._from_dict(source)
+        return Device._from_file(source)
+
+    @ensure_path
+    def load_file(self, fname: Path):
+        """Load device from a .npz file."""
+        with fname.open('rb') as f:
+            attributes = np.load(f, allow_pickle=True).flat[0]
+            w = np.load(f)
+        self.load_dict(attributes)
+        self.set_design_variable(w)
+
+    @classmethod
+    @ensure_path
+    def _from_file(cls, fname: Path) -> Device:
+        """Create a new device by loading from a saved file."""
+        with fname.open('rb') as f:
+            attributes = np.load(f, allow_pickle=True).flat[0]
+            w = np.load(f)
+        d = Device._from_dict(attributes)
+        d.set_design_variable(w)
         return d
 
     def get_design_variable(self) -> npt.NDArray[np.complex128]:
@@ -197,7 +231,7 @@ class Device:
 
 
         Returns:
-            (npt.NDArray | Number): The density after passing theough filters.
+            (npt.NDArray | Number): The density after passing through filters.
         """
         y = np.copy(np.array(x))
         for i in range(self.num_filters()):

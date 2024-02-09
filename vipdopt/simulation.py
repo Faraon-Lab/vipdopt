@@ -114,6 +114,8 @@ class LumericalEncoder(json.JSONEncoder):
             return d
         if isinstance(o, np.ndarray):
             return o.tolist()
+        if isinstance(o, Path):
+            return str(o)
         return super().default(o)
 
 

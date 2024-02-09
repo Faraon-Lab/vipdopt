@@ -172,18 +172,26 @@ def test_pass_through_filters():
 
 
 @pytest.mark.smoke()
-def test_save_load(tmpdir):
-    p = tmpdir / 'device'
-    dev1 = Device((4, 4), (0, 1), (0, 0, 0))
+def test_save_load(tmpdir, device_dict):
+    dev1 = Device.from_source(device_dict)
+    p = tmpdir / 'device.npy'
     dev1.save(p)
 
-    dev2 = Device((10, 10), (0, 1), (0, 1, 2))
-    dev2.load(p)
+    dev2 = Device.from_source(p)
 
     for attr in vars(dev1):
         assert_equal(dev2.__getattribute__(attr), dev1.__getattribute__(attr))
 
-    dev3 = Device.fromfile(p)
+    # Should still work when loading a device with different size (i.e. 4x4 vs 40x40)
+    dev3 = Device((4, 4), (0, 1), (0, 0, 0))
+    dev3.load_file(p)
 
     for attr in vars(dev1):
         assert_equal(dev3.__getattribute__(attr), dev1.__getattribute__(attr))
+
+    dev4 = Device((4, 4), (0, 1), (0, 0, 0))
+    dev4.load_dict(device_dict)
+
+    for attr in vars(dev1):
+        assert_equal(dev4.__getattribute__(attr), dev1.__getattribute__(attr))
+

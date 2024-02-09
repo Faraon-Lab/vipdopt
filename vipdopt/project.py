@@ -40,18 +40,17 @@ class Project:
         return proj
     
     @ensure_path
-    def load_project(self, project_location: Path):
+    def load_project(self, project_dir: Path):
         """Load settings from a project directory."""
-        self.dir = project_location
-        cfg = Config.from_file(self.dir / 'config.json')
-        self.load_config(cfg)
+        self.dir = project_dir
+        cfg = Config.from_file(project_dir / 'config.json')
+        self._load_config(cfg)
 
-    def load_config(self, config: Config | dict):
+    def _load_config(self, config: Config | dict):
         """Load and setup optimization from an appropriate JSON config file."""
         if isinstance(config, dict):
             config = self.config_type(config)
         cfg = copy(config)
-
 
         # Setup optimizer
         optimizer: str = cfg.pop('optimizer')
@@ -108,18 +107,12 @@ class Project:
         self.weights = weights
         full_fom = sum(np.multiply(weights, foms), fom_cls.zero(foms[0]))
 
-        # Load the Device
-        filters: list[Filter] = []
-        filt: dict
-        for filt in cfg['device']['filters']:
-            filter_cls: Type[Filter] = getattr(sys.modules[__name__], filt['type'])
-            filters.append(filter_cls(
-                **filt['parameters'],
-            ))
-        device_data = cfg.pop('device')
-        device_data['filters'] = filters
-        self.device = Device(**device_data)
-        # TODO Actually load the design variable. Likely will need to rework device.py
+        # Load device
+        if 'device' in cfg:
+            device_source = cfg.pop('device',)
+        else:
+            self.dir / 'device' / f'e_{epoch}_i_{iteration}.npy'
+        self.device = Device.from_source(device_source)
 
         # Setup Optimization
         self.optimization = Optimization(
@@ -153,6 +146,12 @@ class Project:
         """Set the value of an attribute, creating it if it doesn't already exist."""
         self.config[name] = value
     
+    def current_device_path(self) -> Path:
+        """Save the current device."""
+        epoch = self.optimization.epoch
+        iteration = self.optimization.iteration
+        return self.dir / 'device' / f'e_{epoch}_i_{iteration}.npy'
+    
     def save(self):
         """Save this project to it's pre-assigned directory."""
         self.save_as(self.dir)
@@ -160,11 +159,15 @@ class Project:
     @ensure_path
     def save_as(self, project_dir: Path): 
         """Save this project to a specified directory, creating it if necessary."""
-        project_dir.mkdir(parents=True, exist_ok=True)
+        (project_dir / 'device').mkdir(parents=True, exist_ok=True)
+        self.dir = project_dir
         cfg = self._generate_config()
+
+        self.device.save(cfg['device'])  # Save device to file for current epoch/iter
         cfg.save_file(project_dir / 'config.json', cls=LumericalEncoder)
 
-        # TODO Save Device, histories, and plots
+
+        # TODO Save histories and plots
 
     def _generate_config(self) -> Config:
         """Create a JSON config for this project's settings."""
@@ -186,6 +189,9 @@ class Project:
             foms.append(data)
         cfg['figures_of_merit'] = {fom.name: foms[i] for i, fom in enumerate(self.foms)}
 
+        # Device
+        cfg['device'] = self.current_device_path()
+
         # Simulation
         cfg['base_simulation'] = self.base_sim.as_dict()
 
@@ -197,7 +203,7 @@ if __name__ == '__main__':
     output_dir = Path('./test_output_optimization/')
 
     opt = Project.from_dir(project_dir)
-    # opt.save_as(output_dir)
+    opt.save_as(output_dir)
 
     # Test that the saved format is loadable
     # reload = Project.from_dir(output_dir)

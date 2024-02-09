@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Type
-from collections.abc import ItemsView
+from collections.abc import ItemsView, KeysView, ValuesView
 from pathlib import Path
 
 from vipdopt.utils import ensure_path, read_config_file, save_config_file, T
@@ -28,7 +28,7 @@ class Config:
         return f'Config object for {self._files} with parameters {self._parameters}'
 
     def get(self, prop: str, default: Any=None) -> Any | None:
-        """Get parameter and return None if it doesn't exist."""
+        """Get parameter and return `default` if it doesn't exist."""
         return self._parameters.get(prop, default)
     
     def pop(self, name: str) -> Any:
@@ -54,8 +54,17 @@ class Config:
         c.update(self)
         return c
     
+    def __contains__(self, item: Any) -> bool:
+        return item in self._parameters
+    
     def items(self) -> ItemsView:
         return self._parameters.items()
+    
+    def keys(self) -> KeysView:
+        return self._parameters.keys()
+
+    def values(self) -> ValuesView:
+        return self._parameters.values()
     
     @ensure_path
     def read_file(self, fname: Path, cfg_format: str='auto') -> None:

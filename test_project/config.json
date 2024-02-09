@@ -1006,7 +1006,7 @@
             ],
             "polarization": "TE",
             "freq": [0.0, 0.1, 0.2],
-            "weight": 1
+            "weight": 1.0
         }
     },
     "device": {

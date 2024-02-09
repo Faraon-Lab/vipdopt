@@ -10,7 +10,7 @@ from vipdopt.configuration.template import SonyBayerRenderer
 TEST_YAML_PATH = Path('vipdopt/configuration/config_example.yml')
 TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')
 
-mock_bad_config_data = {
+_mock_bad_config_data = {
     'bad_config_1.yml': 'border_optimization: true\nuse_smooth_blur: true',
     'bad_config_2.yml': 'border_optimization: true\nnum_sidewalls: 1',
     'bad_config_3.yml': 'add_pdaf: true',
@@ -50,6 +50,33 @@ _mock_sim_file_data = """{
         }
     }
 }"""
+
+_mock_device_dict = {
+        "size": (40, 40),
+        "permittivity_constraints": (0.0, 1.0),
+        "coords": (0, 0, 0),
+        "name": "device",
+        "init_density": 0.5,
+        "randomize": True,
+        "init_seed": 0,
+        "symmetric": True,
+        "filters": [
+            {
+                "type": "Sigmoid",
+                "parameters": {
+                    "eta": 0.5,
+                    "beta": 1.0
+                }
+            },
+            {
+                "type": "Sigmoid",
+                "parameters": {
+                    "eta": 0.5,
+                    "beta": 1.0
+                }
+            }
+        ]
+    }
 
 EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
     # Mesh Properties
@@ -148,6 +175,9 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
             )
 }
 
+@pytest.fixture(scope='session')
+def device_dict():
+    return _mock_device_dict
 
 @pytest.fixture(scope='session')
 def sim_file():
@@ -195,7 +225,7 @@ def example_derived_properties():
 def _mock_bad_config(mocker):
     """Read a config file with disallowed settings"""
     def open_mock(fname, *args):
-        return mocker.mock_open(read_data=mock_bad_config_data[str(fname)]).return_value
+        return mocker.mock_open(read_data=_mock_bad_config_data[str(fname)]).return_value
     mocker.patch('builtins.open', open_mock)
 
 

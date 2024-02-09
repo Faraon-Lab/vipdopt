@@ -21,6 +21,10 @@ class Filter(abc.ABC):
     def _bounds(self):
         pass
 
+    @abc.abstractproperty
+    def init_vars(self) -> dict:
+        pass
+
     def verify_bounds(self, variable: npt.NDArray | Number) -> bool:
         """Checks if variable is within bounds of this filter.
 
@@ -68,6 +72,10 @@ class Sigmoid(Filter):
     def _bounds(self):
         return SIGMOID_BOUNDS
 
+    @property
+    def init_vars(self) -> dict:
+        return {'eta': self.eta, 'beta': self.beta}
+
     def __init__(self, eta: Rational, beta: Rational) -> None:
         """Initialize a sigmoid filter based on eta and beta values."""
         if not self.verify_bounds(eta):
@@ -82,6 +90,11 @@ class Sigmoid(Filter):
     def __repr__(self) -> str:
         """Return a string representation of the filter."""
         return f'Sigmoid filter with eta={self.eta:0.3f} and beta={self.beta:0.3f}'
+    
+    def __eq__(self, __value: object) -> bool:
+        if isinstance(__value, Sigmoid):
+            return self.eta == __value.eta and self.beta == __value.beta
+        return super().__eq__(__value)
 
     @override
     def forward(self, x: npt.NDArray | Number) -> npt.NDArray | Number:

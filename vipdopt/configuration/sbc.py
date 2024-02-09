@@ -1,6 +1,7 @@
 """Configuration manager for SonyBayerFilter."""
 
 from __future__ import annotations
+from typing import Any
 
 import numpy as np
 import yaml
@@ -29,6 +30,11 @@ class SonyBayerConfig(Config):
         new_config = SonyBayerConfig()
         new_config.update(self)
         return new_config
+
+    @override
+    def __setitem__(self, name: str, value: Any) -> None:
+        super().__setitem__(name, value)
+        self._validate()
 
     @ensure_path
     @override
