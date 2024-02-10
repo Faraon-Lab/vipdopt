@@ -17,8 +17,8 @@ def test_load_empty_yaml():
     cfg = Config()
     cfg.read_file('fakefile.yaml')
 
-    with pytest.raises(AttributeError):
-        _ = cfg.fixed_layers  # Accessing a property that doesn't exist
+    with pytest.raises(KeyError):
+        _ = cfg['fixed_layers']  # Accessing a property that doesn't exist
 
 
 @pytest.mark.smoke()
@@ -218,6 +218,6 @@ def test_unsupported_filetype():
 )
 def test_bad_config(fname: str, msg: Pattern):
     cfg = SonyBayerConfig()
-    with pytest.raises(ValueError) as e:  # noqa: PT011
+    with pytest.raises(ValueError, match=msg) as e:  # noqa: PT011
         cfg.read_file(fname)
-    assert re.match(msg, e.value.args[0])
+    # assert re.match(msg, e.value.args[0])

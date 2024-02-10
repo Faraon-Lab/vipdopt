@@ -155,7 +155,7 @@ def save_config_file(config_data: dict, fname: PathLike, cfg_format: str='auto',
             raise NotImplementedError(msg)
 
 
-def read_config_file(fname: PathLike, cfg_format: str='auto') -> dict[str, Any]:
+def read_config_file(fname: PathLike, cfg_format: str='auto') -> dict[str, Any] | None:
     """Read a configuration file."""
     path_filename = convert_path(fname)
     if cfg_format == 'auto':

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Any
+from collections.abc import Mapping
 
 import numpy as np
 import yaml
@@ -21,20 +22,24 @@ VERTICAL_LAYERS = 10
 class SonyBayerConfig(Config):
     """Config object specifically for use with the Sony bayer filter optimization."""
 
-    def __init__(self, data: dict | Config | None=None):
-        """Initialize SonyBayerConfig object."""
-        super().__init__(data=data)
+    # def __init__(self, data: dict | Config | None=None):
+    #     """Initialize SonyBayerConfig object."""
+    #     super().__init__(data=data)
     
-    @override
-    def __copy__(self) -> SonyBayerConfig:
-        new_config = SonyBayerConfig()
-        new_config.update(self)
-        return new_config
+    # @override
+    # def __copy__(self) -> SonyBayerConfig:
+    #     new_config = SonyBayerConfig()
+    #     new_config.update(self)
+    #     return new_config
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._do_validation = True
 
     @override
     def __setitem__(self, name: str, value: Any) -> None:
         super().__setitem__(name, value)
-        self._validate()
+        if self._do_validation:
+            self._validate()
 
     @ensure_path
     @override
@@ -42,17 +47,18 @@ class SonyBayerConfig(Config):
         super().read_file(fname, cfg_format=cfg_format)
         self._validate()
     
-    @override
-    def update(self, new_vals: dict | Config):
-        super().update(new_vals)
+    def update(self, __m: Mapping, **kwargs):
+        """Update self with values from another dictionary-like object."""
+        self._do_validation = False
+        super().update(__m, **kwargs)
+        self._do_validation = True
         self._validate()
 
     def derive_params(self, renderer: TemplateRenderer):
         """Derive the parameters that depend on the config files."""
-        new_yaml = renderer.render(data=self._parameters, pi=np.pi)
+        new_yaml = renderer.render(data=self, pi=np.pi)
         new_params = yaml.safe_load(new_yaml)
-        self._parameters.update(new_params)
-        self._validate()
+        self.update(new_params)
 
     def _explicit_band_centering(self):
         # Determine the wavelengths that will be directed to each focal area
@@ -267,4 +273,4 @@ class SonyBayerConfig(Config):
             self.get('reinterpolate_permittivity_factor') != 1:
                raise ValueError("Expected 'reinterpolate_permittivity_factor' to be 1"
                                 ' if not reinterpolating permittivity,'
-                                f" got '{self['reinterpolate_permittivity_factor']}'.")
+                                f" got '{self.get('reinterpolate_permittivity_factor')}'.")

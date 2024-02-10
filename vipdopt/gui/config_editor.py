@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from typing import Any
+from collections.abc import Mapping
 
 from overrides import override
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, QObject, Qt
@@ -127,14 +128,14 @@ class ConfigModel(QAbstractItemModel):
         """Clear data from the model."""
         self.load({})
 
-    def load(self, document: dict):
+    def load(self, document: Mapping):
         """Load model from a nested dictionary returned by utils.read_config_file.
 
         Arguments:
             document (dict): JSON/YAML-compatible dictionary
         """
-        assert isinstance(document, dict | list | tuple), \
-            f'`document` must be of dict, list or tuple, not {type(document)}'
+        # assert isinstance(document, dict | list | tuple), \
+        #     f'`document` must be of dict, list or tuple, not {type(document)}'
 
         self.beginResetModel()
 

@@ -13,6 +13,7 @@ from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
 from vipdopt.gui.ui_status import Ui_MainWindow as Ui_StatusWindow
 from vipdopt.utils import read_config_file, PathLike
 from vipdopt.gui.config_editor import ConfigModel
+from vipdopt.project import Project
 
 
 class SettingsWindow(QMainWindow, Ui_SettingsWindow):
@@ -21,6 +22,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         """Initialize a SettingsWindow."""
         super().__init__()
         self.setupUi(self)
+
 
         self.config_model = ConfigModel()
         self.config_treeView.setModel(self.config_model)
@@ -32,7 +34,15 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.config_pushButton.clicked.connect(self.load_yaml)
         self.sim_pushButton.clicked.connect(self.load_json)
 
+        # Initialize Backend
+        self.project = Project()
+
     # General Methods
+    def new_project(self):
+        """Create a new project."""
+        self.project = Project()
+        self._update_values()
+
     def open_project(self):
         """Load optimization project into the GUI."""
         proj_dir = QFileDialog.getExistingDirectory(
@@ -41,7 +51,26 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             './',
             QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
         )
+        self.project.load_project(proj_dir)
+        self._update_values()
         logging.info(f'Loaded project from {proj_dir}')
+    
+    def _update_values(self):
+        """Update GUI to match values in Project."""
+        # Config Tab
+        self.config_model.load(self.project.config)
+
+        # Simulation Tab
+        self.sim_model.load(self.project.base_sim.as_dict())
+
+        # FoM Tab
+        # self.fom_gridLayout.getItemPosition()
+
+        # Optimization Tab
+        self.opt_iter_lineEdit.setText(str(self.project.optimization.iteration))
+        self.opt_iter_per_epoch_lineEdit.setText(str(self.project.optimization.iter_per_epoch))
+        self.opt_max_epoch_lineEdit.setText(str(self.project.optimization.max_epochs))
+
 
     # Configuration Tab
     def load_yaml(self):

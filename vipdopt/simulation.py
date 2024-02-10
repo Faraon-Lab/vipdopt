@@ -182,6 +182,7 @@ class LumericalSimulation(ISimulation):
         self.fdtd: lumapi.FDTD | None = None
         self._clear_objects()
         self._synced = False  # Flag for whether fdtd needs to be synced
+        self._env_vars = None  # Parameters to pass into set_env_vars in the future
         if source:
             self.load(source)
 
@@ -208,6 +209,9 @@ class LumericalSimulation(ISimulation):
         logging.info('Verified license with Lumerical servers.\n')
         self.fdtd.newproject()
         self._sync_fdtd()
+        if self._env_vars is not None:
+            self.setup_env_resources(**self._env_vars)
+            self._env_vars = None
 
     @override
     def load(self, source: PathLike | dict):
@@ -425,11 +429,12 @@ class LumericalSimulation(ISimulation):
             resources[resource] = self.fdtd.getresource('FDTD', 1, resource)
         return resources
 
-    async def promise_env_setup(self, **kwargs):
+    def promise_env_setup(self, **kwargs):
         """Setup the environment settings as soon as the fdtd is instantiated."""
-        while self.fdtd is None:
-            time.sleep(1)
-        await self.setup_env_resources(**kwargs)
+        if self.fdtd is None:
+            self._env_vars = kwargs
+        else:
+            self.setup_env_resources(**kwargs)
 
     def setup_env_resources(self, **kwargs):
         """Configure the environment resources for running this simulation.

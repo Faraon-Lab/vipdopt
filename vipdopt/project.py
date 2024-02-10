@@ -6,6 +6,7 @@ from typing import Any, Type, Generic
 from pathlib import Path
 from copy import copy
 import sys
+import logging
 
 import numpy as np
 
@@ -126,6 +127,7 @@ class Project:
         # TODO Register any callbacks for Optimization here
 
         self.config = cfg
+        logging.debug(f'set config to {cfg}')
 
     def get(self, prop: str, default: Any=None) -> Any | None:
         """Get parameter and return None if it doesn't exist."""
@@ -161,7 +163,7 @@ class Project:
         cfg = self._generate_config()
 
         self.device.save(cfg['device'])  # Save device to file for current epoch/iter
-        cfg.save_file(project_dir / 'config.json', cls=LumericalEncoder)
+        cfg.save(project_dir / 'config.json', cls=LumericalEncoder)
 
 
         # TODO Save histories and plots
