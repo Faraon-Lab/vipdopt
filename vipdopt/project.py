@@ -108,10 +108,7 @@ class Project:
         full_fom = sum(np.multiply(weights, foms), fom_cls.zero(foms[0]))
 
         # Load device
-        if 'device' in cfg:
-            device_source = cfg.pop('device',)
-        else:
-            self.dir / 'device' / f'e_{epoch}_i_{iteration}.npy'
+        device_source = cfg.pop('device')
         self.device = Device.from_source(device_source)
 
         # Setup Optimization

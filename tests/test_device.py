@@ -179,19 +179,15 @@ def test_save_load(tmpdir, device_dict):
 
     dev2 = Device.from_source(p)
 
-    for attr in vars(dev1):
-        assert_equal(dev2.__getattribute__(attr), dev1.__getattribute__(attr))
-
     # Should still work when loading a device with different size (i.e. 4x4 vs 40x40)
     dev3 = Device((4, 4), (0, 1), (0, 0, 0))
     dev3.load_file(p)
-
-    for attr in vars(dev1):
-        assert_equal(dev3.__getattribute__(attr), dev1.__getattribute__(attr))
 
     dev4 = Device((4, 4), (0, 1), (0, 0, 0))
     dev4.load_dict(device_dict)
 
     for attr in vars(dev1):
+        assert_equal(dev2.__getattribute__(attr), dev1.__getattribute__(attr))
+        assert_equal(dev3.__getattribute__(attr), dev1.__getattribute__(attr))
         assert_equal(dev4.__getattribute__(attr), dev1.__getattribute__(attr))
 

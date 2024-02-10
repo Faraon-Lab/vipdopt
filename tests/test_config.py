@@ -198,7 +198,7 @@ def test_cascading_params(param, value: Any, template_renderer):
 def test_unsupported_filetype():
     cfg = Config()
     with pytest.raises(NotImplementedError):
-        cfg.read_file('fakefilename', 'json')
+        cfg.read_file('fakefilename', '.html')
 
 @pytest.mark.smoke()
 @pytest.mark.usefixtures('_mock_bad_config')
