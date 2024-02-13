@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import pickle
 import sys
-from pathlib import Path
-from numbers import Number, Rational, Real
-from typing import Type
 from copy import copy
+from numbers import Number, Rational, Real
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
@@ -92,6 +90,12 @@ class Device:
         self._init_variables()
         self.update_density()
 
+    def __eq__(self, __value: object) -> bool:
+        """Test equality."""
+        if isinstance(__value, Device):
+            return np.array_equal(self.w, __value.w)
+        return super().__eq__(__value)
+
     def _init_variables(self):
         """Creates the w variable for the device.
 
@@ -113,7 +117,7 @@ class Device:
 
         w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w
-    
+
     def as_dict(self) -> dict:
         """Return a dictionary representation of this device, sans `self.w`."""
         data = copy(vars(self))
@@ -131,7 +135,7 @@ class Device:
         data['filters'] = filters
 
         return data
-    
+
     def load_dict(self, device_data: dict):
         """Load attributes from a dictionary."""
         vars(self).update(vars(Device._from_dict(device_data)))
@@ -143,13 +147,16 @@ class Device:
         filters: list[Filter] = []
         filt_dict: dict
         for filt_dict in data.pop('filters'):
-            filter_cls: Type[Filter] = getattr(sys.modules['vipdopt.optimization.filter'], filt_dict['type'])
+            filter_cls: type[Filter] = getattr(
+                sys.modules['vipdopt.optimization.filter'],
+                filt_dict['type'],
+            )
             filters.append(filter_cls(
                 **filt_dict['parameters'],
             ))
         data['filters'] = filters
         return cls(**data)
-        
+
     @ensure_path
     def save(self, fname: Path, binarize: bool=False):
         """Save device to a .npz file."""

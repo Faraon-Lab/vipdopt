@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import sys
-from typing import Any
 from collections.abc import Mapping
+from typing import Any
 
 from overrides import override
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, QObject, Qt
@@ -134,9 +134,6 @@ class ConfigModel(QAbstractItemModel):
         Arguments:
             document (dict): JSON/YAML-compatible dictionary
         """
-        # assert isinstance(document, dict | list | tuple), \
-        #     f'`document` must be of dict, list or tuple, not {type(document)}'
-
         self.beginResetModel()
 
         self._rootItem = TreeItem.load(document)

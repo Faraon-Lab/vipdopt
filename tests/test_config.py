@@ -1,6 +1,5 @@
 """Tests for filter.py"""
 
-import re
 from re import Pattern
 from typing import Any
 
@@ -218,6 +217,5 @@ def test_unsupported_filetype():
 )
 def test_bad_config(fname: str, msg: Pattern):
     cfg = SonyBayerConfig()
-    with pytest.raises(ValueError, match=msg) as e:  # noqa: PT011
+    with pytest.raises(ValueError, match=msg):
         cfg.read_file(fname)
-    # assert re.match(msg, e.value.args[0])

@@ -1,4 +1,6 @@
 
+from copy import copy
+
 import numpy as np
 import numpy.typing as npt
 import pytest
@@ -98,19 +100,19 @@ def test_weights():
 @pytest.mark.smoke()
 def test_copy():
     org_vars = vars(BASE_FOM)
-    copy = BASE_FOM.copy()
+    cpy = copy(BASE_FOM)
 
-    assert_equal(vars(copy), org_vars)
+    assert_equal(vars(cpy), org_vars)
 
     # Modifying the copy should not affect the original
-    copy = copy + 1
+    cpy = cpy + 1
     assert_equal(vars(BASE_FOM), org_vars)
-    assert_equal(copy.compute(INPUT_ARRAY), SQUARED_ARRAY + 1)
+    assert_equal(cpy.compute(INPUT_ARRAY), SQUARED_ARRAY + 1)
 
 
 @pytest.mark.smoke()
 def test_iadd():
-    fom = BASE_FOM.copy()
+    fom = copy(BASE_FOM)
     fom += 1
     output = fom.compute(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY + 1)
@@ -121,7 +123,7 @@ def test_iadd():
 
 @pytest.mark.smoke()
 def test_isub():
-    fom = BASE_FOM.copy()
+    fom = copy(BASE_FOM)
     fom -= 1
     output = fom.compute(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY - 1)
@@ -132,7 +134,7 @@ def test_isub():
 
 @pytest.mark.smoke()
 def test_imul():
-    fom = BASE_FOM.copy()
+    fom = copy(BASE_FOM)
     fom *= 2
     output = fom.compute(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY * 2)
@@ -143,7 +145,7 @@ def test_imul():
 
 @pytest.mark.smoke()
 def test_itruediv():
-    fom = BASE_FOM.copy()
+    fom = copy(BASE_FOM)
     fom /= 2
     output = fom.compute(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY / 2)
@@ -163,8 +165,8 @@ def test_bad_op():
     with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for %'):
         BASE_FOM % 2
 
-    fom1 = BASE_FOM.copy()
-    fom2 = BASE_FOM.copy()
+    fom1 = copy(BASE_FOM)
+    fom2 = copy(BASE_FOM)
 
     fom2.polarization = 'Hello World'
     with pytest.raises(
@@ -173,7 +175,7 @@ def test_bad_op():
     ):
         fom1 + fom2
 
-    fom2 = BASE_FOM.copy()
+    fom2 = copy(BASE_FOM)
     fom2.opt_ids = list(range(9))
     with pytest.raises(
         TypeError,
@@ -181,10 +183,18 @@ def test_bad_op():
     ):
         fom1 + fom2
 
-    fom2 = BASE_FOM.copy()
+    fom2 = copy(BASE_FOM)
     fom2.freq = list(range(9))
     with pytest.raises(
         TypeError,
         match=r'unsupported operand type\(s\) for \+: \'FoM\' and \'FoM\' .* equal*',
     ):
         fom1 + fom2
+
+def test_dict():
+    fom = copy(BASE_FOM)
+    fdict = fom.as_dict()
+
+    fom2 = FoM.from_dict(f'{fom.name}', fdict, {})
+
+    assert_equal(fom2, fom)

@@ -1,24 +1,25 @@
-"""Code for managing a project"""
+"""Code for managing a project."""
 
 from __future__ import annotations
 
-from typing import Any, Type, Generic
-from pathlib import Path
-from copy import copy
-import sys
 import logging
+import sys
+from copy import copy
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 
-from vipdopt.utils import PathLike, ensure_path, T
 from vipdopt.configuration import Config, SonyBayerConfig
-from vipdopt.optimization import *
-from vipdopt.monitor import Monitor
-from vipdopt.simulation import LumericalSimulation, LumericalEncoder, ISimulation
+from vipdopt.optimization import Device, FoM, GradientOptimizer, Optimization
+from vipdopt.simulation import LumericalEncoder, LumericalSimulation
+from vipdopt.utils import PathLike, ensure_path
+
 
 class Project:
+    """Class for managing the loading and saving of projects."""
 
-    def __init__(self, config_type: Type[Config]=SonyBayerConfig) -> None:
+    def __init__(self, config_type: type[Config]=SonyBayerConfig) -> None:
         """Initialize a Project."""
         self.dir = Path('.')  # Project directory; defaults to root
         self.config = config_type()
@@ -31,15 +32,15 @@ class Project:
 
     @classmethod
     def from_dir(
-        cls: Type[Project],
+        cls: type[Project],
         project_dir: PathLike,
-        config_type: Type[Config]=SonyBayerConfig,
+        config_type: type[Config]=SonyBayerConfig,
     ) -> Project:
         """Create a new Project from an existing project directory."""
         proj = Project(config_type=config_type)
         proj.load_project(project_dir)
         return proj
-    
+
     @ensure_path
     def load_project(self, project_dir: Path):
         """Load settings from a project directory."""
@@ -59,7 +60,8 @@ class Project:
         try:
             optimizer_type = getattr(sys.modules[__name__], optimizer)
         except AttributeError:
-            raise NotImplementedError(f'Optimizer {optimizer} not currently supported')
+            raise NotImplementedError(f'Optimizer {optimizer} not currently supported')\
+            from None
         self.optimizer = optimizer_type(**optimizer_settings)
 
         # Setup simulations
@@ -70,7 +72,9 @@ class Project:
             solver_exe=cfg['solver_exe'],
         )
         self.base_sim = base_sim
-        src_to_sim_map = {src: base_sim.with_enabled([src]) for src in base_sim.source_names()}
+        src_to_sim_map = {
+            src: base_sim.with_enabled([src]) for src in base_sim.source_names()
+        }
         sims = src_to_sim_map.values()
 
         # General Settings
@@ -80,33 +84,13 @@ class Project:
         # Setup FoMs
         foms: list[FoM] = []
         weights = []
-        fom: dict
-        for name, fom in cfg.pop('figures_of_merit').items():
-            fom_cls: Type[FoM] = getattr(sys.modules[__name__], fom['type'])
-            foms.append(fom_cls(
-                fom_monitors=[
-                    Monitor(
-                        src_to_sim_map[src],
-                        src,
-                        mname,
-                    ) for src, mname in fom['fom_monitors']
-                ],
-                grad_monitors=[
-                    Monitor(
-                        src_to_sim_map[src],
-                        src,
-                        mname,
-                    ) for src, mname in fom['grad_monitors']
-                ],
-                polarization=fom['polarization'],
-                freq=fom['freq'],
-                opt_ids=fom.get('opt_ids', None),
-                name=name,
-            ))
-            weights.append(fom['weight'])
+        fom_dict: dict
+        for name, fom_dict in cfg.pop('figures_of_merit').items():
+            foms.append(FoM.from_dict(name, fom_dict, src_to_sim_map))
+            weights.append(fom_dict['weight'])
         self.foms = foms
         self.weights = weights
-        full_fom = sum(np.multiply(weights, foms), fom_cls.zero(foms[0]))
+        full_fom = sum(np.multiply(weights, foms), FoM.zero(foms[0]))
 
         # Load device
         device_source = cfg.pop('device')
@@ -132,7 +116,7 @@ class Project:
     def get(self, prop: str, default: Any=None) -> Any | None:
         """Get parameter and return None if it doesn't exist."""
         return self.config.get(prop, default)
-    
+
     def pop(self, name: str) -> Any:
         """Pop a parameter."""
         return self.config.pop(name)
@@ -144,19 +128,19 @@ class Project:
     def __setitem__(self, name: str, value: Any) -> None:
         """Set the value of an attribute, creating it if it doesn't already exist."""
         self.config[name] = value
-    
+
     def current_device_path(self) -> Path:
         """Save the current device."""
         epoch = self.optimization.epoch
         iteration = self.optimization.iteration
         return self.dir / 'device' / f'e_{epoch}_i_{iteration}.npy'
-    
+
     def save(self):
         """Save this project to it's pre-assigned directory."""
         self.save_as(self.dir)
-    
+
     @ensure_path
-    def save_as(self, project_dir: Path): 
+    def save_as(self, project_dir: Path):
         """Save this project to a specified directory, creating it if necessary."""
         (project_dir / 'device').mkdir(parents=True, exist_ok=True)
         self.dir = project_dir
@@ -205,8 +189,5 @@ if __name__ == '__main__':
     opt.save_as(output_dir)
 
     # Test that the saved format is loadable
-    # reload = Project.from_dir(output_dir)
 
     # # Also this way
-    # reload2 = Optimization()
-    # reload2.load_project(output_dir)

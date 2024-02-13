@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Sequence
+from copy import copy
 from typing import Any, no_type_check
-import json
 
 import numpy as np
 import numpy.typing as npt
 
 from vipdopt.monitor import Monitor
+from vipdopt.simulation import LumericalSimulation
 from vipdopt.utils import Number
 
 
@@ -56,6 +58,18 @@ class FoM:
             self.name = name
         FoM._COUNTER += 1
 
+    def __eq__(self, __value: object) -> bool:
+        """Test equality."""
+        if isinstance(__value, FoM):
+            return self.fom_monitors == __value.fom_monitors and \
+            self.grad_monitors == __value.grad_monitors and \
+            self.fom_func.__name__ == __value.fom_func.__name__ and \
+            self.gradient_func.__name__ == __value.gradient_func.__name__ and \
+            self.polarization == __value.polarization and \
+            self.freq == __value.freq and \
+            self.opt_ids == __value.opt_ids
+        return super().__eq__(__value)
+
     def compute(self, *args, **kwargs) -> npt.NDArray:
         """Compute FoM."""
         return self.fom_func(*args, **kwargs)
@@ -63,20 +77,50 @@ class FoM:
     def gradient(self, *args, **kwargs) -> npt.NDArray:
         """Compute gradient of FoM."""
         return self.gradient_func(*args, **kwargs)
-    
+
     def as_dict(self) -> dict:
         """Return a dictionary representation of this FoM."""
         data = {}
         data['type'] = type(self).__name__
-        data['fom_monitors'] = [(mon.source_name, mon.monitor_name) for mon in self.fom_monitors]
+        data['fom_monitors'] = [
+            (mon.source_name, mon.monitor_name) for mon in self.fom_monitors
+        ]
         data['grad_monitors'] = [
             (mon.source_name, mon.monitor_name) for mon in self.grad_monitors
         ]
+        if data['type'] == 'FoM':  # Generic FoM needs to copy functions
+            data['fom_func'] = self.fom_func
+            data['gradient_func'] = self.gradient_func
         data['polarization'] = self.polarization
         data['freq'] = self.freq
         data['opt_ids'] = self.opt_ids
-    
+
         return data
+
+    @staticmethod
+    def from_dict(
+        name: str,
+        og_data: dict,
+        src_to_sim_map: dict[str, LumericalSimulation],
+    ) -> type[FoM]:
+        """Create a figure of merit from a dictionary and list of simulations."""
+        data = copy(og_data)
+        fom_cls: type[FoM] = getattr(sys.modules[__name__], data.pop('type'))
+        if 'weight' in data:
+            del data['weight']
+        data['name'] = name
+        # if 'fom_func' in data:
+        # if 'gradient_func' in data:
+
+        data['fom_monitors'] = [
+            Monitor(src_to_sim_map[src], src, mname)
+            for src, mname in data['fom_monitors']
+        ]
+        data['grad_monitors'] = [
+            Monitor(src_to_sim_map[src], src, mname)
+            for src, mname in data['grad_monitors']
+        ]
+        return fom_cls(**data)
 
     @staticmethod
     @no_type_check
@@ -242,9 +286,9 @@ class FoM:
             fom.opt_ids,
         )
 
-    def copy(self) -> FoM:
+    def __copy__(self) -> type[FoM]:
         """Return a copy of this FoM."""
-        return FoM(
+        return self.__class__(
             self.fom_monitors,
             self.grad_monitors,
             self.fom_func,

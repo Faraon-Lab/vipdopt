@@ -5,21 +5,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-import sys
-from copy import copy
-from typing import Type
 
 import numpy.typing as npt
 
 from vipdopt.optimization.device import Device
+from vipdopt.optimization.fom import FoM
 from vipdopt.optimization.optimizer import GradientOptimizer
-from vipdopt.optimization.fom import FoM, BayerFilterFoM
-from vipdopt.optimization.adam import AdamOptimizer
-from vipdopt.simulation import ISimulation, LumericalSimulation, LumericalEncoder
-from vipdopt.configuration import Config
-from vipdopt.utils import ensure_path, save_config_file, read_config_file, PathLike
-from vipdopt.monitor import Monitor
+from vipdopt.simulation import ISimulation
 
 
 class Optimization:
@@ -50,7 +42,7 @@ class Optimization:
         self.iteration = start_iter
         self.max_epochs = max_epochs
         self.iter_per_epoch = iter_per_epoch
-        
+
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
         self._callbacks.append(func)

@@ -1,5 +1,6 @@
 """Module containing common functions used throughout the package."""
 
+import functools
 import importlib.util as imp
 import json
 import logging
@@ -8,9 +9,7 @@ from collections.abc import Callable
 from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
-from typing import Any, TypeVar, ParamSpec, Concatenate
-from typing_extensions import Protocol
-import functools
+from typing import Any, Concatenate, ParamSpec, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -120,23 +119,29 @@ def convert_path(path: PathLike) -> Path:
 def ensure_path(
         func: Callable[Concatenate[Any, Path, P], R],
 ) -> Callable[Concatenate[Any, PathLike, P], R]:
+    """Function decorator for converting PathLike's to Path's."""
     @functools.wraps(func)
     def wrapper(
             arg0: Any,
             path: PathLike,
-            *args: P.args, 
+            *args: P.args,
             **kwargs: P.kwargs,
     ) -> R:
         return func(arg0, convert_path(path), *args, **kwargs)
     return wrapper
 
 
-def save_config_file(config_data: dict, fname: PathLike, cfg_format: str='auto', **kwargs):
+def save_config_file(
+        config_data: dict,
+        fname: PathLike,
+        cfg_format: str='auto',
+        **kwargs,
+):
     """Save a configuration file."""
     path_filename = convert_path(fname)
     if cfg_format == 'auto':
         cfg_format = path_filename.suffix
-    
+
     match cfg_format.lower():
         case '.yaml' | '.yml':
             with path_filename.open('w') as f:
@@ -151,7 +156,7 @@ def save_config_file(config_data: dict, fname: PathLike, cfg_format: str='auto',
                     **kwargs
                 )
         case _:
-            msg = f'{cfg_format} file loading not yet supported.'
+            msg = f'{cfg_format} file saving not yet supported.'
             raise NotImplementedError(msg)
 
 

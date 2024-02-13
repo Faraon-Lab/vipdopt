@@ -1,8 +1,8 @@
 """FDTD Simulation Interface Code."""
 from __future__ import annotations
 
-import functools
 import abc
+import functools
 import json
 import logging
 import time
@@ -19,8 +19,7 @@ import numpy.typing as npt
 from overrides import override
 
 from vipdopt import lumapi
-from vipdopt.utils import PathLike, ensure_path, read_config_file, P, R
-from vipdopt.configuration import Config
+from vipdopt.utils import P, PathLike, R, ensure_path, read_config_file
 
 
 def _check_fdtd(
@@ -42,7 +41,7 @@ def _sync_fdtd_solver(
 )-> Callable[Concatenate[LumericalSimulation, P], R]:
     @functools.wraps(func)
     def wrapped(sim: LumericalSimulation, *args: P.args, **kwargs: P.kwargs):
-        sim._sync_fdtd()
+        sim._sync_fdtd()  # noqa: SLF001
         return func(sim, *args, **kwargs)
     return wrapped
 
@@ -110,8 +109,7 @@ class LumericalEncoder(json.JSONEncoder):
         if isinstance(o, LumericalSimObjectType):
             return {'obj_type': str(o)}
         if isinstance(o, LumericalSimObject):
-            d = o.__dict__.copy()
-            return d
+            return o.__dict__.copy()
         if isinstance(o, np.ndarray):
             return o.tolist()
         if isinstance(o, Path):
@@ -150,7 +148,7 @@ class LumericalSimObject:
     def __getitem__(self, key: str) -> Any:
         """Retrieve a property from an object."""
         return self.properties[key]
-    
+
     def update(self, **vals):
         """Update properties with values in a dictionary."""
         self.properties.update(vals)
@@ -177,7 +175,7 @@ class LumericalSimulation(ISimulation):
         """Create a LumericalSimulation.
 
         Arguments:
-            fname (str): optional filename to load the simulation from
+            source (PathLike | dict | None): optional source to load the simulation from
         """
         self.fdtd: lumapi.FDTD | None = None
         self._clear_objects()
@@ -237,11 +235,11 @@ class LumericalSimulation(ISimulation):
 
     @_check_fdtd
     def _sync_fdtd(self):
-        """Sync local objects with `lumapi.FDTD` objects"""
+        """Sync local objects with `lumapi.FDTD` objects."""
         if self._synced:
             return
         self.fdtd.switchtolayout()
-        for obj_name, obj in self.objects:
+        for obj_name, obj in self.objects.items():
             # Create object if needed
             if self.fdtd.getnamednumber(obj_name) == 0:
                 LumericalSimObjectType.get_add_function(obj.obj_type)(
@@ -263,14 +261,15 @@ class LumericalSimulation(ISimulation):
         with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             f.write(content)
         logging.info(f'Succesfully saved simulation to {fname}.\n')
-    
+
     @_sync_fdtd_solver
     @ensure_path
     def save_lumapi(self, fname: Path):
         """Save using Lumerical's simulation file type (.fsp)."""
         self.fdtd.save(str(fname.with_suffix('')))
-    
+
     def as_dict(self) -> dict:
+        """Return a dictionary representation of this simulation."""
         return {'objects': self.objects}
 
     def as_json(self) -> str:
@@ -342,7 +341,7 @@ class LumericalSimulation(ISimulation):
     def sources(self) -> list[LumericalSimObject]:
         """Return a list of all source objects."""
         return [obj for _, obj in self.objects.items() if obj.obj_type in SOURCE_TYPES]
-    
+
     def source_names(self) -> list[str]:
         """Return a list of all source object names."""
         return [obj.name for obj in self.sources()]

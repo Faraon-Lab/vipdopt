@@ -9,6 +9,9 @@ from vipdopt.configuration.template import SonyBayerRenderer
 
 TEST_YAML_PATH = Path('vipdopt/configuration/config_example.yml')
 TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')
+PROJECT_INPUT_DIR = Path('test_project/')
+PROJECT_OUTPUT_DIR = Path('test_output_project/')
+
 
 _mock_bad_config_data = {
     'bad_config_1.yml': 'border_optimization: true\nuse_smooth_blur: true',
@@ -52,31 +55,61 @@ _mock_sim_file_data = """{
 }"""
 
 _mock_device_dict = {
-        "size": (40, 40),
-        "permittivity_constraints": (0.0, 1.0),
-        "coords": (0, 0, 0),
-        "name": "device",
-        "init_density": 0.5,
-        "randomize": True,
-        "init_seed": 0,
-        "symmetric": True,
-        "filters": [
+        'size': (40, 40),
+        'permittivity_constraints': (0.0, 1.0),
+        'coords': (0, 0, 0),
+        'name': 'device',
+        'init_density': 0.5,
+        'randomize': True,
+        'init_seed': 0,
+        'symmetric': True,
+        'filters': [
             {
-                "type": "Sigmoid",
-                "parameters": {
-                    "eta": 0.5,
-                    "beta": 1.0
+                'type': 'Sigmoid',
+                'parameters': {
+                    'eta': 0.5,
+                    'beta': 1.0
                 }
             },
             {
-                "type": "Sigmoid",
-                "parameters": {
-                    "eta": 0.5,
-                    "beta": 1.0
+                'type': 'Sigmoid',
+                'parameters': {
+                    'eta': 0.5,
+                    'beta': 1.0
                 }
             }
         ]
     }
+
+_mock_fom_dict = {
+    'fom_0': {
+        'type': 'BayerFilterFoM',
+        'fom_monitors': [
+            [
+                'forward_srcx',
+                'focal_monitor_0'
+            ]
+        ],
+        'grad_monitors': [
+            [
+                'forward_srcx',
+                'design_efield_monitor'
+            ],
+            [
+                'adj_src_0x',
+                'design_efield_monitor'
+            ]
+        ],
+        'polarization': 'TE',
+        'freq': [
+            0.0,
+            0.1,
+            0.2
+        ],
+        'weight': 1.0
+    }
+}
+
 
 EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
     # Mesh Properties
@@ -176,15 +209,19 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
 }
 
 @pytest.fixture(scope='session')
-def device_dict():
+def device_dict() -> dict:
     return _mock_device_dict
 
 @pytest.fixture(scope='session')
-def sim_file():
+def fom_dict() -> dict:
+    return _mock_fom_dict
+
+@pytest.fixture(scope='session')
+def sim_file() -> str:
     return _mock_sim_file_data
 
 @pytest.fixture(scope='session')
-def template_renderer():
+def template_renderer() -> SonyBayerRenderer:
     rndr = SonyBayerRenderer('jinja_templates/')
 
     rndr.set_template('derived_simulation_properties.j2')
@@ -225,7 +262,9 @@ def example_derived_properties():
 def _mock_bad_config(mocker):
     """Read a config file with disallowed settings"""
     def open_mock(fname, *args):
-        return mocker.mock_open(read_data=_mock_bad_config_data[str(fname)]).return_value
+        return mocker.mock_open(
+            read_data=_mock_bad_config_data[str(fname)]
+        ).return_value
     mocker.patch('builtins.open', open_mock)
 
 
@@ -244,3 +283,11 @@ def _mock_sim_json(mocker):
     )
     mocker.patch('builtins.open', mocked_sim)
 
+@pytest.fixture()
+def _mock_project_json(mocker):
+    with (PROJECT_INPUT_DIR / 'config.json').open('r') as f:
+        data = f.read()
+    mocked_project = mocker.mock_open(
+        read_data=data,
+    )
+    mocker.patch('builtins.open', mocked_project)

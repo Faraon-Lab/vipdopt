@@ -1,7 +1,6 @@
 """Entrypoint running the GUI. Mainly for testing right now."""
 import logging
 import sys
-from pathlib import Path
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -9,11 +8,11 @@ from PySide6.QtWidgets import (
     QMainWindow,
 )
 
+from vipdopt.gui.config_editor import ConfigModel
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
 from vipdopt.gui.ui_status import Ui_MainWindow as Ui_StatusWindow
-from vipdopt.utils import read_config_file, PathLike
-from vipdopt.gui.config_editor import ConfigModel
 from vipdopt.project import Project
+from vipdopt.utils import PathLike, read_config_file
 
 
 class SettingsWindow(QMainWindow, Ui_SettingsWindow):
@@ -54,7 +53,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.project.load_project(proj_dir)
         self._update_values()
         logging.info(f'Loaded project from {proj_dir}')
-    
+
     def _update_values(self):
         """Update GUI to match values in Project."""
         # Config Tab
@@ -64,7 +63,6 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.sim_model.load(self.project.base_sim.as_dict())
 
         # FoM Tab
-        # self.fom_gridLayout.getItemPosition()
 
         # Optimization Tab
         self.opt_iter_lineEdit.setText(str(self.project.optimization.iteration))
@@ -86,7 +84,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             cfg = read_config_file(fname)
             self.config_lineEdit.setText(fname)
             self.config_model.load(cfg)
-    
+
     # Simulation Tab
     def load_json(self):
         """Load a yaml config file into the configuration tab."""
@@ -101,17 +99,17 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             cfg = read_config_file(fname)
             self.sim_lineEdit.setText(fname)
             self.sim_model.load(cfg)
-    
+
     # FoM Tab
     def add_fom_row(self):
-        pass
+        """Add a FoM to the FoM tab."""
 
     def remove_fom_row(self):
-        pass
+        """Remove the selected FoM from the FoM tab."""
 
     # Optimization Tab
     def load_optimization_settings(self, fname: PathLike):
-        pass
+        """Load settings for the optimization tab."""
 
 
 class StatusDashboard(QMainWindow, Ui_StatusWindow):

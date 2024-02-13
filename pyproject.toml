@@ -147,7 +147,8 @@ omit = [
     "vipdopt/simulation.py",
     "vipdopt/configuration/sbc.py",
     "vipdopt/optimization/optimization.py",
-    "vipdopt/source.py"
+    "vipdopt/monitor.py",
+    "vipdopt/gui/*",
 ]
 
 [tool.coverage.report]
@@ -183,3 +184,6 @@ fail_under = 80
 #
 [tool.mypy]
 disable_error_code = ["operator"]
+exclude = [
+    '/ui_',  # Ignore files starting with 'ui_'
+]

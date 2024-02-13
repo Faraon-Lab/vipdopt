@@ -23,7 +23,7 @@ class Filter(abc.ABC):
 
     @abc.abstractproperty
     def init_vars(self) -> dict:
-        pass
+        """The variables used to initalize this Filter."""
 
     def verify_bounds(self, variable: npt.NDArray | Number) -> bool:
         """Checks if variable is within bounds of this filter.
@@ -69,10 +69,12 @@ class Sigmoid(Filter):
             for reducing re-computation.
     """
     @property
+    @override
     def _bounds(self):
         return SIGMOID_BOUNDS
 
     @property
+    @override
     def init_vars(self) -> dict:
         return {'eta': self.eta, 'beta': self.beta}
 
@@ -90,8 +92,9 @@ class Sigmoid(Filter):
     def __repr__(self) -> str:
         """Return a string representation of the filter."""
         return f'Sigmoid filter with eta={self.eta:0.3f} and beta={self.beta:0.3f}'
-    
+
     def __eq__(self, __value: object) -> bool:
+        """Test equality."""
         if isinstance(__value, Sigmoid):
             return self.eta == __value.eta and self.beta == __value.beta
         return super().__eq__(__value)

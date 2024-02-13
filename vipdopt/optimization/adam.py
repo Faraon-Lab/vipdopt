@@ -7,6 +7,7 @@ import numpy.typing as npt
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.optimizer import GradientOptimizer
 
+
 class AdamOptimizer(GradientOptimizer):
     """Optimizer implementing the Adaptive Moment Estimation (Adam) algorithm."""
 

@@ -11,7 +11,8 @@ class GradientOptimizer(abc.ABC):
     """Abstraction class for all gradient-based optimizers."""
 
     def __init__(self, **kwargs):
-        vars(self).update(kwargs.copy())
+        """Initialize a GradientOptimizer."""
+        vars(self).update(kwargs)
 
     @abc.abstractmethod
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
