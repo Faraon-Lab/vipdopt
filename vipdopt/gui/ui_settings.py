@@ -18,10 +18,11 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QTransform)
 from PySide6.QtWidgets import (QApplication, QComboBox, QFormLayout, QFrame,
     QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QMainWindow, QMenu, QMenuBar,
-    QPushButton, QSizePolicy, QSpacerItem, QStatusBar,
-    QTabWidget, QToolButton, QTreeView, QTreeWidget,
-    QTreeWidgetItem, QVBoxLayout, QWidget)
+    QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
+    QMenu, QMenuBar, QPushButton, QSizePolicy,
+    QSpacerItem, QStatusBar, QTabWidget, QToolButton,
+    QTreeView, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
+    QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -89,6 +90,8 @@ class Ui_MainWindow(object):
 
         self.config_treeView = QTreeView(self.verticalLayoutWidget)
         self.config_treeView.setObjectName(u"config_treeView")
+        self.config_treeView.setAlternatingRowColors(True)
+        self.config_treeView.header().setCascadingSectionResizes(True)
 
         self.verticalLayout.addWidget(self.config_treeView)
 
@@ -137,6 +140,8 @@ class Ui_MainWindow(object):
 
         self.sim_treeView = QTreeView(self.verticalLayoutWidget_3)
         self.sim_treeView.setObjectName(u"sim_treeView")
+        self.sim_treeView.setAlternatingRowColors(True)
+        self.sim_treeView.header().setCascadingSectionResizes(True)
 
         self.verticalLayout_4.addWidget(self.sim_treeView)
 
@@ -157,8 +162,9 @@ class Ui_MainWindow(object):
         __qtreewidgetitem5 = QTreeWidgetItem(__qtreewidgetitem3)
         __qtreewidgetitem5.setCheckState(0, Qt.Checked);
         self.sim_config_treeWidget.setObjectName(u"sim_config_treeWidget")
+        self.sim_config_treeWidget.setAlternatingRowColors(True)
         self.sim_config_treeWidget.setUniformRowHeights(True)
-        self.sim_config_treeWidget.header().setCascadingSectionResizes(False)
+        self.sim_config_treeWidget.header().setCascadingSectionResizes(True)
         self.sim_config_treeWidget.header().setStretchLastSection(False)
 
         self.verticalLayout_4.addWidget(self.sim_config_treeWidget)
@@ -174,66 +180,75 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.fom_gridLayout = QGridLayout()
         self.fom_gridLayout.setObjectName(u"fom_gridLayout")
-        self.label_18 = QLabel(self.verticalLayoutWidget_2)
-        self.label_18.setObjectName(u"label_18")
+        self.fom_weight_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_weight_label.setObjectName(u"fom_weight_label")
 
-        self.fom_gridLayout.addWidget(self.label_18, 0, 3, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_weight_label, 0, 4, 1, 1)
 
-        self.lineEdit_15 = QLineEdit(self.verticalLayoutWidget_2)
-        self.lineEdit_15.setObjectName(u"lineEdit_15")
+        self.fom_type_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_type_label.setObjectName(u"fom_type_label")
+
+        self.fom_gridLayout.addWidget(self.fom_type_label, 0, 1, 1, 1)
+
+        self.fom_weight_lineEdit_0 = QLineEdit(self.verticalLayoutWidget_2)
+        self.fom_weight_lineEdit_0.setObjectName(u"fom_weight_lineEdit_0")
         sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.lineEdit_15.sizePolicy().hasHeightForWidth())
-        self.lineEdit_15.setSizePolicy(sizePolicy)
+        sizePolicy.setHeightForWidth(self.fom_weight_lineEdit_0.sizePolicy().hasHeightForWidth())
+        self.fom_weight_lineEdit_0.setSizePolicy(sizePolicy)
 
-        self.fom_gridLayout.addWidget(self.lineEdit_15, 1, 4, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_weight_lineEdit_0, 1, 4, 1, 1)
 
-        self.label_17 = QLabel(self.verticalLayoutWidget_2)
-        self.label_17.setObjectName(u"label_17")
+        self.fom_grad_mon_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_grad_mon_label.setObjectName(u"fom_grad_mon_label")
 
-        self.fom_gridLayout.addWidget(self.label_17, 0, 2, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_grad_mon_label, 0, 3, 1, 1)
 
-        self.label_16 = QLabel(self.verticalLayoutWidget_2)
-        self.label_16.setObjectName(u"label_16")
+        self.fom_fom_mon_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_fom_mon_label.setObjectName(u"fom_fom_mon_label")
 
-        self.fom_gridLayout.addWidget(self.label_16, 0, 1, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_fom_mon_label, 0, 2, 1, 1)
 
-        self.lineEdit_11 = QLineEdit(self.verticalLayoutWidget_2)
-        self.lineEdit_11.setObjectName(u"lineEdit_11")
+        self.fom_grad_mon_listWidget_0 = QListWidget(self.verticalLayoutWidget_2)
+        self.fom_grad_mon_listWidget_0.setObjectName(u"fom_grad_mon_listWidget_0")
+
+        self.fom_gridLayout.addWidget(self.fom_grad_mon_listWidget_0, 1, 3, 1, 1)
+
+        self.fom_type_comboBox_0 = QComboBox(self.verticalLayoutWidget_2)
+        self.fom_type_comboBox_0.setObjectName(u"fom_type_comboBox_0")
+
+        self.fom_gridLayout.addWidget(self.fom_type_comboBox_0, 1, 1, 1, 1)
+
+        self.fom_name_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_name_label.setObjectName(u"fom_name_label")
+
+        self.fom_gridLayout.addWidget(self.fom_name_label, 0, 0, 1, 1)
+
+        self.fom_fom_mon_listWidget_0 = QListWidget(self.verticalLayoutWidget_2)
+        self.fom_fom_mon_listWidget_0.setObjectName(u"fom_fom_mon_listWidget_0")
+
+        self.fom_gridLayout.addWidget(self.fom_fom_mon_listWidget_0, 1, 2, 1, 1)
+
+        self.fom_name_lineEdit_0 = QLineEdit(self.verticalLayoutWidget_2)
+        self.fom_name_lineEdit_0.setObjectName(u"fom_name_lineEdit_0")
         sizePolicy1 = QSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.lineEdit_11.sizePolicy().hasHeightForWidth())
-        self.lineEdit_11.setSizePolicy(sizePolicy1)
+        sizePolicy1.setHeightForWidth(self.fom_name_lineEdit_0.sizePolicy().hasHeightForWidth())
+        self.fom_name_lineEdit_0.setSizePolicy(sizePolicy1)
 
-        self.fom_gridLayout.addWidget(self.lineEdit_11, 1, 0, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_name_lineEdit_0, 1, 0, 1, 1)
 
-        self.comboBox_2 = QComboBox(self.verticalLayoutWidget_2)
-        self.comboBox_2.setObjectName(u"comboBox_2")
+        self.fom_delrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
+        self.fom_delrow_toolButton.setObjectName(u"fom_delrow_toolButton")
 
-        self.fom_gridLayout.addWidget(self.comboBox_2, 1, 1, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_delrow_toolButton, 1, 5, 1, 1)
 
-        self.label_15 = QLabel(self.verticalLayoutWidget_2)
-        self.label_15.setObjectName(u"label_15")
+        self.fom_addrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
+        self.fom_addrow_toolButton.setObjectName(u"fom_addrow_toolButton")
 
-        self.fom_gridLayout.addWidget(self.label_15, 0, 0, 1, 1)
-
-        self.comboBox_4 = QComboBox(self.verticalLayoutWidget_2)
-        self.comboBox_4.setObjectName(u"comboBox_4")
-
-        self.fom_gridLayout.addWidget(self.comboBox_4, 1, 3, 1, 1)
-
-        self.comboBox_3 = QComboBox(self.verticalLayoutWidget_2)
-        self.comboBox_3.setObjectName(u"comboBox_3")
-        self.comboBox_3.setEditable(False)
-
-        self.fom_gridLayout.addWidget(self.comboBox_3, 1, 2, 1, 1)
-
-        self.label_19 = QLabel(self.verticalLayoutWidget_2)
-        self.label_19.setObjectName(u"label_19")
-
-        self.fom_gridLayout.addWidget(self.label_19, 0, 4, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_addrow_toolButton, 2, 0, 1, 1)
 
 
         self.verticalLayout_2.addLayout(self.fom_gridLayout)
@@ -248,20 +263,31 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_5.addItem(self.horizontalSpacer_4)
 
-        self.fom_addrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
-        self.fom_addrow_toolButton.setObjectName(u"fom_addrow_toolButton")
-
-        self.horizontalLayout_5.addWidget(self.fom_addrow_toolButton)
-
-        self.fom_delrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
-        self.fom_delrow_toolButton.setObjectName(u"fom_delrow_toolButton")
-
-        self.horizontalLayout_5.addWidget(self.fom_delrow_toolButton)
-
 
         self.verticalLayout_2.addLayout(self.horizontalLayout_5)
 
         self.tabWidget.addTab(self.fom_tab, "")
+        self.device_tab = QWidget()
+        self.device_tab.setObjectName(u"device_tab")
+        self.horizontalLayoutWidget = QWidget(self.device_tab)
+        self.horizontalLayoutWidget.setObjectName(u"horizontalLayoutWidget")
+        self.horizontalLayoutWidget.setGeometry(QRect(9, 9, 801, 531))
+        self.horizontalLayout_4 = QHBoxLayout(self.horizontalLayoutWidget)
+        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.horizontalLayout_4.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout_3 = QVBoxLayout()
+        self.verticalLayout_3.setObjectName(u"verticalLayout_3")
+        self.device_treeView = QTreeView(self.horizontalLayoutWidget)
+        self.device_treeView.setObjectName(u"device_treeView")
+        self.device_treeView.setAlternatingRowColors(True)
+        self.device_treeView.header().setCascadingSectionResizes(True)
+
+        self.verticalLayout_3.addWidget(self.device_treeView)
+
+
+        self.horizontalLayout_4.addLayout(self.verticalLayout_3)
+
+        self.tabWidget.addTab(self.device_tab, "")
         self.opt_tab = QWidget()
         self.opt_tab.setObjectName(u"opt_tab")
         self.verticalLayoutWidget_4 = QWidget(self.opt_tab)
@@ -526,19 +552,18 @@ class Ui_MainWindow(object):
         self.sim_config_treeWidget.setSortingEnabled(__sortingEnabled)
 
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.sim_tab), QCoreApplication.translate("MainWindow", u"Simulation", None))
-        self.label_18.setText(QCoreApplication.translate("MainWindow", u"Gradient Monitors", None))
-        self.lineEdit_15.setPlaceholderText(QCoreApplication.translate("MainWindow", u"1.0", None))
-        self.label_17.setText(QCoreApplication.translate("MainWindow", u"Figure of Merit Monitors", None))
-        self.label_16.setText(QCoreApplication.translate("MainWindow", u"Type", None))
-        self.lineEdit_11.setPlaceholderText(QCoreApplication.translate("MainWindow", u"FoM 0", None))
-        self.comboBox_2.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Select...", None))
-        self.label_15.setText(QCoreApplication.translate("MainWindow", u"Name", None))
-        self.comboBox_4.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Select Monitors...", None))
-        self.comboBox_3.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Select Monitors...", None))
-        self.label_19.setText(QCoreApplication.translate("MainWindow", u"Weight", None))
-        self.fom_addrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Add Row", None))
+        self.fom_weight_label.setText(QCoreApplication.translate("MainWindow", u"Weight", None))
+        self.fom_type_label.setText(QCoreApplication.translate("MainWindow", u"Type", None))
+        self.fom_weight_lineEdit_0.setPlaceholderText(QCoreApplication.translate("MainWindow", u"1.0", None))
+        self.fom_grad_mon_label.setText(QCoreApplication.translate("MainWindow", u"Gradient Monitors", None))
+        self.fom_fom_mon_label.setText(QCoreApplication.translate("MainWindow", u"Figure of Merit Monitors", None))
+        self.fom_type_comboBox_0.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Select...", None))
+        self.fom_name_label.setText(QCoreApplication.translate("MainWindow", u"Name", None))
+        self.fom_name_lineEdit_0.setPlaceholderText(QCoreApplication.translate("MainWindow", u"FoM 0", None))
         self.fom_delrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Remove Row", None))
+        self.fom_addrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Add Row", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.fom_tab), QCoreApplication.translate("MainWindow", u"Figure of Merit", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.device_tab), QCoreApplication.translate("MainWindow", u"Device", None))
         self.label_14.setText(QCoreApplication.translate("MainWindow", u"Optimization Settings", None))
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Maximum Iterations:", None))
         self.label_6.setText(QCoreApplication.translate("MainWindow", u"Iterations per Epoch:", None))

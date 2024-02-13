@@ -9,7 +9,7 @@ from collections.abc import Callable
 from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
-from typing import Any, Concatenate, ParamSpec, TypeVar
+from typing import Any, Concatenate, ParamSpec, TypeVar, Type
 
 import numpy as np
 import numpy.typing as npt
@@ -197,3 +197,6 @@ def _yaml_loader(fname: PathLike) -> dict:
     with open(fname, 'rb') as stream:
         return yaml.safe_load(stream)
 
+def subclasses(cls: T) -> list[Type[T]]:
+    """Get all subclasses of a given class."""
+    return [scls.__name__ for scls in cls.__subclasses__()]

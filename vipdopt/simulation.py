@@ -13,6 +13,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 from typing import Any, Concatenate
+from copy import copy
 
 import numpy as np
 import numpy.typing as npt
@@ -102,14 +103,10 @@ class LumericalEncoder(json.JSONEncoder):
     """Encodes LumericalSim objects in JSON format."""
     @override
     def default(self, o: Any) -> Any:
-        if isinstance(o, LumericalSimulation):
-            d = o.__dict__.copy()
-            del d['fdtd']
-            return d
         if isinstance(o, LumericalSimObjectType):
             return {'obj_type': str(o)}
         if isinstance(o, LumericalSimObject):
-            return o.__dict__.copy()
+            return copy(vars(o))
         if isinstance(o, np.ndarray):
             return o.tolist()
         if isinstance(o, Path):
@@ -136,7 +133,7 @@ class LumericalSimObject:
     def __str__(self) -> str:
         """Return string representation of object."""
         return json.dumps(
-            self.__dict__,
+            vars(self),
             indent=4,
             ensure_ascii=True,
         )
@@ -270,10 +267,10 @@ class LumericalSimulation(ISimulation):
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this simulation."""
-        return {'objects': self.objects}
+        return {'objects': {name: vars(obj) for name, obj in self.objects.items()}}
 
     def as_json(self) -> str:
-        """Return a JSON representation of thi ssimulation."""
+        """Return a JSON representation of this simulation."""
         return json.dumps(
             self.as_dict(),
             indent=4,

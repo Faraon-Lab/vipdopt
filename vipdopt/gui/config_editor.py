@@ -76,7 +76,7 @@ class TreeItem:
 
     @classmethod
     def load(
-        cls, value: list | tuple | dict, parent: TreeItem = None, sort=True
+        cls, value: list | tuple | Mapping, parent: TreeItem = None, sort=True
     ) -> TreeItem:
         """Create a 'root' TreeItem from a nested list or a nested dictonary.
 
@@ -93,13 +93,13 @@ class TreeItem:
         root_item = TreeItem(parent)
         root_item.key = 'root'
 
-        if isinstance(value, dict):
+        if isinstance(value, Mapping):
             items = sorted(value.items()) if sort else value.items()
 
             for key, value in items:
                 child = cls.load(value, root_item)
                 child.key = key
-                child.value_type = type(value)
+                child.value_type = dict
                 root_item.append_child(child)
         elif isinstance(value, list | tuple):
             for index, val in enumerate(value):
@@ -132,7 +132,7 @@ class ConfigModel(QAbstractItemModel):
         """Load model from a nested dictionary returned by utils.read_config_file.
 
         Arguments:
-            document (dict): JSON/YAML-compatible dictionary
+            document (Mapping): JSON/YAML-compatible dictionary
         """
         self.beginResetModel()
 

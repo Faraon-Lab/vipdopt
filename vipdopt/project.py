@@ -58,7 +58,7 @@ class Project:
         optimizer: str = cfg.pop('optimizer')
         optimizer_settings: dict = cfg.pop('optimizer_settings')
         try:
-            optimizer_type = getattr(sys.modules[__name__], optimizer)
+            optimizer_type = getattr(sys.modules['vipdopt.optimization'], optimizer)
         except AttributeError:
             raise NotImplementedError(f'Optimizer {optimizer} not currently supported')\
             from None

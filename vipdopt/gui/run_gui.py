@@ -12,7 +12,8 @@ from vipdopt.gui.config_editor import ConfigModel
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
 from vipdopt.gui.ui_status import Ui_MainWindow as Ui_StatusWindow
 from vipdopt.project import Project
-from vipdopt.utils import PathLike, read_config_file
+from vipdopt.optimization import FoM
+from vipdopt.utils import PathLike, read_config_file, subclasses
 
 
 class SettingsWindow(QMainWindow, Ui_SettingsWindow):
@@ -27,6 +28,9 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.config_treeView.setModel(self.config_model)
         self.sim_model = ConfigModel()
         self.sim_treeView.setModel(self.sim_model)
+        self.device_model = ConfigModel()
+        self.device_treeView.setModel(self.device_model)
+
 
         self.actionOpen.triggered.connect(self.open_project)
 
@@ -50,9 +54,12 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             './',
             QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
         )
-        self.project.load_project(proj_dir)
-        self._update_values()
-        logging.info(f'Loaded project from {proj_dir}')
+        if proj_dir:
+            self.project.load_project(proj_dir)
+            print(f'Loaded project from {proj_dir}')
+            self._update_values()
+            print(f'Updated GUI with values from {proj_dir}')
+            print(self.config_model)
 
     def _update_values(self):
         """Update GUI to match values in Project."""
@@ -63,6 +70,15 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.sim_model.load(self.project.base_sim.as_dict())
 
         # FoM Tab
+        for i, fom in enumerate(self.project.foms):
+            self.fom_name_lineEdit_0.setText(fom.name)
+            self.fom_type_comboBox_0.addItems(subclasses(FoM))
+            self.fom_fom_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
+            self.fom_grad_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
+            self.fom_weight_lineEdit_0.setText(str(self.project.weights[i]))
+
+        # Device Tab
+        self.device_model.load(self.project.device.as_dict())
 
         # Optimization Tab
         self.opt_iter_lineEdit.setText(str(self.project.optimization.iteration))
