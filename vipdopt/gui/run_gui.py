@@ -2,10 +2,16 @@
 import logging
 import sys
 
+from PySide6.QtCore import Qt, QStringListModel
+
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QMainWindow,
+    QListWidget,
+    QAbstractItemView,
+    QTreeWidget,
+    QTreeWidgetItem,
 )
 
 from vipdopt.gui.config_editor import ConfigModel
@@ -13,6 +19,7 @@ from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
 from vipdopt.gui.ui_status import Ui_MainWindow as Ui_StatusWindow
 from vipdopt.project import Project
 from vipdopt.optimization import FoM
+from vipdopt.simulation import LumericalSimulation
 from vipdopt.utils import PathLike, read_config_file, subclasses
 
 
@@ -69,12 +76,38 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         # Simulation Tab
         self.sim_model.load(self.project.base_sim.as_dict())
 
+        self.sim_config_treeWidget.clear()
+        sim: LumericalSimulation
+        for i, sim in enumerate(self.project.optimization.sims):
+            sim_node = QTreeWidgetItem((f'Simulation {i}', ))
+            source_nodes = [QTreeWidgetItem((src,)) for src in sim.source_names()]
+            for src in source_nodes:
+                src.setCheckState(1, Qt.CheckState.Unchecked)
+            source_nodes[i].setCheckState(1, Qt.CheckState.Checked)
+            sim_node.addChildren(source_nodes)
+            self.sim_config_treeWidget.addTopLevelItem(sim_node)
+
         # FoM Tab
+        fom_types = subclasses(FoM)
         for i, fom in enumerate(self.project.foms):
             self.fom_name_lineEdit_0.setText(fom.name)
-            self.fom_type_comboBox_0.addItems(subclasses(FoM))
+            self.fom_type_comboBox_0.clear()
+            self.fom_type_comboBox_0.addItems(fom_types)
+            self.fom_type_comboBox_0.setCurrentIndex(fom_types.index(type(fom).__name__))
+
+            self.fom_fom_mon_listWidget_0.clear()
+            self.fom_fom_mon_listWidget_0.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
             self.fom_fom_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
+            for mname in [mon.monitor_name for mon in fom.fom_monitors]:
+                for item in self.fom_fom_mon_listWidget_0.findItems(mname, Qt.MatchFlag.MatchExactly):
+                    item.setSelected(True)
+
+            self.fom_grad_mon_listWidget_0.clear()
             self.fom_grad_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
+            self.fom_grad_mon_listWidget_0.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+            for mname in [mon.monitor_name for mon in fom.grad_monitors]:
+                for item in self.fom_grad_mon_listWidget_0.findItems(mname, Qt.MatchFlag.MatchExactly):
+                    item.setSelected(True)
             self.fom_weight_lineEdit_0.setText(str(self.project.weights[i]))
 
         # Device Tab
@@ -142,8 +175,8 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     # Create application windows
-    status_window = StatusDashboard()
-    status_window.show()
+    # status_window = StatusDashboard()
+    # status_window.show()
     settings_window = SettingsWindow()
     settings_window.show()
     app.exec()
