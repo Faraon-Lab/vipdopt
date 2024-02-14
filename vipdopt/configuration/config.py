@@ -6,6 +6,7 @@ import logging
 from collections import UserDict
 from pathlib import Path
 
+import vipdopt
 from vipdopt.utils import ensure_path, read_config_file, save_config_file
 
 
@@ -28,13 +29,13 @@ class Config(UserDict):
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
         config = read_config_file(fname, cfg_format)
-        logging.debug(f'Loaded config file:\n {config}')
+        vipdopt.logger.debug(f'Loaded config file:\n {config}')
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
             self.update(config)
 
-        logging.info(f'\nSuccesfully loaded configuration from {fname}')
+        vipdopt.logger.info(f'\nSuccesfully loaded configuration from {fname}')
 
     @classmethod
     @ensure_path

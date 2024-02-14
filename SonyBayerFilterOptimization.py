@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 
 from vipdopt.simulation import LumericalSimulation
 from vipdopt.utils import setup_logger
+from vipdopt import logger
 
 f = sys.modules[__name__].__file__
 if not f:

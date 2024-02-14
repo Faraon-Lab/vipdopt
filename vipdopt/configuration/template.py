@@ -10,6 +10,7 @@ import numpy.typing as npt
 from jinja2 import Environment, FileSystemLoader, Undefined
 from overrides import override
 
+import vipdopt
 from vipdopt.configuration.config import read_config_file
 from vipdopt.utils import ensure_path, setup_logger
 
@@ -34,7 +35,7 @@ class TemplateRenderer:
         with open(fname, 'w') as f:
             f.write(output)
 
-        logger.debug(f'Succesfully rendered and saved output to {fname}')
+        vipdopt.logger.debug(f'Succesfully rendered and saved output to {fname}')
 
     @ensure_path
     def set_template(self, template: Path) -> None:
@@ -105,9 +106,9 @@ if __name__ == '__main__':
 
     data = read_config_file(args.data_file)
     output = rndr.render(data=data, pi=np.pi)
-    logger.info(f'Rendered Output:\n{output}')
+    vipdopt.logger.info(f'Rendered Output:\n{output}')
 
     with open(args.output, 'w') as f:
         f.write(output)
 
-    logger.info(f'Succesfully saved output to {args.output}')
+    vipdopt.logger.info(f'Succesfully saved output to {args.output}')

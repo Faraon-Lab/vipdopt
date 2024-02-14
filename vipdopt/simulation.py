@@ -19,6 +19,7 @@ import numpy as np
 import numpy.typing as npt
 from overrides import override
 
+import vipdopt
 from vipdopt import lumapi
 from vipdopt.utils import P, PathLike, R, ensure_path, read_config_file
 
@@ -187,7 +188,7 @@ class LumericalSimulation(ISimulation):
 
     @override
     def connect(self) -> None:
-        logging.info('Attempting to connect to Lumerical servers...')
+        vipdopt.logger.info('Attempting to connect to Lumerical servers...')
 
         # This loop handles the problem of
         # "Failed to start messaging, check licenses..." that Lumerical often has.
@@ -201,7 +202,7 @@ class LumericalSimulation(ISimulation):
                 )
                 continue
 
-        logging.info('Verified license with Lumerical servers.\n')
+        vipdopt.logger.info('Verified license with Lumerical servers.\n')
         self.fdtd.newproject()
         self._sync_fdtd()
         if self._env_vars is not None:
@@ -216,10 +217,10 @@ class LumericalSimulation(ISimulation):
             self._load_file(source)
 
     def _load_file(self, fname: PathLike):
-        logging.info(f'Loading simulation from {fname}...')
+        vipdopt.logger.info(f'Loading simulation from {fname}...')
         sim = read_config_file(fname)
         self._load_dict(sim)
-        logging.info(f'Succesfully loaded {fname}\n')
+        vipdopt.logger.info(f'Succesfully loaded {fname}\n')
 
     def _load_dict(self, d: dict):
         self._clear_objects()
@@ -251,13 +252,13 @@ class LumericalSimulation(ISimulation):
     @ensure_path
     @override
     def save(self, fname: Path):
-        logging.info(f'Saving simulation to {fname}...')
+        vipdopt.logger.info(f'Saving simulation to {fname}...')
         if self.fdtd is not None:
             self.save_lumapi(fname)
         content = self.as_json()
         with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             f.write(content)
-        logging.info(f'Succesfully saved simulation to {fname}.\n')
+        vipdopt.logger.info(f'Succesfully saved simulation to {fname}.\n')
 
     @_sync_fdtd_solver
     @ensure_path
@@ -365,7 +366,7 @@ class LumericalSimulation(ISimulation):
             properties (dict[str, Any]): optional dictionary to populate
                 the new object with
         """
-        logging.debug(f"Creating new object: '{obj_name}'...")
+        vipdopt.logger.debug(f"Creating new object: '{obj_name}'...")
         obj = LumericalSimObject(obj_name, obj_type)
         obj.update(**properties)
         self.add_object(obj)
@@ -396,9 +397,9 @@ class LumericalSimulation(ISimulation):
     def close(self):
         """Close fdtd conenction."""
         if self.fdtd is not None:
-            logging.info('Closing connection with Lumerical...')
+            vipdopt.logger.info('Closing connection with Lumerical...')
             self.fdtd.close()
-            logging.info('Succesfully closed connection with Lumerical.')
+            vipdopt.logger.info('Succesfully closed connection with Lumerical.')
             self.fdtd = None
             self._synced = False
 
@@ -469,9 +470,9 @@ class LumericalSimulation(ISimulation):
             f'{mpi_exe} {mpi_opt} {solver_exe} {{PROJECT_FILE_PATH}}\n'
             'exit 0',
         )
-        logging.debug('Updated simulation resources:')
+        vipdopt.logger.debug('Updated simulation resources:')
         for resource, value in self.get_env_resources().items():
-            logging.debug(f'\t"{resource}" = {value}')
+            vipdopt.logger.debug(f'\t"{resource}" = {value}')
 
     @_check_fdtd
     def get_field_shape(self) -> tuple[int, ...]:
@@ -495,7 +496,7 @@ class LumericalSimulation(ISimulation):
         polarizations = [field_indicator + c for c in 'xyz']
 
         start = time.time()
-        logging.debug(f'Getting {polarizations} from monitor "{monitor_name}"')
+        vipdopt.logger.debug(f'Getting {polarizations} from monitor "{monitor_name}"')
         fields = np.array(
             map(partial(self.fdtd.getdata(monitor_name)), polarizations),
             dtype=np.complex128,
@@ -503,8 +504,8 @@ class LumericalSimulation(ISimulation):
         data_xfer_size_mb = fields.nbytes / (1024 ** 2)
         elapsed = time.time() - start
 
-        logging.debug(f'Transferred {data_xfer_size_mb} MB')
-        logging.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
+        vipdopt.logger.debug(f'Transferred {data_xfer_size_mb} MB')
+        vipdopt.logger.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
         return fields
 
     def get_hfield(self, monitor_name: str) -> npt.NDArray:
@@ -559,7 +560,7 @@ if __name__ == '__main__':
     with LumericalSimulation(Path(args.simulation_json)) as sim:
         sim.setup_env_resources()
 
-        logging.info('Saving Simulation')
+        vipdopt.logger.info('Saving Simulation')
         sim.save(Path('test_sim'))
-        logging.info('Running simulation')
+        vipdopt.logger.info('Running simulation')
         sim.run()

@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy.typing as npt
 
+import vipdopt
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import FoM
 from vipdopt.optimization.optimizer import GradientOptimizer
@@ -50,10 +51,10 @@ class Optimization:
     def _simulation_dispatch(self, sim_idx: int):
         """Target for threads to run simulations."""
         sim = self.sims[sim_idx]
-        logging.debug(f'Running simulation on thread {sim_idx}')
+        vipdopt.logger.debug(f'Running simulation on thread {sim_idx}')
         sim.save(f'_sim{sim_idx}_epoch_{self.epoch}_iter_{self.iteration}')
         sim.run()
-        logging.debug(f'Completed running on thread {sim_idx}')
+        vipdopt.logger.debug(f'Completed running on thread {sim_idx}')
 
     def _pre_run(self):
         """Final pre-processing before running the optimization."""
@@ -69,7 +70,7 @@ class Optimization:
                 for callback in self._callbacks:
                     callback(self)
 
-                logging.debug(
+                vipdopt.logger.debug(
                     f'Epoch {self.epoch}, iter {self.iteration}: Running simulations...'
                 )
                 # Run all the simulations
@@ -83,7 +84,7 @@ class Optimization:
 
                 gradient = self.fom.gradient()
 
-                logging.debug(
+                vipdopt.logger.debug(
                     f'FoM at epoch {self.epoch}, iter {self.iteration}: {fom}\n'
                     f'Gradient {self.epoch}, iter {self.iteration}: {gradient}'
                 )
@@ -97,6 +98,6 @@ class Optimization:
             self.epoch += 1
 
         final_fom = self.fom_hist[-1]
-        logging.info(f'Final FoM: {final_fom}')
+        vipdopt.logger.info(f'Final FoM: {final_fom}')
         final_params = self.param_hist[-1]
-        logging.info(f'Final Parameters: {final_params}')
+        vipdopt.logger.info(f'Final Parameters: {final_params}')

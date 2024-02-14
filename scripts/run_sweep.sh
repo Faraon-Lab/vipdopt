@@ -20,4 +20,4 @@ source /home/${USER}/.bashrc
 source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
 conda activate vipdopt-dev
 
-xvfb-run --server-args="-screen 0 1280x1024x24" python SonyBayerFilterOptimization.py -v optimize rendered.yml sim.json
+xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize test_project -v

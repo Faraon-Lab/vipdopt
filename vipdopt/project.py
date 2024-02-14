@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 
+import vipdopt
 from vipdopt.configuration import Config, SonyBayerConfig
 from vipdopt.optimization import Device, FoM, GradientOptimizer, Optimization
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
@@ -112,7 +113,7 @@ class Project:
         # TODO Register any callbacks for Optimization here
 
         self.config = cfg
-        logging.debug(f'set config to {cfg}')
+        vipdopt.logger.debug(f'set config to {cfg}')
 
     def get(self, prop: str, default: Any=None) -> Any | None:
         """Get parameter and return None if it doesn't exist."""
