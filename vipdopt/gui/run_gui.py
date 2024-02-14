@@ -1,8 +1,9 @@
 """Entrypoint running the GUI. Mainly for testing right now."""
+from __future__ import annotations
 import logging
 import sys
 
-from PySide6.QtCore import Qt, QStringListModel
+from PySide6.QtCore import Qt 
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -12,15 +13,61 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QTreeWidget,
     QTreeWidgetItem,
+    QDialog,
+    QWidget,
 )
 
 from vipdopt.gui.config_editor import ConfigModel
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
 from vipdopt.gui.ui_status import Ui_MainWindow as Ui_StatusWindow
+from vipdopt.gui.ui_fom_dialog import Ui_Dialog as Ui_FomDialog
 from vipdopt.project import Project
 from vipdopt.optimization import FoM
 from vipdopt.simulation import LumericalSimulation
+from vipdopt.monitor import Monitor
 from vipdopt.utils import PathLike, read_config_file, subclasses
+
+
+class FomDialog(QDialog, Ui_FomDialog):
+    def __init__(self, parent: QWidget | None, f: Qt.WindowType = Qt.WindowType.Dialog) -> None:
+        super().__init__(parent, f)
+
+        self.setupUi(self)
+
+    def populate_tree(self, sims: list[LumericalSimulation]):
+        self.treeWidget.clear()
+        sim: LumericalSimulation
+        for i, sim in enumerate(sims):
+            sim_node = QTreeWidgetItem((f'Simulation {i}', ))
+            source_nodes = [QTreeWidgetItem((src,)) for src in sim.monitor_names()]
+            self.uncheck_items(*source_nodes)
+            sim_node.addChildren(source_nodes)
+            self.treeWidget.addTopLevelItem(sim_node)
+    
+    def check_items(self, *items: QTreeWidgetItem):
+        for item in items:
+            item.setCheckState(1, Qt.CheckState.Checked)
+
+    def uncheck_items(self, *items: QTreeWidgetItem):
+        for item in items:
+            item.setCheckState(1, Qt.CheckState.Unchecked)
+            item.setExpanded(False)
+
+    def check_monitors(self, src_to_sim_map: dict[str, LumericalSimulation], *monitors: Monitor):
+        all_children:list[QTreeWidgetItem] = self.treeWidget.findChildren(QTreeWidgetItem)
+        self.uncheck_items(*all_children)
+        mon_items = []
+        for monitor in monitors:
+            mon_nodes = self.treeWidget.findItems(monitor.monitor_name, Qt.MatchFlag.MatchRecursive | Qt.MatchFlag.MatchExactly, 0)
+            mon_node = mon_nodes[list(src_to_sim_map.keys()).index(monitor.source_name)]
+            mon_node.parent().setExpanded(True)
+
+            mon_items.append(mon_node)
+        self.check_items(*mon_items)
+
+
+def _set_list_size(l: QListWidget):
+    l.setMinimumWidth(l.sizeHintForColumn(0)) 
 
 
 class SettingsWindow(QMainWindow, Ui_SettingsWindow):
@@ -43,6 +90,9 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
         self.config_pushButton.clicked.connect(self.load_yaml)
         self.sim_pushButton.clicked.connect(self.load_json)
+
+        self.fom_fom_pushButton_0.clicked.connect(lambda: self.fom_dialog(0, 'fom'))
+        self.fom_grad_pushButton_0.clicked.connect(lambda: self.fom_dialog(0, 'grad'))
 
         # Initialize Backend
         self.project = Project()
@@ -67,7 +117,22 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             self._update_values()
             print(f'Updated GUI with values from {proj_dir}')
             print(self.config_model)
+    
+    def fom_dialog(self, idx: int, mode: str='fom'):
+        dialog = FomDialog(self)
+        dialog.populate_tree(self.project.optimization.sims)
+        fom = self.project.foms[idx]
+        match mode.lower():
+            case 'fom':
+                monitors = fom.fom_monitors
+            case 'grad':
+                monitors = fom.grad_monitors
+            case _:
+                raise ValueError(f'fom_dialog can only be called with mode "fom" or "grad"')
 
+        dialog.check_monitors(self.project.src_to_sim_map, *monitors)
+        dialog.exec()
+    
     def _update_values(self):
         """Update GUI to match values in Project."""
         # Config Tab
@@ -95,19 +160,19 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             self.fom_type_comboBox_0.addItems(fom_types)
             self.fom_type_comboBox_0.setCurrentIndex(fom_types.index(type(fom).__name__))
 
-            self.fom_fom_mon_listWidget_0.clear()
-            self.fom_fom_mon_listWidget_0.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-            self.fom_fom_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
-            for mname in [mon.monitor_name for mon in fom.fom_monitors]:
-                for item in self.fom_fom_mon_listWidget_0.findItems(mname, Qt.MatchFlag.MatchExactly):
-                    item.setSelected(True)
+            # self.fom_fom_mon_listWidget_0.clear()
+            # self.fom_fom_mon_listWidget_0.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+            # self.fom_fom_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
+            # for mname in [mon.monitor_name for mon in fom.fom_monitors]:
+            #     for item in self.fom_fom_mon_listWidget_0.findItems(mname, Qt.MatchFlag.MatchExactly):
+            #         item.setSelected(True)
 
-            self.fom_grad_mon_listWidget_0.clear()
-            self.fom_grad_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
-            self.fom_grad_mon_listWidget_0.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-            for mname in [mon.monitor_name for mon in fom.grad_monitors]:
-                for item in self.fom_grad_mon_listWidget_0.findItems(mname, Qt.MatchFlag.MatchExactly):
-                    item.setSelected(True)
+            # self.fom_grad_mon_listWidget_0.clear()
+            # self.fom_grad_mon_listWidget_0.addItems(self.project.base_sim.monitor_names())
+            # self.fom_grad_mon_listWidget_0.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+            # for mname in [mon.monitor_name for mon in fom.grad_monitors]:
+            #     for item in self.fom_grad_mon_listWidget_0.findItems(mname, Qt.MatchFlag.MatchExactly):
+            #         item.setSelected(True)
             self.fom_weight_lineEdit_0.setText(str(self.project.weights[i]))
 
         # Device Tab
@@ -175,8 +240,8 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     # Create application windows
-    # status_window = StatusDashboard()
-    # status_window.show()
+    status_window = StatusDashboard()
+    status_window.show()
     settings_window = SettingsWindow()
     settings_window.show()
     app.exec()

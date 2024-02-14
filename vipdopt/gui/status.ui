@@ -90,7 +90,7 @@
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QLabel" name="label_11">
+          <widget class="QLabel" name="epoch_label">
            <property name="text">
             <string>value...</string>
            </property>
@@ -104,14 +104,14 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QLabel" name="label_13">
+          <widget class="QLabel" name="iter_label">
            <property name="text">
             <string>value...</string>
            </property>
           </widget>
          </item>
          <item row="2" column="1">
-          <widget class="QLabel" name="label_15">
+          <widget class="QLabel" name="time_est_label">
            <property name="text">
             <string>value...</string>
            </property>
@@ -136,7 +136,7 @@
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QLabel" name="label_7">
+          <widget class="QLabel" name="avg_power_label">
            <property name="text">
             <string>value...</string>
            </property>
@@ -150,7 +150,7 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QLabel" name="label_9">
+          <widget class="QLabel" name="avg_e_label">
            <property name="text">
             <string>value...</string>
            </property>
@@ -161,21 +161,21 @@
        <item>
         <layout class="QGridLayout" name="gridLayout_2">
          <item row="1" column="2">
-          <widget class="QPushButton" name="pushButton_3">
+          <widget class="QPushButton" name="edit_pushButton">
            <property name="text">
             <string>Edit Optimization...</string>
            </property>
           </widget>
          </item>
          <item row="0" column="2">
-          <widget class="QPushButton" name="pushButton">
+          <widget class="QPushButton" name="start_stop_pushButton">
            <property name="text">
             <string>Start / Stop</string>
            </property>
           </widget>
          </item>
          <item row="2" column="2">
-          <widget class="QPushButton" name="pushButton_2">
+          <widget class="QPushButton" name="save_pushButton">
            <property name="text">
             <string>Save</string>
            </property>
@@ -210,7 +210,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>19</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

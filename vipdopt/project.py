@@ -29,6 +29,7 @@ class Project:
         self.optimizer: GradientOptimizer = None
         self.device: Device = None
         self.base_sim: LumericalSimulation = None
+        self.src_to_sim_map = {}
 
     @classmethod
     def from_dir(
@@ -72,10 +73,10 @@ class Project:
             solver_exe=cfg['solver_exe'],
         )
         self.base_sim = base_sim
-        src_to_sim_map = {
+        self.src_to_sim_map = {
             src: base_sim.with_enabled([src]) for src in base_sim.source_names()
         }
-        sims = src_to_sim_map.values()
+        sims = self.src_to_sim_map.values()
 
         # General Settings
         iteration = cfg.get('current_iteration', 0)
@@ -86,7 +87,7 @@ class Project:
         weights = []
         fom_dict: dict
         for name, fom_dict in cfg.pop('figures_of_merit').items():
-            foms.append(FoM.from_dict(name, fom_dict, src_to_sim_map))
+            foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))
             weights.append(fom_dict['weight'])
         self.foms = foms
         self.weights = weights

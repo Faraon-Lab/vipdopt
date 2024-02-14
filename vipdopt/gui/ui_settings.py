@@ -18,11 +18,10 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QTransform)
 from PySide6.QtWidgets import (QApplication, QComboBox, QFormLayout, QFrame,
     QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-    QMenu, QMenuBar, QPushButton, QSizePolicy,
-    QSpacerItem, QStatusBar, QTabWidget, QToolButton,
-    QTreeView, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
-    QWidget)
+    QLineEdit, QMainWindow, QMenu, QMenuBar,
+    QPushButton, QSizePolicy, QSpacerItem, QStatusBar,
+    QTabWidget, QToolButton, QTreeView, QTreeWidget,
+    QTreeWidgetItem, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -210,11 +209,6 @@ class Ui_MainWindow(object):
 
         self.fom_gridLayout.addWidget(self.fom_fom_mon_label, 0, 2, 1, 1)
 
-        self.fom_grad_mon_listWidget_0 = QListWidget(self.verticalLayoutWidget_2)
-        self.fom_grad_mon_listWidget_0.setObjectName(u"fom_grad_mon_listWidget_0")
-
-        self.fom_gridLayout.addWidget(self.fom_grad_mon_listWidget_0, 1, 3, 1, 1)
-
         self.fom_type_comboBox_0 = QComboBox(self.verticalLayoutWidget_2)
         self.fom_type_comboBox_0.setObjectName(u"fom_type_comboBox_0")
 
@@ -224,11 +218,6 @@ class Ui_MainWindow(object):
         self.fom_name_label.setObjectName(u"fom_name_label")
 
         self.fom_gridLayout.addWidget(self.fom_name_label, 0, 0, 1, 1)
-
-        self.fom_fom_mon_listWidget_0 = QListWidget(self.verticalLayoutWidget_2)
-        self.fom_fom_mon_listWidget_0.setObjectName(u"fom_fom_mon_listWidget_0")
-
-        self.fom_gridLayout.addWidget(self.fom_fom_mon_listWidget_0, 1, 2, 1, 1)
 
         self.fom_name_lineEdit_0 = QLineEdit(self.verticalLayoutWidget_2)
         self.fom_name_lineEdit_0.setObjectName(u"fom_name_lineEdit_0")
@@ -249,6 +238,16 @@ class Ui_MainWindow(object):
         self.fom_addrow_toolButton.setObjectName(u"fom_addrow_toolButton")
 
         self.fom_gridLayout.addWidget(self.fom_addrow_toolButton, 2, 0, 1, 1)
+
+        self.fom_fom_pushButton_0 = QPushButton(self.verticalLayoutWidget_2)
+        self.fom_fom_pushButton_0.setObjectName(u"fom_fom_pushButton_0")
+
+        self.fom_gridLayout.addWidget(self.fom_fom_pushButton_0, 1, 2, 1, 1)
+
+        self.fom_grad_pushButton_0 = QPushButton(self.verticalLayoutWidget_2)
+        self.fom_grad_pushButton_0.setObjectName(u"fom_grad_pushButton_0")
+
+        self.fom_gridLayout.addWidget(self.fom_grad_pushButton_0, 1, 3, 1, 1)
 
 
         self.verticalLayout_2.addLayout(self.fom_gridLayout)
@@ -473,7 +472,7 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
 
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(2)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -562,6 +561,8 @@ class Ui_MainWindow(object):
         self.fom_name_lineEdit_0.setPlaceholderText(QCoreApplication.translate("MainWindow", u"FoM 0", None))
         self.fom_delrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Remove Row", None))
         self.fom_addrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Add Row", None))
+        self.fom_fom_pushButton_0.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
+        self.fom_grad_pushButton_0.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.fom_tab), QCoreApplication.translate("MainWindow", u"Figure of Merit", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.device_tab), QCoreApplication.translate("MainWindow", u"Device", None))
         self.label_14.setText(QCoreApplication.translate("MainWindow", u"Optimization Settings", None))
