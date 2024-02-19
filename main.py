@@ -122,6 +122,9 @@ for design_obj in design_objs:
 	# Instead of a lookup table approach, probably should just directly pull from the simulator - we can always interpolate anyway.
 	# Pull the array shape of the design region's corresponding index monitor, squeezing as we do so.
 	field_shape = np.squeeze(simulator.fdtd_hook.getresult(design_obj['design_index_monitor']['name'], 'index preview')['index_x']).shape
+	# # Is this field shape equal to the number of simulation mesh voxels?
+	correct_field_shape = (cfg.pv.device_voxels_simulation_mesh_lateral_bordered, cfg.pv.device_voxels_simulation_mesh_vertical)
+	# assert field_shape == correct_field_shape, f"The sizes of field_shape {field_shape} should instead be {correct_field_shape}."
 	field_shapes.append(field_shape)
 
 
@@ -162,7 +165,7 @@ utility.write_dict_to_file(design_objs, 'design_objs', folder=cfg.OPTIMIZATION_I
 # Handle all processing of weighting and functions that go into the figure of merit
 
 fom_dict = env_constr.fom_dict
-weights = env_constr.weights
+weights = env_constr.weights[..., np.newaxis] * env_constr.spectral_weights_by_fom
 #! env_constr.overall_figure_of_merit() details the instructions for constructing the final FoM number
 
 forward_sources = []
@@ -227,8 +230,16 @@ optimizer = Optimization.AdamOptimizer(
 	moments=adam_moments,
 	fom_func=env_constr.overall_figure_of_merit,
 	grad_func=env_constr.overall_adjoint_gradient,
-	max_iter=cfg.cv.total_num_iterations
+	max_iter=cfg.cv.total_num_iterations,
+	folder=cfg.OPTIMIZATION_INFO_FOLDER
 )
+# optimizer = Optimization.GDOptimizer(
+# 	step_size=cfg.cv.fixed_step_size,
+# 	fom_func=env_constr.overall_figure_of_merit,
+# 	grad_func=env_constr.overall_adjoint_gradient,
+# 	max_iter=cfg.cv.total_num_iterations,
+# 	folder=cfg.OPTIMIZATION_INFO_FOLDER
+# )
 
 # Define the Optimization
 opt = Optimization.Optimization( simulations, indiv_foms, designs, design_objs, 
@@ -252,13 +263,43 @@ if restart:
 	# Get current iteration and determines which epoch we're in, according to the epoch list in config.
 	current_epoch = utility.partition_iterations(cfg.cv.restart_iter, cfg.cv.epoch_list)
 	logging.info(f'Restarting optimization from Iteration {cfg.cv.restart_iter} [Epoch {current_epoch}].')
+
+	# Reload simulations and device / design dictionaries - must have same serialization as when utility.write_dict_to_file() was called
+	simulations = utility.load_dict_from_file('simulations', folder=cfg.OPTIMIZATION_INFO_FOLDER)
+	device_objs = utility.load_dict_from_file('device_objs', folder=cfg.OPTIMIZATION_INFO_FOLDER, serialization='npy')
+	design_objs = utility.load_dict_from_file('design_objs', folder=cfg.OPTIMIZATION_INFO_FOLDER, serialization='npy')
+
+	# # Re-initialize bayer_filter instance
+	for num_design, design in enumerate(designs):
+		design.load_device()
+		# Only if we need to overwrite the designs:
+		cur_design = np.load(cfg.OPTIMIZATION_INFO_FOLDER + "/cur_design.npy" )
+		design.set_design_variable(cur_design)
+		
+		# Regenerate permittivity based on the most recent design
+		# NOTE: This gets corrected later in the optimization loop (Step 1)
+		design.update_filters(current_epoch)
+		design.update_density()
+
+	# Re-load optimizer history including parameters like moments
+	opt.optimizer.load_opt()
+
+	# # Other necessary savestate data - FoM history
+	opt.figure_of_merit_evolution = np.load(cfg.OPTIMIZATION_INFO_FOLDER + "/figure_of_merit.npy")
+	opt.binarization_evolution = np.load(cfg.OPTIMIZATION_INFO_FOLDER + "/binarization.npy")
+	# # gradient_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/gradient_by_focal_pol_wavelength.npy")		# Took out feature because it consumes too much memory
+	for fom_type in cfg.cv.fom_types:
+		opt.fom_evolution[fom_type] = np.load(cfg.OPTIMIZATION_INFO_FOLDER + f"/{fom_type}_by_focal_pol_wavelength.npy")
+	# step_size_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/step_size_evolution.npy")
+	# average_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/average_design_change_evolution.npy")
+	# max_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/max_design_change_evolution.npy")
+	# adam_moments = np.load(cfg.OPTIMIZATION_INFO_FOLDER + "/adam_moments.npy")
+
+
+	# TODO:!!!!!!
+ 
 	
 	# todo: convert the following code
-	
-	# cur_design_variable = np.load(OPTIMIZATION_INFO_FOLDER + "/cur_design_variable.npy" )
-	# cur_design_variable = utility.binarize(cur_design_variable)
-	# designs[0].set_design_variable(cur_design_variable[0:24,0:24,:])
-	# designs[0].save_device()
 
 	# reload_design_variable = cur_design_variable.copy()
 	# if evaluate_bordered_extended:
@@ -270,29 +311,9 @@ if restart:
 	# 	pad_width_reload = pad_2x_width_reload // 2
   
 	# 	reload_design_variable = np.pad( cur_design_variable, ( ( pad_width_reload, pad_width_reload ), ( pad_width_reload, pad_width_reload ), ( 0, 0 ) ), mode='constant' )
- 
-	# # Re-initialize bayer_filter instance
-	for num_design, design in enumerate(designs):
-		design.load_device()
-  
-		# # Load cur_design_variable if they have it
-		# cur_design_variable = np.load(OPTIMIZATION_INFO_FOLDER + "/cur_design_variable.npy" )[0:24, 0:24, :]
-		# design.set_design_variable(cur_design_variable)
-  
-		# Regenerate permittivity based on the most recent design, assuming epoch 0		
-		# NOTE: This gets corrected later in the optimization loop (Step 1)
-		design.update_filters(current_epoch)
-		design.update_density()
 
-	# # # Other necessary savestate data
-	opt.figure_of_merit_evolution = np.load(cfg.OPTIMIZATION_INFO_FOLDER + "/figure_of_merit.npy")
-	# # gradient_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/gradient_by_focal_pol_wavelength.npy")		# Took out feature because it consumes too much memory
-	for fom_type in cfg.cv.fom_types:
-		opt.fom_evolution[fom_type] = np.load(cfg.OPTIMIZATION_INFO_FOLDER + f"/{fom_type}_by_focal_pol_wavelength.npy")
-	# step_size_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/step_size_evolution.npy")
-	# average_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/average_design_change_evolution.npy")
-	# max_design_variable_change_evolution = np.load(OPTIMIZATION_INFO_FOLDER + "/max_design_change_evolution.npy")
-	# adam_moments = np.load(OPTIMIZATION_INFO_FOLDER + "/adam_moments.npy")
+
+  
 
 
 	# if restart_epoch == 0 and restart_iter == 1:
@@ -361,5 +382,12 @@ opt.run()
 
 # utility.backup_all_vars(globals(), cfg.cv.shelf_fn)
 # globals().update(utility.load_backup_vars(cfg.cv.shelf_fn))
+
+# Finalize the binarized device
+cur_index = np.real(utility.index_from_permittivity(
+						utility.binarize(designs[0].get_density())
+					))
+from evaluation import plotter
+plotter.visualize_device(cur_index, cfg.OPTIMIZATION_PLOTS_FOLDER, iteration=cfg.cv.total_num_iterations)
 
 logging.info('Reached end of code.')

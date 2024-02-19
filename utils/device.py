@@ -43,7 +43,7 @@ class Device:
 		self.symmetric = False
 		self.iteration = iteration										# current iteration of optimization
 		
-		self.num_filters = 1											# todo: could this be also an input argument? a dictionary or array of dicts, perhaps e.g. [{'sigmoid':{'strength': 3}, {'bridges':{}}]
+		self.num_filters = 2											# todo: could this be also an input argument? a dictionary or array of dicts, perhaps e.g. [{'sigmoid':{'strength': 3}, {'bridges':{}}]
 		self.num_variables = self.num_filters + 1
 
 		self.minimum_design_value = 0
@@ -52,17 +52,20 @@ class Device:
 		self.init_variables()
 		self.update_filters(epoch=0)
 		self.update_density()
-		self.save_device()
+		# self.save_device()	#! Don't save here - it'll overwrite any previous saves
 		
 
 	def save_device(self):
 		'''Shelves vars() as a dictionary for pickling.'''
 		utility.backup_all_vars(vars(self), os.path.join(self.folder, self.name))
 
-	def load_device(self):
+	def load_device(self, filename=None):
 		'''Overwrites class variables with a previously shelved dictionary vars()
 			Note: A toy device must be created first before it can then be overwritten.'''
-		vars(self).update( utility.load_backup_vars( os.path.join(self.folder, self.name) ) )
+		if filename is None:
+			vars(self).update( utility.load_backup_vars( os.path.join(self.folder, self.name) ) )
+		else:
+			vars(self).update( utility.load_backup_vars( os.path.join(self.folder, filename) ) )
   
 
 	def init_variables(self):
@@ -94,17 +97,19 @@ class Device:
 		self.update_density()
 
 	def get_density(self):
-		return self.w[-1]
+		return self.w[1]		# This needs to be adjusted if more layers are added before the Scale.
 
 	def density_to_permittivity(self, density, eps_min, eps_max):
 		return density_to_permittivity(density, eps_min, eps_max)
 
 	def get_permittivity(self):
-		density = self.w[-1]
-		eps_min = self.permittivity_constraints[0]
-		eps_max = self.permittivity_constraints[1]
+		# #---------Commented block only necessary if Scale filter not present-----------------
+		# density = self.w[-1]
+		# eps_min = self.permittivity_constraints[0]
+		# eps_max = self.permittivity_constraints[1]
 		
-		return self.density_to_permittivity(density, eps_min, eps_max)
+		# return self.density_to_permittivity(density, eps_min, eps_max)
+		return self.w[-1]
 	
 	def update_density(self):
 		'''Passes each layer of the density through filters.'''
@@ -123,6 +128,7 @@ class Device:
 		# todo: FILTER UPDATING CODE
 		self.identity = Filter.Identity()
 		self.sigmoid_1 = Filter.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
+		self.scale_4 = Filter.Scale(self.permittivity_constraints)
 
 		# self.sigmoid_1 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
 		# self.sigmoid_3 = sigmoid.Sigmoid(self.sigmoid_beta, self.sigmoid_eta)
@@ -140,7 +146,7 @@ class Device:
 		# if gp.cv.use_smooth_blur:
 		# 	self.filters = [ self.layering_z_0, self.sigmoid_1, self.max_blur_xy_2, self.sigmoid_3, self.scale_4 ]
 
-		self.filters = [self.sigmoid_1]
+		self.filters = [self.sigmoid_1, self.scale_4]
 		# self.filters = [self.identity]
 		self.num_filters = len(self.filters)											# todo: could this be also an input argument? a dictionary or array of dicts, perhaps e.g. [{'sigmoid':{'strength': 3}, {'bridges':{}}]
 		self.num_variables = self.num_filters + 1
@@ -183,7 +189,7 @@ class Device:
 		gradient = self.backpropagate(gradient)
 
 		# todo: figure out optimizer
-		proposed_design_variable = optimizer.step(self.w[0], gradient, step_size)
+		proposed_design_variable = optimizer.step(self.w[0], gradient)
 		proposed_design_variable = np.maximum(                             # Has to be between minimum_design_value and maximum_design_value
 												np.minimum(proposed_design_variable, self.maximum_design_value),
 												self.minimum_design_value)
@@ -191,9 +197,12 @@ class Device:
 		return proposed_design_variable
 		
 
-	def proposed_design_step_simple(self, gradient, step_size):
+	def proposed_design_step_simple(self, gradient, step_size, change_limits):
 		'''Takes a gradient and updates refractive index (design variable) accordingly.'''
 		gradient = self.backpropagate(gradient)
+
+		# We need to scale the step size such that the maximum change in the design density is between some certain limits
+		# todo:
 
 		# Eq. S2 of Optica Paper Supplement, https://doi.org/10.1364/OPTICA.384228
 		# minus sign here because it was fed the negative of the gradient so (-1)*(-1) = +1
@@ -203,6 +212,12 @@ class Device:
 		proposed_design_variable = np.maximum(                             # Has to be between minimum_design_value and maximum_design_value
 												np.minimum(proposed_design_variable, self.maximum_design_value),
 												self.minimum_design_value)
+
+		min_proposed_change = np.min(np.abs(proposed_design_variable - self.w[0]))
+		max_proposed_change = np.max(np.abs(proposed_design_variable - self.w[0]))
+
+
+		# todo: add scaling of the step size here
 
 
 
@@ -238,10 +253,15 @@ class Device:
 
 		return proposed_design_variable, moments
 
-	def step(self, gradient, step_size):
-		# In the step function, we should update the permittivity with update_permittivity
-		self.w[0] = self.proposed_design_step_simple(gradient, step_size)
-		# Update the variable stack including getting the permittivity at the w[-1] position
+	# def step(self, gradient, step_size, change_limits):
+	# 	# In the step function, we should update the permittivity with update_permittivity
+	# 	self.w[0] = self.proposed_design_step_simple(gradient, step_size, change_limits)
+	# 	# Update the variable stack including getting the permittivity at the w[-1] position
+	# 	self.update_density()
+	# 	self.save_device()
+  
+	def step(self, new_design):
+		self.w[0] = new_design
 		self.update_density()
 		self.save_device()
 

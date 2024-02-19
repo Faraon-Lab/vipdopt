@@ -106,7 +106,10 @@ def backup_all_vars(dict_vars, savefile_name=None):
 				# message = template.format(type(ex).__name__, ex.args)
 				# logging.error(message)
 				pass
-	my_shelf.close()
+	try:
+		my_shelf.close()
+	except Exception as e:
+		logging.critical(e, exc_info=True)  # log exception info at CRITICAL log level
 	
 	
 	logging.info("Backup complete.")
@@ -254,6 +257,7 @@ def binarize(variable_in):
 
 def compute_binarization( input_variable, set_point=0.5 ):
 	# todo: rewrite for multiple materials
+	input_variable = np.real(input_variable)
 	total_shape = np.prod( input_variable.shape )
 	return ( 2. / total_shape ) * np.sum( np.sqrt( ( input_variable - set_point )**2 ) )
 
@@ -310,8 +314,8 @@ def snellRefrOffset(src_angle_incidence, object_list):
 	return [input_theta, r_offset]
 
 def import_cur_index(design, design_obj, simulator, 
-                    reinterpolate_permittivity_factor=1, reinterpolate_permittivity=False,
-                    binary_design=False):
+					reinterpolate_permittivity_factor=1, reinterpolate_permittivity=False,
+					binary_design=False):
 	"""Reinterpolate and import cur_index into design regions"""
 
 	if reinterpolate_permittivity_factor != 1:
@@ -385,6 +389,7 @@ def import_cur_index(design, design_obj, simulator,
 
 		# Convert device to permittivity and then index
 		cur_permittivity = design.density_to_permittivity(cur_density_import_interp, design.permittivity_constraints[0], dispersive_max_permittivity)
+		# todo: Another way to do this that can include dispersion is to update the Scale filter with new permittivity constraint maximum
 		cur_index = index_from_permittivity(cur_permittivity)
 		
 		#?:	maybe todo: cut cur_index by region
@@ -397,3 +402,28 @@ def import_cur_index(design, design_obj, simulator,
 										design_obj['design_index_monitor'], create_object=False )
 
 		return cur_density, cur_permittivity
+
+def design_change_limits(iteration, epoch_list,
+						 epoch_start_design_change_min=0.05, epoch_start_design_change_max=0.15,
+						 epoch_end_design_change_min=0, epoch_end_design_change_max=0.05):
+	'''Control the maximum that the design is allowed to change per epoch. 
+	This will increase according to the limits set, for each iteration
+ 	Returns a list [min_change, max_change] allowed in the design.'''
+
+	current_epoch = partition_iterations(iteration, epoch_list)
+	current_iter = iteration - epoch_list[current_epoch]
+	num_iterations_this_epoch = epoch_list[current_epoch+1] - epoch_list[current_epoch]
+
+	epoch_range_design_change_max = epoch_start_design_change_max - epoch_end_design_change_max
+	epoch_range_design_change_min = epoch_start_design_change_min - epoch_end_design_change_min
+
+	max_change_design = epoch_start_design_change_max
+	min_change_design = epoch_start_design_change_min
+
+	if num_iterations_this_epoch > 1:
+		max_change_design = epoch_end_design_change_max + \
+			(num_iterations_this_epoch - 1 - current_iter) * (epoch_range_design_change_max / (num_iterations_this_epoch - 1))
+		min_change_design = epoch_end_design_change_min + \
+			(num_iterations_this_epoch - 1 - current_iter) * (epoch_range_design_change_min / (num_iterations_this_epoch - 1))
+
+	return min_change_design, max_change_design

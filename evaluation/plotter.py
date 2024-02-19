@@ -413,7 +413,7 @@ def plot_fom_trace(f, plot_directory_location, epoch_list=None):
 
 	if epoch_list is None:
 		epoch_list = np.linspace(0, len(f), 10)
-	upperRange = np.ceil(np.max(f))
+	upperRange = np.max(f) # np.ceil(np.max(f))
 
 	iterations = copy.deepcopy(TEMPLATE_R_VECTOR)
 	iterations.update({'var_name': 'Iterations', 'var_values': range(f.size), 'short_form': 'iter'})

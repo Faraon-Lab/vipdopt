@@ -13,8 +13,8 @@ import numpy as np
 SIGMOID_BOUNDS = (0.0, 1.0)
 
 def sech(z):
-    """Hyperbolic Secant."""
-    return 1.0 / np.cosh(np.asanyarray(z))
+	"""Hyperbolic Secant."""
+	return 1.0 / np.cosh(np.asanyarray(z))
 
 class Filter:
 
@@ -38,13 +38,13 @@ class Filter:
 		raise NotImplementedError()
 
 class Identity(Filter):
-    '''Applies an identity filter which should not perturb the density at all. For testing purposes'''
-    
-    def forward(self, variable_in):
-        return variable_in
-    
-    def chain_rule(self, derivative_out, variable_out, variable_in):
-        return derivative_out
+	'''Applies an identity filter which should not perturb the density at all. For testing purposes'''
+	
+	def forward(self, variable_in):
+		return variable_in
+	
+	def chain_rule(self, derivative_out, variable_out, variable_in):
+		return derivative_out
 
 class Sigmoid(Filter):
 	"""Applies a sigmoidal projection filter to binarize an input.
@@ -75,6 +75,7 @@ class Sigmoid(Filter):
 
 		# Calculate denominator for use in methods
 		self._denominator = np.tanh(beta * eta) + np.tanh(beta * (1 - eta))
+
 
 	def __repr__(self):
 		"""Return a string representation of the filter."""
@@ -121,5 +122,50 @@ class Sigmoid(Filter):
 		if isinstance(x, Number):  # type: ignore
 			return fab.item()
 		return fab
+	
+class Scale(Filter):
+	'''Assuming that there is an input between 0 and 1, scales it to the range, min, and max, that are declared during initialization.
+	See OPTICA paper supplement Section IIA, https://doi.org/10.1364/OPTICA.384228,  for details. 
+	This class is used directly after the sigmoid filter is applied.
+
+	Attributes:
+		variable_bounds: here they will denote the permittivity bounds
+	'''
+
+	def __init__(self, variable_bounds):
+		self.variable_bounds = variable_bounds
+  
+		#
+		# variable_bounds specifies the minimum and maximum value of the scaled variable.
+		# We assume we are scaling an input that is between 0 and 1 -> between min_permittivity and max_permittivity
+		#
+
+		self.min_value = variable_bounds[0]
+		self.max_value = variable_bounds[1]
+		self.range = self.max_value - self.min_value
+	
+	def __repr__(self):
+		"""Return a string representation of the filter."""
+		return f'Scale filter with minimum={self.min_value:0.3f} and max={self.max_value:0.3f}'
+
+	# @override
+	def forward(self, x):
+		'''Performs scaling according to min and max values declared. Assumed that input is between 0 and 1.'''
+		return np.add(self.min_value, np.multiply(self.range, x))
+
+	# @override  # type: ignore
+	def chain_rule(
+		self,
+		deriv_out,
+		var_out,
+		var_in	):
+		"""Apply the chain rule and propagate the derivative back one step.
+		"""
+		return np.multiply(self.range, deriv_out)
+
+	# @override
+	def fabricate(self, x):
+		'''Calls forward()'''
+		return self.forward(x)
 	
 	

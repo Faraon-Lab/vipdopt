@@ -30,6 +30,8 @@ class Optimization:
 
 	def __init__( self, sims, foms, designs, design_objs, optimizer, fom_func, grad_func, weights, simulator ):
 		"""Initialize Optimization object."""
+		self.name = 'OptimizationState'
+
 		self.simulations = sims          # Simulation object(s) passed to the Optimizer
 		self.foms = foms            	 # List of FoM objects
 		self.designs = designs       	 # Device object
@@ -139,8 +141,10 @@ class Optimization:
 				# Save template copy out
 				self.simulator.save(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name'])
 
-				# Save out current index profile
-				np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + "/cur_index.npy"), cur_index)
+				# Save out current design/density profile
+				np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + "/cur_design.npy"), cur_density)
+				if self.iteration in self.epoch_list:	# i.e. new epoch
+					np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + f"/cur_design_e{self.epoch_list.index(self.iteration)}.npy"), cur_density)
 
 
 			#* Start creating array of jobs with different sources
@@ -214,14 +218,23 @@ class Optimization:
 						for f_idx, f in enumerate(self.foms):
 							if tempfile_fwd_name in f.tempfile_fwd_name:	# todo: might need to account for file extensions
 								# todo: rewrite this to hook to whichever device the FoM is tied to
-								print(f'FoM property has length {len(f.fom)}')
-		
+								print(f'FoM property has length {len(f.fom)}')	
+  
 								f.design_fwd_fields = \
-									self.simulator.get_efield('design_efield_monitor')[..., f.freq_index_opt + f.freq_index_restricted_opt]
+									self.simulator.get_efield('design_efield_monitor') #[..., f.freq_index_opt + f.freq_index_restricted_opt]
 								logging.info(f'Accessed design E-field monitor. NOTE: Field shape obtained is: {f.design_fwd_fields.shape}')
 								# Store FoM value and Restricted FoM value (possibly not the true FoM being used for gradient)
+								# f.compute_fom(self.simulator)
+								
+								logging.debug(f'Accessing FoM {self.foms.index(f)} in list.')
+								logging.debug(f'File being accessed: {tempfile_fwd_name} should match FoM tempfile {f.tempfile_fwd_name}')
+								logging.debug(f'TrueFoM before has shape{f.true_fom.shape}')
 								f.compute_fom(self.simulator)
-		
+								logging.debug(f'TrueFoM after has shape{f.true_fom.shape}')
+								
+								# Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
+								f.true_fom /= cfg.pv.max_intensity_by_wavelength
+								
 								# Store fom, restricted fom, true fom
 								self.fom_evolution['transmission'][self.iteration, f_idx, :] = np.squeeze(f.fom)
 								# todo: add line for restricted fom
@@ -261,11 +274,22 @@ class Optimization:
 							if tempfile_adj_name in f.tempfile_adj_name:	# todo: might need to account for file extensions
 								# todo: rewrite this to hook to whichever device the FoM is tied to
 								f.design_adj_fields = \
-									self.simulator.get_efield('design_efield_monitor')[..., f.freq_index_opt + f.freq_index_restricted_opt]
+									self.simulator.get_efield('design_efield_monitor') #[..., f.freq_index_opt + f.freq_index_restricted_opt]
 								logging.info('Accessed design E-field monitor.')
-	
+
 								#* Compute gradient
+								# f.compute_gradient()
+		
+								logging.debug(f'Accessing FoM {self.foms.index(f)} in list.')
+								logging.debug(f'File being accessed: {tempfile_adj_name} should match FoM tempfile {f.tempfile_adj_name}')
+								logging.debug(f'TrueFoM before has shape{f.gradient.shape}')
+								logging.debug(f'freq_index_opt is {f.freq_index_opt}')
 								f.compute_gradient()
+								logging.debug(f'TrueFoM after has shape{f.gradient.shape}')
+	
+								# Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
+								f.gradient /= cfg.pv.max_intensity_by_wavelength #[f.freq_index_opt]
+		
 							gc.collect()
 
 				# todo: sort this out
@@ -282,6 +306,7 @@ class Optimization:
 				np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + "/fom_by_focal_pol_wavelength.npy"), self.fom_evolution[cfg.cv.optimization_fom])
 				for fom_type in cfg.cv.fom_types:
 					np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + f"/{fom_type}_by_focal_pol_wavelength.npy"), self.fom_evolution[fom_type])
+				np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + "/binarization.npy"), self.binarization_evolution)
 
 				# # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
 				plotter.plot_fom_trace(self.figure_of_merit_evolution, cfg.OPTIMIZATION_PLOTS_FOLDER, cfg.cv.epoch_list)
@@ -304,6 +329,9 @@ class Optimization:
 				# list_overall_adjoint_gradient = env_constr.overall_adjoint_gradient( indiv_foms, weights )	# Gives a wavelength vector
 				design_gradient = np.sum(list_overall_adjoint_gradient, -1)									# Sum over wavelength
 
+				# Permittivity factor in amplitude of electric dipole at x_0
+				# Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)
+
 				# todo: might need to assemble this spectrally -------------------------------------------------------------
 				# We need to properly account here for the current real and imaginary index
 				# because they both contribute in the end to the real part of the gradient ΔFoM/Δε_r
@@ -320,6 +348,9 @@ class Optimization:
 				real_part_gradient = np.real( design_gradient )
 				imag_part_gradient = -np.imag( design_gradient )
 				get_grad_density = delta_real_permittivity * real_part_gradient + delta_imag_permittivity * imag_part_gradient
+				#! This is where the gradient picks up a permittivity factor i.e. becomes larger than 1!
+				#! Mitigated by backpropagating through the Scale filter.
+				get_grad_density = 2 * get_grad_density		# Factor of 2 after taking the real part
 
 				assert design.field_shape == get_grad_density.shape, f"The sizes of field_shape {design.field_shape} and gradient_density {get_grad_density.shape} are not the same."
 				# todo: which design? This stops working when there are multiple designs
@@ -333,7 +364,7 @@ class Optimization:
 				# Get the full design gradient by summing the x,y polarization components # todo: Do we need to consider polarization??
 				# todo: design_gradient = 2 * ( xy_polarized_gradients[0] + xy_polarized_gradients[1] )
 				# Project / interpolate the design_gradient, the values of which we have at each (mesh) voxel point, and obtain it at each (geometry) voxel point
-				gradient_region_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
+				gradient_region_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], design.field_shape[0]) #cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
 				gradient_region_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], design.field_shape[1])
 				try:
 					gradient_region_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], design.field_shape[2])
@@ -343,15 +374,19 @@ class Optimization:
 									).transpose((1,2,3,0))
 	
 				design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
-													   np.repeat(design_gradient[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
+													   np.repeat(get_grad_density[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
 													   design_region_geometry, method='linear' )
 				# design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ), device_gradient, bayer_filter_region, method='linear' )
 
 				# Each device needs to remember its gradient!
 				# todo: refine this
 				if cfg.cv.enforce_xy_gradient_symmetry:
-					design_gradient_interpolated = 0.5 * ( design_gradient_interpolated + np.swapaxes( design_gradient_interpolated, 0, 1 ) )
-				design.gradient = copy.deepcopy(design_gradient_interpolated)
+					if simulation['FDTD']['dimension'] in '2D':
+						transpose_design_gradient_interpolated = np.flip(design_gradient_interpolated, 1)
+					if simulation['FDTD']['dimension'] in '3D':
+						transpose_design_gradient_interpolated = np.swapaxes( design_gradient_interpolated, 0, 1 )
+					design_gradient_interpolated = 0.5 * ( design_gradient_interpolated + transpose_design_gradient_interpolated )
+				design.gradient = copy.deepcopy(design_gradient_interpolated)	# This is BEFORE backpropagation
 				
 				logging.info("Completed Step 5: Adjoint Optimization Jobs and Gradient Computation.")
 				# utility.backup_all_vars(globals(), cfg.cv.shelf_fn)
@@ -361,42 +396,43 @@ class Optimization:
 
 				# Backpropagate the design_gradient through the various filters to pick up (per the chain rule) gradients from each filter
 				# so the final product can be applied to the (0-1) scaled permittivity
-				# design_gradient_unfiltered = design.backpropagate( design_gradient )
+				design_gradient_unfiltered = design.backpropagate( design.gradient )
 
-				cur_design_variable = design.get_design_variable()
 				# Get current values of design variable before perturbation, for later comparison.
-				last_design_variable = cur_design_variable.copy()
+				last_design_variable = copy.deepcopy(design.get_design_variable())
 
-				if cfg.cv.optimizer_algorithm.lower() not in ['gradient descent']:
-					use_fixed_step_size = True
-				if use_fixed_step_size:
-					step_size = cfg.cv.fixed_step_size
-				else:
-					step_size = 0.01 # step_size_start
+				# Use the optimizer to determine what the next design variable should be
+				self.optimizer.step(design, design_gradient_unfiltered)
 
 
-				def scale_step_size(epoch_start_design_change_min, epoch_start_design_change_max, 
-									epoch_end_design_change_min, epoch_end_design_change_max):
-					'''Begin scaling of step size so that the design change stays within epoch_design_change limits in config.'''
-					return 3
+				# if cfg.cv.optimizer_algorithm.lower() not in ['gradient descent']:
+				# 	use_fixed_step_size = True
+				# if use_fixed_step_size:
+				# 	step_size = cfg.cv.fixed_step_size
+				# else:
+				# 	step_size = 0.01 # step_size_start
 
-				if False: # cfg.cv.optimizer_algorithm.lower() in ['adam']:
-					adam_moments = design.step_adam(current_iter, -design_gradient,
-													adam_moments, step_size, cfg.cv.adam_betas)
-				else:
-					design.step(-design.gradient, step_size)
-					# self.optimizer.step(design, -design.gradient)
-				cur_design_variable = design.get_design_variable()
-				logging.info(f'Current design sum: {np.sum(cur_design_variable)}, Previous design sum: {np.sum(last_design_variable)}')
-				logging.info(f'Device variable stepped by total of {np.sum(cur_design_variable - last_design_variable)}')
-				# Get permittivity after passing through all the filters of the device
-				cur_design = design.get_permittivity()
+
+				# def scale_step_size(epoch_start_design_change_min, epoch_start_design_change_max, 
+				# 					epoch_end_design_change_min, epoch_end_design_change_max):
+				# 	'''Begin scaling of step size so that the design change stays within epoch_design_change limits in config.'''
+				# 	return 3
+
+				# if False: # cfg.cv.optimizer_algorithm.lower() in ['adam']:
+				# 	adam_moments = design.step_adam(current_iter, -design_gradient,
+				# 									adam_moments, step_size, cfg.cv.adam_betas)
+				# else:
+				# 	design.step(-design.gradient, step_size)
+				# 	# self.optimizer.step(design, -design.gradient)
+				
 
 				#* Save out overall savefile, save out all save information as separate files as well.
-
+				difference_design = np.abs(design.get_design_variable() - last_design_variable)
+				logging.info(f'Device variable stepped by maximum of {np.max(difference_design)} and minimum of {np.min(difference_design)}.')
 			
 			
 			# self.optimizer.run(self.device, self.sim, self.foms)
+			self.optimizer.save_opt()
 			self.iteration += 1
 
 
@@ -439,8 +475,9 @@ class Optimizer:
 	"""Abstraction class for all optimizers."""
 	# TODO: SHOULD NOT BE JUST GRADIENT BASED (e.g. genetic algorithms)
 
-	def __init__( self, fom_func, grad_func, max_iter=100, start_from=0 ):
+	def __init__( self, fom_func, grad_func, max_iter=100, start_from=0, folder='' ):
 		"""Initialize an Optimizer object."""
+		self.name = 'Optimizer'
 		self.fom_hist = []
 		self.param_hist = []
 		self._callbacks = []
@@ -448,30 +485,95 @@ class Optimizer:
 		self.max_iter = max_iter
 		self.fom_func = fom_func
 		self.grad_func = grad_func
+		self.folder = folder
 
 
 	def add_callback(self, func):
 		"""Register a callback function to call after each iteration."""
 		self._callbacks.apend(func)
 
+	def save_opt(self):
+		'''Shelves vars() as a dictionary for pickling.'''
+		utility.backup_all_vars(vars(self), os.path.join(self.folder, self.name))
+
+	def load_opt(self, filename=None):
+		'''Overwrites class variables with a previously shelved dictionary vars()
+			Note: A toy device must be created first before it can then be overwritten.'''
+		if filename is None:
+			vars(self).update( utility.load_backup_vars( os.path.join(self.folder, self.name) ) )
+		else:
+			vars(self).update( utility.load_backup_vars( os.path.join(self.folder, filename) ) )
+
 	def step(self, device, *args, **kwargs):
 		"""Step forward one iteration in the optimization process."""
-		# grad = self.device.backpropagate(gradient)
+		grad = device.backpropagate(gradient)
 
 		# x = some_func(x)
 
 		# self.device.set_design_variable(x)
+
+		# self.save_opt()
 	
 	def run(self, device):
 		"""Run an optimization."""
 		for callback in self._callbacks:
 			callback()
 
+class GDOptimizer(Optimizer):
+	
+	def __init__( self, step_size, **kwargs ):
+		super().__init__(**kwargs)
+		self.name = 'GradientDescentOptimizer'
+		self.step_size = step_size
+
+	def set_callback(self, func):
+		return super().set_callback(func)
+
+	def proposed_step(self, design, gradient):
+		# Eq. S2 of Optica Paper Supplement, https://doi.org/10.1364/OPTICA.384228
+		# [DEPRECATED] minus sign here because it was fed the negative of the gradient so (-1)*(-1) = +1
+		#! Watch out for minus signs here and there
+		proposed_design_variable = design.w[0] + np.multiply(self.step_size, gradient)
+		proposed_design_variable = np.maximum(                             # Has to be between minimum_design_value and maximum_design_value
+												np.minimum(proposed_design_variable, design.maximum_design_value),
+												design.minimum_design_value)
+
+		return proposed_design_variable
+
+	def step(self, design, gradient):
+	
+		# Get current values of design variable before perturbation, for later comparison.
+		last_design_variable = copy.deepcopy(design.get_design_variable())
+		
+		# Using the current value of the step size, step the design forward and examine the change in density.
+		proposed_design_variable = self.proposed_step(design, gradient)
+		difference = np.abs(proposed_design_variable - last_design_variable)
+
+		# For the gradient-based optimization to work, the design cannot change by too much per iteration.
+		# We have preset limits on the device set in config, but these limits depend heavily on the device dimensions and function.
+		design_change_limits = utility.design_change_limits(self.iteration, cfg.cv.epoch_list)
+		while np.max(difference) > design_change_limits[1]: # or np.min(difference) < design_change_limits[0]:
+			logging.info('Modifying step size (Gradient Descent)...')
+			if np.max(difference) < design_change_limits[0]:
+				self.step_size *= 2
+			if np.max(difference) > design_change_limits[1]:
+				self.step_size /= 2
+
+			# Using the NEW value of the step size, step the design forward and examine the change in density.
+			proposed_design_variable = self.proposed_step(design, gradient)
+			difference = np.abs(proposed_design_variable - last_design_variable)
+			# If it is correct, it will break the while loop.
+
+		# The step size is now finalized.
+		design.step(self.proposed_step(design, gradient))
+			
+		
 
 class AdamOptimizer(Optimizer):
 
 	def __init__( self, step_size, betas=(0.9,0.999), eps=1e-8, moments=(0,0), **kwargs ):
 		super().__init__(**kwargs)
+		self.name = 'ADAMOptimizer'
 		self.moments = moments
 		self.step_size = step_size
 		self.betas = betas
@@ -481,7 +583,10 @@ class AdamOptimizer(Optimizer):
 		return super().set_callback(func)
 
 	def step(self, device, gradient, *args, **kwargs):
-		super().step(device, *args, **kwargs)
+		# super().step(device, gradient, *args, **kwargs)	#! Might need to comment this out ?
+
+		# Get current values of design variable before perturbation, for later comparison.
+		last_design_variable = copy.deepcopy(device.get_design_variable())
 
 		# Take gradient step using Adam algorithm
 		grad = device.backpropagate(gradient)
@@ -490,13 +595,13 @@ class AdamOptimizer(Optimizer):
 		m = self.moments[0, ...]
 		v = self.moments[1, ...]
 
-		m = b1 * m + (1 - b1) * grad
-		v = b2 * v + (1 - b2) * grad ** 2
+		m = b1 * m + (1 - b1) * gradient
+		v = b2 * v + (1 - b2) * gradient ** 2
 		self.moments = np.array([m, v])
 
 		m_hat = m / (1 - b1 ** (self.iteration + 1))
 		v_hat = v / (1 - b2 ** (self.iteration + 1))
-		w_hat = device.w - self.step_size * m_hat / np.sqrt(v_hat + self.eps)
+		w_hat = device.w[0] + self.step_size * m_hat / np.sqrt(v_hat + self.eps)
 
 		# Apply changes
 		device.set_design_variable(np.maximum(np.minimum(w_hat, 1), 0))

@@ -188,6 +188,7 @@ def get_config_vars(param_dict):
 	source_angle_theta_vacuum_deg = get_check_none(param_dict, "source_angle_theta_vacuum_deg")
 	source_angle_phi_deg = get_check_none(param_dict, "source_angle_phi_deg")
 	xy_phi_rotations = get_check_none(param_dict, "xy_phi_rotations")
+	xy_adjtheta_rotations = get_check_none(param_dict, "xy_adjtheta_rotations")
 	xy_pol_rotations = get_check_none(param_dict, "xy_pol_rotations")
 	xy_names = get_check_none(param_dict, "xy_names")
 	use_source_aperture = get_check_none(param_dict, "use_source_aperture")
@@ -326,7 +327,8 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	# device_voxels_vertical = int(np.round( device_size_vertical_um / geometry_spacing_minimum_um))
 	device_voxels_vertical = int(np.round( device_size_vertical_um / cd.device_scale_um))
 
-	device_voxels_simulation_mesh_lateral = 1 + int(cd.device_size_lateral_um / cd.mesh_spacing_um)
+	device_voxels_simulation_mesh_lateral = 1 + int(np.ceil(cd.device_size_lateral_um / cd.mesh_spacing_um))
+	# device_voxels_simulation_mesh_lateral = 1 + int(cd.device_size_lateral_um / cd.mesh_spacing_um)
 	# device_voxels_simulation_mesh_lateral = 2 + int(device_size_lateral_um / mesh_spacing_um)
 	# device_voxels_simulation_mesh_vertical = 2 + int(device_size_vertical_um / mesh_spacing_um)
 	device_voxels_simulation_mesh_vertical = lookup_additional_vertical_mesh_cells[ cd.num_vertical_layers ] + \
@@ -490,6 +492,7 @@ def post_process_config_vars(**config_dict):		# cd: Config Dictionary
 	#! --------------------------------------------------------------------
 
 	# Spectral and polarization selectivity information
+	# todo: we re-implemented this but in EnvironmentConstructor.py (i.e. where the FoM is determined)
 	if cd.weight_by_individual_wavelength:
 		weight_focal_plane_map_performance_weighting = [ 1.0, 1.0, 1.0, 1.0 ]
 		weight_focal_plane_map = [ 1.0, 1.0, 1.0, 1.0 ]
