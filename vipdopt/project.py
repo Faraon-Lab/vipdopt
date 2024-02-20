@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import sys
 from copy import copy
 from pathlib import Path
@@ -10,7 +9,6 @@ from typing import Any
 
 import numpy as np
 
-import vipdopt
 from vipdopt.configuration import Config, SonyBayerConfig
 from vipdopt.optimization import Device, FoM, GradientOptimizer, Optimization
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
@@ -99,6 +97,8 @@ class Project:
         self.device = Device.from_source(device_source)
 
         # Setup Optimization
+        work_dir = self.dir / '.tmp'
+        work_dir.mkdir(exist_ok=True, mode=0o777)
         self.optimization = Optimization(
             sims,
             self.device,
@@ -108,12 +108,12 @@ class Project:
             start_iter=iteration,
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
+            work_dir=work_dir,
         )
 
         # TODO Register any callbacks for Optimization here
 
         self.config = cfg
-        vipdopt.logger.debug(f'set config to {cfg}')
 
     def get(self, prop: str, default: Any=None) -> Any | None:
         """Get parameter and return None if it doesn't exist."""

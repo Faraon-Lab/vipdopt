@@ -9,11 +9,13 @@ from collections.abc import Callable
 from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
-from typing import Any, Concatenate, ParamSpec, TypeVar, Type
+from typing import Any, Concatenate, ParamSpec, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 import yaml
+from mpi4py import MPI
+from overrides import override
 from yaml.constructor import SafeConstructor
 
 PathLike = TypeVar('PathLike', str, Path, bytes, os.PathLike)
@@ -48,12 +50,18 @@ class TruncateFormatter(logging.Formatter):
 To see full output, run with -vv or check {self.log_file}\n"""
         return msg
 
+class PrependRankAdapter(logging.LoggerAdapter):
+    """Prepend the message with the MPI rank."""
+    @override
+    def process(self, msg, kwargs):
+        return f'Rank {MPI.COMM_WORLD.Get_rank()}: {msg}', kwargs
+
 
 def setup_logger(
         name: str,
         level: int=logging.INFO,
         log_file: str='dev.log',
-    ) -> logging.Logger:
+    ) -> logging.Logger | logging.LoggerAdapter:
     """Setup logger to use across the program."""
     logger = logging.Logger(name)
     logger.setLevel(logging.DEBUG)
@@ -79,6 +87,9 @@ def setup_logger(
 
     logger.addHandler(shandler)
     logger.addHandler(fhandler)
+
+    if MPI.COMM_WORLD.Get_size() > 1:
+        return PrependRankAdapter(logger)
     return logger
 
 
@@ -197,6 +208,6 @@ def _yaml_loader(fname: PathLike) -> dict:
     with open(fname, 'rb') as stream:
         return yaml.safe_load(stream)
 
-def subclasses(cls: T) -> list[Type[T]]:
+def subclasses(cls: T) -> list[type[T]]:
     """Get all subclasses of a given class."""
     return [scls.__name__ for scls in cls.__subclasses__()]

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections import UserDict
 from pathlib import Path
 

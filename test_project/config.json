@@ -673,7 +673,7 @@
                         "x": 5.1e-07,
                         "y": 5.1e-07,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -687,7 +687,7 @@
                         "x": -5.1e-07,
                         "y": 5.1e-07,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -701,7 +701,7 @@
                         "x": -5.1e-07,
                         "y": -5.1e-07,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -715,7 +715,7 @@
                         "x": 5.1e-07,
                         "y": -5.1e-07,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -731,7 +731,7 @@
                         "y": 5.1e-07,
                         "y span": 1.02e-06,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -747,7 +747,7 @@
                         "y": 5.1e-07,
                         "y span": 1.02e-06,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -763,7 +763,7 @@
                         "y": -5.1e-07,
                         "y span": 1.02e-06,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -779,7 +779,7 @@
                         "y": -5.1e-07,
                         "y span": 1.02e-06,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60
@@ -795,7 +795,7 @@
                         "y": 0,
                         "y span": 2.04e-06,
                         "z": -1.5299999999999998e-06,
-                        "override global_monitor settings": 1,
+                        "override global monitor settings": 1,
                         "use wavelength spacing": 1,
                         "use source limits": 1,
                         "frequency points": 60

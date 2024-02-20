@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
+from pathlib import Path
 
 import numpy.typing as npt
 
@@ -12,7 +12,24 @@ import vipdopt
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import FoM
 from vipdopt.optimization.optimizer import GradientOptimizer
-from vipdopt.simulation import ISimulation
+from vipdopt.simulation import LumericalSimulation
+
+
+def _simulation_dispatch(
+        idx: int,
+        work_dir: Path,
+        objects: dict,
+        env_vars: dict,
+) -> Path:
+    """Create and run a simulation and return the path of the save file."""
+    output_path = work_dir / f'sim_{idx}.fsp'
+    with LumericalSimulation(objects) as sim:
+        sim.promise_env_setup(**env_vars)
+        sim.save_lumapi(output_path)
+        vipdopt.logger.debug(f'Starting simulation {idx}')
+        sim.run()
+    vipdopt.logger.debug(f'Completed running simulation {idx}')
+    return output_path
 
 
 class Optimization:
@@ -20,7 +37,7 @@ class Optimization:
 
     def __init__(
             self,
-            sims: list[ISimulation],
+            sims: list[LumericalSimulation],
             device: Device,
             optimizer: GradientOptimizer,
             fom: FoM,
@@ -28,12 +45,14 @@ class Optimization:
             start_iter: int=0,
             max_epochs: int=1,
             iter_per_epoch: int=100,
+            work_dir: Path = Path('.'),
     ):
         """Initialize Optimzation object."""
         self.sims = sims
         self.device = device
         self.optimizer = optimizer
         self.fom = fom
+        self.dir = work_dir
 
         self.fom_hist: list[npt.NDArray] = []
         self.param_hist: list[npt.NDArray] = []
@@ -48,13 +67,6 @@ class Optimization:
         """Register a callback function to call after each iteration."""
         self._callbacks.append(func)
 
-    def _simulation_dispatch(self, sim_idx: int):
-        """Target for threads to run simulations."""
-        sim = self.sims[sim_idx]
-        vipdopt.logger.debug(f'Running simulation on thread {sim_idx}')
-        sim.save(f'_sim{sim_idx}_epoch_{self.epoch}_iter_{self.iteration}')
-        sim.run()
-        vipdopt.logger.debug(f'Completed running on thread {sim_idx}')
 
     def _pre_run(self):
         """Final pre-processing before running the optimization."""
@@ -64,7 +76,6 @@ class Optimization:
 
     def run(self):
         """Run the optimization."""
-        self._pre_run()
         while self.epoch < self.max_epochs:
             while self.iteration < self.iter_per_epoch:
                 for callback in self._callbacks:
@@ -74,9 +85,17 @@ class Optimization:
                     f'Epoch {self.epoch}, iter {self.iteration}: Running simulations...'
                 )
                 # Run all the simulations
-                n_sims = len(self.sims)
-                with ThreadPoolExecutor() as ex:
-                    ex.map(self._simulation_dispatch, range(n_sims))
+                jobs = [
+                    (i, self.dir, sim.as_dict(), sim.get_env_vars())
+                    for i, sim in enumerate(self.sims)
+                ]
+
+                with Pool(len(self.sims)) as pool:
+                    results_locations = pool.starmap(_simulation_dispatch, jobs)
+
+                vipdopt.logger.debug(f'Sim results saved to {results_locations}')
+
+                break
 
                 # Compute FoM and Gradient
                 fom = self.fom.compute()
@@ -94,9 +113,11 @@ class Optimization:
                 self.optimizer.step(self.device, gradient, self.iteration)
 
                 self.iteration += 1
+            break
             self.iteration = 0
             self.epoch += 1
 
+        return
         final_fom = self.fom_hist[-1]
         vipdopt.logger.info(f'Final FoM: {final_fom}')
         final_params = self.param_hist[-1]

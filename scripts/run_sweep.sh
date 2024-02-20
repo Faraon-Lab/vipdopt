@@ -2,7 +2,7 @@
 #SBATCH -A Faraon_Computing
 #SBATCH --time=2:00:00   # walltime
 
-#SBATCH --nodes=10   # number of nodes
+#SBATCH --nodes=11   # number of nodes
 #SBATCH --ntasks-per-node=8  # number of processor cores (i.e. tasks)
 #SBATCH --mem-per-cpu=8G
 
@@ -20,4 +20,4 @@ source /home/${USER}/.bashrc
 source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
 conda activate vipdopt-dev
 
-xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize test_project -v
+xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize test_project

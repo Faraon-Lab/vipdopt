@@ -9,11 +9,11 @@ import time
 from argparse import ArgumentParser
 from collections import OrderedDict
 from collections.abc import Callable
+from copy import copy
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
 from typing import Any, Concatenate
-from copy import copy
 
 import numpy as np
 import numpy.typing as npt
@@ -178,7 +178,9 @@ class LumericalSimulation(ISimulation):
         self.fdtd: lumapi.FDTD | None = None
         self._clear_objects()
         self._synced = False  # Flag for whether fdtd needs to be synced
-        self._env_vars = None  # Parameters to pass into set_env_vars in the future
+        # Parameters to pass into set_env_vars in the future
+        self._env_vars: dict | None = None
+
         if source:
             self.load(source)
 
@@ -186,9 +188,18 @@ class LumericalSimulation(ISimulation):
     def __str__(self) -> str:
         return self.as_json()
 
+    def get_env_vars(self) -> dict:
+        """Return the current pending environment variables to be set.
+
+        Returns:
+            dict: The current pending environment variables to be set. If
+                `self._env_vars` is None, returns an empty dictionary.
+        """
+        return {} if self._env_vars is None else self._env_vars
+
     @override
     def connect(self) -> None:
-        vipdopt.logger.info('Attempting to connect to Lumerical servers...')
+        vipdopt.logger.debug('Attempting to connect to Lumerical servers...')
 
         # This loop handles the problem of
         # "Failed to start messaging, check licenses..." that Lumerical often has.
@@ -202,12 +213,9 @@ class LumericalSimulation(ISimulation):
                 )
                 continue
 
-        vipdopt.logger.info('Verified license with Lumerical servers.\n')
+        vipdopt.logger.debug('Verified license with Lumerical servers.\n')
         self.fdtd.newproject()
         self._sync_fdtd()
-        if self._env_vars is not None:
-            self.setup_env_resources(**self._env_vars)
-            self._env_vars = None
 
     @override
     def load(self, source: PathLike | dict):
@@ -246,19 +254,22 @@ class LumericalSimulation(ISimulation):
                 )
             for key, val in obj.properties.items():
                 self.fdtd.setnamed(obj_name, key, val)
+        if self._env_vars is not None:
+            self.setup_env_resources(**self._env_vars)
+            self._env_vars = None
         self._synced = True
+        vipdopt.logger.debug('Resynced LumericalSimulation with fdtd solver')
 
 
     @ensure_path
     @override
     def save(self, fname: Path):
-        vipdopt.logger.info(f'Saving simulation to {fname}...')
         if self.fdtd is not None:
             self.save_lumapi(fname)
         content = self.as_json()
         with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             f.write(content)
-        vipdopt.logger.info(f'Succesfully saved simulation to {fname}.\n')
+        vipdopt.logger.debug(f'Succesfully saved simulation to {fname}.\n')
 
     @_sync_fdtd_solver
     @ensure_path
@@ -301,6 +312,8 @@ class LumericalSimulation(ISimulation):
         new_sim = LumericalSimulation()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
+
+        new_sim.promise_env_setup(**self.get_env_vars())
 
         return new_sim
 
@@ -397,9 +410,9 @@ class LumericalSimulation(ISimulation):
     def close(self):
         """Close fdtd conenction."""
         if self.fdtd is not None:
-            vipdopt.logger.info('Closing connection with Lumerical...')
+            vipdopt.logger.debug('Closing connection with Lumerical...')
             self.fdtd.close()
-            vipdopt.logger.info('Succesfully closed connection with Lumerical.')
+            vipdopt.logger.debug('Succesfully closed connection with Lumerical.')
             self.fdtd = None
             self._synced = False
 
@@ -429,7 +442,7 @@ class LumericalSimulation(ISimulation):
     def promise_env_setup(self, **kwargs):
         """Setup the environment settings as soon as the fdtd is instantiated."""
         if self.fdtd is None:
-            self._env_vars = kwargs
+            self._env_vars = kwargs if len(kwargs) > 0 else None
         else:
             self.setup_env_resources(**kwargs)
 
@@ -558,7 +571,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
 
     with LumericalSimulation(Path(args.simulation_json)) as sim:
-        sim.setup_env_resources()
+        sim.promise_env_setup()
 
         vipdopt.logger.info('Saving Simulation')
         sim.save(Path('test_sim'))
