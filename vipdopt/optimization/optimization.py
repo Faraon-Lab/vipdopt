@@ -6,6 +6,7 @@ from collections.abc import Callable
 from multiprocessing import Pool
 from pathlib import Path
 
+import numpy as np
 import numpy.typing as npt
 
 import vipdopt
@@ -40,7 +41,7 @@ class Optimization:
             sims: list[LumericalSimulation],
             device: Device,
             optimizer: GradientOptimizer,
-            fom: FoM,
+            fom: FoM|None,
             start_epoch: int=0,
             start_iter: int=0,
             max_epochs: int=1,
@@ -84,12 +85,51 @@ class Optimization:
                 vipdopt.logger.debug(
                     f'Epoch {self.epoch}, iter {self.iteration}: Running simulations...'
                 )
+                
+                # self.device.update_filters(current_epoch)
+                self.device.update_density()
+                cur_density = self.device.get_density()
+                cur_permittivity = self.device.get_permittivity()
+    
+                # Calculate material % and binarization level, store away
+				# todo: redo this section once you get sigmoid filters up and can start counting materials
+				vipdopt.logger.info(f'TiO2% is {100 * np.count_nonzero(cur_index > cfg.cv.min_device_index) / cur_index.size}%.')		# todo: seems to be wrong?		
+				# logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
+				binarization_fraction = utility.compute_binarization(cur_density)
+				logging.info(f'Binarization is {100 * binarization_fraction}%.')
+				self.binarization_evolution[self.iteration] = 100 * utility.compute_binarization(cur_density)
+
+                # Save template copy out
+				self.simulator.save(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name'])
+
+				# Save out current design/density profile
+				np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + "/cur_design.npy"), cur_density)
+				if self.iteration in self.epoch_list:	# i.e. new epoch
+					np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + f"/cur_design_e{self.epoch_list.index(self.iteration)}.npy"), cur_density)
+
+    
+                for sim in self.sims:
+                    vipdopt.logger.info(f'Accessing sim for device re-import: {sim.info['name']}')
+                    sim.connect(license_checked=True)
+                    
+                    # Import cur_index into design regions
+                    cur_density, cur_permittivity = utility.import_cur_index(self.device, sim,
+                                reinterpolate_permittivity = False, # cfg.cv.reinterpolate_permittivity,
+                                reinterpolate_permittivity_factor = 1 # cfg.cv.reinterpolate_permittivity_factor
+                            )
+                    cur_index = self.device.index_from_permittivity(cur_permittivity)
+                    
+                    # sim.objects['design_import']
+                    print(3)
+            	    # TODO: Add reinterpolation of the device
+                
                 # Run all the simulations
                 jobs = [
                     (i, self.dir, sim.as_dict(), sim.get_env_vars())
                     for i, sim in enumerate(self.sims)
                 ]
 
+                #! TODO: Currently running up against this problem
                 with Pool(len(self.sims)) as pool:
                     results_locations = pool.starmap(_simulation_dispatch, jobs)
 

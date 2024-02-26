@@ -57,5 +57,5 @@ class Monitor:
     def trans_mag(self) -> npt.ArrayLike:
         """Return the transmission magnitude of this source."""
         if self._trans_mag is None:
-            self._trans_mag = self.sim.get_transimission_magnitude(self.monitor_name)
+            self._trans_mag = self.sim.get_transmission_magnitude(self.monitor_name)
         return self._trans_mag

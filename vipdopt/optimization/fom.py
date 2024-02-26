@@ -40,7 +40,7 @@ class FoM:
             fom_func: Callable[..., npt.NDArray],
             gradient_func: Callable[..., npt.NDArray],
             polarization: str,
-            freq: Sequence[Number],
+            freq: Sequence[Number],     # freq actually refers to the WHOLE lambda vector
             opt_ids: Sequence[int] | None=None,
             name: str='',
     ) -> None:
@@ -113,6 +113,7 @@ class FoM:
         # if 'gradient_func' in data:
 
         data['fom_monitors'] = [
+            # Monitor(simulation, source, monitor)
             Monitor(src_to_sim_map[src], src, mname)
             for src, mname in data['fom_monitors']
         ]
@@ -172,6 +173,7 @@ class FoM:
         assert isinstance(first, FoM)
         assert isinstance(second, FoM)
 
+        # NOTE: Polarization might be unnecessary as a check
         if first.polarization != second.polarization or \
             first.opt_ids != second.opt_ids or \
                 first.freq != second.freq:
@@ -299,6 +301,25 @@ class FoM:
             self.name,
         )
 
+# todo: add the following
+# 		self.freq_index_negative_opt: Specify and array of frequency indices that should be optimized with a negative gradient. This is useful for making sure light does not focus to a point, for example.
+# 		self.fom = np.array([]) # The more convenient way to look at fom. For example, power transmission through a monitor even if you're optimizing for a point source.
+# 		self.restricted_fom = np.array([]) # FOM that is being restricted. For instance, frequencies that should not be focused.
+# 		self.true_fom = np.array([]) # The true FoM being used to define the adjoint source.
+# 		self.gradient = np.array([])
+# 		self.restricted_gradient = np.array([])
+	
+# 		self.tempfile_fwd_name = ''
+# 		self.tempfile_adj_name = ''
+		
+# 		self.design_fwd_fields = None
+# 		self.design_adj_fields = None
+
+# 		# Boolean array specifying which frequencies are active.
+# 		# This is a bit confusing. Almost deprecated really. enabled means of the frequencies being optimized, which are enabled. Useful in rare circumstances where some things need to be fully disable to help catch up.
+# 		self.enabled = np.ones((len(self.freq_index_opt)))
+# 		# Adding this once I started optimizing for functions we DONT want (i.e. restricted_gradient). This is of the freq_index_opt_restricted values, which do we want to optimize?
+# 		self.enabled_restricted = np.ones((len(self.freq_index_restricted_opt)))
 
 class BayerFilterFoM(FoM):
     """FoM implementing the particular figure of merit for the SonyBayerFilter."""

@@ -85,8 +85,8 @@ class LumericalSimObjectType(StrEnum):
     RECT = 'rect'
 
     def get_add_function(self) -> Callable:
-        """Get the corerct lumapi function to add an object."""
-        return getattr(lumapi.FDTD, f'add{self.value}')
+        """Get the correct lumapi function to add an object."""
+        return getattr(vipdopt.lumapi.FDTD, f'add{self.value}')
 
 SOURCE_TYPES = [
     LumericalSimObjectType.DIPOLE,
@@ -98,6 +98,10 @@ MONITOR_TYPES = [
     LumericalSimObjectType.POWER,
     LumericalSimObjectType.PROFILE,
     LumericalSimObjectType.INDEX,
+]
+
+IMPORT_TYPES = [
+    LumericalSimObjectType.IMPORT
 ]
 
 class LumericalEncoder(json.JSONEncoder):
@@ -124,7 +128,7 @@ class LumericalSimObject:
         properties (OrderedDict[str, Any]): Map of named properties and their values
     """
     def __init__(self, name: str, obj_type: LumericalSimObjectType) -> None:
-        """Crearte a LumericalSimObject."""
+        """Create a LumericalSimObject."""
         self.name = name
         self.obj_type = obj_type
         self.properties: OrderedDict[str, Any] = OrderedDict()
@@ -164,7 +168,8 @@ class LumericalSimulation(ISimulation):
     """Lumerical FDTD Simulation Code.
 
     Attributes:
-        fdtd (lumapi.FDTD): Lumerical session
+        fdtd (vipdopt.lumapi.FDTD): Lumerical session
+        info (OrderedDict[str]: Info about this simulation - filename, path, simulator, coordinates.
         objects (OrderedDict[str, LumericalSimObject]): The objects within
             the simulation
     """
@@ -175,7 +180,8 @@ class LumericalSimulation(ISimulation):
         Arguments:
             source (PathLike | dict | None): optional source to load the simulation from
         """
-        self.fdtd: lumapi.FDTD | None = None
+        self.fdtd: vipdopt.lumapi.FDTD | None = None
+        self.info: dict
         self._clear_objects()
         self._synced = False  # Flag for whether fdtd needs to be synced
         # Parameters to pass into set_env_vars in the future
@@ -198,22 +204,28 @@ class LumericalSimulation(ISimulation):
         return {} if self._env_vars is None else self._env_vars
 
     @override
-    def connect(self) -> None:
+    def connect(self, license_checked:bool = True) -> None:
         vipdopt.logger.debug('Attempting to connect to Lumerical servers...')
 
+        if license_checked:
+            self.fdtd = 1       # Placeholder
+        
         # This loop handles the problem of
         # "Failed to start messaging, check licenses..." that Lumerical often has.
         while self.fdtd is None:
             try:
-                self.fdtd = lumapi.FDTD(hide=True)
-            except (AttributeError, lumapi.LumApiError) as e:
+                vipdopt.fdtd = vipdopt.lumapi.FDTD(hide=True)
+                vipdopt.logger.info('Verified license with Lumerical servers.\n')
+                vipdopt.fdtd = vipdopt.lumapi.FDTD(hide=False)             #! Need to turn the GUI on for debugging
+                self.fdtd = vipdopt.fdtd
+            except (AttributeError, vipdopt.lumapi.LumApiError) as e:
                 logging.exception(
                     'Licensing server error - can be ignored.',
                     exc_info=e,
                 )
                 continue
 
-        vipdopt.logger.debug('Verified license with Lumerical servers.\n')
+        self.fdtd = vipdopt.fdtd
         self.fdtd.newproject()
         self._sync_fdtd()
 
@@ -231,6 +243,9 @@ class LumericalSimulation(ISimulation):
         vipdopt.logger.info(f'Succesfully loaded {fname}\n')
 
     def _load_dict(self, d: dict):
+        self._clear_info()
+        self.info.update(d['info'])
+        
         self._clear_objects()
         for obj in d['objects'].values():
             self.new_object(
@@ -241,24 +256,32 @@ class LumericalSimulation(ISimulation):
 
     @_check_fdtd
     def _sync_fdtd(self):
-        """Sync local objects with `lumapi.FDTD` objects."""
+        """Sync local objects with `vipdopt.lumapi.FDTD` objects."""
         if self._synced:
             return
         self.fdtd.switchtolayout()
         for obj_name, obj in self.objects.items():
             # Create object if needed
             if self.fdtd.getnamednumber(obj_name) == 0:
+                kwargs = {'name':obj_name} if obj_name not in ['FDTD'] else {}
                 LumericalSimObjectType.get_add_function(obj.obj_type)(
-                    self.fdtd,
-                    **obj.properties,
+                    self.fdtd, **kwargs #,**obj.properties,
+                    #! 20240223 Ian: Had to take this out because OrderedDict properties that were inactive in Lumerical were returning errors
+                    #! and sometimes that needs to happen, but lumapi.py offers no pass statement.
                 )
             for key, val in obj.properties.items():
-                self.fdtd.setnamed(obj_name, key, val)
+                try:
+                    self.fdtd.setnamed(obj_name, key, val)
+                except Exception as ex:
+                    template = "An exception of type {0} occurred. Arguments:\n{1!r}\n"
+                    message = template.format(type(ex).__name__, ex.args)
+                    logging.debug(message + f' Property {key} in FDTD Object {obj_name} is inactive / cannot be changed.')
+
         if self._env_vars is not None:
             self.setup_env_resources(**self._env_vars)
             self._env_vars = None
         self._synced = True
-        vipdopt.logger.debug('Resynced LumericalSimulation with fdtd solver')
+        vipdopt.logger.debug('Resynced LumericalSimulation with fdtd solver.')
 
 
     @ensure_path
@@ -276,6 +299,7 @@ class LumericalSimulation(ISimulation):
     def save_lumapi(self, fname: Path):
         """Save using Lumerical's simulation file type (.fsp)."""
         self.fdtd.save(str(fname.with_suffix('')))
+        self.info['path'] = str(fname.with_suffix(''))
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this simulation."""
@@ -300,6 +324,11 @@ class LumericalSimulation(ISimulation):
         """Set the specified job manager resource for this simulation."""
         self.fdtd.setresource('FDTD', resource_num, resource, value)
 
+    def _clear_info(self):
+        """Clear all existing simulation info and create a new project."""
+        self.info = OrderedDict()
+        
+
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
         self.objects = OrderedDict()
@@ -310,6 +339,7 @@ class LumericalSimulation(ISimulation):
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
         new_sim = LumericalSimulation()
+        new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
 
@@ -322,9 +352,11 @@ class LumericalSimulation(ISimulation):
         for obj in objs:
             self.update_object(obj, enabled=1)
 
-    def with_enabled(self, objs: list[str]) -> LumericalSimulation:
+    def with_enabled(self, objs: list[str], name:str|None = None) -> LumericalSimulation:
         """Return copy of this simulation with only objects in objs enabled."""
-        new_sim = self.copy()
+        new_sim = self.copy()               # Unlinked
+        if name is not None:
+            new_sim.info['name'] = name
         new_sim.disable_all_sources()
         new_sim.enable(objs)
         return new_sim
@@ -362,8 +394,17 @@ class LumericalSimulation(ISimulation):
         return [obj for _, obj in self.objects.items() if obj.obj_type in MONITOR_TYPES]
 
     def monitor_names(self) -> list[str]:
-        """Return a list of all montor object names."""
+        """Return a list of all monitor object names."""
         return [obj.name for obj in self.monitors()]
+    
+    def imports(self) -> list[LumericalSimObject]:
+        """Return a list of all import objects."""
+        return [obj for _, obj in self.objects.items() if obj.obj_type in IMPORT_TYPES]
+
+    def import_names(self) -> list[str]:
+        """Return a list of all import object names."""
+        return [obj.name for obj in self.imports()]
+        
 
     def new_object(
         self,
@@ -387,7 +428,7 @@ class LumericalSimulation(ISimulation):
 
     def add_object(self, obj: LumericalSimObject) -> None:
         """Add an existing object to the simulation."""
-        # Add copy to the lumapi.FDTD
+        # Add copy to the vipdopt.lumapi.FDTD
         if self.fdtd is not None:
             LumericalSimObjectType.get_add_function(obj.obj_type)(
                 self.fdtd,
@@ -413,6 +454,7 @@ class LumericalSimulation(ISimulation):
             vipdopt.logger.debug('Closing connection with Lumerical...')
             self.fdtd.close()
             vipdopt.logger.debug('Succesfully closed connection with Lumerical.')
+            #! 20240224 - We could comment out the next two lines
             self.fdtd = None
             self._synced = False
 
@@ -494,7 +536,7 @@ class LumericalSimulation(ISimulation):
         return np.squeeze(index_prev['index_x']).shape
 
     @_check_fdtd
-    def get_transimission_magnitude(self, monitor_name: str) -> npt.NDArray:
+    def get_transmission_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the transmission for a given monitor."""
         # Ensure this is a transmission monitor
         monitor_name = monitor_name.replace('focal', 'transmission')
@@ -551,7 +593,7 @@ class LumericalSimulation(ISimulation):
     def get_overall_power(self, monitor_name) -> npt.NDArray:
         """Return the overall power from a given monitor."""
         source_power = self.get_source_power()
-        t = self.get_transimission_magnitude(monitor_name)
+        t = self.get_transmission_magnitude(monitor_name)
         return source_power * t.T
 
 if __name__ == '__main__':

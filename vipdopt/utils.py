@@ -63,7 +63,7 @@ def setup_logger(
         log_file: str='dev.log',
     ) -> logging.Logger | logging.LoggerAdapter:
     """Setup logger to use across the program."""
-    logger = logging.Logger(name)
+    logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
 
@@ -80,7 +80,12 @@ def setup_logger(
 
     # Create a handler for putting info into a .log file. Includes time stamps etc.
     # Will write EVERYTHING to the log (i.e. level = debug)
-    fhandler = logging.FileHandler(log_file)
+    if not os.path.exists(os.path.dirname(log_file)):
+        try:
+            os.makedirs(os.path.dirname(log_file))
+        except Exception as e:
+            pass
+    fhandler = logging.FileHandler(log_file, mode='a')
     fhandler.setFormatter(
         logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     )
@@ -152,6 +157,9 @@ def save_config_file(
     path_filename = convert_path(fname)
     if cfg_format == 'auto':
         cfg_format = path_filename.suffix
+
+    if type(config_data) is not dict:
+        config_data = config_data.data     #! 20240221: Hacked together by Ian to make this work, JSON wasn't dumping file of type Config properly
 
     match cfg_format.lower():
         case '.yaml' | '.yml':

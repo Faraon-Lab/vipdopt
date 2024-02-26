@@ -10,6 +10,10 @@ import numpy.typing as npt
 from jinja2 import Environment, FileSystemLoader, Undefined
 from overrides import override
 
+import sys
+import os
+sys.path.append(os.getcwd())
+
 import vipdopt
 from vipdopt.configuration.config import read_config_file
 from vipdopt.utils import ensure_path, setup_logger
@@ -106,9 +110,9 @@ if __name__ == '__main__':
 
     data = read_config_file(args.data_file)
     output = rndr.render(data=data, pi=np.pi)
-    vipdopt.logger.info(f'Rendered Output:\n{output}')
+    logger.info(f'Rendered Output:\n{output}')
 
     with open(args.output, 'w') as f:
         f.write(output)
 
-    vipdopt.logger.info(f'Succesfully saved output to {args.output}')
+    logger.info(f'Successfully saved output to {args.output}')

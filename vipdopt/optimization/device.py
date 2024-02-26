@@ -16,6 +16,12 @@ from vipdopt.utils import PathLike, ensure_path
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
 
+def index_from_permittivity(permittivity_):
+	'''Checks all permittivity values are real and then takes square root to give index.'''
+	assert np.all(np.imag(permittivity_) == 0), 'Not expecting complex index values right now!'
+
+	return np.sqrt(permittivity_)
+
 # TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
 class Device:
     """An optical device / object that can be optimized.
@@ -245,6 +251,8 @@ class Device:
             y = self.filters[i].fabricate(y) if binarize \
                 else self.filters[i].forward(y)  # type: ignore
         return y
+
+    #! TODO: UPDATE_FILTERS() METHOD
 
     def backpropagate(self, gradient):
         """Backpropagate a gradient to be applied to pre-filtered design variables."""
