@@ -2,7 +2,7 @@
 #SBATCH -A Faraon_Computing
 #SBATCH --time=2:00:00   # walltime
 
-#SBATCH --nodes=5   # number of nodes
+#SBATCH --nodes=10   # number of nodes
 #SBATCH --ntasks-per-node=8  # number of processor cores (i.e. tasks)
 #SBATCH --mem-per-cpu=8G
 
