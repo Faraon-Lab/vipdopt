@@ -166,6 +166,7 @@ class Project:
 				mpi_exe=cfg['mpi_exe'],
 				nprocs=cfg['nprocs'],
 				solver_exe=cfg['solver_exe'],
+				nsims=len(base_sim.source_names())
 			)
 		except Exception as e:
 			pass

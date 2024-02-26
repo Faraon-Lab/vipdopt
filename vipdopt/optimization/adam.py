@@ -42,7 +42,7 @@ class AdamOptimizer(GradientOptimizer):
 
         m_hat = m / (1 - b1 ** (iteration + 1))
         v_hat = v / (1 - b2 ** (iteration + 1))
-        w_hat = device.w - self.step_size * m_hat / np.sqrt(v_hat + self.eps)
+        w_hat = device.get_design_variable() - self.step_size * m_hat / np.sqrt(v_hat + self.eps)
 
         # Apply changes
         device.set_design_variable(np.maximum(np.minimum(w_hat, 1), 0))

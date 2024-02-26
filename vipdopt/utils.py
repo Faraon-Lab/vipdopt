@@ -10,6 +10,11 @@ from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
 from typing import Any, Concatenate, ParamSpec, TypeVar
+from multiprocessing.pool import AsyncResult
+import time
+import importlib
+import types
+
 
 import numpy as np
 import numpy.typing as npt
@@ -219,3 +224,20 @@ def _yaml_loader(fname: PathLike) -> dict:
 def subclasses(cls: T) -> list[type[T]]:
     """Get all subclasses of a given class."""
     return [scls.__name__ for scls in cls.__subclasses__()]
+
+
+def wait_for_results(results: list[AsyncResult]):
+    while True:
+        time.sleep(1)
+        # catch exception if results are not ready yet
+        try:
+            ready = [result.ready() for result in results]
+            successful = [result.successful() for result in results]
+        except Exception:
+            continue
+        # exit loop if all tasks returned success
+        if all(successful):
+            break
+        # raise exception reporting exceptions received from workers
+        if all(ready) and not all(successful):
+            raise Exception(f'Workers raised following exceptions {[result._value for result in results if not result.successful()]}')

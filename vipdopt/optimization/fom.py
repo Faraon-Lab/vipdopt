@@ -51,7 +51,7 @@ class FoM:
         self.gradient_func = gradient_func
         self.polarization = polarization
         self.freq = freq
-        self.opt_ids = list(range(len(freq))) if opt_ids is None else opt_ids
+        self.opt_ids = tuple(range(len(freq))) if opt_ids is None else tuple(opt_ids)
         if name == '':
             self.name = f'fom_{FoM._COUNTER}'
         else:
@@ -181,21 +181,21 @@ class FoM:
                 f"unsupported operand type(s) for {operator}: 'FoM' and 'FoM' when "
                 "polarization, opt_ids, and/or freq is not equal")
 
-        og_fom_func_1 = first.fom_func
-        og_grad_func_1 = first.gradient_func
-        og_fom_func_2 = second.fom_func
-        og_grad_func_2 = second.gradient_func
+        # og_fom_func_1 = first.fom_func
+        # og_grad_func_1 = first.gradient_func
+        # og_fom_func_2 = second.fom_func
+        # og_grad_func_2 = second.gradient_func
 
         def new_compute(*args, **kwargs):
             return func(
-                og_fom_func_1(*args, **kwargs),
-                og_fom_func_2(*args, **kwargs),
+                first.compute(*args, **kwargs),
+                second.compute(*args, **kwargs),
             )
 
         def new_gradient(*args, **kwargs):
             return func(
-                og_grad_func_1(*args, **kwargs),
-                og_grad_func_2(*args, **kwargs),
+                first.gradient(*args, **kwargs),
+                second.gradient(*args, **kwargs),
             )
 
         return FoM(
@@ -275,7 +275,7 @@ class FoM:
             (FoM): A new FoM instance such that fom_func and grad_func are equal to 0,
                 and polarization, freq, and opt_ids come from `fom`.
         """
-        def zero_func(self, *args, **kwargs):  # noqa: ARG001
+        def zero_func(*args, **kwargs):  # noqa: ARG001
             return 0
 
         return FoM(
@@ -347,20 +347,25 @@ class BayerFilterFoM(FoM):
 
     def _bayer_fom(self):
         """Compute bayer filter figure of merit."""
-        total_tfom = np.zeros(self.fom_monitors[0].shape) # FoM for transmission monitor
-        total_ffom = np.zeros(self.fom_monitors[0].shape) # FoM for focal monitor
-        for source in self.fom_monitors:
-            transmission = source.trans_mag()
+        total_tfom = np.zeros(self.fom_monitors[0].tshape)[..., self.opt_ids] # FoM for transmission monitor
+        total_ffom = np.zeros(self.fom_monitors[0].fshape)[..., self.opt_ids] # FoM for focal monitor
+        for monitor in self.fom_monitors:
+            transmission = monitor.trans_mag
+            # print(transmission.shape)
+            # print(self.opt_ids)
+            # print(total_tfom.shape)
+            # print(transmission[..., self.opt_ids].shape)
+            # print(transmission[..., self.opt_ids])
             total_tfom += transmission[..., self.opt_ids]
 
-            efield = source.e()
+            efield = monitor.e
             total_ffom += np.sum(np.square(np.abs(efield[..., self.opt_ids])), axis=0)
 
         return total_tfom, total_ffom
 
     def _bayer_gradient(self):
         """Compute the gradient of the bayer filter figure of merit."""
-        e_fwd = self.grad_monitors[0].e()
-        e_adj = self.grad_monitors[1].e()
+        e_fwd = self.grad_monitors[0].e
+        e_adj = self.grad_monitors[1].e
         df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
         return df_dev[..., self.opt_ids]
