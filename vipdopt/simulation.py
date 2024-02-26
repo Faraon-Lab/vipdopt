@@ -20,7 +20,6 @@ import numpy.typing as npt
 from overrides import override
 
 import vipdopt
-from vipdopt import lumapi
 from vipdopt.utils import P, PathLike, R, ensure_path, read_config_file
 
 
@@ -71,6 +70,8 @@ class ISimulation(abc.ABC):
         """Run the simulation."""
 
 
+
+
 class LumericalSimObjectType(StrEnum):
     """Types of simulation objects in Lumerical."""
     FDTD = 'fdtd'
@@ -86,7 +87,7 @@ class LumericalSimObjectType(StrEnum):
 
     def get_add_function(self) -> Callable:
         """Get the corerct lumapi function to add an object."""
-        return getattr(lumapi.FDTD, f'add{self.value}')
+        return getattr(vipdopt.lumapi.FDTD, f'add{self.value}')
 
 SOURCE_TYPES = [
     LumericalSimObjectType.DIPOLE,
@@ -99,6 +100,16 @@ MONITOR_TYPES = [
     LumericalSimObjectType.PROFILE,
     LumericalSimObjectType.INDEX,
 ]
+
+OBJECT_TYPE_NAME_MAP = {
+    'FDTD': LumericalSimObjectType.FDTD,
+    'GaussianSource': LumericalSimObjectType.GAUSSIAN,
+    'DipoleSource': LumericalSimObjectType.DIPOLE,
+    'Rectangle': LumericalSimObjectType.RECT,
+    'Mesh': LumericalSimObjectType.MESH,
+    'Import': LumericalSimObjectType.IMPORT,
+    'IndexMonitor': LumericalSimObjectType.INDEX,
+}
 
 class LumericalEncoder(json.JSONEncoder):
     """Encodes LumericalSim objects in JSON format."""
@@ -175,7 +186,7 @@ class LumericalSimulation(ISimulation):
         Arguments:
             source (PathLike | dict | None): optional source to load the simulation from
         """
-        self.fdtd: lumapi.FDTD | None = None
+        self.fdtd: vipdopt.lumapi.FDTD | None = None
         self._clear_objects()
         self._synced = False  # Flag for whether fdtd needs to be synced
         # Parameters to pass into set_env_vars in the future
@@ -205,9 +216,9 @@ class LumericalSimulation(ISimulation):
         # "Failed to start messaging, check licenses..." that Lumerical often has.
         while self.fdtd is None:
             try:
-                self.fdtd = lumapi.FDTD(hide=True)
-            except (AttributeError, lumapi.LumApiError) as e:
-                logging.exception(
+                self.fdtd = vipdopt.lumapi.FDTD(hide=True)
+            except (AttributeError, vipdopt.lumapi.LumApiError) as e:
+                vipdopt.logger.exception(
                     'Licensing server error - can be ignored.',
                     exc_info=e,
                 )
@@ -221,16 +232,49 @@ class LumericalSimulation(ISimulation):
     def load(self, source: PathLike | dict):
         if isinstance(source, dict):
             self._load_dict(source)
+        elif source.suffix == '.fsp':
+            self._load_fsp(source)
         else:
             self._load_file(source)
+    
+    @_check_fdtd
+    def _load_fsp(self, fname: PathLike):
+        """Load a simulation from a Lumerical .fsp file."""
+        vipdopt.logger.debug(f'Loading simulation from {fname}...')
+        self._clear_objects()
+        self.fdtd.load(str(fname))
+        self.fdtd.selectall()
+        objects = self.fdtd.getAllSelectedObjects()
+        # vipdopt.logger.debug(list(vars(objects[0]).keys()))
+        # vipdopt.logger.debug(list(objects[0].__dict__.keys()))
+        # print(objects[0]['type'])
+        for o in objects:
+            otype = o['type']
+            if otype == 'DFTMonitor':
+                if o['spatial interpolation'] == 'specified position':
+                    obj_type = LumericalSimObjectType.PROFILE
+                else:
+                    obj_type = LumericalSimObjectType.POWER
+            else:
+                obj_type = OBJECT_TYPE_NAME_MAP[otype]
+            oname = o._id.name.split('::')[-1]
+            sim_obj = LumericalSimObject(oname, obj_type)
+            for name in o._nameMap:
+                sim_obj[name] = o[name]
+            
+            self.objects[oname] = sim_obj
+        vipdopt.logger.debug(self.as_json())
+
 
     def _load_file(self, fname: PathLike):
-        vipdopt.logger.info(f'Loading simulation from {fname}...')
+        """Load a simulation from a JSON file."""
+        vipdopt.logger.debug(f'Loading simulation from {fname}...')
         sim = read_config_file(fname)
         self._load_dict(sim)
         vipdopt.logger.info(f'Succesfully loaded {fname}\n')
 
     def _load_dict(self, d: dict):
+        """Load a simulation from a dictionary of objects."""
         self._clear_objects()
         for obj in d['objects'].values():
             self.new_object(
@@ -454,8 +498,12 @@ class LumericalSimulation(ISimulation):
             nprocs (int): The number of processes to run the simulation with
             hostfile (Path | None): Path to a hostfile for running distributed jobs
             solver_exe (Path): Path to the fdtd-solver to run
+            nsims (int): The number of simulations being run
         """
         self.set_resource(1, 'mpi no default options', '1')
+
+        nsims = kwargs.pop('nsims', 1)
+        self.set_resource(1, 'capacity', nsims)
 
         mpi_exe = kwargs.pop(
             'mpi_exe',
@@ -488,17 +536,59 @@ class LumericalSimulation(ISimulation):
             vipdopt.logger.debug(f'\t"{resource}" = {value}')
 
     @_check_fdtd
+    def getresult(
+        self,
+        object_name: str,
+        property_name: str | None=None,
+        dataset_value: str | None=None,
+    ) -> Any:
+        """Get a result from the FDTD solver, accesing a specific value if desired."""
+        if property_name is None:
+            res = self.fdtd.getresult(object_name)  # Gets all named results
+            vipdopt.logger.debug(f'Available results from {object_name}:\n{res}')
+            return res
+
+        res = self.fdtd.getresult(object_name, property_name)
+        if dataset_value is not None:
+            res = res[dataset_value]
+        vipdopt.logger.debug(f'Got "{property_name}" from "{object_name}": {res}')
+        return res
+
+    def get_shape(
+            self,
+            monitor_name: str,
+            value: str,
+            dataset_value: str | None=None,
+    ) -> tuple[int, ...]:
+        """Return the shape of a property returned from this simulation's monitors."""
+        prop = self.getresult(monitor_name, value, dataset_value)
+        return np.squeeze(prop).shape
+
     def get_field_shape(self) -> tuple[int, ...]:
         """Return the shape of the fields returned from this simulation's monitors."""
-        index_prev = self.fdtd.getresult('design_index_monitor', 'index preview')
-        return np.squeeze(index_prev['index_x']).shape
+        return self.get_shape('design_index_monitor', 'index', 'x')
+        for s in self.fdtd.getresult('design_index_monitor').splitlines():
+            vipdopt.logger.debug(s)
+            vipdopt.logger.debug(self.fdtd.getresult('design_index_monitor', s))
+        if self.fdtd.haveresult('design_index_monitor', 'index preview'):
+            index_prev = self.fdtd.getresult('design_index_monitor', 'index preview')
+            return np.squeeze(index_prev['index_x']).shape
+        index = self.fdtd.getresult('design_index_monitor', 'index_x')
+            
+        return np.squeeze(index).shape
+    
+    def get_transimission_shape(self, monitor_name: str) -> npt.NDArray:
+        """Return the magnitude of the transmission for a given monitor."""
+        # Ensure this is a transmission monitor
+        monitor_name = monitor_name.replace('focal', 'transmission')
+        return self.get_shape(monitor_name, 'T', 'T')
 
-    @_check_fdtd
     def get_transimission_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the transmission for a given monitor."""
         # Ensure this is a transmission monitor
         monitor_name = monitor_name.replace('focal', 'transmission')
-        return np.abs(self.fdtd.getresult(monitor_name, 'T')['T'])
+        transmission = self.getresult(monitor_name, 'T', 'T')
+        return np.abs(transmission)
 
     @_check_fdtd
     def get_field(self, monitor_name: str, field_indicator: str) -> npt.NDArray:
@@ -511,7 +601,7 @@ class LumericalSimulation(ISimulation):
         start = time.time()
         vipdopt.logger.debug(f'Getting {polarizations} from monitor "{monitor_name}"')
         fields = np.array(
-            map(partial(self.fdtd.getdata(monitor_name)), polarizations),
+            list(map(partial(self.fdtd.getdata, monitor_name), polarizations)),
             dtype=np.complex128,
         )
         data_xfer_size_mb = fields.nbytes / (1024 ** 2)
@@ -519,7 +609,7 @@ class LumericalSimulation(ISimulation):
 
         vipdopt.logger.debug(f'Transferred {data_xfer_size_mb} MB')
         vipdopt.logger.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
-        return fields
+        return fields.squeeze()
 
     def get_hfield(self, monitor_name: str) -> npt.NDArray:
         """Return the H field from a monitor."""
@@ -532,9 +622,8 @@ class LumericalSimulation(ISimulation):
     @_check_fdtd
     def get_pfield(self, monitor_name: str) -> npt.NDArray:
         """Returns power as a function of space and wavelength, with xyz components."""
-        return self.fdtd.getresult(monitor_name, 'P')['P']
+        return self.getresult(monitor_name, 'P', 'P')
 
-    @_check_fdtd
     def get_efield_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the E field from a monitor."""
         efield = self.get_efield(monitor_name)
@@ -544,10 +633,9 @@ class LumericalSimulation(ISimulation):
     @_check_fdtd
     def get_source_power(self) -> npt.NDArray:
         """Return the source power of a given monitor."""
-        f = self.fdtd.getresult('focal_monitor_0', 'f')
+        f = self.getresult('focal_monitor_0', 'f')
         return self.fdtd.sourcepower(f)
 
-    @_check_fdtd
     def get_overall_power(self, monitor_name) -> npt.NDArray:
         """Return the overall power from a given monitor."""
         source_power = self.get_source_power()
@@ -570,8 +658,11 @@ if __name__ == '__main__':
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level)
 
-    with LumericalSimulation(Path(args.simulation_json)) as sim:
-        sim.promise_env_setup()
+    # with LumericalSimulation(Path(args.simulation_json)) as sim:
+    with LumericalSimulation() as sim:
+        # sim.promise_env_setup()
+        sim._load_fsp('test_project/.tmp/sim_0.fsp')
+        exit()
 
         vipdopt.logger.info('Saving Simulation')
         sim.save(Path('test_sim'))

@@ -70,10 +70,11 @@ class Project:
             mpi_exe=cfg['mpi_exe'],
             nprocs=cfg['nprocs'],
             solver_exe=cfg['solver_exe'],
+            nsims=len(base_sim.source_names()[:5])
         )
         self.base_sim = base_sim
         self.src_to_sim_map = {
-            src: base_sim.with_enabled([src]) for src in base_sim.source_names()
+            src: base_sim.with_enabled([src]) for src in base_sim.source_names()[:5]
         }
         sims = self.src_to_sim_map.values()
 
@@ -109,6 +110,7 @@ class Project:
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
             work_dir=work_dir,
+            env_vars=base_sim.get_env_vars(),
         )
 
         # TODO Register any callbacks for Optimization here

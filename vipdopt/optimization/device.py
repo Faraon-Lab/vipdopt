@@ -249,7 +249,7 @@ class Device:
     def backpropagate(self, gradient):
         """Backpropagate a gradient to be applied to pre-filtered design variables."""
         grad = np.copy(gradient)
-        for i in range(self.num_filters(), -1, -1):
+        for i in range(self.num_filters() - 1, -1, -1):
             filt = self.filters[i]
             y = self.w[..., i]
             x = self.w[..., i - 1]
