@@ -19,7 +19,6 @@ import types
 import numpy as np
 import numpy.typing as npt
 import yaml
-from mpi4py import MPI
 from overrides import override
 from yaml.constructor import SafeConstructor
 
@@ -54,12 +53,6 @@ class TruncateFormatter(logging.Formatter):
             return f"""{msg[:self.max_length]}...\nOutput truncated.
 To see full output, run with -vv or check {self.log_file}\n"""
         return msg
-
-class PrependRankAdapter(logging.LoggerAdapter):
-    """Prepend the message with the MPI rank."""
-    @override
-    def process(self, msg, kwargs):
-        return f'Rank {MPI.COMM_WORLD.Get_rank()}: {msg}', kwargs
 
 
 def setup_logger(
@@ -98,8 +91,6 @@ def setup_logger(
     logger.addHandler(shandler)
     logger.addHandler(fhandler)
 
-    if MPI.COMM_WORLD.Get_size() > 1:
-        return PrependRankAdapter(logger)
     return logger
 
 
