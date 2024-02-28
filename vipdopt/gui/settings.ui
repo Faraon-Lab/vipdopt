@@ -240,6 +240,34 @@
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <layout class="QGridLayout" name="fom_gridLayout">
+         <item row="0" column="5">
+          <widget class="QLabel" name="fom_fwd_sim_label">
+           <property name="text">
+            <string>Forward Simulation</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QLabel" name="fom_name_label">
+           <property name="text">
+            <string>Name</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="2">
+          <widget class="QLabel" name="fom_fom_mon_label">
+           <property name="text">
+            <string>Figure of Merit Monitors</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="3">
+          <widget class="QLabel" name="fom_grad_mon_label">
+           <property name="text">
+            <string>Gradient Monitors</string>
+           </property>
+          </widget>
+         </item>
          <item row="0" column="4">
           <widget class="QLabel" name="fom_weight_label">
            <property name="text">
@@ -254,85 +282,10 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="4">
-          <widget class="QLineEdit" name="fom_weight_lineEdit_0">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="placeholderText">
-            <string>1.0</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="3">
-          <widget class="QLabel" name="fom_grad_mon_label">
+         <item row="0" column="6">
+          <widget class="QLabel" name="fom_adj_sim_label">
            <property name="text">
-            <string>Gradient Monitors</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="2">
-          <widget class="QLabel" name="fom_fom_mon_label">
-           <property name="text">
-            <string>Figure of Merit Monitors</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="QComboBox" name="fom_type_comboBox_0">
-           <property name="placeholderText">
-            <string>Select...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="fom_name_label">
-           <property name="text">
-            <string>Name</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QLineEdit" name="fom_name_lineEdit_0">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="placeholderText">
-            <string>FoM 0</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="5">
-          <widget class="QToolButton" name="fom_delrow_toolButton">
-           <property name="text">
-            <string>Remove Row</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QToolButton" name="fom_addrow_toolButton">
-           <property name="text">
-            <string>Add Row</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2">
-          <widget class="QPushButton" name="fom_fom_pushButton_0">
-           <property name="text">
-            <string>Choose Monitors...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="3">
-          <widget class="QPushButton" name="fom_grad_pushButton_0">
-           <property name="text">
-            <string>Choose Monitors...</string>
+            <string>Adjoint Simulation</string>
            </property>
           </widget>
          </item>

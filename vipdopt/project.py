@@ -20,42 +20,42 @@ from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import PathLike, ensure_path
 
 
-def create_internal_folder_structure(main_dir, work_dir, debug_mode=False):
+def create_internal_folder_structure(main_dir: Path, work_dir: Path, debug_mode=False):
     # global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
     # global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
     
-    directories = {'MAIN': main_dir}
+    directories: dict[str, Path] = {'main': main_dir}
 
     #* Output / Save Paths 
-    DATA_FOLDER = work_dir
-    SAVED_SCRIPTS_FOLDER = os.path.join(DATA_FOLDER, 'saved_scripts')
-    OPTIMIZATION_INFO_FOLDER = os.path.join(DATA_FOLDER, 'opt_info')
-    OPTIMIZATION_PLOTS_FOLDER = os.path.join(OPTIMIZATION_INFO_FOLDER, 'plots')
-    DEBUG_COMPLETED_JOBS_FOLDER = 'ares_test_dev'
-    PULL_COMPLETED_JOBS_FOLDER = DATA_FOLDER
+    data_folder = work_dir
+    saved_scripts_folder = data_folder / 'saved_scripts'
+    optimization_info_folder = data_folder / 'opt_info'
+    optimization_plots_folder = optimization_info_folder / 'plots'
+    debug_completed_jobs_folder = 'ares_test_dev'
+    pull_completed_jobs_folder = data_folder
     if debug_mode:
-        PULL_COMPLETED_JOBS_FOLDER = DEBUG_COMPLETED_JOBS_FOLDER
+        pull_completed_jobs_folder = debug_completed_jobs_folder
 
-    EVALUATION_FOLDER = os.path.join(main_dir, 'eval')
-    EVALUATION_CONFIG_FOLDER = os.path.join(EVALUATION_FOLDER, 'configs')
-    EVALUATION_UTILS_FOLDER = os.path.join(EVALUATION_FOLDER, 'utils')
+    evaluation_folder = main_dir / 'eval'
+    evaluation_config_folder = evaluation_folder / 'configs'
+    evaluation_utils_folder = evaluation_folder / 'utils'
 
-    # parameters['MODEL_PATH'] = os.path.join(DATA_FOLDER, 'model.pth')
-    # parameters['OPTIMIZER_PATH'] = os.path.join(DATA_FOLDER, 'optimizer.pth')
+    # parameters['MODEL_PATH'] = DATA_FOLDER / 'model.pth'
+    # parameters['OPTIMIZER_PATH'] = DATA_FOLDER / 'optimizer.pth'
 
 
     # #* Save out the various files that exist right before the optimization runs for debugging purposes.
     # # If these files have changed significantly, the optimization should be re-run to compare to anything new.
 
-    if not os.path.isdir( SAVED_SCRIPTS_FOLDER ):
-        os.mkdir( SAVED_SCRIPTS_FOLDER )
-    if not os.path.isdir( OPTIMIZATION_INFO_FOLDER ):
-        os.mkdir( OPTIMIZATION_INFO_FOLDER )
-    if not os.path.isdir( OPTIMIZATION_PLOTS_FOLDER ):
-        os.mkdir( OPTIMIZATION_PLOTS_FOLDER )
+    if not os.path.isdir( saved_scripts_folder ):
+        saved_scripts_folder.mkdir(exist_ok=True)
+    if not os.path.isdir( optimization_info_folder ):
+        optimization_info_folder.mkdir(exist_ok=True)
+    if not os.path.isdir( optimization_plots_folder ):
+        optimization_plots_folder.mkdir(exist_ok=True)
 
     try:
-        shutil.copy2( main_dir + "/slurm_vis10lyr.sh", SAVED_SCRIPTS_FOLDER + "/slurm_vis10lyr.sh" )
+        shutil.copy2( main_dir + "/slurm_vis10lyr.sh", saved_scripts_folder + "/slurm_vis10lyr.sh" )
     except Exception as ex:
         pass
     # shutil.copy2( cfg.python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
@@ -65,8 +65,8 @@ def create_internal_folder_structure(main_dir, work_dir, debug_mode=False):
     # # TODO: et cetera... might have to save out various scripts from each folder
 
     #  Create convenient folder for evaluation code
-    if not os.path.isdir( EVALUATION_FOLDER ):
-        os.mkdir( EVALUATION_FOLDER )
+    if not os.path.isdir( evaluation_folder ):
+        evaluation_folder.mkdir(exist_ok=True)
     
     
     # TODO: finalize this when the Project directory internal structure is finalized    
@@ -80,15 +80,15 @@ def create_internal_folder_structure(main_dir, work_dir, debug_mode=False):
     #shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
     
     
-    directories.update( {'DATA': DATA_FOLDER,
-                        'SAVED_SCRIPTS': SAVED_SCRIPTS_FOLDER,
-                        'OPT_INFO': OPTIMIZATION_INFO_FOLDER,
-                        'OPT_PLOTS': OPTIMIZATION_PLOTS_FOLDER,
-                        'PULL_COMPLETED_JOBS': PULL_COMPLETED_JOBS_FOLDER,
-                        'DEBUG_COMPLETED_JOBS': DEBUG_COMPLETED_JOBS_FOLDER,
-                        'EVALUATION': EVALUATION_FOLDER,
-                        'EVAL_CONFIG': EVALUATION_CONFIG_FOLDER,
-                        'EVAL_UTILS': EVALUATION_UTILS_FOLDER
+    directories.update( {'data': data_folder,
+                        'saved_scripts': saved_scripts_folder,
+                        'opt_info': optimization_info_folder,
+                        'opt_plots': optimization_plots_folder,
+                        'pull_completed_jobs': pull_completed_jobs_folder,
+                        'debug_completed_jobs': debug_completed_jobs_folder,
+                        'evaluation': evaluation_folder,
+                        'eval_config': evaluation_config_folder,
+                        'eval_utils': evaluation_utils_folder
                     } )
     return directories
 

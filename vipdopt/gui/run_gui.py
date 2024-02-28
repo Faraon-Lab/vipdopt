@@ -5,6 +5,7 @@ import logging
 import sys
 
 from PySide6.QtCore import Qt, QCoreApplication
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -23,7 +24,7 @@ import vipdopt
 from vipdopt.gui.config_editor import ConfigModel
 from vipdopt.gui.ui_fom_dialog import Ui_Dialog as Ui_FomDialog
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
-from vipdopt.gui.ui_status import Ui_MainWindow as Ui_StatusWindow
+from vipdopt.gui.ui_dashboard import Ui_MainWindow as Ui_DashboardWindow
 from vipdopt.monitor import Monitor
 from vipdopt.optimization import FoM, BayerFilterFoM
 from vipdopt.project import Project
@@ -390,12 +391,37 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         """Load settings for the optimization tab."""
 
 
-class StatusDashboard(QMainWindow, Ui_StatusWindow):
+class StatusDashboard(QMainWindow, Ui_DashboardWindow):
     """Wrapper class for the status window."""
     def __init__(self):
         """Initialize a StatusWindow."""
         super().__init__()
         self.setupUi(self)
+
+        self.actionOpen.triggered.connect(self.open_project)
+
+        self.project = Project()
+
+    def open_project(self):
+        """Load optimization project into the GUI."""
+        proj_dir = QFileDialog.getExistingDirectory(
+            self,
+            'Select Project Directory',
+            './',
+            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
+        )
+        if proj_dir:
+            self.project.load_project(proj_dir)
+            vipdopt.logger.info(f'Loaded project from {proj_dir}')
+            self._update_values()
+            vipdopt.logger.info(f'Updated GUI with values from {proj_dir}')
+
+    def _update_values(self):
+        plots_folder = self.project.folders['opt_plots']
+        refractive_index_plot = plots_folder / 'index.png'
+        efield_plot = plots_folder / 'efield.png'
+        fom_plot = plots_folder / 'fom.png'
+        transmission_plot = plots_folder / 'transmission.png'
 
 
 if __name__ == '__main__':
@@ -404,8 +430,8 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     # Create application windows
-    # status_window = StatusDashboard()
-    # status_window.show()
+    status_window = StatusDashboard()
+    status_window.show()
     settings_window = SettingsWindow()
     settings_window.show()
     app.exec()
