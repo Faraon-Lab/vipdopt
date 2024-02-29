@@ -406,7 +406,7 @@ class MplCanvas(FigureCanvasQTAgg):
             self.fig = figure
             self.axes = figure.axes
         else:
-            self.fig, self.axes = plt.subplots(1, 1, figsize=(width, height), dpi=dpi)
+            self.fig, self.axes = plt.subplots(2, 2, figsize=(width, height), dpi=dpi)
         super().__init__(self.fig)
 
 
@@ -419,10 +419,8 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         self.actionOpen.triggered.connect(self.open_project)
 
-        self.canvases = [[MplCanvas(), MplCanvas()], [MplCanvas(), MplCanvas()]]
-        for i in range(2):
-            for j in range(2):
-                self.gridLayout.addWidget(self.canvases[i][j], i, j)
+        self.plot_canvas = MplCanvas()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
 
         self.project = Project()
         self.running = False
@@ -453,21 +451,20 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         plots_folder = self.project.subdirectories['opt_plots']
         # refractive_index_plot = plots_folder / 'index.png'
         # # efield_plot = plots_folder / 'efield.png'
-        # self.horizontalLayout.removeWidget(self.plot_canvas)
-        self.gridLayout.removeItem(self.gridLayout.itemAtPosition(0, 0))
+        self.horizontalLayout.removeWidget(self.plot_canvas)
         # self.plot_canvas = MplCanvas()
-        # for canvas in [c for row in self.canvases for c in row]:
-        #     canvas.a
+        for ax in self.plot_canvas.axes.flat:
+            ax.clear()
         with (plots_folder / 'fom.pkl').open('rb') as f:
             fom_fig = pickle.load(f)
-        self.canvases[0][0] = MplCanvas(fom_fig)
-        self.gridLayout.addWidget(self.canvases[0][0], 0, 0)
+        self.plot_canvas = MplCanvas(fom_fig)
         # self.plot_canvas.axes[0, 0] = fom_plot
         # with (plots_folder / 'fom.png').open('w') as f:
         #     self.plot_canvas.fig.savefig(f)
 
 
         # self.plot_canvas.draw()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
     
         # transmission_plot = plots_folder / 'transmission.png'
 
