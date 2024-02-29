@@ -17,3 +17,5 @@ class GradientOptimizer(abc.ABC):
     @abc.abstractmethod
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
+        print(3)
+

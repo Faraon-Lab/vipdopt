@@ -10,6 +10,7 @@ from typing import Any, no_type_check
 import numpy as np
 import numpy.typing as npt
 
+import vipdopt
 from vipdopt.monitor import Monitor
 from vipdopt.simulation import LumericalSimulation
 from vipdopt.utils import Number
@@ -70,11 +71,11 @@ class FoM:
             self.opt_ids == __value.opt_ids
         return super().__eq__(__value)
 
-    def compute(self, *args, **kwargs) -> npt.NDArray:
+    def compute_fom(self, *args, **kwargs) -> npt.NDArray:
         """Compute FoM."""
         return self.fom_func(*args, **kwargs)
 
-    def gradient(self, *args, **kwargs) -> npt.NDArray:
+    def compute_gradient(self, *args, **kwargs) -> npt.NDArray:     #! 20240227 Ian - Renamed this.
         """Compute gradient of FoM."""
         return self.gradient_func(*args, **kwargs)
 
@@ -151,8 +152,10 @@ class FoM:
             return FoM(
                 first.fom_monitors,
                 first.grad_monitors,
-                lambda *args, **kwargs: func(og_fom_func(*args, **kwargs), second),
-                lambda *args, **kwargs: func(og_grad_func(*args, **kwargs), second),
+                # lambda *args, **kwargs: func(og_fom_func(*args, **kwargs), second),
+                # lambda *args, **kwargs: func(og_grad_func(*args, **kwargs), second),
+                lambda *args, **kwargs: tuple(map(lambda x: func(x, second), og_fom_func(*args, **kwargs))),
+                lambda *args, **kwargs: tuple(map(lambda x: func(x, second), og_grad_func(*args, **kwargs))),
                 first.polarization,
                 first.freq,
                 first.opt_ids,
@@ -163,8 +166,10 @@ class FoM:
             return FoM(
                 second.fom_monitors,
                 second.grad_monitors,
-                lambda *args, **kwargs: func(first, og_fom_func(*args, **kwargs)),
-                lambda *args, **kwargs: func(first, og_grad_func(*args, **kwargs)),
+                # lambda *args, **kwargs: func(first[..., np.newaxis], og_fom_func(*args, **kwargs)),
+                # lambda *args, **kwargs: func(first, og_grad_func(*args, **kwargs)),
+                lambda *args, **kwargs: tuple(map(lambda x: func(first, x), og_fom_func(*args, **kwargs))),
+                lambda *args, **kwargs: tuple(map(lambda x: func(first, x), og_grad_func(*args, **kwargs))),
                 second.polarization,
                 second.freq,
                 second.opt_ids,
@@ -187,16 +192,30 @@ class FoM:
         # og_grad_func_2 = second.gradient_func
 
         def new_compute(*args, **kwargs):
-            return func(
-                first.compute(*args, **kwargs),
-                second.compute(*args, **kwargs),
-            )
+            try:
+                return tuple(func(*x) for x in zip(first.compute_fom(*args, **kwargs), second.compute_fom(*args, **kwargs)))
+            except Exception as e:
+                try:
+                    return tuple(map(lambda x: func(first.compute_fom(*args, **kwargs), x), second.compute_fom(*args, **kwargs)))
+                except Exception as e:
+                    return tuple(map(lambda x: func(x, second.compute_fom(*args, **kwargs) ), first.compute_fom(*args, **kwargs)))
+            # return func(
+            #     first.compute(*args, **kwargs),
+            #     second.compute(*args, **kwargs),
+            # )
 
         def new_gradient(*args, **kwargs):
-            return func(
-                first.gradient(*args, **kwargs),
-                second.gradient(*args, **kwargs),
-            )
+            try:
+                return tuple(func(*x) for x in zip(first.compute_gradient(*args, **kwargs), second.compute_gradient(*args, **kwargs)))
+            except Exception as e:
+                try:
+                    return tuple(map(lambda x: func(first.compute_gradient(*args, **kwargs), x), second.compute_gradient(*args, **kwargs)))
+                except Exception as e:
+                    return tuple(map(lambda x: func(x, second.compute_gradient(*args, **kwargs) ), first.compute_gradient(*args, **kwargs)))
+            # return func(
+            #     first.gradient(*args, **kwargs),
+            #     second.gradient(*args, **kwargs),
+            # )
 
         return FoM(
             first.grad_monitors + second.grad_monitors,
@@ -308,10 +327,10 @@ class FoM:
 # 		self.true_fom = np.array([]) # The true FoM being used to define the adjoint source.
 # 		self.gradient = np.array([])
 # 		self.restricted_gradient = np.array([])
-	
+    
 # 		self.tempfile_fwd_name = ''
 # 		self.tempfile_adj_name = ''
-		
+        
 # 		self.design_fwd_fields = None
 # 		self.design_adj_fields = None
 
@@ -347,10 +366,13 @@ class BayerFilterFoM(FoM):
 
     def _bayer_fom(self):
         """Compute bayer filter figure of merit."""
+        #! Here we need to figure out which FoM belongs to which file
         total_tfom = np.zeros(self.fom_monitors[0].tshape)[..., self.opt_ids] # FoM for transmission monitor
-        total_ffom = np.zeros(self.fom_monitors[0].fshape)[..., self.opt_ids] # FoM for focal monitor
+        total_ffom = np.zeros(self.fom_monitors[0].fshape[1:])[..., self.opt_ids] # FoM for focal monitor - need to take [1:] because intensity sums over first axis
+        source_weight = np.zeros(self.fom_monitors[0].fshape, dtype=np.complex128) # Source weight calculation - Apply opt_ids slice when gradient is fully calculated.
         for monitor in self.fom_monitors:
             transmission = monitor.trans_mag
+            vipdopt.logger.info(f'Accessing monitor {monitor.monitor_name}')
             # print(transmission.shape)
             # print(self.opt_ids)
             # print(total_tfom.shape)
@@ -360,12 +382,69 @@ class BayerFilterFoM(FoM):
 
             efield = monitor.e
             total_ffom += np.sum(np.square(np.abs(efield[..., self.opt_ids])), axis=0)
+            
+            source_weight += np.expand_dims(np.conj(efield[:,0,0,0, :]), axis=(1,2,3))
+            # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])       # We'll apply opt_ids slice when gradient is fully calculated.
+        
+        # # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's function[design_efield from adj_src simulation]
+        # # Reshape source weight (nλ) to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj)
+        # # https://stackoverflow.com/a/30032182
+        self.source_weight = source_weight # np.expand_dims(source_weight, axis=(1,2,3))
+        #! 20240228 Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
+            
+        #* Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with direction along the polarization
+        # This is going to be the amplitude of the dipole-adjoint source driven at the focal plane
+        #! Reminder that this is only applicable for dipole-based adjoint sources!!!
+        # # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1		# x-polarized if phi = 0, y-polarized if phi = 90.	
+        # todo: REDO - direction of source_weight vector potential error.
+
+        # # self.source_weight = np.squeeze( np.conj(
+        # # 		focal_data[pol_xy_idx, 0, 0, 0, :]			# shape: (3, nx, ny, nz, nλ)
+        # # 		#get_focal_data[adj_src_idx][xy_idx, 0, 0, 0, spectral_indices[0]:spectral_indices[1]:1]
+        # # 		) )
+        # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
+        
 
         return total_tfom, total_ffom
 
     def _bayer_gradient(self):
         """Compute the gradient of the bayer filter figure of merit."""
-        e_fwd = self.grad_monitors[0].e
+        e_fwd = self.design_fwd_fields
         e_adj = self.grad_monitors[1].e
-        df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
+        
+        # #! DEBUG: Check orthogonality and direction of E-fields in the design monitor
+        vipdopt.logger.info((f'Forward design fields have average absolute xyz-components: '
+                    f'{np.mean(np.abs(e_fwd[0]))}, {np.mean(np.abs(e_fwd[1]))}, '
+                    f'{np.mean(np.abs(e_fwd[2]))}.'
+                    ))
+        vipdopt.logger.info((f'Adjoint design fields have average absolute xyz-components: '
+        			f'{np.mean(np.abs(e_adj[0]))}, {np.mean(np.abs(e_adj[1]))}, '
+        			f'{np.mean(np.abs(e_adj[2]))}.'
+        			))
+        vipdopt.logger.info((f'Source weight has average absolute xyz-components: '
+        		f'{np.mean(np.abs(self.source_weight[0]))}, {np.mean(np.abs(self.source_weight[1]))}, '
+        		f'{np.mean(np.abs(self.source_weight[2]))}.'
+        			))
+
+        # df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
+        e_adj = e_adj * self.source_weight
+        df_dev = 1 * (e_fwd[0]*e_adj[0] + \
+        		e_fwd[1]*e_adj[1] + \
+        		e_fwd[2]*e_adj[2]
+        	)
+        # Taking the real part comes when multiplying by Δε0 i.e. change in permittivity.
+
+        vipdopt.logger.info('Computing Gradient')
+
+        self.gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+        # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+
+        self.gradient[..., self.opt_ids] = df_dev[..., self.opt_ids] # * self.enabled
+        # self.restricted_gradient[..., self.freq_index_restricted_opt] = df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
+
+        # self.gradient = df_dev[..., pos_gradient_indices] * self.enabled
+        # # self.restricted_gradient = df_dev[..., neg_gradient_indices] * self.enabled_restricted
+
+        # return df_dev
+        
         return df_dev[..., self.opt_ids]
