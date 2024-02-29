@@ -20,9 +20,6 @@ from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import PathLike, ensure_path, glob_first
 
 
-class ProjectLoadError(BaseException):
-    """Error to raise when failing to load a project."""
-
 def create_internal_folder_structure(root_dir: Path,debug_mode=False):
     # global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
     # global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
@@ -109,10 +106,10 @@ class Project:
         self.optimization: Optimization = None
         self.optimizer: GradientOptimizer = None
         self.device: Device = None
-        self.base_sim: LumericalSimulation = LumericalSimulation()
-        self.src_to_sim_map: dict[str, LumericalSimulation] = {}
-        self.foms: list[FoM] = []
-        self.weights: list[float] = []
+        self.base_sim: LumericalSimulation = None
+        self.src_to_sim_map = {}
+        self.foms = []
+        self.weights = []
         self.subdirectories: dict[str, Path] = {}
 
     @classmethod
@@ -134,11 +131,7 @@ class Project:
         cfg_file = project_dir / file_name
         if not cfg_file.exists():
             # Search the directory for a configuration file
-            try:
-                cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
-            except FileNotFoundError as e:
-                msg = f'Could not find a config file in {project_dir}'
-                raise ProjectLoadError(msg) from e
+            cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
         cfg = Config.from_file(cfg_file)
         cfg_sim = Config.from_file(project_dir / 'sim.json')
         cfg.data['base_simulation'] = cfg_sim.data              #! 20240221: Hacked together to combine the two outputs of template.py
@@ -159,10 +152,10 @@ class Project:
             try:
                 optimizer_type = getattr(sys.modules['vipdopt.optimization'], optimizer)
             except AttributeError:
-                msg = f'Optimizer {optimizer} not currently supported'
-                raise ProjectLoadError(msg) from None
+                raise NotImplementedError(f'Optimizer {optimizer} not currently supported')\
+                from None
             self.optimizer = optimizer_type(**optimizer_settings)
-        except BaseException:
+        except Exception as e:
             self.optimizer = None
 
         try:
@@ -172,7 +165,7 @@ class Project:
             base_sim = LumericalSimulation(cfg.pop('base_simulation'))
             #! TODO: IT'S NOT LOADING cfg.data['base_simulation']['objects']['FDTD']['dimension'] properly!
             vipdopt.logger.info('...successfully loaded base simulation!')
-        except BaseException:
+        except Exception as e:
             base_sim = LumericalSimulation()
         
         # TODO: Are we running it locally or on SLURM or on AWS or?
@@ -199,6 +192,82 @@ class Project:
             self.weights.append(fom_dict['weight'])
             self.foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))
         full_fom = sum(np.multiply(self.weights, self.foms))
+        
+        # Overall Weights for each FoM
+        self.weights = np.array(self.weights)
+        
+        # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM (e.g. spectral sorting)
+        # spectral_weights_by_fom = np.zeros((len(fom_dict), cfg.pv.num_design_frequency_points))
+        spectral_weights_by_fom = np.zeros((cfg['num_bands'], cfg['num_design_frequency_points']))
+        # Each wavelength band needs a left, right, and peak (usually center).
+        wl_band_bounds = {'left': [], 'peak': [], 'right': []}
+
+        def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
+            # Reminder that wl_band_bounds is a dictionary {'left': [], 'peak': [], 'right': []}
+            
+            # Naive method: Split lambda_values_um into num_bands and return lefts, centers, and rights accordingly.
+            # i.e. assume all bands are equally spread across all of lambda_values_um without missing any values
+
+            for key in wl_band_bounds.keys():				# Reassign empty lists to be numpy arrays
+                wl_band_bounds[key] = np.zeros(num_bands)
+            
+            wl_bands = np.array_split(lambda_values_um, num_bands)
+            # wl_bands = np.array_split(lambda_values_um, [3,7,12,14])  # https://stackoverflow.com/a/67294512 
+            # e.g. would give a list of arrays with length 3, 4, 5, 2, and N-(3+4+5+2)
+
+            for band_idx, band in enumerate(wl_bands):
+                wl_band_bounds['left'][band_idx] = band[0]
+                wl_band_bounds['right'][band_idx] = band[-1]
+                wl_band_bounds['peak'][band_idx] = band[(len(band)-1)//2]
+            
+            return wl_band_bounds
+
+        def determine_spectral_weights(spectral_weights_by_fom, wl_band_bound_idxs, mode='identity', *args, **kwargs):
+            
+            # Right now we have it set up to send specific wavelength bands to specific FoMs
+            # This can be thought of as creating a desired transmission spectra for each FoM
+            # The bounds of each band are controlled by wl_band_bound_idxs
+
+
+            for fom_idx, fom in enumerate(spectral_weights_by_fom):
+                # We can choose different modes here
+                if mode in ['identity']:	# 1 everywhere
+                    fom[:] = 1
+
+                elif mode in ['hat']:		# 1 everywhere, 0 otherwise
+                    fom[ wl_band_bound_idxs['left'][fom_idx] : wl_band_bound_idxs['right'][fom_idx]+1 ] = 1
+        
+                elif mode in ['gaussian']:	# gaussians centered on peaks
+                    scaling_exp = - (4/7) / np.log( 0.5 )
+                    band_peak = wl_band_bound_idxs['peak'][fom_idx]
+                    band_width = wl_band_bound_idxs['left'][fom_idx] - wl_band_bound_idxs['right'][fom_idx]
+                    wl_idxs = range(spectral_weights_by_fom.shape[-1])
+                    fom[:] = np.exp( -( wl_idxs - band_peak)**2 / ( scaling_exp * band_width )**2 )
+
+            # # Plotting code to check weighting shapes
+            # import matplotlib.pyplot as plt
+            # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
+            # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
+            # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
+            # for fom in spectral_weights_by_fom:
+            # 	plt.plot(fom)
+            # plt.show()
+            # print(3)
+        
+            return spectral_weights_by_fom
+
+        wl_band_bounds = assign_bands(wl_band_bounds, cfg['lambda_values_um'], cfg['num_bands'])
+        vipdopt.logger.info(f'Desired peak locations per band are: {wl_band_bounds["peak"]}')
+
+        # Convert to the nearest matching indices of lambda_values_um
+        wl_band_bound_idxs = wl_band_bounds.copy()
+        for key, val in wl_band_bounds.items():
+            wl_band_bound_idxs[key] = np.searchsorted(cfg['lambda_values_um'], val)
+
+        spectral_weights_by_fom = determine_spectral_weights(spectral_weights_by_fom, wl_band_bound_idxs, mode='gaussian') # args, kwargs
+
+        self.weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
+
 
         # Load device
         try:
@@ -232,6 +301,9 @@ class Project:
             )
 
         # Setup Folder Structure
+        work_dir = self.dir / '.tmp'
+        work_dir.mkdir(exist_ok=True, mode=0o777)
+        vipdopt_dir = os.path.dirname(__file__)         # Go up one folder
         
         running_on_local_machine = False
         slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
@@ -255,7 +327,7 @@ class Project:
             start_iter=iteration,
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
-            env_vars=copy(self.base_sim.get_env_vars()),
+            env_vars=self.base_sim._env_vars.copy(),
             dirs=self.subdirectories,
         )
 

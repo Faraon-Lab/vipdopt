@@ -16,10 +16,12 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 
 import vipdopt
+from vipdopt import STL
 from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.fom import FoM
+from vipdopt.optimization.fom import BayerFilterFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
+from vipdopt.monitor import Monitor
 from vipdopt.simulation import LumericalSimulation
 from vipdopt.utils import wait_for_results
 
@@ -141,14 +143,26 @@ class Optimization:
         """Generate the plots and save to file."""
         folder = self.dirs['opt_plots']
 
+        #! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
+
         # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
         fom_fig = plotter.plot_fom_trace(self.figure_of_merit_evolution, folder, self.epoch_list)
         quad_trans_fig = plotter.plot_quadrant_transmission_trace(self.fom_evolution['transmission'], folder, self.epoch_list)
-        # plotter.plot_individual_quadrant_transmission(quadrant_transmission_data, lambda_values_um, OPTIMIZATION_PLOTS_FOLDER,
-        # 										epoch, iteration=30)	# continuously produces only one plot per epoch to save space
-        overall_trans_fig = plotter.plot_overall_transmission_trace(self.fom_evolution['transmission'], folder, self.epoch_list)
+        
+        self.runner_sim.fdtd.load(self.sim_files[0].name)
+        E_focal = self.runner_sim.getresult('transmission_focal_monitor_','E')
+        intensity_fig = plotter.plot_Enorm_focal(np.sum(np.abs(np.squeeze(E_focal['E']))**2, axis=-1),
+                                                E_focal['x'], E_focal['lambda'],
+                                                folder, self.iteration, wl_idxs=[7,22])
+        
+        # plotter.plot_individual_quadrant_transmission(self.fom_evolution['intensity'], 
+        #                     self.cfg['lambda_values_um'], folder, self.epoch_list)	# continuously produces only one plot per epoch to save space
+        overall_trans_fig = plotter.plot_quadrant_transmission_trace(self.fom_evolution['overall_transmission'], folder, self.epoch_list,
+                                                                filename='overall_trans_trace')
+        
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
         final_device_layer_fig, _ = plotter.visualize_device(cur_index, folder, iteration=self.iteration)
+        
         # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
         # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
 
@@ -162,6 +176,8 @@ class Optimization:
             pickle.dump(quad_trans_fig, f)
         with (folder / 'overall_trans.pkl').open('wb') as f:
             pickle.dump(overall_trans_fig, f)
+        with (folder / 'Enorm.pkl').open('wb') as f:
+            pickle.dump(intensity_fig, f)
         with (folder / 'final_device_layer.pkl').open('wb') as f:
             pickle.dump(final_device_layer_fig, f)
         # todo: rest of the plots
@@ -173,6 +189,9 @@ class Optimization:
         # Connect to Lumerical
         self.loop = True
         return
+        with ThreadPool() as pool:
+            pool.apply(LumericalSimulation.connect, (self.runner_sim,))
+            pool.map(LumericalSimulation.connect, self.sims)
 
     def _post_run(self):
         """Final post-processing after running the optimization."""
@@ -186,6 +205,15 @@ class Optimization:
     def run_simulations(self):
         """Run all of the simulations in parallel."""
 
+        # jobs = [
+        #     (i, self.dir, sim.as_dict(), sim.get_env_vars())
+        #     for i, sim in enumerate(self.sims)
+        # ]
+
+        # with Pool() as pool:
+        #     sim_files = pool.starmap(_simulation_dispatch, jobs)
+
+        # vipdopt.logger.debug('Creating new fdtd...')
         if self.nsims == 0:
             return
 
@@ -249,7 +277,7 @@ class Optimization:
             
         # Use dummy simulation to run all of them at once using lumapi
         # self.runner_sim.promise_env_setup(self.sims[0]._env_vars)
-        # self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
+        self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
         for fname in self.sim_files:
             # self.runner_sim.fdtd.addjob(str(fname), 'FDTD')
             self.runner_sim.fdtd.addjob(fname.name, 'FDTD')     #! Has to just add the filename
@@ -314,8 +342,12 @@ class Optimization:
                 for f in self.foms:
                     for m in f.fom_monitors:
                         m._e = None
+                        m._h = None
+                        m._trans_mag = None
                     for m in f.grad_monitors:
                         m._e = None
+                        m._h = None
+                        m._trans_mag = None
                 
                 vipdopt.logger.info("Beginning Step 4: Computing Figure of Merit")
                 
@@ -356,6 +388,9 @@ class Optimization:
                             
                             # Store fom, restricted fom, true fom
                             self.fom_evolution['transmission'][self.iteration, f_idx, :] = np.squeeze(f.fom)
+                            self.fom_evolution['overall_transmission'][self.iteration, f_idx, :] = np.squeeze(np.abs(
+                                        f.fom_monitors[0].sim.getresult('transmission_focal_monitor_', 'T', 'T')
+                                    ))
                             # todo: add line for restricted fom
                             self.fom_evolution[self.cfg['optimization_fom']][self.iteration, f_idx, :] = np.squeeze(f.true_fom)
     
@@ -567,8 +602,14 @@ class Optimization:
             self.iteration = 0
             self.epoch += 1
 
-        final_fom = self.fom_hist[-1]
+        #! TODO: Turn fom_hist into figure_of_merit_evolution
+        final_fom = self.figure_of_merit_evolution[-1]
         vipdopt.logger.info(f'Final FoM: {final_fom}')
         final_params = self.param_hist[-1]
         vipdopt.logger.info(f'Final Parameters: {final_params}')
         self._post_run()
+        
+        full_density = self.device.binarize(self.device.get_density())
+        stl_generator = STL.STL(full_density)
+        stl_generator.generate_stl()
+        stl_generator.save_stl( self.dirs['data'] / 'final_device.stl' )

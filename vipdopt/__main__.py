@@ -96,7 +96,7 @@ if __name__ == '__main__':
     # project.save()
 
     # Now that config is loaded, set up lumapi
-    vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_hpc'])   #todo: If Windows
+    vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_local'])   #todo: If Windows
 
     # Debug that base_sim is correctly created...
     project.base_sim.connect(license_checked=False)		
@@ -260,7 +260,7 @@ if __name__ == '__main__':
         #! DEBUG: Check the proportions of the individual FoM gradients. One could be too small relative to the others.
         #! This becomes crucial when a functionality isn't working or when the performance weighting needs to be adjusted.
         for f_idx, f in enumerate(indiv_foms):
-            logging.info(f'Average absolute gradient for FoM {f_idx} is {np.mean(np.abs(f.gradient))}.')
+            vipdopt.logger.info(f'Average absolute gradient for FoM {f_idx} is {np.mean(np.abs(f.gradient))}.')
 
         final_weights = np.array(weights)
 
