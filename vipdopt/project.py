@@ -15,7 +15,7 @@ sys.path.append(os.getcwd())
 import vipdopt
 from vipdopt.configuration import Config, SonyBayerConfig
 from vipdopt.optimization import Device, FoM, GradientOptimizer, Optimization
-from vipdopt.optimization.filter import Sigmoid
+from vipdopt.optimization.filter import Sigmoid, Scale
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import PathLike, ensure_path, glob_first
 
@@ -49,20 +49,12 @@ def create_internal_folder_structure(root_dir: Path,debug_mode=False):
     # #* Save out the various files that exist right before the optimization runs for debugging purposes.
     # # If these files have changed significantly, the optimization should be re-run to compare to anything new.
 
-    # if not os.path.isdir( saved_scripts_folder ):
-    #     saved_scripts_folder.mkdir(exist_ok=True)
-    # if not os.path.isdir( optimization_info_folder ):
-    #     optimization_info_folder.mkdir(exist_ok=True)
-    # if not os.path.isdir( optimization_plots_folder ):
-    #     optimization_plots_folder.mkdir(exist_ok=True)
-
     try:
         shutil.copy2( root_dir + "/slurm_vis10lyr.sh", saved_scripts_folder + "/slurm_vis10lyr.sh" )
     except Exception as ex:
         pass
     # shutil.copy2( cfg.python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
     # shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
-    #              os.path.join(SAVED_SCRIPTS_FOLDER, os.path.basename(yaml_filename)) )
     # shutil.copy2( python_src_directory + "/configs/SonyBayerFilterParameters.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterParameters.py" )
     # # TODO: et cetera... might have to save out various scripts from each folder
 
@@ -82,6 +74,7 @@ def create_internal_folder_structure(root_dir: Path,debug_mode=False):
     #shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
     
     
+
     directories = {
         'root': root_dir,
         'data': data_folder,
@@ -174,18 +167,14 @@ class Project:
             vipdopt.logger.info('...successfully loaded base simulation!')
         except Exception as e:
             base_sim = LumericalSimulation()
-            vipdopt.logger.exception(e)
-            
-        try:
-            # TODO: Are we running it locally or on SLURM or on AWS or?
-            base_sim.promise_env_setup(
-                mpi_exe=cfg['mpi_exe'],
-                nprocs=cfg['nprocs'],
-                solver_exe=cfg['solver_exe'],
-                nsims=len(base_sim.source_names())
-            )
-        except Exception as e:
-            pass
+        
+        # TODO: Are we running it locally or on SLURM or on AWS or?
+        base_sim.promise_env_setup(
+            mpi_exe=cfg['mpi_exe'],
+            nprocs=cfg['nprocs'],
+            solver_exe=cfg['solver_exe'],
+            nsims=len(base_sim.source_names())
+        )
             
         self.base_sim = base_sim
         self.src_to_sim_map = {
@@ -214,16 +203,32 @@ class Project:
       
             #* Design Region(s) + Constraints
             # e.g. feature sizes, bridging/voids, permittivity constraints, corresponding E-field monitor regions
+            region_coordinates = {'x': np.linspace(-0.5 * cfg['device_size_lateral_bordered_um'], 0.5 * cfg['device_size_lateral_bordered_um'], cfg['device_voxels_lateral_bordered'])}
+            if cfg['simulator_dimension'] == '2D':
+                voxel_array_size = ( cfg['device_voxels_lateral_bordered'], cfg['device_voxels_vertical'], 3 )
+                region_coordinates.update({
+                    'y': np.linspace(cfg['device_vertical_minimum_um'], cfg['device_vertical_maximum_um'], cfg['device_voxels_vertical']),
+                    'z': np.linspace(-0.5 * cfg['mesh_spacing_um'] * 1e-6, 0.5 * cfg['mesh_spacing_um'] * 1e-6, 3)
+                })
+            elif cfg['simulator_dimension'] == '3D':
+                voxel_array_size = ( cfg['device_voxels_lateral_bordered'], cfg['device_voxels_lateral_bordered'], cfg['device_voxels_vertical'] )
+                region_coordinates.update({
+                    'y': np.linspace(-0.5 * cfg['device_size_lateral_bordered_um'], 0.5 * cfg['device_size_lateral_bordered_um'], cfg['device_voxels_lateral_bordered']),
+                    'z': np.linspace(cfg['device_vertical_minimum_um'], cfg['device_vertical_maximum_um'], cfg['device_voxels_vertical'])
+                })
+                
             self.device = Device(
-                (cfg['device_voxels_simulation_mesh_vertical'], cfg['device_voxels_simulation_mesh_lateral']),
+                voxel_array_size,       # (cfg['device_voxels_simulation_mesh_vertical'], cfg['device_voxels_simulation_mesh_lateral']),
                 (cfg['min_device_permittivity'], cfg['max_device_permittivity']),
-                (0, 0, 0),
-                randomize=True,
+                region_coordinates,
+                randomize=False,            #! 20240228 Ian - Changed this
                 init_seed=0,
-                filters=[Sigmoid(0.5, 1.0), Sigmoid(0.5, 1.0)],
+                filters=[Sigmoid(0.5, 1.0), Scale((cfg['min_device_permittivity'], cfg['max_device_permittivity']))],
             )
 
         # Setup Folder Structure
+        work_dir = self.dir / '.tmp'
+        work_dir.mkdir(exist_ok=True, mode=0o777)
         vipdopt_dir = os.path.dirname(__file__)         # Go up one folder
         
         running_on_local_machine = False
@@ -243,15 +248,18 @@ class Project:
             # might need to load the array of foms[] as well...
             # and the weights AS WELL AS the full_fom()
             # and the gradient function
+            cfg,
             start_epoch=epoch,
             start_iter=iteration,
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
-            dirs=self.subdirectories,
+            env_vars=self.base_sim._env_vars.copy()
+            dirs=self.subdirectories
         )
 
         # TODO Register any callbacks for Optimization here
         #! TODO: Is the optimization accessing plots and histories when being called?
+        self.optimization.create_history(cfg['fom_types'], cfg['max_epochs']*cfg['iter_per_epoch'], cfg['num_design_frequency_points'])
 
         self.config = cfg
 

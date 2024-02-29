@@ -27,10 +27,10 @@ FOM_ZERO = FoM.zero(BASE_FOM)
 
 @pytest.mark.smoke()
 def test_compute_fom():
-    output = BASE_FOM.compute(INPUT_ARRAY)
+    output = BASE_FOM.compute_fom(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY)
 
-    output = BASE_FOM.gradient(INPUT_ARRAY)
+    output = BASE_FOM.compute_gradient(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY)
 
 
@@ -64,10 +64,10 @@ def test_compute_fom():
         ]
 )
 def test_arithmetic(fom: FoM, exp_fom: npt.ArrayLike, exp_grad: npt.ArrayLike):
-    act_fom = fom.compute(INPUT_ARRAY)
+    act_fom = fom.compute_fom(INPUT_ARRAY)
     assert_equal(act_fom, exp_fom)
 
-    act_grad = fom.gradient(INPUT_ARRAY)
+    act_grad = fom.compute_gradient(INPUT_ARRAY)
     assert_equal(act_grad, exp_grad)
 
 
@@ -75,9 +75,9 @@ def test_arithmetic(fom: FoM, exp_fom: npt.ArrayLike, exp_grad: npt.ArrayLike):
 def test_sum():
     n = 10
     combined_fom = sum([BASE_FOM] * n, FOM_ZERO)
-    output = combined_fom.compute(INPUT_ARRAY)
+    output = combined_fom.compute_fom(INPUT_ARRAY)
     assert_equal(output, 10 * SQUARED_ARRAY)
-    output = combined_fom.gradient(INPUT_ARRAY)
+    output = combined_fom.compute_gradient(INPUT_ARRAY)
     assert_equal(output, 10 * GRADIENT_ARRAY)
 
 
@@ -91,9 +91,9 @@ def test_weights():
     assert isinstance(combined_fom, FoM)
     assert not isinstance(combined_fom, int)
 
-    output = combined_fom.compute(INPUT_ARRAY)
+    output = combined_fom.compute_fom(INPUT_ARRAY)
     assert_close(output, sum(weights) * SQUARED_ARRAY)
-    output = combined_fom.gradient(INPUT_ARRAY)
+    output = combined_fom.compute_gradient(INPUT_ARRAY)
     assert_close(output, sum(weights) * GRADIENT_ARRAY)
 
 
@@ -107,17 +107,17 @@ def test_copy():
     # Modifying the copy should not affect the original
     cpy = cpy + 1
     assert_equal(vars(BASE_FOM), org_vars)
-    assert_equal(cpy.compute(INPUT_ARRAY), SQUARED_ARRAY + 1)
+    assert_equal(cpy.compute_fom(INPUT_ARRAY), SQUARED_ARRAY + 1)
 
 
 @pytest.mark.smoke()
 def test_iadd():
     fom = copy(BASE_FOM)
     fom += 1
-    output = fom.compute(INPUT_ARRAY)
+    output = fom.compute_fom(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY + 1)
 
-    output = fom.gradient(INPUT_ARRAY)
+    output = fom.compute_gradient(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY + 1)
 
 
@@ -125,10 +125,10 @@ def test_iadd():
 def test_isub():
     fom = copy(BASE_FOM)
     fom -= 1
-    output = fom.compute(INPUT_ARRAY)
+    output = fom.compute_fom(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY - 1)
 
-    output = fom.gradient(INPUT_ARRAY)
+    output = fom.compute_gradient(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY - 1)
 
 
@@ -136,10 +136,10 @@ def test_isub():
 def test_imul():
     fom = copy(BASE_FOM)
     fom *= 2
-    output = fom.compute(INPUT_ARRAY)
+    output = fom.compute_fom(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY * 2)
 
-    output = fom.gradient(INPUT_ARRAY)
+    output = fom.compute_gradient(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY * 2)
 
 
@@ -147,10 +147,10 @@ def test_imul():
 def test_itruediv():
     fom = copy(BASE_FOM)
     fom /= 2
-    output = fom.compute(INPUT_ARRAY)
+    output = fom.compute_fom(INPUT_ARRAY)
     assert_equal(output, SQUARED_ARRAY / 2)
 
-    output = fom.gradient(INPUT_ARRAY)
+    output = fom.compute_gradient(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY / 2)
 
 

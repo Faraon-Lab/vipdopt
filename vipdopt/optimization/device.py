@@ -10,17 +10,11 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from vipdopt.optimization.filter import Filter
+from vipdopt.optimization.filter import Filter, Sigmoid, Scale
 from vipdopt.utils import PathLike, ensure_path
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
-
-def index_from_permittivity(permittivity_):
-	'''Checks all permittivity values are real and then takes square root to give index.'''
-	assert np.all(np.imag(permittivity_) == 0), 'Not expecting complex index values right now!'
-
-	return np.sqrt(permittivity_)
 
 # TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
 class Device:
@@ -45,9 +39,9 @@ class Device:
 
     def __init__(
             self,
-            size: tuple[int, int] ,
+            size: tuple[int, int, int] ,                            #! 20240227 Ian - Added second device
             permittivity_constraints: tuple[Real, Real],
-            coords: tuple[Rational, Rational, Rational],
+            coords: dict | tuple[Rational, Rational, Rational],     #! 20240227 Ian - Had to change this to a Dict(NDArray(Float)) of 'x','y','z'
             name: str='device',
             init_density: float=0.5,
             randomize: bool=False,
@@ -59,8 +53,8 @@ class Device:
         """Initialize Device object."""
         if filters is None:
             filters = []
-        if len(size) != 2:  # noqa: PLR2004
-            raise ValueError(f'Device size must be 2 dimensional; got {len(size)}')
+        if len(size) != 3:  # noqa: PLR2004                         #! 20240227 Ian - Changed this to 3-dimensions so it'll work for now
+            raise ValueError(f'Device size must be 3 dimensional; got {len(size)}')
         if any(d < 1 for d in size) or any(not isinstance(d, int) for d in size):
             raise ValueError('Expected positive, integer dimensions;'
                              f' received {size}')
@@ -79,9 +73,9 @@ class Device:
         if len(coords) != 3:  # noqa: PLR2004
             raise ValueError('Expected device coordinates to be 3 dimensional; '
                              f'got {len(coords)}')
-        if any(not isinstance(coord, Rational) for coord in coords):
-            raise ValueError('Expected device coordinates to be rational;'
-                             f' got {coords}')
+        # if any(not isinstance(coord, Rational) for coord in coords.values()):     #! 20240227 Ian - Commented this out for now
+        #     raise ValueError('Expected device coordinates to be rational;'
+        #                      f' got {coords}')
         self.coords = coords
 
         # Optional arguments
@@ -113,13 +107,15 @@ class Device:
         n_var = self.num_filters() + 1
 
         w = np.zeros((*self.size, n_var), dtype=np.complex128)
-        if self.randomize:
+        if self.randomize:                                                 #! 20240228 Ian - Fixed randomize
             rng = np.random.default_rng(self.init_seed)
             w[:] = rng.normal(self.init_density, GAUSSIAN_SCALE, size=w.shape)
 
             if self.symmetric:
                 w[..., 0] = np.tril(w[..., 0]) + np.triu(w[..., 0].T, 1)
                 w[..., 0] = np.flip(w[..., 0], axis=1)
+            
+            w[..., 0] = np.maximum(np.minimum(w[..., 0], 1), 0)
         else:
             w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w
@@ -205,22 +201,31 @@ class Device:
         return self.w[..., 0]
 
     def set_design_variable(self, value: npt.NDArray[np.complex128]):
-        """Set the first layer of the device region to specifieed values."""
+        """Set the first layer of the device region to specified values."""
         self.w[..., 0] = value.copy()
         self.update_density()
 
     def num_filters(self):
         """Return the number of filters in this device."""
         return len(self.filters)
+    
+    def update_filters(self, epoch=0):
+        sigmoid_beta = 0.0625* (2**epoch)
+        sigmoid_eta = 0.5
+        self.filters=[Sigmoid(sigmoid_eta, sigmoid_beta), Scale(self.permittivity_constraints)]
 
     def get_density(self):
         """Return the density of the device region (i.e. last layer)."""
-        return self.w[..., -1]
+        return self.w[..., -2]
 
     def get_permittivity(self) -> npt.NDArray[np.complex128]:
         """Return the permittivity of the design variable."""
-        eps_min, eps_max = self.permittivity_constraints
-        return self.get_density() * (eps_max - eps_min) + eps_min
+        
+        # # Now that there is a Scale filter, this is unnecessary.
+        # eps_min, eps_max = self.permittivity_constraints
+        # return self.get_density() * (eps_max - eps_min) + eps_min
+        
+        return self.w[...,-1]
 
     def update_density(self):
         """Pass each layer of density through the devices filters."""
@@ -228,6 +233,31 @@ class Device:
             var_in = self.w[..., i]
             var_out = self.filters[i].forward(var_in)
             self.w[..., i + 1] = var_out
+    
+
+    def index_from_permittivity(self, permittivity_):
+        '''Checks all permittivity values are real and then takes square root to give index.'''
+        assert np.all(np.imag(permittivity_) == 0), 'Not expecting complex index values right now!'
+
+        return np.sqrt(permittivity_)
+
+    def permittivity_to_density(self, eps, eps_min, eps_max):
+        return (eps - eps_min) / (eps_max - eps_min)
+
+    def density_to_permittivity(self, density, eps_min, eps_max):
+        return density*(eps_max - eps_min) + eps_min
+
+    def binarize(self, variable_in):
+        '''Assumes density - if not, convert explicitly.'''
+        return 1.0 * np.greater_equal(variable_in, 0.5)
+
+    def compute_binarization(self, input_variable, set_point=0.5 ):
+        # todo: rewrite for multiple materials
+        input_variable = np.real(input_variable)
+        total_shape = np.prod( input_variable.shape )
+        return ( 2. / total_shape ) * np.sum( np.sqrt( ( input_variable - set_point )**2 ) )
+
+
 
     def pass_through_filters(
             self,
@@ -252,16 +282,25 @@ class Device:
                 else self.filters[i].forward(y)  # type: ignore
         return y
 
-    #! TODO: UPDATE_FILTERS() METHOD
 
     def backpropagate(self, gradient):
         """Backpropagate a gradient to be applied to pre-filtered design variables."""
         grad = np.copy(gradient)
-        for i in range(self.num_filters() - 1, -1, -1):
-            filt = self.filters[i]
-            y = self.w[..., i]
-            x = self.w[..., i - 1]
+        
+        # Previous for-loop just in case
+        for f_idx in range(0, self.num_filters()):
+            get_filter = self.filters[self.num_filters() - f_idx - 1]
+            variable_out = self.w[..., self.num_filters() - f_idx]
+            variable_in = self.w[..., self.num_filters() - f_idx - 1]
 
-            grad = filt.chain_rule(grad, y, x)
+            grad = get_filter.chain_rule(gradient, variable_out, variable_in)
+        
+        #! 20240228 Ian - Fixed, previous version had something wrong
+        # for i in range(self.num_filters() - 1, -1, -1):
+        #     filt = self.filters[i]
+        #     y = self.w[..., i]
+        #     x = self.w[..., i - 1]
+
+        #     grad = filt.chain_rule(grad, y, x)
 
         return grad

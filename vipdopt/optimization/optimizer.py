@@ -18,6 +18,7 @@ class GradientOptimizer(abc.ABC):
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
 
+        
 class GradientDescentOptimizer(GradientOptimizer):
     """Optimizer for doing basic gradient descent."""
 

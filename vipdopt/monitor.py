@@ -37,14 +37,15 @@ class Monitor:
     def tshape(self) -> tuple[int, ...]:
         """Return the shape of the numpy array for this monitor's fields."""
         if self._tshape is None and self.sim.fdtd is not None:
-            self._tshape = self.sim.get_transimission_shape(self.monitor_name)
+            self._tshape = self.sim.get_transmission_shape(self.monitor_name)
         return self._tshape
 
     @property
     def fshape(self) -> tuple[int, ...]:
         """Return the shape of the numpy array for this monitor's fields."""
         if self._fshape is None and self.sim.fdtd is not None:
-            self._fshape = self.sim.get_field_shape()
+            # self._fshape = self.sim.get_field_shape()
+            self._fshape = self.e.shape                 #! 20240228 Ian - We need the design E-field shape not the design index shape
         return self._fshape
 
     @property

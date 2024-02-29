@@ -11,5 +11,5 @@ from vipdopt.utils import import_lumapi
 lumapi: ModuleType = import_lumapi(
     f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
 )
-fdtd: Any
+fdtd: Any = None
 logger: logging.Logger = logging.getLogger()
