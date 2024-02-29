@@ -400,9 +400,13 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
 
 class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, width=5, height=4, dpi=100):
+    def __init__(self, figure: Figure= None, width=5, height=4, dpi=100):
         # fig = Figure(figsize=(width, height), dpi=dpi)
-        self.fig, self.axes = plt.subplots(2, 2, figsize=(width, height), dpi=dpi)
+        if figure is not None:
+            self.fig = figure
+            self.axes = figure.axes
+        else:
+            self.fig, self.axes = plt.subplots(2, 2, figsize=(width, height), dpi=dpi)
         super().__init__(self.fig)
 
 
@@ -446,23 +450,27 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
     def _update_plots(self):
         plots_folder = self.project.subdirectories['opt_plots']
         # refractive_index_plot = plots_folder / 'index.png'
-        # efield_plot = plots_folder / 'efield.png'
-        self.horizontalLayout.removeWidget(self.plot_canvas())
-        self.plot_canvas = MplCanvas()
+        # # efield_plot = plots_folder / 'efield.png'
+        self.horizontalLayout.removeWidget(self.plot_canvas)
+        # self.plot_canvas = MplCanvas()
         for ax in self.plot_canvas.axes.flat:
             ax.clear()
         with (plots_folder / 'fom.pkl').open('rb') as f:
-            fom_plot = pickle.load(f)
-        l = fom_plot.get_lines()[0]
-        self.plot_canvas.axes[0, 0].plot(l.get_data[0], l.get_data[1])
+            fom_fig = pickle.load(f)
+        self.plot_canvas = MplCanvas(fom_fig)
+        # self.plot_canvas.axes[0, 0] = fom_plot
+        # with (plots_folder / 'fom.png').open('w') as f:
+        #     self.plot_canvas.fig.savefig(f)
 
 
-        self.plot_canvas.draw()
+        # self.plot_canvas.draw()
         self.horizontalLayout.insertWidget(0, self.plot_canvas)
     
         # transmission_plot = plots_folder / 'transmission.png'
 
     def _update_values(self):
+
+        self._update_plots()
 
         if self.running:
             self.start_stop_pushButton.setText('Stop Optimization')

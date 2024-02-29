@@ -62,6 +62,7 @@ class Optimization:
         self.iteration = start_iter
         self.max_epochs = max_epochs
         self.iter_per_epoch = iter_per_epoch
+        self.stats = {}
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
@@ -100,9 +101,9 @@ class Optimization:
         # Create Plots
         foms = np.array(self.fom_hist)
         fig, axs = plt.subplots(1, 1)
-        fom_plot = axs.plot(range(len(foms)), foms.mean(axis=tuple(range(1, foms.ndim))))
+        axs.plot(range(len(foms)), foms.mean(axis=tuple(range(1, foms.ndim))))
         with (folder / 'fom.pkl').open('wb') as f:
-            pickle.dump(fom_plot, f)
+            pickle.dump(fig, f)
         
 
     def _pre_run(self):
