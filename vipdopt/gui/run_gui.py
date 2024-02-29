@@ -414,12 +414,8 @@ class MplCanvas(FigureCanvasQTAgg):
             self.axes = figure.axes
             self.fig.set_layout_engine('constrained')
         else:
-<<<<<<< HEAD
             self.fig = Figure(figsize=(width, height), layout='constrained')
             self.axes = self.fig.axes
-=======
-            self.fig, self.axes = plt.subplots(2, 2, figsize=(width, height), dpi=dpi)
->>>>>>> 67f67d8b1699356abfde8a10d64ce88b90b3a6d1
         super().__init__(self.fig)
 
 
