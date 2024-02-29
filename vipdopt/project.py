@@ -255,10 +255,6 @@ class Project:
             dirs=self.subdirectories,
         )
 
-        # TODO Register any callbacks for Optimization here
-        #! TODO: Is the optimization accessing plots and histories when being called?
-        self.optimization.create_history(cfg['fom_types'], cfg['max_epochs']*cfg['iter_per_epoch'], cfg['num_design_frequency_points'])
-
         self.config = cfg
 
     def get(self, prop: str, default: Any=None) -> Any | None:

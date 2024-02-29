@@ -4,6 +4,7 @@
 *.json
 *.yaml
 *.yml
+!runs/
 !vipdopt/configuration/config_example.yml
 !environment.yml
 !test_project/config.json
