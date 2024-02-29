@@ -5,7 +5,6 @@ import logging
 import sys
 
 from PySide6.QtCore import Qt, QCoreApplication
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -18,10 +17,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QToolButton,
-    QVBoxLayout
 )
 
 import pickle
+from typing import Callable
 
 import vipdopt
 from vipdopt.gui.config_editor import ConfigModel
@@ -34,16 +33,20 @@ from vipdopt.project import Project
 from vipdopt.simulation import LumericalSimulation, ISimulation
 from vipdopt.utils import PathLike, read_config_file, subclasses
 
-import numpy as np
 import matplotlib as mpl
 mpl.use('agg')
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 FOM_TYPES = subclasses(FoM)
 SIM_TYPES = subclasses(ISimulation)
 OPTIMIZER_TYPES = subclasses(GradientOptimizer)
+
+PLOT_NAMES = [
+    ['fom.pkl', 'quad_trans.pkl'],
+    ['overall_trans.pkl', 'final_device_layer.pkl'],
+]
+PLOT_DIMS = (len(PLOT_NAMES), len(PLOT_NAMES[0]))
 
 class FomDialog(QDialog, Ui_FomDialog):
     """Dialog window for configuring FoMs."""
@@ -428,13 +431,17 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         self.actionOpen.triggered.connect(self.open_project)
 
-        self.plot_canvas = MplCanvas()
-        self.horizontalLayout.insertWidget(0, self.plot_canvas)
+        self.plots = [
+            [MplCanvas() for _ in range(PLOT_DIMS[1])] for _ in range(PLOT_DIMS[0])
+        ]
+        for i in range(PLOT_DIMS[0]):
+            for j in range(PLOT_DIMS[1]):
+                self.gridLayout.addWidget(self.plots[i][j], i, j)
 
         self.project = Project()
         self.running = False
 
-        # self._update_values()
+        self.start_stop_pushButton.setText('Start Optimization')
 
         self.start_stop_pushButton.clicked.connect(self.toggle_optimization)
         self.edit_pushButton.clicked.connect(self.settings_window)
@@ -458,53 +465,35 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         win.project = self.project
         try:
             win._update_values()
-        except BaseException as e:
+        except BaseException:
             pass
+        win.setWindowModality(Qt.WindowModality.ApplicationModal)
+        def wrap_func(f: Callable):
+            def override_close(*args):
+                f(*args)
+                self._update_values()
+            return override_close
+
+        win.closeEvent = wrap_func(win.closeEvent)
         win.show()
 
     def toggle_optimization(self):
         self.project.optimization.loop = not self.running
         self.running = not self.running
+        self._update_values()
     
     def _update_plots(self):
         plots_folder = self.project.subdirectories['opt_plots']
-        # refractive_index_plot = plots_folder / 'index.png'
-        # # efield_plot = plots_folder / 'efield.png'
-        # self.horizontalLayout.removeWidget(self.plot_canvas)
-        for i in range(2):
-            for j in range(2):
-                self.gridLayout.removeWidget(self.canvases[i][j])
-        # self.plot_canvas = MplCanvas()
-        # for canvas in [c for row in self.canvases for c in row]:
-        #     canvas.a
-        plot_names = [
-            ['fom.pkl', 'index.pkl'],
-            ['efield.pkl', 'transmission.pkl'],
-        ]
-        for i in range(len(plot_names)):
-            for j, name in enumerate(plot_names[i]):
+
+        for i in range(PLOT_DIMS[0]):
+            for j, name in enumerate(PLOT_NAMES[i]):
+                self.gridLayout.removeWidget(self.plots[i][j])
                 fig_path = plots_folder / name
                 if fig_path.exists():
-                    self.canvases[i][j] = MplCanvas(
+                    self.plots[i][j] = MplCanvas(
                         pickle.load(fig_path.open('rb'))
                     )
-                # else:
-                #     self.canvases[i][j] = MplCanvas()
-        # with (plots_folder / 'fom.pkl').open('rb') as f:
-        #     fom_fig = pickle.load(f)
-        # self.canvases[0][0] = MplCanvas(fom_fig)
-        for i in range(len(self.canvases)):
-            for j in range(len(self.canvases[0])):
-                self.gridLayout.addWidget(self.canvases[i][j], i, j)
-        # self.plot_canvas.axes[0, 0] = fom_plot
-        # with (plots_folder / 'fom.png').open('w') as f:
-        #     self.plot_canvas.fig.savefig(f)
-
-
-        # self.plot_canvas.draw()
-        self.horizontalLayout.insertWidget(0, self.plot_canvas)
-    
-        # transmission_plot = plots_folder / 'transmission.png'
+                self.gridLayout.addWidget(self.plots[i][j], i, j)
 
     def _update_values(self):
 
@@ -513,7 +502,7 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         if self.running:
             self.start_stop_pushButton.setText('Stop Optimization')
         else:
-            self.start_stop_pushButton.setText('Sart Optimization')
+            self.start_stop_pushButton.setText('Start Optimization')
 
 
 if __name__ == '__main__':

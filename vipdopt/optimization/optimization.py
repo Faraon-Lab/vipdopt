@@ -173,9 +173,6 @@ class Optimization:
         # Connect to Lumerical
         self.loop = True
         return
-        with ThreadPool() as pool:
-            pool.apply(LumericalSimulation.connect, (self.runner_sim,))
-            pool.map(LumericalSimulation.connect, self.sims)
 
     def _post_run(self):
         """Final post-processing after running the optimization."""
@@ -189,15 +186,6 @@ class Optimization:
     def run_simulations(self):
         """Run all of the simulations in parallel."""
 
-        # jobs = [
-        #     (i, self.dir, sim.as_dict(), sim.get_env_vars())
-        #     for i, sim in enumerate(self.sims)
-        # ]
-
-        # with Pool() as pool:
-        #     sim_files = pool.starmap(_simulation_dispatch, jobs)
-
-        # vipdopt.logger.debug('Creating new fdtd...')
         if self.nsims == 0:
             return
 

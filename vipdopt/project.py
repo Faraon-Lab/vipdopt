@@ -20,6 +20,9 @@ from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import PathLike, ensure_path, glob_first
 
 
+class ProjectLoadError(BaseException):
+    """Error to raise when failing to load a project."""
+
 def create_internal_folder_structure(root_dir: Path,debug_mode=False):
     # global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
     # global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
@@ -107,9 +110,9 @@ class Project:
         self.optimizer: GradientOptimizer = None
         self.device: Device = None
         self.base_sim: LumericalSimulation = LumericalSimulation()
-        self.src_to_sim_map = {}
-        self.foms = []
-        self.weights = []
+        self.src_to_sim_map: dict[str, LumericalSimulation] = {}
+        self.foms: list[FoM] = []
+        self.weights: list[float] = []
         self.subdirectories: dict[str, Path] = {}
 
     @classmethod
@@ -131,7 +134,11 @@ class Project:
         cfg_file = project_dir / file_name
         if not cfg_file.exists():
             # Search the directory for a configuration file
-            cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
+            try:
+                cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
+            except FileNotFoundError as e:
+                msg = f'Could not find a config file in {project_dir}'
+                raise ProjectLoadError(msg) from e
         cfg = Config.from_file(cfg_file)
         cfg_sim = Config.from_file(project_dir / 'sim.json')
         cfg.data['base_simulation'] = cfg_sim.data              #! 20240221: Hacked together to combine the two outputs of template.py
@@ -152,10 +159,10 @@ class Project:
             try:
                 optimizer_type = getattr(sys.modules['vipdopt.optimization'], optimizer)
             except AttributeError:
-                raise NotImplementedError(f'Optimizer {optimizer} not currently supported')\
-                from None
+                msg = f'Optimizer {optimizer} not currently supported'
+                raise ProjectLoadError(msg) from None
             self.optimizer = optimizer_type(**optimizer_settings)
-        except Exception as e:
+        except BaseException:
             self.optimizer = None
 
         try:
@@ -165,7 +172,7 @@ class Project:
             base_sim = LumericalSimulation(cfg.pop('base_simulation'))
             #! TODO: IT'S NOT LOADING cfg.data['base_simulation']['objects']['FDTD']['dimension'] properly!
             vipdopt.logger.info('...successfully loaded base simulation!')
-        except Exception as e:
+        except BaseException:
             base_sim = LumericalSimulation()
         
         # TODO: Are we running it locally or on SLURM or on AWS or?
@@ -225,9 +232,6 @@ class Project:
             )
 
         # Setup Folder Structure
-        work_dir = self.dir / '.tmp'
-        work_dir.mkdir(exist_ok=True, mode=0o777)
-        vipdopt_dir = os.path.dirname(__file__)         # Go up one folder
         
         running_on_local_machine = False
         slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
@@ -251,7 +255,7 @@ class Project:
             start_iter=iteration,
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
-            env_vars=self.base_sim._env_vars.copy(),
+            env_vars=copy(self.base_sim.get_env_vars()),
             dirs=self.subdirectories,
         )
 
