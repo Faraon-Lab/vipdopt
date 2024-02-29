@@ -12,11 +12,11 @@
             "name": "FDTD",
             "obj_type": "fdtd",
             "properties": {
-                "dimension": "2D",
+                "dimension": "3D",
                 "x span": 3.06e-06,
-                "y max": 3.3150000000000004e-06,
-                "y min": -2.8049999999999994e-06,
-                
+                "y span": 3.06e-06,
+                "z max": 2.8049999999999994e-06,
+                "z min": -2.2949999999999996e-06,
                 "simulation time": 6.000000000000001e-13,
                 "index": 1.5
             }
@@ -31,14 +31,14 @@
                 "polarization angle": 0,
                 "direction": "Backward",
                 "x span": 6.12e-06,
-                "injection axis": "y-axis",
-                "y": 2.89e-06,
-                
+                "injection axis": "z-axis",
+                "y span": 6.12e-06,
+                "z": 2.5499999999999997e-06,
                 "x": 0.0,
-                "wavelength start": 4.5e-07,
-                "wavelength stop": 7.5e-07,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07,
                 "waist radius w0": 1e-06,
-                "distance from waist": -8.5e-07
+                "distance from waist": -5.099999999999998e-07
             }
         },
         "forward_src_y": {
@@ -51,14 +51,14 @@
                 "polarization angle": 90,
                 "direction": "Backward",
                 "x span": 6.12e-06,
-                "injection axis": "y-axis",
-                "y": 2.89e-06,
-                
+                "injection axis": "z-axis",
+                "y span": 6.12e-06,
+                "z": 2.5499999999999997e-06,
                 "x": 0.0,
-                "wavelength start": 4.5e-07,
-                "wavelength stop": 7.5e-07,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07,
                 "waist radius w0": 1e-06,
-                "distance from waist": -8.5e-07
+                "distance from waist": -5.099999999999998e-07
             }
         },
             "adj_src_0x": {
@@ -68,12 +68,12 @@
                 
                 "properties": {
                     "x": 5.1e-07,
-                    "y": -1.5299999999999998e-06,
+                    "y": 5.1e-07,
+                    "z": -1.5299999999999998e-06,
                     "theta": 90,
                     "phi": 0,
-                    
-                    "wavelength start": 4.5e-07,
-                    "wavelength stop": 7.5e-07
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
                 }
             },
             "adj_src_0y": {
@@ -83,12 +83,12 @@
                 
                 "properties": {
                     "x": 5.1e-07,
-                    "y": -1.5299999999999998e-06,
-                    "theta": 0,
-                    "phi": 0,
-                    
-                    "wavelength start": 4.5e-07,
-                    "wavelength stop": 7.5e-07
+                    "y": 5.1e-07,
+                    "z": -1.5299999999999998e-06,
+                    "theta": 90,
+                    "phi": 90,
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
                 }
             },
             "adj_src_1x": {
@@ -98,12 +98,12 @@
                 
                 "properties": {
                     "x": -5.1e-07,
-                    "y": -1.5299999999999998e-06,
+                    "y": 5.1e-07,
+                    "z": -1.5299999999999998e-06,
                     "theta": 90,
                     "phi": 0,
-                    
-                    "wavelength start": 4.5e-07,
-                    "wavelength stop": 7.5e-07
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
                 }
             },
             "adj_src_1y": {
@@ -113,12 +113,72 @@
                 
                 "properties": {
                     "x": -5.1e-07,
-                    "y": -1.5299999999999998e-06,
-                    "theta": 0,
+                    "y": 5.1e-07,
+                    "z": -1.5299999999999998e-06,
+                    "theta": 90,
+                    "phi": 90,
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
+                }
+            },
+            "adj_src_2x": {
+                "name": "adj_src_2x",
+                "obj_type": "dipole",
+                "attached_monitor": 2,
+                
+                "properties": {
+                    "x": -5.1e-07,
+                    "y": -5.1e-07,
+                    "z": -1.5299999999999998e-06,
+                    "theta": 90,
                     "phi": 0,
-                    
-                    "wavelength start": 4.5e-07,
-                    "wavelength stop": 7.5e-07
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
+                }
+            },
+            "adj_src_2y": {
+                "name": "adj_src_2y",
+                "obj_type": "dipole",
+                "attached_monitor": 2,
+                
+                "properties": {
+                    "x": -5.1e-07,
+                    "y": -5.1e-07,
+                    "z": -1.5299999999999998e-06,
+                    "theta": 90,
+                    "phi": 90,
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
+                }
+            },
+            "adj_src_3x": {
+                "name": "adj_src_3x",
+                "obj_type": "dipole",
+                "attached_monitor": 3,
+                
+                "properties": {
+                    "x": 5.1e-07,
+                    "y": -5.1e-07,
+                    "z": -1.5299999999999998e-06,
+                    "theta": 90,
+                    "phi": 0,
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
+                }
+            },
+            "adj_src_3y": {
+                "name": "adj_src_3y",
+                "obj_type": "dipole",
+                "attached_monitor": 3,
+                
+                "properties": {
+                    "x": 5.1e-07,
+                    "y": -5.1e-07,
+                    "z": -1.5299999999999998e-06,
+                    "theta": 90,
+                    "phi": 90,
+                    "wavelength start": 3.75e-07,
+                    "wavelength stop": 7.249999999999999e-07
                 }
             },
         "focal_monitor_0": {
@@ -127,12 +187,12 @@
             "properties": {
                 "monitor type": "point",
                 "x": 5.1e-07,
-                "y": -1.5299999999999998e-06,
-                
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
-                "frequency points": 30
+                "frequency points": 60
             }
         },
         "focal_monitor_1": {
@@ -141,42 +201,104 @@
             "properties": {
                 "monitor type": "point",
                 "x": -5.1e-07,
-                "y": -1.5299999999999998e-06,
-                
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
-                "frequency points": 30
+                "frequency points": 60
+            }
+        },
+        "focal_monitor_2": {
+            "name": "focal_monitor_2",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "point",
+                "x": -5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "focal_monitor_3": {
+            "name": "focal_monitor_3",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "point",
+                "x": 5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
             }
         },
         "transmission_monitor_0": {
             "name": "transmission_monitor_0",
             "obj_type": "power",
             "properties": {
-                "monitor type": "Linear X",
-                "y": -1.5299999999999998e-06,
-                
+                "monitor type": "2D Z-normal",
+                "y": 5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
                 "x": 5.1e-07,
                 "x span": 1.02e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
-                "frequency points": 30
+                "frequency points": 60
             }
         },
         "transmission_monitor_1": {
             "name": "transmission_monitor_1",
             "obj_type": "power",
             "properties": {
-                "monitor type": "Linear X",
-                "y": -1.5299999999999998e-06,
-                
+                "monitor type": "2D Z-normal",
+                "y": 5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
                 "x": -5.1e-07,
                 "x span": 1.02e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
-                "frequency points": 30
+                "frequency points": 60
+            }
+        },
+        "transmission_monitor_2": {
+            "name": "transmission_monitor_2",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "2D Z-normal",
+                "y": -5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
+                "x": -5.1e-07,
+                "x span": 1.02e-06,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "transmission_monitor_3": {
+            "name": "transmission_monitor_3",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "2D Z-normal",
+                "y": -5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
+                "x": 5.1e-07,
+                "x span": 1.02e-06,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
             }
         },
 
@@ -184,15 +306,16 @@
             "name": "transmission_focal_monitor_",
             "obj_type": "power",
             "properties": {
-                "monitor type": "Linear X",
-                "y": -1.5299999999999998e-06,
-                
+                "monitor type": "2D Z-normal",
+                "y": 0,
+                "y span": 2.04e-06,
+                "z": -1.5299999999999998e-06,
                 "x": 0,
                 "x span": 2.04e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
-                "frequency points": 30
+                "frequency points": 60
             }
         },
         "PEC_screen": {
@@ -201,9 +324,10 @@
             "properties": {
                 "x": 0,
                 "x span": 3.5904e-06,
-                "y min": 2.193e-06,
-                "y max": 2.346e-06,
-                
+                "y": 0,
+                "y span": 3.5904e-06,
+                "z min": 2.091e-06,
+                "z max": 2.1420000000000004e-06,
                 "material": "PEC (Perfect Electrical Conductor)"
             }
         },
@@ -213,9 +337,10 @@
             "properties": {
                 "x": 0,
                 "x span": 2.04e-06,
-                "y min": 2.193e-06,
-                "y max": 2.346e-06,
-                
+                "y": 0,
+                "y span": 2.04e-06,
+                "z min": 2.091e-06,
+                "z max": 2.1420000000000004e-06,
                 "index": 1.5
             }
         },
@@ -225,9 +350,9 @@
             "dev_id": 0,                
             "properties": {
                 "x span": 2.04e-06,
-                "y min": 0.0,
-                "y max": 2.04e-06
-                
+                "y span": 2.04e-06,
+                "z min": 0.0,
+                "z max": 2.04e-06
             }
         },
         "design_mesh": {
@@ -237,12 +362,13 @@
             "properties": {
                 "x": 0,
                 "x span": 3.06e-06,
-                "y min": -5e-07,
-                "y max": 2.54e-06,
-                
-                "dx": 5.0999999999999993e-08,
-                "dy": 5.0999999999999993e-08,
-                "dz": 5.0999999999999993e-08
+                "y": 0,
+                "y span": 3.06e-06,
+                "z min": -5e-07,
+                "z max": 2.54e-06,
+                "dx": 1.7e-08,
+                "dy": 1.7e-08,
+                "dz": 1.7e-08
             }
         },
         "design_index_monitor": {
@@ -251,10 +377,10 @@
             "dev_id": 0,
             "properties": {
                 "x span": 2.04e-06,
-                "monitor type": "2D Z-Normal",
-                "y min": 0.0,
-                "y max": 2.04e-06,
-                
+                "monitor type": "3D",
+                "y span": 2.04e-06,
+                "z min": 0.0,
+                "z max": 2.04e-06,
                 "spatial interpolation": "nearest mesh cell"
             }
         },
@@ -264,13 +390,13 @@
             "dev_id": 0,
             "properties": {
                 "x span": 2.04e-06,
-                "monitor type": "2D Z-Normal",
-                "y min": 0.0,
-                "y max": 2.04e-06,
-                
+                "monitor type": "3D",
+                "y span": 2.04e-06,
+                "z min": 0.0,
+                "z max": 2.04e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
-                "frequency points": 30,
+                "frequency points": 60,
                 "output Hx": 0,
                 "output Hy": 0,
                 "output Hz": 0

@@ -176,7 +176,7 @@ class Optimization:
             pickle.dump(quad_trans_fig, f)
         with (folder / 'overall_trans.pkl').open('wb') as f:
             pickle.dump(overall_trans_fig, f)
-        with (folder / 'Enorm.pkl').open('wb') as f:
+        with (folder / 'enorm.pkl').open('wb') as f:
             pickle.dump(intensity_fig, f)
         with (folder / 'final_device_layer.pkl').open('wb') as f:
             pickle.dump(final_device_layer_fig, f)
