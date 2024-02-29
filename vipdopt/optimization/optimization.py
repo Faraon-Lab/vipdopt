@@ -239,7 +239,7 @@ class Optimization:
             
         # Use dummy simulation to run all of them at once using lumapi
         # self.runner_sim.promise_env_setup(self.sims[0]._env_vars)
-        self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
+        # self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
         for fname in self.sim_files:
             # self.runner_sim.fdtd.addjob(str(fname), 'FDTD')
             self.runner_sim.fdtd.addjob(fname.name, 'FDTD')     #! Has to just add the filename
