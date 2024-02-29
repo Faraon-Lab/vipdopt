@@ -106,7 +106,7 @@ class Project:
         self.optimization: Optimization = None
         self.optimizer: GradientOptimizer = None
         self.device: Device = None
-        self.base_sim: LumericalSimulation = None
+        self.base_sim: LumericalSimulation = LumericalSimulation()
         self.src_to_sim_map = {}
         self.foms = []
         self.weights = []
