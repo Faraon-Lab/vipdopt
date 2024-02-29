@@ -9,6 +9,7 @@
 !environment.yml
 !test_project/config.json
 !uniform_project/*.json
+!runs/test_run/*
 temp/
 tmp/
 
