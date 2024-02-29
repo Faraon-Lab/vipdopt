@@ -18,7 +18,6 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, PercentFormatter,
 							   AutoMinorLocator)
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import pandas as pd
 
 # Custom Classes and Imports
 sys.path.append(os.path.dirname(__file__))
