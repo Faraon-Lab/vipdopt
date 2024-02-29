@@ -49,8 +49,8 @@ class Optimization:
         self.optimizer = optimizer
         self.fom = fom
         self.dirs = dirs
-        # self.sim_files = [work_dir / f'{sim.info["name"]}.fsp' for sim in self.sims]
-        self.sim_files = [dirs['temp'] / f'sim_{i}.fsp' for i in range(self.nsims)]
+        self.sim_files = [dirs['temp'] / f'{sim.info["name"]}.fsp' for sim in self.sims]
+        # self.sim_files = [dirs['temp'] / f'sim_{i}.fsp' for i in range(self.nsims)]
         self.cfg = cfg                  #! 20240228 Ian - Optimization needs to call a few config variables
         self.foms = []
         self.weights = []
@@ -225,7 +225,7 @@ class Optimization:
         
         for sim_idx, sim in enumerate(self.sims):
             # self.runner_sim.fdtd.load(sim.info['name'])
-            self.runner_sim.fdtd.load(os.path.abspath(self.sim_files[sim_idx]))
+            self.runner_sim.fdtd.load(self.sim_files[sim_idx].name)
             # Switch to Layout
             self.runner_sim.fdtd.switchtolayout()
     
@@ -402,11 +402,11 @@ class Optimization:
 
                 
                 # # # TODO: Save out variables that need saving for restart and debug purposes
-                np.save(os.path.abspath(self.dir / "figure_of_merit.npy"), self.figure_of_merit_evolution)
-                np.save(os.path.abspath(self.dir / "fom_by_focal_pol_wavelength.npy"), self.fom_evolution[self.cfg['optimization_fom']])
+                np.save(os.path.abspath(self.dirs['opt_info'] / "figure_of_merit.npy"), self.figure_of_merit_evolution)
+                np.save(os.path.abspath(self.dirs['opt_info'] / "fom_by_focal_pol_wavelength.npy"), self.fom_evolution[self.cfg['optimization_fom']])
                 for fom_type in self.cfg['fom_types']:
-                    np.save(os.path.abspath(self.dir /  f"{fom_type}_by_focal_pol_wavelength.npy"), self.fom_evolution[fom_type])
-                np.save(os.path.abspath(self.dir / "binarization.npy"), self.binarization_evolution)
+                    np.save(os.path.abspath(self.dirs['opt_info'] /  f"{fom_type}_by_focal_pol_wavelength.npy"), self.fom_evolution[fom_type])
+                np.save(os.path.abspath(self.dirs['opt_info'] / "binarization.npy"), self.binarization_evolution)
 
                 # # # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
                 # plotter.plot_fom_trace(self.figure_of_merit_evolution, cfg.OPTIMIZATION_PLOTS_FOLDER, cfg.cv.epoch_list)

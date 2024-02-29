@@ -24,83 +24,83 @@ from pathlib import Path
 from vipdopt.project import Project
 
 if __name__ == '__main__':
-	parser = ArgumentParser(
-		prog='vipdopt',
-		description='Volumetric Inverse Photonic Design Optimizer',
-	)
-	parser.add_argument('-v', '--verbose', action='store_const', const=True,
-							default=False, help='Enable verbose output.')
-	parser.add_argument(
-		 '--log',
-		type=Path,
-		default=None,
-		help='Path to the log file.'
-	)
+    parser = ArgumentParser(
+        prog='vipdopt',
+        description='Volumetric Inverse Photonic Design Optimizer',
+    )
+    parser.add_argument('-v', '--verbose', action='store_const', const=True,
+                            default=False, help='Enable verbose output.')
+    parser.add_argument(
+         '--log',
+        type=Path,
+        default=None,
+        help='Path to the log file.'
+    )
 
-	subparsers = parser.add_subparsers()
-	opt_parser = subparsers.add_parser('optimize')
+    subparsers = parser.add_subparsers()
+    opt_parser = subparsers.add_parser('optimize')
 
-	opt_parser.add_argument('-v', '--verbose', action='store_const', const=True,
-							default=SUPPRESS, help='Enable verbose output.')
-	opt_parser.add_argument(
-		'directory',
-		type=Path,
-		help='Project directory to use',
-	)
-	opt_parser.add_argument(
-		 '--log',
-		type=Path,
-		default=SUPPRESS,
-		help='Path to the log file.'
-	)
-	
-	opt_parser.add_argument(
-		'config',
-		type=str,
-		help='Configuration file to use in the optimization',
-	)
+    opt_parser.add_argument('-v', '--verbose', action='store_const', const=True,
+                            default=SUPPRESS, help='Enable verbose output.')
+    opt_parser.add_argument(
+        'directory',
+        type=Path,
+        help='Project directory to use',
+    )
+    opt_parser.add_argument(
+         '--log',
+        type=Path,
+        default=SUPPRESS,
+        help='Path to the log file.'
+    )
+    
+    opt_parser.add_argument(
+        'config',
+        type=str,
+        help='Configuration file to use in the optimization',
+    )
 
-	args = parser.parse_args()
-	if args.log is None:
-		args.log = args.directory / 'dev.log'
+    args = parser.parse_args()
+    if args.log is None:
+        args.log = args.directory / 'dev.log'
 
-	# Set verbosity
-	level = logging.DEBUG if args.verbose else logging.INFO
-	vipdopt.logger = setup_logger('global_logger', level, log_file=args.log)
-	vipdopt.logger.info(f'Starting up optimization file: {os.path.basename(__file__)}')
-	vipdopt.logger.info("All modules loaded.")
-	vipdopt.logger.debug(f'Current working directory: {os.getcwd()}')
+    # Set verbosity
+    level = logging.DEBUG if args.verbose else logging.INFO
+    vipdopt.logger = setup_logger('global_logger', level, log_file=args.log)
+    vipdopt.logger.info(f'Starting up optimization file: {os.path.basename(__file__)}')
+    vipdopt.logger.info("All modules loaded.")
+    vipdopt.logger.debug(f'Current working directory: {os.getcwd()}')
 
-	#
-	#* Step 0: Set up simulation conditions and environment.
-	# i.e. current sources, boundary conditions, supporting structures, surrounding regions.
-	# Also any other necessary editing of the Lumerical environment and objects.
-	vipdopt.logger.info('Beginning Step 0: Project Setup...')
-	
-	project = Project()
-	# What does the Project class contain?
-	# 'dir': directory where it's stored; 'config': SonyBayerConfig object; 'optimization': Optimization object;
-	# 'optimizer': Adam/GDOptimizer object; 'device': Device object;
-	# 'base_sim': Simulation object; 'src_to_sim_map': dict with source names as keys, Simulation objects as values
-	# 'foms': list of FoM objects, 'weights': array of shape (#FoMs, nλ)
+    #
+    #* Step 0: Set up simulation conditions and environment.
+    # i.e. current sources, boundary conditions, supporting structures, surrounding regions.
+    # Also any other necessary editing of the Lumerical environment and objects.
+    vipdopt.logger.info('Beginning Step 0: Project Setup...')
+    
+    project = Project()
+    # What does the Project class contain?
+    # 'dir': directory where it's stored; 'config': SonyBayerConfig object; 'optimization': Optimization object;
+    # 'optimizer': Adam/GDOptimizer object; 'device': Device object;
+    # 'base_sim': Simulation object; 'src_to_sim_map': dict with source names as keys, Simulation objects as values
+    # 'foms': list of FoM objects, 'weights': array of shape (#FoMs, nλ)
 
-	# TODO: Partitioning the base_sim into simulations: i.e. a list of Simulation objects
-	# TODO: And the same with devices
-	# Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
+    # TODO: Partitioning the base_sim into simulations: i.e. a list of Simulation objects
+    # TODO: And the same with devices
+    # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
 
-	# project.base_sim = LumericalSimulation(sim.json)
-	# project.optimizer = AdamOptimizer()
-	# project.foms = some list of FoMs
-	# project.save_as('test_project')
-	project.load_project(args.directory, file_name=args.config)
-	# project.save()
+    # project.base_sim = LumericalSimulation(sim.json)
+    # project.optimizer = AdamOptimizer()
+    # project.foms = some list of FoMs
+    # project.save_as('test_project')
+    project.load_project(args.directory, file_name=args.config)
+    # project.save()
 
-	# Now that config is loaded, set up lumapi
-	vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_local'])   #todo: If Windows
+    # Now that config is loaded, set up lumapi
+    vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_local'])   #todo: If Windows
 
-	# # Debug that base_sim is correctly created...
-	# project.base_sim.connect()		
-	# project.base_sim.save( project.folders['DATA'] / project.base_sim.info['name'] )
+    # Debug that base_sim is correctly created...
+    project.base_sim.connect(license_checked=False)		
+    project.base_sim.save( project.subdirectories['temp'] / project.base_sim.info['name'] )
  
     # For each subdevice (design) region, create a field_shape variable to store the E- and H-fields for adjoint calculation.
     field_shapes = []
@@ -162,7 +162,7 @@ if __name__ == '__main__':
         if not license_checked:
             license_checked = True
         # sim.setup_env_resources()
-        sim.save( os.path.abspath( project.folders['DATA'] / sim.info['name'] ) )
+        sim.save( os.path.abspath( project.subdirectories['temp'] / sim.info['name'] ) )
         # # sim.close()
 
     vipdopt.logger.info('Completed Step 1: All Simulations Setup')
@@ -184,21 +184,21 @@ if __name__ == '__main__':
     # 			{'fwd': [0], 'adj': [2], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []}
     # 			]
 
-    foms: list[FoM] = []
-    weights = []
-    fom_dict: dict
-    for name, fom_dict in project.config.pop('figures_of_merit').items():
-        foms.append(FoM.from_dict(name, fom_dict, project.src_to_sim_map))
-        weights.append(fom_dict['weight'])
-    project.foms = foms
-    project.weights = weights
-    # todo: do we need to reassign this to a FUNCTION?
-    #! also sum isn't working
-    full_fom = sum(np.multiply(weights, foms), FoM.zero(foms[0]))
-    # This is another FoM object
-    # that basically calls all of the weights and FoMs that are assigned to it
-    # so you can just call full_fom._bayer_fom()
-    # Call it after all the data has been stored!
+    # foms: list[FoM] = []
+    # weights = []
+    # fom_dict: dict
+    # for name, fom_dict in project.config.pop('figures_of_merit').items():
+    #     foms.append(FoM.from_dict(name, fom_dict, project.src_to_sim_map))
+    #     weights.append(fom_dict['weight'])
+    # project.foms = foms
+    # project.weights = weights
+    # # todo: do we need to reassign this to a FUNCTION?
+    # #! also sum isn't working
+    # full_fom = sum(np.multiply(weights, foms), FoM.zero(foms[0]))
+    # # This is another FoM object
+    # # that basically calls all of the weights and FoMs that are assigned to it
+    # # so you can just call full_fom._bayer_fom()
+    # # Call it after all the data has been stored!
     
     #! 20240228 Ian - We need to store these functions somewhere and they take over the _math_helper() of FoM because that's not working right now
     #! They could go into project.py or optimization.py ?
@@ -294,7 +294,7 @@ if __name__ == '__main__':
     # Update optimization with fom_function
     project.optimization.foms = project.foms            # List of FoM objects
     project.optimization.weights = project.weights       # List of weights corresponding to above
-    project.optimization.fom = full_fom
+    # project.optimization.fom = full_fom
     project.optimization.fom_func = overall_figure_of_merit
     project.optimization.grad_func = overall_adjoint_gradient
     

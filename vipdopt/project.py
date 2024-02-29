@@ -28,12 +28,12 @@ def create_internal_folder_structure(root_dir: Path,debug_mode=False):
 
     #* Output / Save Paths 
     data_folder = root_dir / 'data'
-    temp_foler = root_dir / '.tmp'
+    temp_folder = root_dir / '.tmp'
     checkpoint_folder = data_folder / 'checkpoints'
     saved_scripts_folder = data_folder / 'saved_scripts'
     optimization_info_folder = data_folder / 'opt_info'
     optimization_plots_folder = optimization_info_folder / 'plots'
-    debug_completed_jobs_folder = temp_foler / 'ares_test_dev'
+    debug_completed_jobs_folder = temp_folder / 'ares_test_dev'
     pull_completed_jobs_folder = data_folder
     if debug_mode:
         pull_completed_jobs_folder = debug_completed_jobs_folder
@@ -87,7 +87,7 @@ def create_internal_folder_structure(root_dir: Path,debug_mode=False):
         'eval_config': evaluation_config_folder,
         'eval_utils': evaluation_utils_folder,
         'checkpoints': checkpoint_folder,
-        'temp': temp_foler,
+        'temp': temp_folder,
     }
     for d in directories.values():
         d.mkdir(exist_ok=True, mode=0o777, parents=True)  # Create missing directories with full perms
@@ -192,8 +192,6 @@ class Project:
             self.weights.append(fom_dict['weight'])
             self.foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))
         full_fom = sum(np.multiply(self.weights, self.foms))
-        #! 20240224 Ian - Took this part out to handle it in main.py. Could move it back later
-        #! But some restructuring should be discussed
 
         # Load device
         try:
