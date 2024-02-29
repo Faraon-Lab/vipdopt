@@ -92,8 +92,8 @@ if __name__ == '__main__':
 	# project.optimizer = AdamOptimizer()
 	# project.foms = some list of FoMs
 	# project.save_as('test_project')
-	project.load_project(args.directory, file_name='processed_config.yml')
-	project.save()
+	project.load_project(args.directory, file_name=args.config)
+	# project.save()
 
 	# Now that config is loaded, set up lumapi
 	vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_local'])   #todo: If Windows
@@ -183,17 +183,17 @@ if __name__ == '__main__':
 	# 			{'fwd': [0], 'adj': [2], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []}
 	# 			]
 
-	foms: list[FoM] = []
-	weights = []
-	fom_dict: dict
-	for name, fom_dict in project.config.pop('figures_of_merit').items():
-		foms.append(FoM.from_dict(name, fom_dict, project.src_to_sim_map))
-		weights.append(fom_dict['weight'])
-	project.foms = foms
-	project.weights = weights
-	# todo: do we need to reassign this to a FUNCTION?
-	#! also sum isn't working
-	full_fom = sum(np.multiply(weights, foms), FoM.zero(foms[0]))
+	# foms: list[FoM] = []
+	# weights = []
+	# fom_dict: dict
+	# for name, fom_dict in project.config.pop('figures_of_merit').items():
+	# 	foms.append(FoM.from_dict(name, fom_dict, project.src_to_sim_map))
+	# 	weights.append(fom_dict['weight'])
+	# project.foms = foms
+	# project.weights = weights
+	# # todo: do we need to reassign this to a FUNCTION?
+	# #! also sum isn't working
+	# full_fom = sum(np.multiply(weights, foms), FoM.zero(foms[0]))
 	# This is another FoM object
 	# that basically calls all of the weights and FoMs that are assigned to it
 	# so you can just call full_fom._bayer_fom()
@@ -208,7 +208,7 @@ if __name__ == '__main__':
 	vipdopt.logger.info('Beginning Step 3: Run Optimization')
 	
 	# Update optimization with fom_function
-	project.optimization.fom = full_fom
+	# project.optimization.fom = full_fom
 
 	# Create histories and plots
 	# todo: SAVE TO OPTIMIZATION OR TO PROJECT?

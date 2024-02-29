@@ -18,7 +18,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QToolButton,
+    QVBoxLayout
 )
+
+import pickle
 
 import vipdopt
 from vipdopt.gui.config_editor import ConfigModel
@@ -30,6 +33,11 @@ from vipdopt.optimization import FoM, BayerFilterFoM
 from vipdopt.project import Project
 from vipdopt.simulation import LumericalSimulation, ISimulation
 from vipdopt.utils import PathLike, read_config_file, subclasses
+
+import numpy as np
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 FOM_TYPES = subclasses(FoM)
 SIM_TYPES = subclasses(ISimulation)
@@ -391,6 +399,13 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         """Load settings for the optimization tab."""
 
 
+class MplCanvas(FigureCanvasQTAgg):
+    def __init__(self, width=5, height=4, dpi=100):
+        # fig = Figure(figsize=(width, height), dpi=dpi)
+        self.fig, self.axes = plt.subplots(2, 2, figsize=(width, height), dpi=dpi)
+        super().__init__(self.fig)
+
+
 class StatusDashboard(QMainWindow, Ui_DashboardWindow):
     """Wrapper class for the status window."""
     def __init__(self):
@@ -400,7 +415,15 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         self.actionOpen.triggered.connect(self.open_project)
 
+        self.plot_canvas = MplCanvas()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
+
         self.project = Project()
+        self.running = False
+
+        # self._update_values()
+
+        self.start_stop_pushButton.clicked.connect(self.toggle_optimization)
 
     def open_project(self):
         """Load optimization project into the GUI."""
@@ -415,13 +438,36 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
             vipdopt.logger.info(f'Loaded project from {proj_dir}')
             self._update_values()
             vipdopt.logger.info(f'Updated GUI with values from {proj_dir}')
+    
+    def toggle_optimization(self):
+        self.project.optimization.loop = not self.running
+        self.running = not self.running
+    
+    def _update_plots(self):
+        plots_folder = self.project.subdirectories['opt_plots']
+        # refractive_index_plot = plots_folder / 'index.png'
+        # efield_plot = plots_folder / 'efield.png'
+        self.horizontalLayout.removeWidget(self.plot_canvas())
+        self.plot_canvas = MplCanvas()
+        for ax in self.plot_canvas.axes.flat:
+            ax.clear()
+        with (plots_folder / 'fom.pkl').open('rb') as f:
+            fom_plot = pickle.load(f)
+        l = fom_plot.get_lines()[0]
+        self.plot_canvas.axes[0, 0].plot(l.get_data[0], l.get_data[1])
+
+
+        self.plot_canvas.draw()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
+    
+        # transmission_plot = plots_folder / 'transmission.png'
 
     def _update_values(self):
-        plots_folder = self.project.folders['opt_plots']
-        refractive_index_plot = plots_folder / 'index.png'
-        efield_plot = plots_folder / 'efield.png'
-        fom_plot = plots_folder / 'fom.png'
-        transmission_plot = plots_folder / 'transmission.png'
+
+        if self.running:
+            self.start_stop_pushButton.setText('Stop Optimization')
+        else:
+            self.start_stop_pushButton.setText('Sart Optimization')
 
 
 if __name__ == '__main__':
@@ -432,6 +478,6 @@ if __name__ == '__main__':
     # Create application windows
     status_window = StatusDashboard()
     status_window.show()
-    settings_window = SettingsWindow()
-    settings_window.show()
+    # settings_window = SettingsWindow()
+    # settings_window.show()
     app.exec()

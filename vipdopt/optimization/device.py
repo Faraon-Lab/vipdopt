@@ -120,8 +120,8 @@ class Device:
             if self.symmetric:
                 w[..., 0] = np.tril(w[..., 0]) + np.triu(w[..., 0].T, 1)
                 w[..., 0] = np.flip(w[..., 0], axis=1)
-
-        w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
+        else:
+            w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w
 
     def as_dict(self) -> dict:

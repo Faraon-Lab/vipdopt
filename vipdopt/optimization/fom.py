@@ -8,6 +8,7 @@ from copy import copy
 from typing import Any, no_type_check
 
 import numpy as np
+from numpy._typing import NDArray
 import numpy.typing as npt
 
 from vipdopt.monitor import Monitor
@@ -369,3 +370,34 @@ class BayerFilterFoM(FoM):
         e_adj = self.grad_monitors[1].e
         df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
         return df_dev[..., self.opt_ids]
+
+
+class UniformFoM(FoM):
+    def __init__(
+            self,
+            fom_monitors: Sequence[Monitor],
+            grad_monitors: Sequence[Monitor],
+            polarization: str,
+            freq: Sequence[Number],
+            opt_ids: Sequence[int] | None = None,
+            name: str = '',
+            constant: float=0.5,
+    ) -> None:
+        self.constant = constant
+        super().__init__(
+            fom_monitors,
+            grad_monitors,
+            self._uniform_fom,
+            self._uniform_gradient,
+            polarization,
+            freq,
+            opt_ids,
+            name,
+        )
+    
+    def _uniform_fom(self, variables: npt.NDArray):
+        return 1 - np.abs(variables - self.constant)
+    
+    def _uniform_gradient(self, variables: npt.NDArray):
+        return np.sign(variables - self.constant)
+
