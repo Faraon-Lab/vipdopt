@@ -244,15 +244,15 @@ class Project:
                     wl_idxs = range(spectral_weights_by_fom.shape[-1])
                     fom[:] = np.exp( -( wl_idxs - band_peak)**2 / ( scaling_exp * band_width )**2 )
 
-            # # Plotting code to check weighting shapes
-            # import matplotlib.pyplot as plt
-            # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
-            # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
-            # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
-            # for fom in spectral_weights_by_fom:
-            # 	plt.plot(fom)
-            # plt.show()
-            # print(3)
+            # Plotting code to check weighting shapes
+            import matplotlib.pyplot as plt
+            plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
+            plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
+            plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
+            for fom in spectral_weights_by_fom:
+            	plt.plot(fom)
+            plt.show()
+            print(3)
         
             return spectral_weights_by_fom
 
@@ -265,6 +265,9 @@ class Project:
             wl_band_bound_idxs[key] = np.searchsorted(cfg['lambda_values_um'], val)
 
         spectral_weights_by_fom = determine_spectral_weights(spectral_weights_by_fom, wl_band_bound_idxs, mode='gaussian') # args, kwargs
+        # Repeat green weighting for other FoM such that green weighting applies to FoMs 1,3
+        if self.config['simulator_dimension'] == '3D':      #! Bayer Filter Functionality
+            spectral_weights_by_fom = np.insert(spectral_weights_by_fom, 3, spectral_weights_by_fom[1,:], axis=0)
 
         self.weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
 
