@@ -4,11 +4,11 @@
 *.json
 *.yaml
 *.yml
+!runs/
 !vipdopt/configuration/config_example.yml
 !environment.yml
 !test_project/config.json
 !uniform_project/*.json
-!runs/test_run/*
 temp/
 tmp/
 

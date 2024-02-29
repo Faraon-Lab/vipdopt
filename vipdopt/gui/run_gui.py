@@ -414,8 +414,12 @@ class MplCanvas(FigureCanvasQTAgg):
             self.axes = figure.axes
             self.fig.set_layout_engine('constrained')
         else:
+<<<<<<< HEAD
             self.fig = Figure(figsize=(width, height), layout='constrained')
             self.axes = self.fig.axes
+=======
+            self.fig, self.axes = plt.subplots(2, 2, figsize=(width, height), dpi=dpi)
+>>>>>>> 67f67d8b1699356abfde8a10d64ce88b90b3a6d1
         super().__init__(self.fig)
 
 
@@ -428,10 +432,8 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         self.actionOpen.triggered.connect(self.open_project)
 
-        self.canvases = [[MplCanvas(), MplCanvas()], [MplCanvas(), MplCanvas()]]
-        for i in range(2):
-            for j in range(2):
-                self.gridLayout.addWidget(self.canvases[i][j], i, j)
+        self.plot_canvas = MplCanvas()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
 
         self.project = Project()
         self.running = False
@@ -504,6 +506,7 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
 
         # self.plot_canvas.draw()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
     
         # transmission_plot = plots_folder / 'transmission.png'
 

@@ -126,7 +126,8 @@ adjoint_y_positions_um: {{ [
     -data.device_size_lateral_um / 4,
 ] | list }}
 
-#* Optimzation Properties
+#* Optimization Properties
+total_iters: {{data.max_epochs * data.iter_per_epoch}}
 epoch_range_design_change_max: {{ data.epoch_start_design_change_max - data.epoch_end_design_change_max }}
 epoch_range_design_change_min: {{ data.epoch_start_design_change_min - data.epoch_end_design_change_min }}
 spectral_focal_plane_map: {{ [

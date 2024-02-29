@@ -62,6 +62,30 @@ class Ui_MainWindow(object):
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.gridLayout = QGridLayout()
         self.gridLayout.setObjectName(u"gridLayout")
+        self.plot_0_0_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_0_0_label.setObjectName(u"plot_0_0_label")
+        self.plot_0_0_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_0_0_label, 0, 0, 1, 1)
+
+        self.plot_0_1_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_0_1_label.setObjectName(u"plot_0_1_label")
+        self.plot_0_1_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_0_1_label, 1, 0, 1, 1)
+
+        self.plot_1_1_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_1_1_label.setObjectName(u"plot_1_1_label")
+        self.plot_1_1_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_1_1_label, 1, 1, 1, 1)
+
+        self.plot_1_0_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_1_0_label.setObjectName(u"plot_1_0_label")
+        self.plot_1_0_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_1_0_label, 0, 1, 1, 1)
+
 
         self.horizontalLayout.addLayout(self.gridLayout)
 
@@ -237,6 +261,10 @@ class Ui_MainWindow(object):
         self.actionDelete.setText(QCoreApplication.translate("MainWindow", u"Delete", None))
         self.actionVipdopt_Help.setText(QCoreApplication.translate("MainWindow", u"Vipdopt Help", None))
         self.actionAbout_Vipdopt.setText(QCoreApplication.translate("MainWindow", u"About Vipdopt", None))
+        self.plot_0_0_label.setText("")
+        self.plot_0_1_label.setText("")
+        self.plot_1_1_label.setText("")
+        self.plot_1_0_label.setText("")
         self.label_10.setText(QCoreApplication.translate("MainWindow", u"Current Epoch", None))
         self.epoch_label.setText(QCoreApplication.translate("MainWindow", u"value...", None))
         self.label_12.setText(QCoreApplication.translate("MainWindow", u"Current Iteration:", None))
