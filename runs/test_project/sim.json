@@ -1,0 +1,479 @@
+{
+    "objects": {
+        "FDTD": {
+            "name": "FDTD",
+            "obj_type": "fdtd",
+            "properties": {
+                "x span": 3.06e-06,
+                "y span": 3.06e-06,
+                "z max": 3.3150000000000004e-06,
+                "z min": -2.8049999999999994e-06,
+                "simulation time": 6.000000000000001e-13,
+                "index": 1.5
+            }
+        },
+        "forward_srcx": {
+            "name": "forward_src_x",
+            "obj_type": "gaussian",
+            "properties": {
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 0,
+                "direction" : "Backward",
+                "x span": 6.12e-06,
+                "y span": 6.12e-06,
+                "z": 2.89e-06,
+                "x": 0.0,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07,
+                "waist radius w0": 1e-06,
+                "distance from waist": -8.5e-07
+            }
+        },
+        "forward_srcy": {
+            "name": "forward_src_y",
+            "obj_type": "gaussian",
+            "properties": {
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 90,
+                "direction" : "Backward",
+                "x span": 6.12e-06,
+                "y span": 6.12e-06,
+                "z": 2.89e-06,
+                "x": 0.0,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07,
+                "waist radius w0": 1e-06,
+                "distance from waist": -8.5e-07
+            }
+        },
+        "adj_src_0x": {
+            "name": "adj_src_0x",
+            "obj_type": "dipole",
+            "properties": {
+                "x": 5.1e-07,
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 0,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "adj_src_0y": {
+            "name": "adj_src_0y",
+            "obj_type": "dipole",
+            "properties": {
+                "x": 5.1e-07,
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 90,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "adj_src_1x": {
+            "name": "adj_src_1x",
+            "obj_type": "dipole",
+            "properties": {
+                "x": -5.1e-07,
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 0,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "adj_src_1y": {
+            "name": "adj_src_1y",
+            "obj_type": "dipole",
+            "properties": {
+                "x": -5.1e-07,
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 90,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "adj_src_2x": {
+            "name": "adj_src_2x",
+            "obj_type": "dipole",
+            "properties": {
+                "x": -5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 0,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "adj_src_2y": {
+            "name": "adj_src_2y",
+            "obj_type": "dipole",
+            "properties": {
+                "x": -5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 90,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "adj_src_3x": {
+            "name": "adj_src_3x",
+            "obj_type": "dipole",
+            "properties": {
+                "x": 5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 0,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "adj_src_3y": {
+            "name": "adj_src_3y",
+            "obj_type": "dipole",
+            "properties": {
+                "x": 5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "theta": 90,
+                "phi": 90,
+                "wavelength start": 3.75e-07,
+                "wavelength stop": 7.249999999999999e-07
+            }
+        },
+        "focal_monitor_0": {
+            "name": "focal_monitor_0",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "point",
+                "x": 5.1e-07,
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "focal_monitor_1": {
+            "name": "focal_monitor_1",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "point",
+                "x": -5.1e-07,
+                "y": 5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "focal_monitor_2": {
+            "name": "focal_monitor_2",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "point",
+                "x": -5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "focal_monitor_3": {
+            "name": "focal_monitor_3",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "point",
+                "x": 5.1e-07,
+                "y": -5.1e-07,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "transmission_monitor_0": {
+            "name": "transmission_monitor_0",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "2D Z-normal",
+                "x": 5.1e-07,
+                "x span": 1.02e-06,
+                "y": 5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "transmission_monitor_1": {
+            "name": "transmission_monitor_1",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "2D Z-normal",
+                "x": -5.1e-07,
+                "x span": 1.02e-06,
+                "y": 5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "transmission_monitor_2": {
+            "name": "transmission_monitor_2",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "2D Z-normal",
+                "x": -5.1e-07,
+                "x span": 1.02e-06,
+                "y": -5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "transmission_monitor_3": {
+            "name": "transmission_monitor_3",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "2D Z-normal",
+                "x": 5.1e-07,
+                "x span": 1.02e-06,
+                "y": -5.1e-07,
+                "y span": 1.02e-06,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },
+        "transmission_focal_monitor_": {
+            "name": "transmission_focal_monitor_",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "2D Z-normal",
+                "x": 0,
+                "x span": 2.04e-06,
+                "y": 0,
+                "y span": 2.04e-06,
+                "z": -1.5299999999999998e-06,
+                "override global_monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 60
+            }
+        },"PEC_screen": {
+            "name": "PEC_screen",
+            "obj_type": "rect",
+            "properties": {
+                "x": 0,
+                "x span": 3.5904e-06,
+                "y": 0,
+                "y span": 3.5904e-06,
+                "z min": 2.091e-06,
+                "z max": 2.1420000000000004e-06,
+                "material": "PEC (Perfect Electrical Conductor)"
+            }
+        },
+        "source_aperture": {
+            "name": "source_aperture",
+            "obj_type": "rect",
+            "properties": {
+                "x": 0,
+                "x span": 2.04e-06,
+                "y": 0,
+                "y span": 2.04e-06,
+                "z min": 2.091e-06,
+                "z max": 2.1420000000000004e-06,
+                "index": 1.5
+            }
+        },
+        "sidewall_0": {
+            "name": "sidewall_0",
+            "obj_type": "rect",
+            "properties": {
+                "x": 1.0625e-06,
+                "x span": 8.500000000000001e-08,
+                "y": 0.0,
+                "y span": 2.21e-06,
+                "z min": -1.5299999999999998e-06,
+                "z max": 2.04e-06,
+                "material": "etch"
+            }
+        },
+        "sidewall_1": {
+            "name": "sidewall_1",
+            "obj_type": "rect",
+            "properties": {
+                "x": 0.0,
+                "x span": 2.21e-06,
+                "y": 1.0625e-06,
+                "y span": 8.500000000000001e-08,
+                "z min": -1.5299999999999998e-06,
+                "z max": 2.04e-06,
+                "material": "etch"
+            }
+        },
+        "sidewall_2": {
+            "name": "sidewall_2",
+            "obj_type": "rect",
+            "properties": {
+                "x": -1.0625e-06,
+                "x span": 8.500000000000001e-08,
+                "y": 0.0,
+                "y span": 2.21e-06,
+                "z min": -1.5299999999999998e-06,
+                "z max": 2.04e-06,
+                "material": "etch"
+            }
+        },
+        "sidewall_3": {
+            "name": "sidewall_3",
+            "obj_type": "rect",
+            "properties": {
+                "x": 0.0,
+                "x span": 2.21e-06,
+                "y": -1.0625e-06,
+                "y span": 8.500000000000001e-08,
+                "z min": -1.5299999999999998e-06,
+                "z max": 2.04e-06,
+                "material": "etch"
+            }
+        },
+        "mesh_sidewall_0": {
+            "name": "mesh_sidewall_0",
+            "obj_type": "mesh",
+            "properties": {
+                "set maximum mesh step": 1,
+                "override z mesh": 0,
+                "based on a structure": 1,
+                "structure": "sidewall_0",
+                "override x mesh": 0,
+                "override y mesh": 1,
+                "dy": 1.7e-08
+            }
+        },
+        "mesh_sidewall_1": {
+            "name": "mesh_sidewall_1",
+            "obj_type": "mesh",
+            "properties": {
+                "set maximum mesh step": 1,
+                "override z mesh": 0,
+                "based on a structure": 1,
+                "structure": "sidewall_1",
+                "override x mesh": 1,
+                "override y mesh": 0,
+                "dx": 1.7e-08
+            }
+        },
+        "mesh_sidewall_2": {
+            "name": "mesh_sidewall_2",
+            "obj_type": "mesh",
+            "properties": {
+                "set maximum mesh step": 1,
+                "override z mesh": 0,
+                "based on a structure": 1,
+                "structure": "sidewall_2",
+                "override x mesh": 1,
+                "override y mesh": 0,
+                "dx": 1.7e-08
+            }
+        },
+        "mesh_sidewall_3": {
+            "name": "mesh_sidewall_3",
+            "obj_type": "mesh",
+            "properties": {
+                "set maximum mesh step": 1,
+                "override z mesh": 0,
+                "based on a structure": 1,
+                "structure": "sidewall_3",
+                "override x mesh": 0,
+                "override y mesh": 1,
+                "dy": 1.7e-08
+            }
+        },
+        "design_import": {
+            "name": "design_import",
+            "obj_type": "import",
+            "properties": {
+                "dev_id": 0,
+                "x span": 2.04e-06,
+                "y span": 2.04e-06,
+                "z min": 0.0,
+                "z max": 2.04e-06
+            }
+        },
+        "design_mesh": {
+            "name": "design_mesh",
+            "obj_type": "mesh",
+            "properties": {
+                "dev_id": 0,
+                "x": 0,
+                "x span": 3.06e-06,
+                "y": 0,
+                "y span": 3.06e-06,
+                "z min": -5e-07,
+                "z max": 2.54e-06,
+                "dx": 1.7e-08,
+                "dy": 1.7e-08,
+                "dz": 1.7e-08
+            }
+        },
+        "design_index_monitor": {
+            "name": "design_index_monitor",
+            "obj_type": "index",
+            "properties": {
+                "monitor type": "3D",
+                "dev_id": 0,
+                "x span": 2.04e-06,
+                "y span": 2.04e-06,
+                "z min": 0.0,
+                "z max": 2.04e-06,
+                "spatial interpolation": "nearest mesh cell"
+            }
+        },
+        "design_efield_monitor": {
+            "name": "design_efield_monitor",
+            "obj_type": "profile",
+            "properties": {
+                "monitor type": "3D",
+                "dev_id": 0,
+                "x span": 2.04e-06,
+                "y span": 2.04e-06,
+                "z min": 0.0,
+                "z max": 2.04e-06,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "frequency points": 60,
+                "output Hx": 0,
+                "output Hy": 0,
+                "output Hz": 0
+            }
+        }
+    }
+}

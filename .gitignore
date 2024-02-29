@@ -4,13 +4,28 @@
 *.json
 *.yaml
 *.yml
-!runs/
-!vipdopt/configuration/config_example.yml
-!environment.yml
-!test_project/config.json
-!uniform_project/*.json
 temp/
 tmp/
+
+# Misc. Files
+*.pkl
+*.npy
+*.npz
+
+
+# Exceptions for this example config file
+!vipdopt/configuration/config_example.yml
+!environment.yml
+
+# Exceptions for test project directories...
+!runs/**/*.json
+!runs/**/*.yaml
+!runs/**/*.yml
+!runs/**/*.pkl
+
+# ... But do exclude these
+runs/**/*.png
+runs/**/.tmp/
 
 # Lumerical files
 *.lsf
@@ -23,11 +38,6 @@ __pycache__/
 
 # C extensions
 *.so
-
-# Misc. Files
-*.pkl
-*.npy
-*.npz
 
 # Distribution / packaging
 .Python

@@ -132,6 +132,7 @@ class Project:
         if not cfg_file.exists():
             # Search the directory for a configuration file
             cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
+        print(f'Loading from {cfg_file}')
         cfg = Config.from_file(cfg_file)
         cfg_sim = Config.from_file(project_dir / 'sim.json')
         cfg.data['base_simulation'] = cfg_sim.data              #! 20240221: Hacked together to combine the two outputs of template.py
@@ -244,15 +245,6 @@ class Project:
                     wl_idxs = range(spectral_weights_by_fom.shape[-1])
                     fom[:] = np.exp( -( wl_idxs - band_peak)**2 / ( scaling_exp * band_width )**2 )
 
-            # Plotting code to check weighting shapes
-            import matplotlib.pyplot as plt
-            plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
-            plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
-            plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
-            for fom in spectral_weights_by_fom:
-            	plt.plot(fom)
-            plt.show()
-            print(3)
         
             return spectral_weights_by_fom
 
