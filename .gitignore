@@ -10,6 +10,8 @@
 !uniform_project/*.json
 !runs/*.json
 !runs/*.yaml
+!runs/*.yml
+!runs/*.png
 temp/
 tmp/
 

@@ -16,6 +16,7 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 
 import vipdopt
+from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import FoM
 from vipdopt.optimization.optimizer import GradientOptimizer
@@ -70,6 +71,8 @@ class Optimization:
         self.iteration = start_iter
         self.max_epochs = max_epochs
         self.iter_per_epoch = iter_per_epoch
+        self.epoch_list = list(range(0,max_epochs*iter_per_epoch+1,iter_per_epoch))
+        
         self.stats = {}
 
     def add_callback(self, func: Callable):
@@ -138,12 +141,31 @@ class Optimization:
         """Generate the plots and save to file."""
         folder = self.dirs['opt_plots']
 
+        # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
+        fom_fig = plotter.plot_fom_trace(self.figure_of_merit_evolution, folder, self.epoch_list)
+        quad_trans_fig = plotter.plot_quadrant_transmission_trace(self.fom_evolution['transmission'], folder, self.epoch_list)
+        # plotter.plot_individual_quadrant_transmission(quadrant_transmission_data, lambda_values_um, OPTIMIZATION_PLOTS_FOLDER,
+        # 										epoch, iteration=30)	# continuously produces only one plot per epoch to save space
+        overall_trans_fig = plotter.plot_overall_transmission_trace(self.fom_evolution['transmission'], folder, self.epoch_list)
+        cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
+        final_device_layer_fig, _ = plotter.visualize_device(cur_index, folder, iteration=self.iteration)
+        # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
+        # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
+
         # Create Plots
-        foms = np.array(self.fom_hist)
-        fig, axs = plt.subplots(1, 1)
-        axs.plot(range(len(foms)), foms.mean(axis=tuple(range(1, foms.ndim))))
+        # foms = np.array(self.figure_of_merit_evolution)
+        # fig, axs = plt.subplots(1, 1)
+        # axs.plot(range(len(foms)), foms.mean(axis=tuple(range(1, foms.ndim))))
         with (folder / 'fom.pkl').open('wb') as f:
-            pickle.dump(fig, f)
+            pickle.dump(fom_fig, f)
+        with (folder / 'quad_trans.pkl').open('wb') as f:
+            pickle.dump(quad_trans_fig, f)
+        with (folder / 'overall_trans.pkl').open('wb') as f:
+            pickle.dump(overall_trans_fig, f)
+        with (folder / 'final_device_layer.pkl').open('wb') as f:
+            pickle.dump(final_device_layer_fig, f)
+        # todo: rest of the plots
+        # plt.close()
         
 
     def _pre_run(self):
@@ -151,9 +173,6 @@ class Optimization:
         # Connect to Lumerical
         self.loop = True
         return
-        with ThreadPool() as pool:
-            pool.apply(LumericalSimulation.connect, (self.runner_sim,))
-            pool.map(LumericalSimulation.connect, self.sims)
 
     def _post_run(self):
         """Final post-processing after running the optimization."""
@@ -167,15 +186,6 @@ class Optimization:
     def run_simulations(self):
         """Run all of the simulations in parallel."""
 
-        # jobs = [
-        #     (i, self.dir, sim.as_dict(), sim.get_env_vars())
-        #     for i, sim in enumerate(self.sims)
-        # ]
-
-        # with Pool() as pool:
-        #     sim_files = pool.starmap(_simulation_dispatch, jobs)
-
-        # vipdopt.logger.debug('Creating new fdtd...')
         if self.nsims == 0:
             return
 
@@ -204,10 +214,10 @@ class Optimization:
         # 	# Save template copy out
         # 	self.simulator.save(simulation['SIM_INFO']['path'], simulation['SIM_INFO']['name'])
 
-        # 	# Save out current design/density profile
-        # 	np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + "/cur_design.npy"), cur_density)
-        # 	if self.iteration in self.epoch_list:	# i.e. new epoch
-        # 		np.save(os.path.abspath(cfg.OPTIMIZATION_INFO_FOLDER + f"/cur_design_e{self.epoch_list.index(self.iteration)}.npy"), cur_density)
+        # Save out current design/density profile
+        np.save(os.path.abspath(self.dirs['opt_info'] / "cur_design.npy"), self.device.get_design_variable())
+        if self.iteration in self.epoch_list:	# i.e. new epoch
+            np.save(os.path.abspath(self.dirs['opt_info'] /  f"cur_design_e{self.epoch_list.index(self.iteration)}.npy"), self.device.get_design_variable())
 
         
         #
@@ -300,6 +310,13 @@ class Optimization:
                 #     f'Gradient {self.epoch}, iter {self.iteration}: {gradient}'
                 # )
                 
+                #! ESSENTIAL STEP - MUST CLEAR THE E-FIELDS OTHERWISE THEY WON'T UPDATE (see monitor.e function)
+                for f in self.foms:
+                    for m in f.fom_monitors:
+                        m._e = None
+                    for m in f.grad_monitors:
+                        m._e = None
+                
                 vipdopt.logger.info("Beginning Step 4: Computing Figure of Merit")
                 
                 tempfile_fwd_name_arr = [file.name for file in self.sim_files if any(x in file.name for x in ['forward','fwd'])]
@@ -307,6 +324,10 @@ class Optimization:
                 
                 for tempfile_fwd_name in tempfile_fwd_name_arr:
                     self.runner_sim.fdtd.load(tempfile_fwd_name)
+                    # efield_test = self.runner_sim.get_efield('design_efield_monitor')
+                    # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_fwd_name} is {efield_test[1,2,2,0,15]}')
+                
+                    # print(3)
 
                     for f_idx, f in enumerate(self.foms):
                         if f.fom_monitors[-1].sim.info['name'] in tempfile_fwd_name:      # todo: might need to account for file extensions
@@ -316,6 +337,7 @@ class Optimization:
                             
                             f.design_fwd_fields = f.grad_monitors[0].e
                             vipdopt.logger.info(f'Accessed design E-field monitor. NOTE: Field shape obtained is: {f.grad_monitors[0].fshape}')
+                            # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_fwd_name} is alternately {f.design_fwd_fields[1,2,2,0,15]}')
                             # Store FoM value and Restricted FoM value (possibly not the true FoM being used for gradient)
                             # f.compute_fom(self.simulator)
                             
@@ -330,11 +352,12 @@ class Optimization:
                             
                             # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
                             f.true_fom /= np.array(self.cfg['max_intensity_by_wavelength'])[list(f.opt_ids)]
-                            # todo: histories
-                            # # Store fom, restricted fom, true fom
-                            # self.fom_evolution['transmission'][self.iteration, f_idx, :] = np.squeeze(f.fom)
-                            # # todo: add line for restricted fom
-                            # self.fom_evolution[self.cfg['optimization_fom']][self.iteration, f_idx, :] = np.squeeze(f.true_fom)
+                            
+                            
+                            # Store fom, restricted fom, true fom
+                            self.fom_evolution['transmission'][self.iteration, f_idx, :] = np.squeeze(f.fom)
+                            # todo: add line for restricted fom
+                            self.fom_evolution[self.cfg['optimization_fom']][self.iteration, f_idx, :] = np.squeeze(f.true_fom)
     
                             # Compute adjoint amplitude or source weight (for mode overlap)
     
@@ -352,6 +375,8 @@ class Optimization:
             
                 for tempfile_adj_name in tempfile_adj_name_arr:
                     self.runner_sim.fdtd.load(tempfile_adj_name)
+                    # efield_test = self.runner_sim.get_efield('design_efield_monitor')
+                    # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_adj_name} is {efield_test[1,2,2,0,15]}')
                         
                     #* Process the various figures of merit for performance weighting.
                     # Copy everything so as not to disturb the original data
@@ -362,8 +387,9 @@ class Optimization:
                             # todo: rewrite this to hook to whichever device the FoM is tied to
                             # print(f'FoM property has length {len(f.fom)}')	
                             
-                            # f.design_adj_fields = f.grad_monitors[-1].e
+                            f.design_adj_fields = f.grad_monitors[-1].e
                             vipdopt.logger.info('Accessed design E-field monitor.')
+                            # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_adj_name} is alternately {f.design_adj_fields[1,2,2,0,15]}')
 
                             #* Compute gradient
                             # f.compute_gradient()
@@ -407,16 +433,6 @@ class Optimization:
                 for fom_type in self.cfg['fom_types']:
                     np.save(os.path.abspath(self.dirs['opt_info'] /  f"{fom_type}_by_focal_pol_wavelength.npy"), self.fom_evolution[fom_type])
                 np.save(os.path.abspath(self.dirs['opt_info'] / "binarization.npy"), self.binarization_evolution)
-
-                # # # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
-                # plotter.plot_fom_trace(self.figure_of_merit_evolution, cfg.OPTIMIZATION_PLOTS_FOLDER, cfg.cv.epoch_list)
-                # plotter.plot_quadrant_transmission_trace(self.fom_evolution['transmission'], cfg.OPTIMIZATION_PLOTS_FOLDER, cfg.cv.epoch_list)
-                # # plotter.plot_individual_quadrant_transmission(quadrant_transmission_data, lambda_values_um, OPTIMIZATION_PLOTS_FOLDER,
-                # # 										epoch, iteration=30)	# continuously produces only one plot per epoch to save space
-                # plotter.plot_overall_transmission_trace(self.fom_evolution['transmission'], cfg.OPTIMIZATION_PLOTS_FOLDER, cfg.cv.epoch_list)
-                # plotter.visualize_device(cur_index, cfg.OPTIMIZATION_PLOTS_FOLDER, iteration=self.iteration)
-                # # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
-                # # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
                 
                 self.param_hist.append(self.device.get_design_variable())
 
@@ -432,6 +448,7 @@ class Optimization:
                 list_overall_adjoint_gradient = self.grad_func(self.foms, self.weights)
                 # list_overall_adjoint_gradient = env_constr.overall_adjoint_gradient( indiv_foms, weights )	# Gives a wavelength vector
                 design_gradient = np.sum(list_overall_adjoint_gradient, -1)									# Sum over wavelength
+                vipdopt.logger.info(f'Design_gradient has average {np.mean(design_gradient)}, max {np.max(design_gradient)}')
 
                 # Permittivity factor in amplitude of electric dipole at x_0
                 # Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)
@@ -527,9 +544,10 @@ class Optimization:
                 last_design_variable = self.device.get_design_variable().copy()
                 
                 # Step with the gradient
-                # w_hat = self.device.get_design_variable() - 0.05 * design_gradient_unfiltered
-                # self.device.set_design_variable(np.maximum(np.minimum(w_hat, 1), 0))
                 # design_gradient_unfiltered *= -1             #! minimize
+                # w_hat = self.device.get_design_variable() + 0.05 * design_gradient_unfiltered
+                # w_hat = np.random.random(self.device.get_design_variable().shape)
+                # self.device.set_design_variable(np.maximum(np.minimum(w_hat, 1), 0))
                 self.optimizer.step(self.device, design_gradient_unfiltered, self.iteration)
 
 
@@ -540,6 +558,7 @@ class Optimization:
                 # todo: saving out
                 # self.optimizer.save_opt()
                 
+                self.generate_plots()
                 self.iteration += 1
                   
             

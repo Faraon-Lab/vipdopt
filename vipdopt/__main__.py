@@ -297,7 +297,10 @@ if __name__ == '__main__':
     # project.optimization.fom = full_fom
     project.optimization.fom_func = overall_figure_of_merit
     project.optimization.grad_func = overall_adjoint_gradient
-    
+    # TODO Register any callbacks for Optimization here
+    #! TODO: Is the optimization accessing plots and histories when being called?
+    project.optimization.create_history(project.config['fom_types'], project.config['total_iters'], project.config['num_design_frequency_points'])
+
     project.optimization.run()
 
     vipdopt.logger.info('Completed Step 3: Run Optimization')
