@@ -6,6 +6,8 @@ from collections.abc import Callable
 from multiprocessing import Queue, Manager
 from multiprocessing.pool import Pool, ThreadPool
 from pathlib import Path
+import signal
+import pickle
 
 import os
 import numpy as np
@@ -21,21 +23,8 @@ from vipdopt.simulation import LumericalSimulation
 from vipdopt.utils import wait_for_results
 
 
-def _simulation_dispatch(
-        idx: int,
-        work_dir: Path,
-        objects: dict,
-        env_vars: dict,
-) -> Path:
-    """Create and run a simulation and return the path of the save file."""
-    output_path = work_dir / f'sim_{idx}.fsp'
-    vipdopt.logger.debug(f'Starting simulation {idx}')
-    # with LumericalSimulation(objects) as sim:
-    #     sim.promise_env_setup(**env_vars)
-    #     sim.save_lumapi(output_path)
-    return output_path
 
-
+DEFAULT_OPT_FOLDERS = {'temp': Path('.'), 'opt_info': Path('.'), 'opt_plots': Path('.')}
 class Optimization:
     """Class for orchestrating all the pieces of an optimization."""
 
@@ -50,25 +39,23 @@ class Optimization:
             start_iter: int=0,
             max_epochs: int=1,
             iter_per_epoch: int=100,
-            work_dir: Path = Path('.'),
-            folders: dict = {},
+            dirs: dict[str, Path]=DEFAULT_OPT_FOLDERS,
             env_vars: dict = {}
     ):
         """Initialize Optimization object."""
         self.sims = list(sims)
         self.nsims = len(sims)
-        self.sim_files = [work_dir / f'{sim.info["name"]}.fsp' for sim in self.sims]
-        # self.sim_files =  [work_dir / f'sim_{i}.fsp' for i in range(self.nsims)]
         self.device = device
         self.optimizer = optimizer
         self.fom = fom
+        self.dirs = dirs
+        # self.sim_files = [work_dir / f'{sim.info["name"]}.fsp' for sim in self.sims]
+        self.sim_files = [dirs['temp'] / f'sim_{i}.fsp' for i in range(self.nsims)]
+        self.cfg = cfg                  #! 20240228 Ian - Optimization needs to call a few config variables
         self.foms = []
         self.weights = []
-        
-        self.cfg = cfg                  #! 20240228 Ian - Optimization needs to call a few config variables, so
-        self.dir = work_dir
-        self.folders = folders
         self.env_vars = env_vars
+        self.loop = True
 
         self.runner_sim = LumericalSimulation()  # Dummy sim for running in parallel
         self.runner_sim.fdtd = vipdopt.fdtd
@@ -83,6 +70,7 @@ class Optimization:
         self.iteration = start_iter
         self.max_epochs = max_epochs
         self.iter_per_epoch = iter_per_epoch
+        self.stats = {}
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
@@ -135,10 +123,34 @@ class Optimization:
                 zip(self.sims, [file.name for file in self.sim_files])
                 # zip(self.sims, self.sim_files)
             )
+    
+    def save_histories(self):
+        """Save the fom and parameter histories to file."""
+        folder = self.dirs['opt_info']
+        foms = np.array(self.fom_hist)
+        with (folder / 'fom_history.npy').open('wb') as f:
+            np.save(f, foms)
+        params = np.array(self.param_hist)
+        with (folder / 'paramater_history.npy').open('wb') as f:
+            np.save(f, params)
+    
+    def generate_plots(self):
+        """Generate the plots and save to file."""
+        folder = self.dirs['opt_plots']
+
+        # Create Plots
+        foms = np.array(self.fom_hist)
+        fig, axs = plt.subplots(1, 1)
+        axs.plot(range(len(foms)), foms.mean(axis=tuple(range(1, foms.ndim))))
+        with (folder / 'fom.pkl').open('wb') as f:
+            pickle.dump(fig, f)
+        
 
     def _pre_run(self):
         """Final pre-processing before running the optimization."""
         # Connect to Lumerical
+        self.loop = True
+        return
         with ThreadPool() as pool:
             pool.apply(LumericalSimulation.connect, (self.runner_sim,))
             pool.map(LumericalSimulation.connect, self.sims)
@@ -146,6 +158,9 @@ class Optimization:
     def _post_run(self):
         """Final post-processing after running the optimization."""
         # Disconnect from Lumerical
+        self.loop = False
+        self.save_histories()
+        self.generate_plots()
         with ThreadPool() as pool:
             pool.map(LumericalSimulation.close, self.sims)
 
@@ -161,6 +176,12 @@ class Optimization:
         #     sim_files = pool.starmap(_simulation_dispatch, jobs)
 
         # vipdopt.logger.debug('Creating new fdtd...')
+        if self.nsims == 0:
+            return
+
+        vipdopt.logger.debug(
+            f'Epoch {self.epoch}, iter {self.iteration}: Running simulations...'
+        )
 
         # self.save_sims()      #! 20240227 Ian - Seems to be overwriting with blanks.
         
@@ -245,13 +266,18 @@ class Optimization:
     def run(self):
         """Run the optimization."""
         self._pre_run()
+        vipdopt.logger.info(f'Initial Device: {self.device.get_design_variable()}')
         while self.epoch < self.max_epochs:
             while self.iteration < self.iter_per_epoch:
+                if not self.loop:
+                    break
                 for callback in self._callbacks:
                     callback(self)
 
                 vipdopt.logger.info(
                     f'=========\nEpoch {self.epoch}, iter {self.iteration}: Running simulations...'
+                vipdopt.logger.debug(
+                    f'\tDesign Variable: {self.device.get_design_variable()}'
                 )
                 
                 # Run all the simulations
@@ -361,6 +387,17 @@ class Optimization:
                 # # todo: plots and histories
                 self.figure_of_merit_evolution[self.iteration] = np.sum(list_overall_figure_of_merit, -1)			# Sum over wavelength
                 vipdopt.logger.info(f'Figure of merit is now: {self.figure_of_merit_evolution[self.iteration]}')
+                  
+#                 # Compute FoM and Gradient
+#                 fom = self.fom.compute(self.device.get_design_variable())
+#                 self.fom_hist.append(fom)
+
+#                 gradient = self.fom.gradient(self.device.get_design_variable())
+
+#                 vipdopt.logger.debug(
+#                     f'\tFoM: {fom}\n'
+#                     f'\tGradient: {gradient}'
+#                 )
 
                 
                 # # # TODO: Save out variables that need saving for restart and debug purposes
@@ -503,8 +540,10 @@ class Optimization:
                 # self.optimizer.save_opt()
                 
                 self.iteration += 1
-                # break
-            # break
+                  
+            
+            if not self.loop:
+                break
             self.iteration = 0
             self.epoch += 1
 

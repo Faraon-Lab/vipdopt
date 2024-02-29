@@ -7,9 +7,10 @@ import logging
 import os
 from collections.abc import Callable
 from importlib.abc import Loader
+import itertools
 from numbers import Number
 from pathlib import Path
-from typing import Any, Concatenate, ParamSpec, TypeVar
+from typing import Any, Concatenate, ParamSpec, TypeVar, Iterable, Iterator, Generator
 from multiprocessing.pool import AsyncResult
 import time
 import importlib
@@ -19,7 +20,6 @@ import types
 import numpy as np
 import numpy.typing as npt
 import yaml
-from mpi4py import MPI
 from overrides import override
 from yaml.constructor import SafeConstructor
 
@@ -30,6 +30,7 @@ T = TypeVar('T')
 R = TypeVar('R')
 
 P = ParamSpec('P')
+Q = ParamSpec('Q')
 
 
 class TruncateFormatter(logging.Formatter):
@@ -54,12 +55,6 @@ class TruncateFormatter(logging.Formatter):
             return f"""{msg[:self.max_length]}...\nOutput truncated.
 To see full output, run with -vv or check {self.log_file}\n"""
         return msg
-
-class PrependRankAdapter(logging.LoggerAdapter):
-    """Prepend the message with the MPI rank."""
-    @override
-    def process(self, msg, kwargs):
-        return f'Rank {MPI.COMM_WORLD.Get_rank()}: {msg}', kwargs
 
 
 def setup_logger(
@@ -98,8 +93,6 @@ def setup_logger(
     logger.addHandler(shandler)
     logger.addHandler(fhandler)
 
-    if MPI.COMM_WORLD.Get_size() > 1:
-        return PrependRankAdapter(logger)
     return logger
 
 
@@ -241,3 +234,40 @@ def wait_for_results(results: list[AsyncResult]):
         # raise exception reporting exceptions received from workers
         if all(ready) and not all(successful):
             raise Exception(f'Workers raised following exceptions {[result._value for result in results if not result.successful()]}')
+
+
+def ladd_to_all(l: Iterable[T], val: T) -> Generator[T, None, None]:
+    """Add a value to all memebers of a list on the left."""
+    for item in l:
+        yield val + item
+        
+def radd_to_all(l: Iterable[T], val: T) -> Generator[T, None, None]:
+    """Add a value to all memebers of a list on the right."""
+    for item in l:
+        yield item + val
+
+def split_glob(pattern: str) -> Generator[str, None, None]:
+    """Convert a glob pattern into multiple patterns if necessary."""
+    if '{' in pattern:
+        start = pattern.index('{')
+        end = pattern.index('}')
+
+        prefix = pattern[:start]
+        choices = pattern[start + 1:end].split(',')
+        for choice in choices:
+            for p in ladd_to_all(split_glob(pattern[end + 1:]), prefix + choice.strip()):
+                yield p
+    else:
+        yield pattern
+
+def glob_first(search_dir: PathLike, pattern: str) -> Path | None:
+    """Find the first file to match the given pattern."""
+    patterns = list(split_glob(pattern))
+    search_path = convert_path(search_dir)
+    matches = itertools.chain.from_iterable(map(search_path.glob, patterns))
+    try:
+        first_match = next(matches)
+    except StopIteration as e:
+        msg = f'No path found with pattern {pattern} in {search_path}'
+        raise FileNotFoundError(msg) from e
+    return first_match

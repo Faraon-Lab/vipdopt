@@ -281,7 +281,7 @@ class LumericalSimulation(ISimulation):
 
     def _load_dict(self, d: dict):
         self._clear_info()
-        self.info.update(d['info'])
+        self.info.update(d.get('info', {}))
         
         self._clear_objects()
         for obj in d['objects'].values():

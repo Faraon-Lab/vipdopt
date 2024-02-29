@@ -20,8 +20,8 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFormLayout, QFrame,
     QGridLayout, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QMainWindow, QMenu, QMenuBar,
     QPushButton, QSizePolicy, QSpacerItem, QStatusBar,
-    QTabWidget, QToolButton, QTreeView, QTreeWidget,
-    QTreeWidgetItem, QVBoxLayout, QWidget)
+    QTabWidget, QTreeView, QTreeWidget, QTreeWidgetItem,
+    QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -179,6 +179,26 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.fom_gridLayout = QGridLayout()
         self.fom_gridLayout.setObjectName(u"fom_gridLayout")
+        self.fom_fwd_sim_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_fwd_sim_label.setObjectName(u"fom_fwd_sim_label")
+
+        self.fom_gridLayout.addWidget(self.fom_fwd_sim_label, 0, 5, 1, 1)
+
+        self.fom_name_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_name_label.setObjectName(u"fom_name_label")
+
+        self.fom_gridLayout.addWidget(self.fom_name_label, 0, 0, 1, 1)
+
+        self.fom_fom_mon_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_fom_mon_label.setObjectName(u"fom_fom_mon_label")
+
+        self.fom_gridLayout.addWidget(self.fom_fom_mon_label, 0, 2, 1, 1)
+
+        self.fom_grad_mon_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_grad_mon_label.setObjectName(u"fom_grad_mon_label")
+
+        self.fom_gridLayout.addWidget(self.fom_grad_mon_label, 0, 3, 1, 1)
+
         self.fom_weight_label = QLabel(self.verticalLayoutWidget_2)
         self.fom_weight_label.setObjectName(u"fom_weight_label")
 
@@ -189,65 +209,10 @@ class Ui_MainWindow(object):
 
         self.fom_gridLayout.addWidget(self.fom_type_label, 0, 1, 1, 1)
 
-        self.fom_weight_lineEdit_0 = QLineEdit(self.verticalLayoutWidget_2)
-        self.fom_weight_lineEdit_0.setObjectName(u"fom_weight_lineEdit_0")
-        sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.fom_weight_lineEdit_0.sizePolicy().hasHeightForWidth())
-        self.fom_weight_lineEdit_0.setSizePolicy(sizePolicy)
+        self.fom_adj_sim_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_adj_sim_label.setObjectName(u"fom_adj_sim_label")
 
-        self.fom_gridLayout.addWidget(self.fom_weight_lineEdit_0, 1, 4, 1, 1)
-
-        self.fom_grad_mon_label = QLabel(self.verticalLayoutWidget_2)
-        self.fom_grad_mon_label.setObjectName(u"fom_grad_mon_label")
-
-        self.fom_gridLayout.addWidget(self.fom_grad_mon_label, 0, 3, 1, 1)
-
-        self.fom_fom_mon_label = QLabel(self.verticalLayoutWidget_2)
-        self.fom_fom_mon_label.setObjectName(u"fom_fom_mon_label")
-
-        self.fom_gridLayout.addWidget(self.fom_fom_mon_label, 0, 2, 1, 1)
-
-        self.fom_type_comboBox_0 = QComboBox(self.verticalLayoutWidget_2)
-        self.fom_type_comboBox_0.setObjectName(u"fom_type_comboBox_0")
-
-        self.fom_gridLayout.addWidget(self.fom_type_comboBox_0, 1, 1, 1, 1)
-
-        self.fom_name_label = QLabel(self.verticalLayoutWidget_2)
-        self.fom_name_label.setObjectName(u"fom_name_label")
-
-        self.fom_gridLayout.addWidget(self.fom_name_label, 0, 0, 1, 1)
-
-        self.fom_name_lineEdit_0 = QLineEdit(self.verticalLayoutWidget_2)
-        self.fom_name_lineEdit_0.setObjectName(u"fom_name_lineEdit_0")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.fom_name_lineEdit_0.sizePolicy().hasHeightForWidth())
-        self.fom_name_lineEdit_0.setSizePolicy(sizePolicy1)
-
-        self.fom_gridLayout.addWidget(self.fom_name_lineEdit_0, 1, 0, 1, 1)
-
-        self.fom_delrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
-        self.fom_delrow_toolButton.setObjectName(u"fom_delrow_toolButton")
-
-        self.fom_gridLayout.addWidget(self.fom_delrow_toolButton, 1, 5, 1, 1)
-
-        self.fom_addrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
-        self.fom_addrow_toolButton.setObjectName(u"fom_addrow_toolButton")
-
-        self.fom_gridLayout.addWidget(self.fom_addrow_toolButton, 2, 0, 1, 1)
-
-        self.fom_fom_pushButton_0 = QPushButton(self.verticalLayoutWidget_2)
-        self.fom_fom_pushButton_0.setObjectName(u"fom_fom_pushButton_0")
-
-        self.fom_gridLayout.addWidget(self.fom_fom_pushButton_0, 1, 2, 1, 1)
-
-        self.fom_grad_pushButton_0 = QPushButton(self.verticalLayoutWidget_2)
-        self.fom_grad_pushButton_0.setObjectName(u"fom_grad_pushButton_0")
-
-        self.fom_gridLayout.addWidget(self.fom_grad_pushButton_0, 1, 3, 1, 1)
+        self.fom_gridLayout.addWidget(self.fom_adj_sim_label, 0, 6, 1, 1)
 
 
         self.verticalLayout_2.addLayout(self.fom_gridLayout)
@@ -551,18 +516,13 @@ class Ui_MainWindow(object):
         self.sim_config_treeWidget.setSortingEnabled(__sortingEnabled)
 
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.sim_tab), QCoreApplication.translate("MainWindow", u"Simulation", None))
+        self.fom_fwd_sim_label.setText(QCoreApplication.translate("MainWindow", u"Forward Simulation", None))
+        self.fom_name_label.setText(QCoreApplication.translate("MainWindow", u"Name", None))
+        self.fom_fom_mon_label.setText(QCoreApplication.translate("MainWindow", u"Figure of Merit Monitors", None))
+        self.fom_grad_mon_label.setText(QCoreApplication.translate("MainWindow", u"Gradient Monitors", None))
         self.fom_weight_label.setText(QCoreApplication.translate("MainWindow", u"Weight", None))
         self.fom_type_label.setText(QCoreApplication.translate("MainWindow", u"Type", None))
-        self.fom_weight_lineEdit_0.setPlaceholderText(QCoreApplication.translate("MainWindow", u"1.0", None))
-        self.fom_grad_mon_label.setText(QCoreApplication.translate("MainWindow", u"Gradient Monitors", None))
-        self.fom_fom_mon_label.setText(QCoreApplication.translate("MainWindow", u"Figure of Merit Monitors", None))
-        self.fom_type_comboBox_0.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Select...", None))
-        self.fom_name_label.setText(QCoreApplication.translate("MainWindow", u"Name", None))
-        self.fom_name_lineEdit_0.setPlaceholderText(QCoreApplication.translate("MainWindow", u"FoM 0", None))
-        self.fom_delrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Remove Row", None))
-        self.fom_addrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Add Row", None))
-        self.fom_fom_pushButton_0.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
-        self.fom_grad_pushButton_0.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
+        self.fom_adj_sim_label.setText(QCoreApplication.translate("MainWindow", u"Adjoint Simulation", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.fom_tab), QCoreApplication.translate("MainWindow", u"Figure of Merit", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.device_tab), QCoreApplication.translate("MainWindow", u"Device", None))
         self.label_14.setText(QCoreApplication.translate("MainWindow", u"Optimization Settings", None))

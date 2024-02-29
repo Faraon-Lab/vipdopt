@@ -17,5 +17,17 @@ class GradientOptimizer(abc.ABC):
     @abc.abstractmethod
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
-        print(3)
 
+        
+class GradientDescentOptimizer(GradientOptimizer):
+    """Optimizer for doing basic gradient descent."""
+
+    def __init__(self, step_size=0.01, **kwargs):
+        super().__init__(step_size=step_size, **kwargs)
+    
+    def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
+        """Step with the gradient."""
+        grad = device.backpropagate(gradient)
+        w_hat = device.get_design_variable() - self.step_size * grad
+
+        device.set_design_variable(w_hat)

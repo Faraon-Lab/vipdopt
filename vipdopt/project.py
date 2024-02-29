@@ -17,56 +17,50 @@ from vipdopt.configuration import Config, SonyBayerConfig
 from vipdopt.optimization import Device, FoM, GradientOptimizer, Optimization
 from vipdopt.optimization.filter import Sigmoid, Scale
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
-from vipdopt.utils import PathLike, ensure_path
+from vipdopt.utils import PathLike, ensure_path, glob_first
 
 
-def create_internal_folder_structure(main_dir, work_dir, debug_mode=False):
+def create_internal_folder_structure(root_dir: Path,debug_mode=False):
     # global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
     # global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
     
-    directories = {'MAIN': main_dir}
+    directories: dict[str, Path] = {'main': root_dir}
 
     #* Output / Save Paths 
-    DATA_FOLDER = work_dir
-    SAVED_SCRIPTS_FOLDER = os.path.join(DATA_FOLDER, 'saved_scripts')
-    OPTIMIZATION_INFO_FOLDER = os.path.join(DATA_FOLDER, 'opt_info')
-    OPTIMIZATION_PLOTS_FOLDER = os.path.join(OPTIMIZATION_INFO_FOLDER, 'plots')
-    DEBUG_COMPLETED_JOBS_FOLDER = 'ares_test_dev'
-    PULL_COMPLETED_JOBS_FOLDER = DATA_FOLDER
+    data_folder = root_dir / 'data'
+    temp_foler = root_dir / '.tmp'
+    checkpoint_folder = data_folder / 'checkpoints'
+    saved_scripts_folder = data_folder / 'saved_scripts'
+    optimization_info_folder = data_folder / 'opt_info'
+    optimization_plots_folder = optimization_info_folder / 'plots'
+    debug_completed_jobs_folder = temp_foler / 'ares_test_dev'
+    pull_completed_jobs_folder = data_folder
     if debug_mode:
-        PULL_COMPLETED_JOBS_FOLDER = DEBUG_COMPLETED_JOBS_FOLDER
+        pull_completed_jobs_folder = debug_completed_jobs_folder
 
-    EVALUATION_FOLDER = os.path.join(main_dir, 'eval')
-    EVALUATION_CONFIG_FOLDER = os.path.join(EVALUATION_FOLDER, 'configs')
-    EVALUATION_UTILS_FOLDER = os.path.join(EVALUATION_FOLDER, 'utils')
+    evaluation_folder = root_dir / 'eval'
+    evaluation_config_folder = evaluation_folder / 'configs'
+    evaluation_utils_folder = evaluation_folder / 'utils'
 
-    # parameters['MODEL_PATH'] = os.path.join(DATA_FOLDER, 'model.pth')
-    # parameters['OPTIMIZER_PATH'] = os.path.join(DATA_FOLDER, 'optimizer.pth')
+    # parameters['MODEL_PATH'] = DATA_FOLDER / 'model.pth'
+    # parameters['OPTIMIZER_PATH'] = DATA_FOLDER / 'optimizer.pth'
 
 
     # #* Save out the various files that exist right before the optimization runs for debugging purposes.
     # # If these files have changed significantly, the optimization should be re-run to compare to anything new.
 
-    if not os.path.isdir( SAVED_SCRIPTS_FOLDER ):
-        os.mkdir( SAVED_SCRIPTS_FOLDER )
-    if not os.path.isdir( OPTIMIZATION_INFO_FOLDER ):
-        os.mkdir( OPTIMIZATION_INFO_FOLDER )
-    if not os.path.isdir( OPTIMIZATION_PLOTS_FOLDER ):
-        os.mkdir( OPTIMIZATION_PLOTS_FOLDER )
-
     try:
-        shutil.copy2( main_dir + "/slurm_vis10lyr.sh", SAVED_SCRIPTS_FOLDER + "/slurm_vis10lyr.sh" )
+        shutil.copy2( root_dir + "/slurm_vis10lyr.sh", saved_scripts_folder + "/slurm_vis10lyr.sh" )
     except Exception as ex:
         pass
     # shutil.copy2( cfg.python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
     # shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
-    # 			 os.path.join(SAVED_SCRIPTS_FOLDER, os.path.basename(yaml_filename)) )
     # shutil.copy2( python_src_directory + "/configs/SonyBayerFilterParameters.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterParameters.py" )
     # # TODO: et cetera... might have to save out various scripts from each folder
 
     #  Create convenient folder for evaluation code
-    if not os.path.isdir( EVALUATION_FOLDER ):
-        os.mkdir( EVALUATION_FOLDER )
+    # if not os.path.isdir( evaluation_folder ):
+    #     evaluation_folder.mkdir(exist_ok=True)
     
     
     # TODO: finalize this when the Project directory internal structure is finalized    
@@ -80,16 +74,23 @@ def create_internal_folder_structure(main_dir, work_dir, debug_mode=False):
     #shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
     
     
-    directories.update( {'DATA': DATA_FOLDER,
-                        'SAVED_SCRIPTS': SAVED_SCRIPTS_FOLDER,
-                        'OPT_INFO': OPTIMIZATION_INFO_FOLDER,
-                        'OPT_PLOTS': OPTIMIZATION_PLOTS_FOLDER,
-                        'PULL_COMPLETED_JOBS': PULL_COMPLETED_JOBS_FOLDER,
-                        'DEBUG_COMPLETED_JOBS': DEBUG_COMPLETED_JOBS_FOLDER,
-                        'EVALUATION': EVALUATION_FOLDER,
-                        'EVAL_CONFIG': EVALUATION_CONFIG_FOLDER,
-                        'EVAL_UTILS': EVALUATION_UTILS_FOLDER
-                    } )
+
+    directories = {
+        'root': root_dir,
+        'data': data_folder,
+        'saved_scripts': saved_scripts_folder,
+        'opt_info': optimization_info_folder,
+        'opt_plots': optimization_plots_folder,
+        'pull_completed_jobs': pull_completed_jobs_folder,
+        'debug_completed_jobs': debug_completed_jobs_folder,
+        'evaluation': evaluation_folder,
+        'eval_config': evaluation_config_folder,
+        'eval_utils': evaluation_utils_folder,
+        'checkpoints': checkpoint_folder,
+        'temp': temp_foler,
+    }
+    for d in directories.values():
+        d.mkdir(exist_ok=True, mode=0o777, parents=True)  # Create missing directories with full perms
     return directories
 
 
@@ -107,6 +108,9 @@ class Project:
         self.device: Device = None
         self.base_sim: LumericalSimulation = None
         self.src_to_sim_map = {}
+        self.foms = []
+        self.weights = []
+        self.subdirectories: dict[str, Path] = {}
 
     @classmethod
     def from_dir(
@@ -120,11 +124,15 @@ class Project:
         return proj
 
     @ensure_path
-    def load_project(self, project_dir: Path, file_name:str ='config.json'):
+    def load_project(self, project_dir: Path, file_name:str ='processed_config.yaml'):
         """Load settings from a project directory - or creates them if initializing for the first time. 
         MUST have a config file in the project directory."""
         self.dir = project_dir
-        cfg = Config.from_file(project_dir / file_name)
+        cfg_file = project_dir / file_name
+        if not cfg_file.exists():
+            # Search the directory for a configuration file
+            cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
+        cfg = Config.from_file(cfg_file)
         cfg_sim = Config.from_file(project_dir / 'sim.json')
         cfg.data['base_simulation'] = cfg_sim.data              #! 20240221: Hacked together to combine the two outputs of template.py
         self._load_config(cfg)
@@ -180,6 +188,10 @@ class Project:
 
         # Setup FoMs
         self.foms = []
+        for name, fom_dict in cfg.pop('figures_of_merit').items():
+            self.weights.append(fom_dict['weight'])
+            self.foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))
+        full_fom = sum(np.multiply(self.weights, self.foms))
         #! 20240224 Ian - Took this part out to handle it in main.py. Could move it back later
         #! But some restructuring should be discussed
 
@@ -224,14 +236,14 @@ class Project:
         if slurm_job_env_variable is None:
             running_on_local_machine = True
         
-        self.folders = create_internal_folder_structure(self.dir, work_dir, running_on_local_machine)
+        self.subdirectories = create_internal_folder_structure(self.dir, running_on_local_machine)
 
         # Setup Optimization
         self.optimization = Optimization(
             sims,
             self.device,
             self.optimizer,
-            None,				# full_fom
+            full_fom,                # full_fom
             #will be filled in once full_fom is calculated
             # might need to load the array of foms[] as well...
             # and the weights AS WELL AS the full_fom()
@@ -241,9 +253,8 @@ class Project:
             start_iter=iteration,
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
-            work_dir=work_dir,
-            folders=self.folders,
             env_vars=self.base_sim._env_vars.copy()
+            dirs=self.subdirectories
         )
 
         # TODO Register any callbacks for Optimization here
