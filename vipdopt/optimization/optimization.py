@@ -276,6 +276,7 @@ class Optimization:
 
                 vipdopt.logger.info(
                     f'=========\nEpoch {self.epoch}, iter {self.iteration}: Running simulations...'
+                )
                 vipdopt.logger.debug(
                     f'\tDesign Variable: {self.device.get_design_variable()}'
                 )

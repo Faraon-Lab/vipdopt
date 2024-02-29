@@ -253,8 +253,8 @@ class Project:
             start_iter=iteration,
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
-            env_vars=self.base_sim._env_vars.copy()
-            dirs=self.subdirectories
+            env_vars=self.base_sim._env_vars.copy(),
+            dirs=self.subdirectories,
         )
 
         # TODO Register any callbacks for Optimization here
