@@ -20,6 +20,7 @@ from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import PathLike, ensure_path, glob_first
 
 
+
 def create_internal_folder_structure(root_dir: Path,debug_mode=False):
     # global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
     # global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
@@ -397,6 +398,20 @@ class Project:
         cfg['base_simulation'] = self.base_sim.as_dict()
 
         return cfg
+    
+    def start_optimization(self):
+        """Start this project's optimization."""
+        try:
+            self.optimization.loop = True
+            self.optimization.run()
+        finally:
+            vipdopt.logger.info('Saving optimization after early stop...')
+            self.save()
+    
+    def stop_optimization(self):
+        """Stop this project's optimization."""
+        vipdopt.logger.info('stopping optimization early')
+        self.optimization.loop = False
 
 
 if __name__ == '__main__':

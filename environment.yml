@@ -6,6 +6,7 @@ dependencies:
   - python=3.11.*
   - scipy=1.11.*
   - numpy=1.25.*
+  - numpy-stl=3.3.1
   - matplotlib=3.7.*
   - scikit-image=0.20.*
   - PyYAML
@@ -15,7 +16,6 @@ dependencies:
   - Jinja2
   - pip
   - PySide6=6.6.1
-  - QtPy=2.4.1
   # For Linting
   - ruff=0.0.287
   # For static type checking

@@ -25,7 +25,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(800, 600)
+        MainWindow.resize(1068, 610)
         sizePolicy = QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -94,21 +94,6 @@ class Ui_MainWindow(object):
 
         self.formLayout.setWidget(1, QFormLayout.FieldRole, self.iter_label)
 
-        self.time_est_label = QLabel(self.centralwidget)
-        self.time_est_label.setObjectName(u"time_est_label")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.time_est_label.sizePolicy().hasHeightForWidth())
-        self.time_est_label.setSizePolicy(sizePolicy1)
-
-        self.formLayout.setWidget(2, QFormLayout.FieldRole, self.time_est_label)
-
-        self.label_14 = QLabel(self.centralwidget)
-        self.label_14.setObjectName(u"label_14")
-
-        self.formLayout.setWidget(2, QFormLayout.LabelRole, self.label_14)
-
 
         self.verticalLayout_2.addLayout(self.formLayout)
 
@@ -141,25 +126,25 @@ class Ui_MainWindow(object):
         self.gridLayout_2.setObjectName(u"gridLayout_2")
         self.edit_pushButton = QPushButton(self.centralwidget)
         self.edit_pushButton.setObjectName(u"edit_pushButton")
-        sizePolicy2 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        sizePolicy2.setHorizontalStretch(0)
-        sizePolicy2.setVerticalStretch(0)
-        sizePolicy2.setHeightForWidth(self.edit_pushButton.sizePolicy().hasHeightForWidth())
-        self.edit_pushButton.setSizePolicy(sizePolicy2)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.edit_pushButton.sizePolicy().hasHeightForWidth())
+        self.edit_pushButton.setSizePolicy(sizePolicy1)
 
         self.gridLayout_2.addWidget(self.edit_pushButton, 1, 2, 1, 1)
 
         self.start_stop_pushButton = QPushButton(self.centralwidget)
         self.start_stop_pushButton.setObjectName(u"start_stop_pushButton")
-        sizePolicy2.setHeightForWidth(self.start_stop_pushButton.sizePolicy().hasHeightForWidth())
-        self.start_stop_pushButton.setSizePolicy(sizePolicy2)
+        sizePolicy1.setHeightForWidth(self.start_stop_pushButton.sizePolicy().hasHeightForWidth())
+        self.start_stop_pushButton.setSizePolicy(sizePolicy1)
 
         self.gridLayout_2.addWidget(self.start_stop_pushButton, 0, 2, 1, 1)
 
         self.save_pushButton = QPushButton(self.centralwidget)
         self.save_pushButton.setObjectName(u"save_pushButton")
-        sizePolicy2.setHeightForWidth(self.save_pushButton.sizePolicy().hasHeightForWidth())
-        self.save_pushButton.setSizePolicy(sizePolicy2)
+        sizePolicy1.setHeightForWidth(self.save_pushButton.sizePolicy().hasHeightForWidth())
+        self.save_pushButton.setSizePolicy(sizePolicy1)
 
         self.gridLayout_2.addWidget(self.save_pushButton, 2, 2, 1, 1)
 
@@ -176,7 +161,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 800, 22))
+        self.menubar.setGeometry(QRect(0, 0, 1068, 22))
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")
         self.menuEdit = QMenu(self.menubar)
@@ -260,8 +245,6 @@ class Ui_MainWindow(object):
         self.epoch_label.setText(QCoreApplication.translate("MainWindow", u"value...", None))
         self.label_12.setText(QCoreApplication.translate("MainWindow", u"Current Iteration:", None))
         self.iter_label.setText(QCoreApplication.translate("MainWindow", u"value...", None))
-        self.time_est_label.setText(QCoreApplication.translate("MainWindow", u"value...", None))
-        self.label_14.setText(QCoreApplication.translate("MainWindow", u"Estimated time Remaining:", None))
         self.label_6.setText(QCoreApplication.translate("MainWindow", u"Average Power:", None))
         self.avg_power_label.setText(QCoreApplication.translate("MainWindow", u"value...", None))
         self.label_8.setText(QCoreApplication.translate("MainWindow", u"Average E Field:", None))

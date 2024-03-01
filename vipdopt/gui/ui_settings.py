@@ -27,7 +27,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(819, 626)
+        MainWindow.resize(759, 618)
         self.actionSave = QAction(MainWindow)
         self.actionSave.setObjectName(u"actionSave")
         self.actionOpen = QAction(MainWindow)
@@ -56,30 +56,29 @@ class Ui_MainWindow(object):
         self.actionAbout_Vipdopt.setObjectName(u"actionAbout_Vipdopt")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
+        self.horizontalLayout_6 = QHBoxLayout(self.centralwidget)
+        self.horizontalLayout_6.setObjectName(u"horizontalLayout_6")
         self.tabWidget = QTabWidget(self.centralwidget)
         self.tabWidget.setObjectName(u"tabWidget")
-        self.tabWidget.setGeometry(QRect(0, 0, 821, 581))
         self.config_tab = QWidget()
         self.config_tab.setObjectName(u"config_tab")
-        self.verticalLayoutWidget = QWidget(self.config_tab)
-        self.verticalLayoutWidget.setObjectName(u"verticalLayoutWidget")
-        self.verticalLayoutWidget.setGeometry(QRect(10, 10, 801, 531))
-        self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)
+        self.horizontalLayout_8 = QHBoxLayout(self.config_tab)
+        self.horizontalLayout_8.setObjectName(u"horizontalLayout_8")
+        self.verticalLayout = QVBoxLayout()
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.label = QLabel(self.verticalLayoutWidget)
+        self.label = QLabel(self.config_tab)
         self.label.setObjectName(u"label")
 
         self.horizontalLayout.addWidget(self.label)
 
-        self.config_lineEdit = QLineEdit(self.verticalLayoutWidget)
+        self.config_lineEdit = QLineEdit(self.config_tab)
         self.config_lineEdit.setObjectName(u"config_lineEdit")
 
         self.horizontalLayout.addWidget(self.config_lineEdit)
 
-        self.config_pushButton = QPushButton(self.verticalLayoutWidget)
+        self.config_pushButton = QPushButton(self.config_tab)
         self.config_pushButton.setObjectName(u"config_pushButton")
 
         self.horizontalLayout.addWidget(self.config_pushButton)
@@ -87,7 +86,7 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addLayout(self.horizontalLayout)
 
-        self.config_treeView = QTreeView(self.verticalLayoutWidget)
+        self.config_treeView = QTreeView(self.config_tab)
         self.config_treeView.setObjectName(u"config_treeView")
         self.config_treeView.setAlternatingRowColors(True)
         self.config_treeView.header().setCascadingSectionResizes(True)
@@ -100,7 +99,7 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_3.addItem(self.horizontalSpacer_3)
 
-        self.pushButton_3 = QPushButton(self.verticalLayoutWidget)
+        self.pushButton_3 = QPushButton(self.config_tab)
         self.pushButton_3.setObjectName(u"pushButton_3")
 
         self.horizontalLayout_3.addWidget(self.pushButton_3)
@@ -108,28 +107,29 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addLayout(self.horizontalLayout_3)
 
+
+        self.horizontalLayout_8.addLayout(self.verticalLayout)
+
         self.tabWidget.addTab(self.config_tab, "")
         self.sim_tab = QWidget()
         self.sim_tab.setObjectName(u"sim_tab")
-        self.verticalLayoutWidget_3 = QWidget(self.sim_tab)
-        self.verticalLayoutWidget_3.setObjectName(u"verticalLayoutWidget_3")
-        self.verticalLayoutWidget_3.setGeometry(QRect(9, 9, 801, 531))
-        self.verticalLayout_4 = QVBoxLayout(self.verticalLayoutWidget_3)
+        self.verticalLayout_6 = QVBoxLayout(self.sim_tab)
+        self.verticalLayout_6.setObjectName(u"verticalLayout_6")
+        self.verticalLayout_4 = QVBoxLayout()
         self.verticalLayout_4.setObjectName(u"verticalLayout_4")
-        self.verticalLayout_4.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.label_3 = QLabel(self.verticalLayoutWidget_3)
+        self.label_3 = QLabel(self.sim_tab)
         self.label_3.setObjectName(u"label_3")
 
         self.horizontalLayout_2.addWidget(self.label_3)
 
-        self.sim_lineEdit = QLineEdit(self.verticalLayoutWidget_3)
+        self.sim_lineEdit = QLineEdit(self.sim_tab)
         self.sim_lineEdit.setObjectName(u"sim_lineEdit")
 
         self.horizontalLayout_2.addWidget(self.sim_lineEdit)
 
-        self.sim_pushButton = QPushButton(self.verticalLayoutWidget_3)
+        self.sim_pushButton = QPushButton(self.sim_tab)
         self.sim_pushButton.setObjectName(u"sim_pushButton")
 
         self.horizontalLayout_2.addWidget(self.sim_pushButton)
@@ -137,19 +137,21 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_4.addLayout(self.horizontalLayout_2)
 
-        self.sim_treeView = QTreeView(self.verticalLayoutWidget_3)
+        self.sim_treeView = QTreeView(self.sim_tab)
         self.sim_treeView.setObjectName(u"sim_treeView")
         self.sim_treeView.setAlternatingRowColors(True)
         self.sim_treeView.header().setCascadingSectionResizes(True)
+        self.sim_treeView.header().setMinimumSectionSize(150)
+        self.sim_treeView.header().setDefaultSectionSize(200)
 
         self.verticalLayout_4.addWidget(self.sim_treeView)
 
-        self.label_2 = QLabel(self.verticalLayoutWidget_3)
+        self.label_2 = QLabel(self.sim_tab)
         self.label_2.setObjectName(u"label_2")
 
         self.verticalLayout_4.addWidget(self.label_2)
 
-        self.sim_config_treeWidget = QTreeWidget(self.verticalLayoutWidget_3)
+        self.sim_config_treeWidget = QTreeWidget(self.sim_tab)
         __qtreewidgetitem = QTreeWidgetItem(self.sim_config_treeWidget)
         __qtreewidgetitem1 = QTreeWidgetItem(__qtreewidgetitem)
         __qtreewidgetitem1.setCheckState(0, Qt.Checked);
@@ -164,53 +166,70 @@ class Ui_MainWindow(object):
         self.sim_config_treeWidget.setAlternatingRowColors(True)
         self.sim_config_treeWidget.setUniformRowHeights(True)
         self.sim_config_treeWidget.header().setCascadingSectionResizes(True)
+        self.sim_config_treeWidget.header().setMinimumSectionSize(150)
+        self.sim_config_treeWidget.header().setDefaultSectionSize(200)
         self.sim_config_treeWidget.header().setStretchLastSection(False)
 
         self.verticalLayout_4.addWidget(self.sim_config_treeWidget)
 
+
+        self.verticalLayout_6.addLayout(self.verticalLayout_4)
+
         self.tabWidget.addTab(self.sim_tab, "")
         self.fom_tab = QWidget()
         self.fom_tab.setObjectName(u"fom_tab")
-        self.verticalLayoutWidget_2 = QWidget(self.fom_tab)
-        self.verticalLayoutWidget_2.setObjectName(u"verticalLayoutWidget_2")
-        self.verticalLayoutWidget_2.setGeometry(QRect(10, 10, 801, 531))
-        self.verticalLayout_2 = QVBoxLayout(self.verticalLayoutWidget_2)
+        self.horizontalLayout_9 = QHBoxLayout(self.fom_tab)
+        self.horizontalLayout_9.setObjectName(u"horizontalLayout_9")
+        self.verticalLayout_2 = QVBoxLayout()
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.fom_gridLayout = QGridLayout()
         self.fom_gridLayout.setObjectName(u"fom_gridLayout")
-        self.fom_fwd_sim_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_fwd_sim_label = QLabel(self.fom_tab)
         self.fom_fwd_sim_label.setObjectName(u"fom_fwd_sim_label")
+        sizePolicy = QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.fom_fwd_sim_label.sizePolicy().hasHeightForWidth())
+        self.fom_fwd_sim_label.setSizePolicy(sizePolicy)
 
         self.fom_gridLayout.addWidget(self.fom_fwd_sim_label, 0, 5, 1, 1)
 
-        self.fom_name_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_name_label = QLabel(self.fom_tab)
         self.fom_name_label.setObjectName(u"fom_name_label")
+        self.fom_name_label.setMinimumSize(QSize(75, 0))
 
         self.fom_gridLayout.addWidget(self.fom_name_label, 0, 0, 1, 1)
 
-        self.fom_fom_mon_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_fom_mon_label = QLabel(self.fom_tab)
         self.fom_fom_mon_label.setObjectName(u"fom_fom_mon_label")
+        sizePolicy.setHeightForWidth(self.fom_fom_mon_label.sizePolicy().hasHeightForWidth())
+        self.fom_fom_mon_label.setSizePolicy(sizePolicy)
 
         self.fom_gridLayout.addWidget(self.fom_fom_mon_label, 0, 2, 1, 1)
 
-        self.fom_grad_mon_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_grad_mon_label = QLabel(self.fom_tab)
         self.fom_grad_mon_label.setObjectName(u"fom_grad_mon_label")
+        sizePolicy.setHeightForWidth(self.fom_grad_mon_label.sizePolicy().hasHeightForWidth())
+        self.fom_grad_mon_label.setSizePolicy(sizePolicy)
 
         self.fom_gridLayout.addWidget(self.fom_grad_mon_label, 0, 3, 1, 1)
 
-        self.fom_weight_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_weight_label = QLabel(self.fom_tab)
         self.fom_weight_label.setObjectName(u"fom_weight_label")
+        self.fom_weight_label.setMinimumSize(QSize(75, 0))
 
         self.fom_gridLayout.addWidget(self.fom_weight_label, 0, 4, 1, 1)
 
-        self.fom_type_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_type_label = QLabel(self.fom_tab)
         self.fom_type_label.setObjectName(u"fom_type_label")
+        self.fom_type_label.setMinimumSize(QSize(100, 0))
 
         self.fom_gridLayout.addWidget(self.fom_type_label, 0, 1, 1, 1)
 
-        self.fom_adj_sim_label = QLabel(self.verticalLayoutWidget_2)
+        self.fom_adj_sim_label = QLabel(self.fom_tab)
         self.fom_adj_sim_label.setObjectName(u"fom_adj_sim_label")
+        sizePolicy.setHeightForWidth(self.fom_adj_sim_label.sizePolicy().hasHeightForWidth())
+        self.fom_adj_sim_label.setSizePolicy(sizePolicy)
 
         self.fom_gridLayout.addWidget(self.fom_adj_sim_label, 0, 6, 1, 1)
 
@@ -230,37 +249,41 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_2.addLayout(self.horizontalLayout_5)
 
+
+        self.horizontalLayout_9.addLayout(self.verticalLayout_2)
+
         self.tabWidget.addTab(self.fom_tab, "")
         self.device_tab = QWidget()
         self.device_tab.setObjectName(u"device_tab")
-        self.horizontalLayoutWidget = QWidget(self.device_tab)
-        self.horizontalLayoutWidget.setObjectName(u"horizontalLayoutWidget")
-        self.horizontalLayoutWidget.setGeometry(QRect(9, 9, 801, 531))
-        self.horizontalLayout_4 = QHBoxLayout(self.horizontalLayoutWidget)
+        self.horizontalLayout_10 = QHBoxLayout(self.device_tab)
+        self.horizontalLayout_10.setObjectName(u"horizontalLayout_10")
+        self.horizontalLayout_4 = QHBoxLayout()
         self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
-        self.horizontalLayout_4.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout_3 = QVBoxLayout()
         self.verticalLayout_3.setObjectName(u"verticalLayout_3")
-        self.device_treeView = QTreeView(self.horizontalLayoutWidget)
+        self.device_treeView = QTreeView(self.device_tab)
         self.device_treeView.setObjectName(u"device_treeView")
         self.device_treeView.setAlternatingRowColors(True)
         self.device_treeView.header().setCascadingSectionResizes(True)
+        self.device_treeView.header().setMinimumSectionSize(150)
+        self.device_treeView.header().setDefaultSectionSize(200)
 
         self.verticalLayout_3.addWidget(self.device_treeView)
 
 
         self.horizontalLayout_4.addLayout(self.verticalLayout_3)
 
+
+        self.horizontalLayout_10.addLayout(self.horizontalLayout_4)
+
         self.tabWidget.addTab(self.device_tab, "")
         self.opt_tab = QWidget()
         self.opt_tab.setObjectName(u"opt_tab")
-        self.verticalLayoutWidget_4 = QWidget(self.opt_tab)
-        self.verticalLayoutWidget_4.setObjectName(u"verticalLayoutWidget_4")
-        self.verticalLayoutWidget_4.setGeometry(QRect(9, 9, 801, 531))
-        self.verticalLayout_5 = QVBoxLayout(self.verticalLayoutWidget_4)
+        self.horizontalLayout_11 = QHBoxLayout(self.opt_tab)
+        self.horizontalLayout_11.setObjectName(u"horizontalLayout_11")
+        self.verticalLayout_5 = QVBoxLayout()
         self.verticalLayout_5.setObjectName(u"verticalLayout_5")
-        self.verticalLayout_5.setContentsMargins(0, 0, 0, 0)
-        self.label_14 = QLabel(self.verticalLayoutWidget_4)
+        self.label_14 = QLabel(self.opt_tab)
         self.label_14.setObjectName(u"label_14")
         font = QFont()
         font.setPointSize(20)
@@ -271,60 +294,76 @@ class Ui_MainWindow(object):
 
         self.formLayout = QFormLayout()
         self.formLayout.setObjectName(u"formLayout")
-        self.label_4 = QLabel(self.verticalLayoutWidget_4)
+        self.formLayout.setLabelAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.formLayout.setFormAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.label_4 = QLabel(self.opt_tab)
         self.label_4.setObjectName(u"label_4")
 
         self.formLayout.setWidget(1, QFormLayout.LabelRole, self.label_4)
 
-        self.opt_iter_lineEdit = QLineEdit(self.verticalLayoutWidget_4)
+        self.opt_iter_lineEdit = QLineEdit(self.opt_tab)
         self.opt_iter_lineEdit.setObjectName(u"opt_iter_lineEdit")
+        sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.opt_iter_lineEdit.sizePolicy().hasHeightForWidth())
+        self.opt_iter_lineEdit.setSizePolicy(sizePolicy1)
+        self.opt_iter_lineEdit.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignVCenter)
 
         self.formLayout.setWidget(1, QFormLayout.FieldRole, self.opt_iter_lineEdit)
 
-        self.label_6 = QLabel(self.verticalLayoutWidget_4)
+        self.label_6 = QLabel(self.opt_tab)
         self.label_6.setObjectName(u"label_6")
 
         self.formLayout.setWidget(2, QFormLayout.LabelRole, self.label_6)
 
-        self.opt_iter_per_epoch_lineEdit = QLineEdit(self.verticalLayoutWidget_4)
+        self.opt_iter_per_epoch_lineEdit = QLineEdit(self.opt_tab)
         self.opt_iter_per_epoch_lineEdit.setObjectName(u"opt_iter_per_epoch_lineEdit")
+        sizePolicy1.setHeightForWidth(self.opt_iter_per_epoch_lineEdit.sizePolicy().hasHeightForWidth())
+        self.opt_iter_per_epoch_lineEdit.setSizePolicy(sizePolicy1)
 
         self.formLayout.setWidget(2, QFormLayout.FieldRole, self.opt_iter_per_epoch_lineEdit)
 
-        self.label_5 = QLabel(self.verticalLayoutWidget_4)
+        self.label_5 = QLabel(self.opt_tab)
         self.label_5.setObjectName(u"label_5")
 
         self.formLayout.setWidget(3, QFormLayout.LabelRole, self.label_5)
 
-        self.opt_max_epoch_lineEdit = QLineEdit(self.verticalLayoutWidget_4)
+        self.opt_max_epoch_lineEdit = QLineEdit(self.opt_tab)
         self.opt_max_epoch_lineEdit.setObjectName(u"opt_max_epoch_lineEdit")
+        sizePolicy1.setHeightForWidth(self.opt_max_epoch_lineEdit.sizePolicy().hasHeightForWidth())
+        self.opt_max_epoch_lineEdit.setSizePolicy(sizePolicy1)
 
         self.formLayout.setWidget(3, QFormLayout.FieldRole, self.opt_max_epoch_lineEdit)
 
-        self.label_7 = QLabel(self.verticalLayoutWidget_4)
+        self.label_7 = QLabel(self.opt_tab)
         self.label_7.setObjectName(u"label_7")
 
         self.formLayout.setWidget(4, QFormLayout.LabelRole, self.label_7)
 
-        self.opt_binarfreq_lineEdit = QLineEdit(self.verticalLayoutWidget_4)
+        self.opt_binarfreq_lineEdit = QLineEdit(self.opt_tab)
         self.opt_binarfreq_lineEdit.setObjectName(u"opt_binarfreq_lineEdit")
+        sizePolicy1.setHeightForWidth(self.opt_binarfreq_lineEdit.sizePolicy().hasHeightForWidth())
+        self.opt_binarfreq_lineEdit.setSizePolicy(sizePolicy1)
 
         self.formLayout.setWidget(4, QFormLayout.FieldRole, self.opt_binarfreq_lineEdit)
 
-        self.label_11 = QLabel(self.verticalLayoutWidget_4)
+        self.label_11 = QLabel(self.opt_tab)
         self.label_11.setObjectName(u"label_11")
 
         self.formLayout.setWidget(5, QFormLayout.LabelRole, self.label_11)
 
-        self.opt_step_size_lineEdit = QLineEdit(self.verticalLayoutWidget_4)
+        self.opt_step_size_lineEdit = QLineEdit(self.opt_tab)
         self.opt_step_size_lineEdit.setObjectName(u"opt_step_size_lineEdit")
+        sizePolicy1.setHeightForWidth(self.opt_step_size_lineEdit.sizePolicy().hasHeightForWidth())
+        self.opt_step_size_lineEdit.setSizePolicy(sizePolicy1)
 
         self.formLayout.setWidget(5, QFormLayout.FieldRole, self.opt_step_size_lineEdit)
 
 
         self.verticalLayout_5.addLayout(self.formLayout)
 
-        self.line = QFrame(self.verticalLayoutWidget_4)
+        self.line = QFrame(self.opt_tab)
         self.line.setObjectName(u"line")
         self.line.setLineWidth(6)
         self.line.setFrameShape(QFrame.HLine)
@@ -332,7 +371,11 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_5.addWidget(self.line)
 
-        self.label_8 = QLabel(self.verticalLayoutWidget_4)
+        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+
+        self.verticalLayout_5.addItem(self.verticalSpacer_2)
+
+        self.label_8 = QLabel(self.opt_tab)
         self.label_8.setObjectName(u"label_8")
         self.label_8.setFont(font)
         self.label_8.setAlignment(Qt.AlignCenter)
@@ -341,12 +384,12 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_7 = QHBoxLayout()
         self.horizontalLayout_7.setObjectName(u"horizontalLayout_7")
-        self.label_9 = QLabel(self.verticalLayoutWidget_4)
+        self.label_9 = QLabel(self.opt_tab)
         self.label_9.setObjectName(u"label_9")
 
         self.horizontalLayout_7.addWidget(self.label_9)
 
-        self.opt_comboBox = QComboBox(self.verticalLayoutWidget_4)
+        self.opt_comboBox = QComboBox(self.opt_tab)
         self.opt_comboBox.addItem("")
         self.opt_comboBox.setObjectName(u"opt_comboBox")
 
@@ -361,48 +404,72 @@ class Ui_MainWindow(object):
 
         self.opt_optimizer_gridLayout = QGridLayout()
         self.opt_optimizer_gridLayout.setObjectName(u"opt_optimizer_gridLayout")
-        self.lineEdit_10 = QLineEdit(self.verticalLayoutWidget_4)
-        self.lineEdit_10.setObjectName(u"lineEdit_10")
-
-        self.opt_optimizer_gridLayout.addWidget(self.lineEdit_10, 1, 2, 1, 1)
-
-        self.label_10 = QLabel(self.verticalLayoutWidget_4)
-        self.label_10.setObjectName(u"label_10")
-
-        self.opt_optimizer_gridLayout.addWidget(self.label_10, 0, 1, 1, 1)
-
-        self.lineEdit_7 = QLineEdit(self.verticalLayoutWidget_4)
-        self.lineEdit_7.setObjectName(u"lineEdit_7")
-
-        self.opt_optimizer_gridLayout.addWidget(self.lineEdit_7, 0, 2, 1, 1)
-
-        self.lineEdit_9 = QLineEdit(self.verticalLayoutWidget_4)
+        self.lineEdit_9 = QLineEdit(self.opt_tab)
         self.lineEdit_9.setObjectName(u"lineEdit_9")
+        sizePolicy1.setHeightForWidth(self.lineEdit_9.sizePolicy().hasHeightForWidth())
+        self.lineEdit_9.setSizePolicy(sizePolicy1)
 
         self.opt_optimizer_gridLayout.addWidget(self.lineEdit_9, 3, 2, 1, 1)
 
-        self.label_12 = QLabel(self.verticalLayoutWidget_4)
+        self.label_13 = QLabel(self.opt_tab)
+        self.label_13.setObjectName(u"label_13")
+        self.label_13.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+
+        self.opt_optimizer_gridLayout.addWidget(self.label_13, 1, 1, 1, 1)
+
+        self.label_12 = QLabel(self.opt_tab)
         self.label_12.setObjectName(u"label_12")
+        sizePolicy2 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        sizePolicy2.setHorizontalStretch(0)
+        sizePolicy2.setVerticalStretch(0)
+        sizePolicy2.setHeightForWidth(self.label_12.sizePolicy().hasHeightForWidth())
+        self.label_12.setSizePolicy(sizePolicy2)
+        self.label_12.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
 
         self.opt_optimizer_gridLayout.addWidget(self.label_12, 3, 1, 1, 1)
 
-        self.label_13 = QLabel(self.verticalLayoutWidget_4)
-        self.label_13.setObjectName(u"label_13")
+        self.lineEdit_7 = QLineEdit(self.opt_tab)
+        self.lineEdit_7.setObjectName(u"lineEdit_7")
+        sizePolicy1.setHeightForWidth(self.lineEdit_7.sizePolicy().hasHeightForWidth())
+        self.lineEdit_7.setSizePolicy(sizePolicy1)
 
-        self.opt_optimizer_gridLayout.addWidget(self.label_13, 1, 1, 1, 1)
+        self.opt_optimizer_gridLayout.addWidget(self.lineEdit_7, 0, 2, 1, 1)
 
         self.horizontalSpacer = QSpacerItem(150, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
 
         self.opt_optimizer_gridLayout.addItem(self.horizontalSpacer, 0, 0, 1, 1)
 
+        self.lineEdit_10 = QLineEdit(self.opt_tab)
+        self.lineEdit_10.setObjectName(u"lineEdit_10")
+        sizePolicy1.setHeightForWidth(self.lineEdit_10.sizePolicy().hasHeightForWidth())
+        self.lineEdit_10.setSizePolicy(sizePolicy1)
+
+        self.opt_optimizer_gridLayout.addWidget(self.lineEdit_10, 1, 2, 1, 1)
+
+        self.label_10 = QLabel(self.opt_tab)
+        self.label_10.setObjectName(u"label_10")
+        self.label_10.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+
+        self.opt_optimizer_gridLayout.addWidget(self.label_10, 0, 1, 1, 1)
+
+        self.horizontalSpacer_5 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        self.opt_optimizer_gridLayout.addItem(self.horizontalSpacer_5, 0, 3, 1, 1)
+
 
         self.verticalLayout_5.addLayout(self.opt_optimizer_gridLayout)
 
+
+        self.horizontalLayout_11.addLayout(self.verticalLayout_5)
+
         self.tabWidget.addTab(self.opt_tab, "")
+
+        self.horizontalLayout_6.addWidget(self.tabWidget)
+
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 819, 22))
+        self.menubar.setGeometry(QRect(0, 0, 759, 22))
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")
         self.menuEdit = QMenu(self.menubar)
@@ -437,7 +504,7 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
 
-        self.tabWidget.setCurrentIndex(2)
+        self.tabWidget.setCurrentIndex(0)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -535,9 +602,9 @@ class Ui_MainWindow(object):
         self.label_9.setText(QCoreApplication.translate("MainWindow", u"Optimizer:", None))
         self.opt_comboBox.setItemText(0, QCoreApplication.translate("MainWindow", u"Adam", None))
 
-        self.label_10.setText(QCoreApplication.translate("MainWindow", u"Beta 1:", None))
-        self.label_12.setText(QCoreApplication.translate("MainWindow", u"Epsilon:", None))
         self.label_13.setText(QCoreApplication.translate("MainWindow", u"Beta 2:", None))
+        self.label_12.setText(QCoreApplication.translate("MainWindow", u"Epsilon:", None))
+        self.label_10.setText(QCoreApplication.translate("MainWindow", u"Beta 1:", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.opt_tab), QCoreApplication.translate("MainWindow", u"Optimization Options", None))
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.menuEdit.setTitle(QCoreApplication.translate("MainWindow", u"Edit", None))

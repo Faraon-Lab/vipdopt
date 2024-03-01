@@ -33,17 +33,12 @@ from vipdopt.monitor import Monitor
 from vipdopt.optimization import FoM, BayerFilterFoM, GradientOptimizer
 from vipdopt.project import Project
 from vipdopt.simulation import LumericalSimulation, ISimulation
-from vipdopt.utils import PathLike, read_config_file, subclasses
+from vipdopt.utils import PathLike, read_config_file, subclasses, StoppableThread
 
-import numpy as np
 import matplotlib as mpl
-import matplotlib.font_manager
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-import warnings
-
-warnings.filterwarnings( "ignore", module = 'matplotlib.*')
 
 font = {
     'size': 12,
@@ -147,7 +142,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         # Initialize Backend
         self.project = Project()
 
-        self.fom_addrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
+        self.fom_addrow_toolButton = QToolButton()
         self.fom_addrow_toolButton.setObjectName(u"fom_addrow_toolButton")
         self.fom_gridLayout.addWidget(self.fom_addrow_toolButton, 1, 0, 1, 1)
         self.fom_addrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Add Row", None))
@@ -170,7 +165,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         rows = self.fom_gridLayout.rowCount()
 
         # Name Line Edit
-        name_lineEdit = QLineEdit(self.verticalLayoutWidget_2)
+        name_lineEdit = QLineEdit()
         name_lineEdit.setObjectName(f'fom_name_lineEdit_{name}')
         sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -181,27 +176,27 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.fom_gridLayout.addWidget(name_lineEdit, rows, 0, 1, 1)
 
         # Type Combo Box
-        type_comboBox = QComboBox(self.verticalLayoutWidget_2)
+        type_comboBox = QComboBox()
         type_comboBox.setObjectName(f'fom_type_comboBox_{name}')
         type_comboBox.clear()
         type_comboBox.addItems(FOM_TYPES)
         self.fom_gridLayout.addWidget(type_comboBox, rows, 1, 1, 1)
         
         # Monitor Buttons
-        fom_pushButton = QPushButton(self.verticalLayoutWidget_2)
+        fom_pushButton = QPushButton()
         fom_pushButton.setObjectName(f'fom_fom_pushButton_{name}')
         fom_pushButton.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
         self.fom_gridLayout.addWidget(fom_pushButton, rows, 2, 1, 1)
         fom_pushButton.clicked.connect(lambda: self.fom_dialog(name, 'fom'))
         
-        grad_pushButton = QPushButton(self.verticalLayoutWidget_2)
+        grad_pushButton = QPushButton()
         grad_pushButton.setObjectName(f'fom_grad_pushButton_{name}')
         grad_pushButton.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
         self.fom_gridLayout.addWidget(grad_pushButton, rows, 3, 1, 1)
         grad_pushButton.clicked.connect(lambda: self.fom_dialog(name, 'grad'))
 
         # Weight Line Edit
-        weight_lineEdit = QLineEdit(self.verticalLayoutWidget_2)
+        weight_lineEdit = QLineEdit()
         weight_lineEdit.setObjectName(f'fom_weight_lineEdit_{name}')
         sizePolicy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         sizePolicy1.setHorizontalStretch(0)
@@ -212,19 +207,19 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.fom_gridLayout.addWidget(weight_lineEdit, rows, 4, 1, 1)
 
         # Simulation Combo Boxes
-        fwd_sim_comboBox = QComboBox(self.verticalLayoutWidget_2)
+        fwd_sim_comboBox = QComboBox()
         fwd_sim_comboBox.setObjectName(f'fom_fwd_sim_comboBox_{name}')
         fwd_sim_comboBox.clear()
         self.fom_gridLayout.addWidget(fwd_sim_comboBox, rows, 5, 1, 1)
 
-        adj_sim_comboBox = QComboBox(self.verticalLayoutWidget_2)
+        adj_sim_comboBox = QComboBox()
         adj_sim_comboBox.setObjectName(f'fom_adj_sim_comboBox_{name}')
         adj_sim_comboBox.clear()
         self.fom_gridLayout.addWidget(adj_sim_comboBox, rows, 6, 1, 1)
 
 
         # Delete Row button
-        delrow_toolButton = QToolButton(self.verticalLayoutWidget_2)
+        delrow_toolButton = QToolButton()
         delrow_toolButton.setObjectName(f'fom_delrow_toolButton_{name}')
         self.fom_gridLayout.addWidget(delrow_toolButton, rows, 7, 1, 1)
         delrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Remove Row", None))
@@ -422,7 +417,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
 
 class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, figure: Figure= None, width=2, height=2, dpi=100, fontsize=12):
+    def __init__(self, figure: Figure= None, width=3, height=12/5, dpi=100, fontsize=12):
         # fig = Figure(figsize=(width, height), dpi=dpi)
         self.fontsize = fontsize
         if figure is not None:
@@ -432,7 +427,7 @@ class MplCanvas(FigureCanvasQTAgg):
             self.fig = Figure(figsize=(width, height), dpi=dpi)
             self.fig.set_layout_engine('constrained')
         super().__init__(self.fig)
-        self.adjust_figure_size(2, 2)
+        self.adjust_figure_size(width)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     
     def change_font(self, fig: Figure):
@@ -474,6 +469,7 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         self.project = Project()
         self.running = False
+        self.opt_thread = StoppableThread()
 
         self.start_stop_pushButton.setText('Start Optimization')
 
@@ -512,8 +508,14 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         win.show()
 
     def toggle_optimization(self):
-        self.project.optimization.loop = not self.running
         self.running = not self.running
+        if self.running:
+            self.opt_thread = StoppableThread(target=self.project.start_optimization)
+            self.opt_thread.run()
+        else:
+            self.opt_thread.stop()
+            self.opt_thread = StoppableThread(target=self.project.stop_optimization)
+            self.opt_thread.run()
         self._update_values()
     
     def _update_plots(self):
@@ -525,7 +527,6 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
                 fig_path = plots_folder / name
                 if fig_path.exists():
                     self.plots[i][j].deleteLater()
-                    # old_fig.clear()
                     self.plots[i][j] = MplCanvas(
                         pickle.load(fig_path.open('rb'))
                     )
@@ -539,6 +540,11 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
             self.start_stop_pushButton.setText('Stop Optimization')
         else:
             self.start_stop_pushButton.setText('Start Optimization')
+        
+        self.iter_label.setText(str(self.project.optimization.iteration))
+        self.epoch_label.setText(str(self.project.optimization.epoch))
+        self.avg_e_label.setText('unknown')
+        self.avg_power_label.setText('unknown')
 
 
 if __name__ == '__main__':
