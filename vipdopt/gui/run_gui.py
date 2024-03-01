@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QToolButton,
-    QVBoxLayout
+    QLayout
 )
 
 import pickle
@@ -36,11 +36,22 @@ from vipdopt.simulation import LumericalSimulation, ISimulation
 from vipdopt.utils import PathLike, read_config_file, subclasses
 
 import numpy as np
+import matplotlib as mpl
+import matplotlib.font_manager
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+import warnings
 
-plt.rcParams.update({'font.weight': 'normal', 'font.size':20})
+warnings.filterwarnings( "ignore", module = 'matplotlib.*')
+
+font = {
+    'size': 12,
+    'family': 'serif',
+    'weight': 'bold',
+    'serif': ['cmr10'],
+}
+mpl.rc('font', **font)
 
 FOM_TYPES = subclasses(FoM)
 SIM_TYPES = subclasses(ISimulation)
@@ -51,6 +62,7 @@ PLOT_NAMES = [
     ['enorm.pkl', 'final_device_layer.pkl'],
 ]
 PLOT_DIMS = (len(PLOT_NAMES), len(PLOT_NAMES[0]))
+
 
 class FomDialog(QDialog, Ui_FomDialog):
     """Dialog window for configuring FoMs."""
@@ -410,16 +422,26 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
 
 class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, figure: Figure= None, width=2, height=2, dpi=100):
+    def __init__(self, figure: Figure= None, width=2, height=2, dpi=100, fontsize=12):
         # fig = Figure(figsize=(width, height), dpi=dpi)
+        self.fontsize = fontsize
         if figure is not None:
+            self.change_font(figure)
             self.fig = figure
         else:
             self.fig = Figure(figsize=(width, height), dpi=dpi)
             self.fig.set_layout_engine('constrained')
-        self.axes = self.fig.axes
         super().__init__(self.fig)
         self.adjust_figure_size(2, 2)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    
+    def change_font(self, fig: Figure):
+        for ax in fig.axes:
+            ax.set_title(ax.get_title(), fontsize=self.fontsize)
+            ax.set_xlabel(ax.get_xlabel(), fontsize=self.fontsize)
+            ax.set_ylabel(ax.get_ylabel(), fontsize=self.fontsize)
+            ax.set_xticklabels(ax.get_xticklabels(), fontsize=self.fontsize)
+            ax.set_yticklabels(ax.get_yticklabels(), fontsize=self.fontsize)
     
     def adjust_figure_size(self, fig_width, fig_height=None):
         if fig_height is None:
@@ -438,6 +460,8 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         """Initialize a StatusWindow."""
         super().__init__()
         self.setupUi(self)
+        self.horizontalLayout.setContentsMargins(5, 5, 5, 5)
+
 
         self.actionOpen.triggered.connect(self.open_project)
 
@@ -500,6 +524,8 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
                 self.gridLayout.removeWidget(self.plots[i][j])
                 fig_path = plots_folder / name
                 if fig_path.exists():
+                    self.plots[i][j].deleteLater()
+                    # old_fig.clear()
                     self.plots[i][j] = MplCanvas(
                         pickle.load(fig_path.open('rb'))
                     )

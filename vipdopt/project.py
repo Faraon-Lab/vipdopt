@@ -132,7 +132,6 @@ class Project:
         if not cfg_file.exists():
             # Search the directory for a configuration file
             cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
-        print(f'Loading from {cfg_file}')
         cfg = Config.from_file(cfg_file)
         cfg_sim = Config.from_file(project_dir / 'sim.json')
         cfg.data['base_simulation'] = cfg_sim.data              #! 20240221: Hacked together to combine the two outputs of template.py
@@ -142,8 +141,8 @@ class Project:
         """Load and setup optimization from an appropriate JSON config file."""
         
         # Load config file
-        if isinstance(config, dict):
-            config = self.config_type(config)
+        # if isinstance(config, dict):
+        #     config = self.config_type(config)
         cfg = copy(config)
 
         try:
@@ -159,6 +158,7 @@ class Project:
         except Exception as e:
             self.optimizer = None
 
+
         try:
             # Setup base simulation -
             # Are we running using Lumerical or ceviche or fdtd-z or SPINS or?
@@ -168,6 +168,7 @@ class Project:
             vipdopt.logger.info('...successfully loaded base simulation!')
         except Exception as e:
             base_sim = LumericalSimulation()
+
         
         # TODO: Are we running it locally or on SLURM or on AWS or?
         base_sim.promise_env_setup(
@@ -202,6 +203,7 @@ class Project:
         spectral_weights_by_fom = np.zeros((cfg['num_bands'], cfg['num_design_frequency_points']))
         # Each wavelength band needs a left, right, and peak (usually center).
         wl_band_bounds = {'left': [], 'peak': [], 'right': []}
+
 
         def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
             # Reminder that wl_band_bounds is a dictionary {'left': [], 'peak': [], 'right': []}
@@ -258,7 +260,7 @@ class Project:
 
         spectral_weights_by_fom = determine_spectral_weights(spectral_weights_by_fom, wl_band_bound_idxs, mode='gaussian') # args, kwargs
         # Repeat green weighting for other FoM such that green weighting applies to FoMs 1,3
-        if self.config['simulator_dimension'] == '3D':      #! Bayer Filter Functionality
+        if cfg['simulator_dimension'] == '3D':      #! Bayer Filter Functionality
             spectral_weights_by_fom = np.insert(spectral_weights_by_fom, 3, spectral_weights_by_fom[1,:], axis=0)
 
         self.weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
