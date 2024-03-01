@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 import pickle
 from typing import Callable
+import subprocess
 
 import vipdopt
 from vipdopt.gui.config_editor import ConfigModel
@@ -34,6 +35,7 @@ from vipdopt.optimization import FoM, BayerFilterFoM, GradientOptimizer
 from vipdopt.project import Project
 from vipdopt.simulation import LumericalSimulation, ISimulation
 from vipdopt.utils import PathLike, read_config_file, subclasses, StoppableThread
+from vipdopt.submit_job import generate_script
 
 import matplotlib as mpl
 from matplotlib.figure import Figure
@@ -482,9 +484,21 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         win.closeEvent = wrap_func(win.closeEvent)
         win.show()
 
+    def create_submission_script(self):
+        slurm_script = str(self.project.dir / 'slurm.sh'),
+        generate_script(
+            self.project.optimization.nsims,
+            str(self.project.dir),
+            'config.json',
+        )
+        subprocess.call(['sbatch', str(slurm_script)])
+
+
+
     def toggle_optimization(self):
         self.running = not self.running
         if self.running:
+            self.create_submission_script()
             self.opt_thread = StoppableThread(target=self.project.start_optimization)
             self.opt_thread.run()
         else:
@@ -502,9 +516,10 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
                 fig_path = plots_folder / name
                 if fig_path.exists():
                     self.plots[i][j].deleteLater()
-                    self.plots[i][j] = MplCanvas(
-                        pickle.load(fig_path.open('rb'))
-                    )
+                    new_fig = pickle.load(fig_path.open('rb'))
+                    if isinstance(new_fig, tuple):
+                        new_fig = new_fig[0]
+                    self.plots[i][j] = MplCanvas(new_fig)
                 self.gridLayout.addWidget(self.plots[i][j], i, j)
 
     def _update_values(self):

@@ -15,7 +15,7 @@ dependencies:
   - dill
   - Jinja2
   - pip
-  - PySide6=6.6.1
+  - pyside6=6.6.1
   # For Linting
   - ruff=0.0.287
   # For static type checking
