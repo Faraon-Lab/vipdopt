@@ -11,7 +11,7 @@ simulator_dimension: 3D
 simulator_max_wait_time: 3600
 use_autograd: False
 convert_existing: False
-mesh_spacing_um: 0.017
+mesh_spacing_um: 0.051
 geometry_spacing_lateral_um: 0.051
 device_scale_um: 0.051
 use_smooth_blur: False
@@ -123,11 +123,11 @@ vertical_layer_height_voxels: 8
 device_size_vertical_um: 2.04
 device_voxels_lateral: 40
 device_voxels_vertical: 40
-device_voxels_simulation_mesh_lateral: 121
-device_voxels_simulation_mesh_vertical: 122
+device_voxels_simulation_mesh_lateral: 41
+device_voxels_simulation_mesh_vertical: 42
 device_vertical_maximum_um: 2.04
 device_size_lateral_bordered_um: 2.04
-device_voxels_simulation_mesh_lateral_bordered: 121
+device_voxels_simulation_mesh_lateral_bordered: 41
 border_size_um: 0.255
 border_size_voxels: 5
 device_voxels_lateral_bordered: 40
@@ -142,7 +142,7 @@ fdtd_region_maximum_vertical_um: 2.8049999999999997
 fdtd_region_minimum_vertical_um: -2.295
 
 #* Surrounding Properties
-pec_aperture_thickness_um: 0.051000000000000004
+pec_aperture_thickness_um: 0.153
 sidewall_x_positions_um: [1.0625, 0, -1.0625, 0]
 sidewall_y_positions_um: [0, 1.0625, 0, -1.0625]
 sidewall_xspan_positions_um: [0.085, 2.21, 0.085, 2.21]

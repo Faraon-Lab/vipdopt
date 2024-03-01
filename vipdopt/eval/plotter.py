@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, PercentFormatter,
                                AutoMinorLocator)
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import pandas as pd
 
 # Custom Classes and Imports
 sys.path.append(os.path.dirname(__file__))
@@ -70,12 +71,13 @@ TEMPLATE_PLOT_DATA = {'r':copy.deepcopy(sweep_parameters),
 #     print('Font name is ' + fp.get_name())
 #     plt.rcParams.update({'font.sans-serif':fp.get_name()}) 
 
-plt.rcParams.update({'font.sans-serif':'Helvetica Neue',            # Change this based on whatever custom font you have installed
-                     'font.weight': 'normal', 'font.size':20})              
-plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['mathtext.fontset'] = 'custom'
-plt.rcParams['mathtext.rm'] = 'Helvetica Neue'
-plt.rcParams['mathtext.it'] = 'Helvetica Neue:italic'
+# plt.rcParams.update({'font.sans-serif':'Helvetica Neue',            # Change this based on whatever custom font you have installed
+#                      'font.weight': 'normal', 'font.size':20})
+plt.rcParams.update({'font.weight': 'normal', 'font.size':20})              
+# plt.rcParams['font.family'] = 'sans-serif'
+# plt.rcParams['mathtext.fontset'] = 'custom'
+# plt.rcParams['mathtext.rm'] = 'Helvetica Neue'
+# plt.rcParams['mathtext.it'] = 'Helvetica Neue:italic'
 # plt.rcParams['text.usetex'] = True
 
 # mpl.rcParams['font.sans-serif'] = 'Helvetica Neue'
@@ -243,7 +245,7 @@ class BasicPlot():
         
         # export_msg_string = (SAVE_LOCATION + f'/{filename}'.replace("_", " ")).title()
         export_msg_string = filename.replace("_", "").title()
-        logging.info('Exported: ' + export_msg_string)
+        vipdopt.logger.info('Exported: ' + export_msg_string)
         
         if close_plot:
             plt.close()
@@ -284,7 +286,7 @@ class SpectrumPlot(BasicPlot):
         plt.savefig(SAVE_LOCATION + f'/{filename}.png', bbox_inches='tight')
         
         export_msg_string = (SAVE_LOCATION + f'/{filename}'.replace("_", " ")).title()
-        logging.info('Exported: ' + export_msg_string)
+        vipdopt.logger.info('Exported: ' + export_msg_string)
         
         if close_plot:
             plt.close()
@@ -390,7 +392,7 @@ class SweepPlot(BasicPlot):
         
         # export_msg_string = (SAVE_LOCATION + f'/{filename}'.replace("_", " ")).title()
         export_msg_string = filename.replace("_", "").title()
-        logging.info('Exported: ' + export_msg_string + param_filename_str)
+        vipdopt.logger.info('Exported: ' + export_msg_string + param_filename_str)
         
         if close_plot:
             plt.close()
@@ -456,7 +458,7 @@ def plot_quadrant_transmission_trace(f, plot_directory_location, epoch_list=None
     for adj_src in range(num_adjoint_src):
         quad_trace[adj_src] = copy.deepcopy(quad_trace)[adj_src]
         quad_trace[adj_src].update({'var_name': f'Q{adj_src}', 'var_values': trace[adj_src]})
-    logging.info('Quadrant Transmissions Trace is:')
+    vipdopt.logger.info('Quadrant Transmissions Trace is:')
     plot_data = {'r':[iterations],
                 'f': quad_trace,
                 'title': 'Quadrant Transmissions - Trace'}
@@ -478,11 +480,10 @@ def plot_quadrant_transmission_trace(f, plot_directory_location, epoch_list=None
 
     return fig
 
-def plot_individual_quadrant_transmission(f, r, plot_directory_location, epoch, iteration, pol='x'):
+def plot_individual_quadrant_transmission(f, r, plot_directory_location, iteration):
     '''Plot the most updated quadrant transmission.'''
 
-    # Convert to ndarray
-    f = np.array(f[pol])
+    f = f[iteration]
     upperRange = np.max(f)
 
     num_adjoint_src = 4
@@ -496,8 +497,14 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, epoch, 
     plot_data = {'r':[lambda_vector],
                 'f': quad_trace,
                 'title': 'Quadrant Transmissions - Trace'}
+    
+    # plot_subfolder_name = 'quad_trans'
+    # plot_directory_location = plot_directory_location / plot_subfolder_name
+    # if not os.path.isdir(plot_directory_location):
+    #     os.makedirs(plot_directory_location)
 
     bp = BasicPlot(plot_data)
+    fig, ax = bp.fig, bp.ax
     bp.plot_config['y_axis']['limits'] = [0.0, 1.0]
     bp.append_line_data(plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'])
     bp.assign_title()
@@ -506,7 +513,9 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, epoch, 
     # for i in range(0,numEpochs+1):
     # 	plt.vlines(i*numIter, 0,upperRange, **vline_style)
     # bp.fig, bp.ax = fig, ax
-    bp.export_plot_config(plot_directory_location,'quad_trans', f'trans_e{epoch}i{iteration}')
+    bp.export_plot_config(plot_directory_location,'quad_trans', f'trans_i{iteration}')
+    
+    return fig
 
 def visualize_device(cur_data, plot_directory_location, num_visualize_layers=1, iteration=''):
     '''Visualizes each (voxel) layer of cur_data. This data can be either density, permittivity, or index,
@@ -618,7 +627,7 @@ def plot_overall_transmission_trace(f, plot_directory_location, epoch_list=None)
 
     return fig
 
-def plot_Enorm_focal(f, r, wl, plot_directory_location, iteration, wl_idxs = [0,-1]):
+def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs = [0,-1]):
     '''Plot the most updated quadrant transmission.'''
 
     upperRange = np.max(f)
@@ -647,6 +656,73 @@ def plot_Enorm_focal(f, r, wl, plot_directory_location, iteration, wl_idxs = [0,
         # 	plt.vlines(i*numIter, 0,upperRange, **vline_style)
         # bp.fig, bp.ax = fig, ax
         bp.export_plot_config(plot_directory_location,'Efield_plots', f'Enorm_wl{ int(1e9*wl[wl_idx])}nm_i{iteration}')
+        
+def plot_Enorm_focal_3d(f, x, y, wl, plot_directory_location, iteration, wl_idxs = [0,-1]):
+    '''Plot the most updated quadrant transmission.'''
+
+    '''For the given job index, plots the E-norm f.p. image at specific input spectra, corresponding to that job.
+    Note: Includes focal scatter region. '''
+
+    plot_subfolder_name = 'Enorm_fp_image_spectra'
+    plot_directory_location = plot_directory_location / plot_subfolder_name
+    if not os.path.isdir(plot_directory_location):
+        os.makedirs(plot_directory_location)
+    
+    r_vectors = 2 * [copy.deepcopy(TEMPLATE_R_VECTOR)]
+    r_vectors[0].update({'var_name': 'x', 'var_values': x, 'short_form': 'x'})
+    r_vectors[1].update({'var_name': 'y', 'var_values': y, 'short_form': 'y'})
+    f_vectors = [copy.deepcopy(TEMPLATE_F_VECTOR)]
+    f_vectors[0].update({'var_name': 'Enorm', 'var_values': f})
+    
+    for wl_idx in wl_idxs:
+        plot_wl = float(wl[wl_idx])
+        
+        fig, ax = plt.subplots()
+        
+        # Find the index of plot_wl in the wl_vector
+        # wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
+
+        # If the monitor area is rectangular, truncate to a square
+        max_spatial_idx = np.min(np.shape(f_vectors[0]['var_values'])[0:2])
+        r_vectors[0]['var_values'] = r_vectors[0]['var_values'][0:max_spatial_idx]
+        r_vectors[1]['var_values'] = r_vectors[1]['var_values'][0:max_spatial_idx]
+
+        Y_grid, X_grid = np.meshgrid(np.squeeze(r_vectors[0]['var_values'])*1e6, np.squeeze(r_vectors[1]['var_values'])*1e6)
+        c = ax.pcolormesh(X_grid, Y_grid, f_vectors[0]['var_values'][0:max_spatial_idx,0:max_spatial_idx,wl_idx],
+                            cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
+        plt.gca().set_aspect('equal')
+        
+        wl_str = f'{plot_wl*1e9:.0f}nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f}um'
+        title_string = r'$E_{norm}$' + ' at Focal Plane: $\lambda = $ ' + f'{wl_str}'
+        plt.title(title_string)
+        plt.xlabel('x (um)')
+        plt.ylabel('y (um)')
+
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.25)
+        fig.colorbar(c, cax=cax)
+
+        fig_width = 8.0
+        fig_height = fig_width*1.0
+        l = ax.figure.subplotpars.left
+        r = ax.figure.subplotpars.right
+        t = ax.figure.subplotpars.top
+        b = ax.figure.subplotpars.bottom
+        figw = float(fig_width)/(r-l)
+        figh = float(fig_height)/(t-b)
+        ax.figure.set_size_inches(figw, figh, forward=True)
+        plt.tight_layout()
+
+        #plt.show(block=False)
+        #plt.show()
+            
+        plt.savefig(plot_directory_location / f'Enorm_{wl_str}_i{iteration}.png',
+            bbox_inches='tight')
+        vipdopt.logger.info('Exported: Enorm Focal Plane Image at wavelength ' + wl_str)
+
+        plt.close()
+        
+    return fig, ax
 
 #* Evaluation after Optimization
 
@@ -784,7 +860,7 @@ def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, sweep_parameters, 
             + '/' + utility.isolate_filename(job_names[job_idx]).replace('.fsp', '')\
             + '_' + f'{wl_str}' + '.png',
             bbox_inches='tight')
-        logging.info('Exported: Enorm Focal Plane Image at wavelength ' + wl_str)
+        vipdopt.logger.info('Exported: Enorm Focal Plane Image at wavelength ' + wl_str)
     
         plt.close()
     
@@ -872,7 +948,7 @@ def plot_device_cross_section_spectrum(plot_data, job_idx, sweep_parameters, job
                 + '/' + utility.isolate_filename(job_names[job_idx]).replace('.fsp', '')\
                 + '_Enorm_' + f'{device_cross_idx}' + '_' + f'{wl_str}' + '.png',
                 bbox_inches='tight')
-            logging.info(f'Exported: Device Cross Section Enorm Image {device_cross_idx} at wavelength ' + wl_str)
+            vipdopt.logger.info(f'Exported: Device Cross Section Enorm Image {device_cross_idx} at wavelength ' + wl_str)
 
             plt.close()
 
@@ -940,7 +1016,7 @@ def plot_device_cross_section_spectrum(plot_data, job_idx, sweep_parameters, job
                     + '/' + utility.isolate_filename(job_names[job_idx]).replace('.fsp', '')\
                     + '_realE' + f'{display_vector_labels[display_vector_component]}' + '_' + f'{device_cross_idx}' + '_' + f'{wl_str}' + '.png',
                     bbox_inches='tight')
-                logging.info(f'Exported: Device Cross Section E{display_vector_labels[display_vector_component]}_real Image {device_cross_idx} at wavelength ' + wl_str)
+                vipdopt.logger.info(f'Exported: Device Cross Section E{display_vector_labels[display_vector_component]}_real Image {device_cross_idx} at wavelength ' + wl_str)
         
         plt.close()
     

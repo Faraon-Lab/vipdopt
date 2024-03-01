@@ -17,20 +17,15 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
 from PySide6.QtWidgets import (QApplication, QFormLayout, QGridLayout, QHBoxLayout,
-    QLabel, QLayout, QMainWindow, QMenu,
-    QMenuBar, QPushButton, QSizePolicy, QSpacerItem,
-    QStatusBar, QVBoxLayout, QWidget)
+    QLabel, QMainWindow, QMenu, QMenuBar,
+    QPushButton, QSizePolicy, QSpacerItem, QStatusBar,
+    QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(800, 600)
-        sizePolicy = QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(MainWindow.sizePolicy().hasHeightForWidth())
-        MainWindow.setSizePolicy(sizePolicy)
         self.actionNew = QAction(MainWindow)
         self.actionNew.setObjectName(u"actionNew")
         self.actionOpen = QAction(MainWindow)
@@ -59,52 +54,71 @@ class Ui_MainWindow(object):
         self.actionAbout_Vipdopt.setObjectName(u"actionAbout_Vipdopt")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
-        sizePolicy.setHeightForWidth(self.centralwidget.sizePolicy().hasHeightForWidth())
-        self.centralwidget.setSizePolicy(sizePolicy)
-        self.horizontalLayout = QHBoxLayout(self.centralwidget)
+        self.horizontalLayoutWidget = QWidget(self.centralwidget)
+        self.horizontalLayoutWidget.setObjectName(u"horizontalLayoutWidget")
+        self.horizontalLayoutWidget.setGeometry(QRect(9, 9, 781, 531))
+        self.horizontalLayout = QHBoxLayout(self.horizontalLayoutWidget)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.gridLayout = QGridLayout()
         self.gridLayout.setObjectName(u"gridLayout")
-        self.gridLayout.setSizeConstraint(QLayout.SetNoConstraint)
+        self.plot_0_0_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_0_0_label.setObjectName(u"plot_0_0_label")
+        self.plot_0_0_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_0_0_label, 0, 0, 1, 1)
+
+        self.plot_0_1_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_0_1_label.setObjectName(u"plot_0_1_label")
+        self.plot_0_1_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_0_1_label, 1, 0, 1, 1)
+
+        self.plot_1_1_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_1_1_label.setObjectName(u"plot_1_1_label")
+        self.plot_1_1_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_1_1_label, 1, 1, 1, 1)
+
+        self.plot_1_0_label = QLabel(self.horizontalLayoutWidget)
+        self.plot_1_0_label.setObjectName(u"plot_1_0_label")
+        self.plot_1_0_label.setAlignment(Qt.AlignCenter)
+
+        self.gridLayout.addWidget(self.plot_1_0_label, 0, 1, 1, 1)
+
 
         self.horizontalLayout.addLayout(self.gridLayout)
 
         self.verticalLayout_2 = QVBoxLayout()
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.verticalLayout_2.setSizeConstraint(QLayout.SetMinimumSize)
         self.formLayout = QFormLayout()
         self.formLayout.setObjectName(u"formLayout")
-        self.label_10 = QLabel(self.centralwidget)
+        self.label_10 = QLabel(self.horizontalLayoutWidget)
         self.label_10.setObjectName(u"label_10")
 
         self.formLayout.setWidget(0, QFormLayout.LabelRole, self.label_10)
 
-        self.epoch_label = QLabel(self.centralwidget)
+        self.epoch_label = QLabel(self.horizontalLayoutWidget)
         self.epoch_label.setObjectName(u"epoch_label")
 
         self.formLayout.setWidget(0, QFormLayout.FieldRole, self.epoch_label)
 
-        self.label_12 = QLabel(self.centralwidget)
+        self.label_12 = QLabel(self.horizontalLayoutWidget)
         self.label_12.setObjectName(u"label_12")
 
         self.formLayout.setWidget(1, QFormLayout.LabelRole, self.label_12)
 
-        self.iter_label = QLabel(self.centralwidget)
+        self.iter_label = QLabel(self.horizontalLayoutWidget)
         self.iter_label.setObjectName(u"iter_label")
 
         self.formLayout.setWidget(1, QFormLayout.FieldRole, self.iter_label)
 
-        self.time_est_label = QLabel(self.centralwidget)
+        self.time_est_label = QLabel(self.horizontalLayoutWidget)
         self.time_est_label.setObjectName(u"time_est_label")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.time_est_label.sizePolicy().hasHeightForWidth())
-        self.time_est_label.setSizePolicy(sizePolicy1)
 
         self.formLayout.setWidget(2, QFormLayout.FieldRole, self.time_est_label)
 
-        self.label_14 = QLabel(self.centralwidget)
+        self.label_14 = QLabel(self.horizontalLayoutWidget)
         self.label_14.setObjectName(u"label_14")
 
         self.formLayout.setWidget(2, QFormLayout.LabelRole, self.label_14)
@@ -114,22 +128,22 @@ class Ui_MainWindow(object):
 
         self.formLayout_2 = QFormLayout()
         self.formLayout_2.setObjectName(u"formLayout_2")
-        self.label_6 = QLabel(self.centralwidget)
+        self.label_6 = QLabel(self.horizontalLayoutWidget)
         self.label_6.setObjectName(u"label_6")
 
         self.formLayout_2.setWidget(0, QFormLayout.LabelRole, self.label_6)
 
-        self.avg_power_label = QLabel(self.centralwidget)
+        self.avg_power_label = QLabel(self.horizontalLayoutWidget)
         self.avg_power_label.setObjectName(u"avg_power_label")
 
         self.formLayout_2.setWidget(0, QFormLayout.FieldRole, self.avg_power_label)
 
-        self.label_8 = QLabel(self.centralwidget)
+        self.label_8 = QLabel(self.horizontalLayoutWidget)
         self.label_8.setObjectName(u"label_8")
 
         self.formLayout_2.setWidget(1, QFormLayout.LabelRole, self.label_8)
 
-        self.avg_e_label = QLabel(self.centralwidget)
+        self.avg_e_label = QLabel(self.horizontalLayoutWidget)
         self.avg_e_label.setObjectName(u"avg_e_label")
 
         self.formLayout_2.setWidget(1, QFormLayout.FieldRole, self.avg_e_label)
@@ -139,27 +153,18 @@ class Ui_MainWindow(object):
 
         self.gridLayout_2 = QGridLayout()
         self.gridLayout_2.setObjectName(u"gridLayout_2")
-        self.edit_pushButton = QPushButton(self.centralwidget)
+        self.edit_pushButton = QPushButton(self.horizontalLayoutWidget)
         self.edit_pushButton.setObjectName(u"edit_pushButton")
-        sizePolicy2 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        sizePolicy2.setHorizontalStretch(0)
-        sizePolicy2.setVerticalStretch(0)
-        sizePolicy2.setHeightForWidth(self.edit_pushButton.sizePolicy().hasHeightForWidth())
-        self.edit_pushButton.setSizePolicy(sizePolicy2)
 
         self.gridLayout_2.addWidget(self.edit_pushButton, 1, 2, 1, 1)
 
-        self.start_stop_pushButton = QPushButton(self.centralwidget)
+        self.start_stop_pushButton = QPushButton(self.horizontalLayoutWidget)
         self.start_stop_pushButton.setObjectName(u"start_stop_pushButton")
-        sizePolicy2.setHeightForWidth(self.start_stop_pushButton.sizePolicy().hasHeightForWidth())
-        self.start_stop_pushButton.setSizePolicy(sizePolicy2)
 
         self.gridLayout_2.addWidget(self.start_stop_pushButton, 0, 2, 1, 1)
 
-        self.save_pushButton = QPushButton(self.centralwidget)
+        self.save_pushButton = QPushButton(self.horizontalLayoutWidget)
         self.save_pushButton.setObjectName(u"save_pushButton")
-        sizePolicy2.setHeightForWidth(self.save_pushButton.sizePolicy().hasHeightForWidth())
-        self.save_pushButton.setSizePolicy(sizePolicy2)
 
         self.gridLayout_2.addWidget(self.save_pushButton, 2, 2, 1, 1)
 
@@ -256,6 +261,10 @@ class Ui_MainWindow(object):
         self.actionDelete.setText(QCoreApplication.translate("MainWindow", u"Delete", None))
         self.actionVipdopt_Help.setText(QCoreApplication.translate("MainWindow", u"Vipdopt Help", None))
         self.actionAbout_Vipdopt.setText(QCoreApplication.translate("MainWindow", u"About Vipdopt", None))
+        self.plot_0_0_label.setText("")
+        self.plot_0_1_label.setText("")
+        self.plot_1_1_label.setText("")
+        self.plot_1_0_label.setText("")
         self.label_10.setText(QCoreApplication.translate("MainWindow", u"Current Epoch", None))
         self.epoch_label.setText(QCoreApplication.translate("MainWindow", u"value...", None))
         self.label_12.setText(QCoreApplication.translate("MainWindow", u"Current Iteration:", None))

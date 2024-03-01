@@ -148,17 +148,24 @@ class Optimization:
         # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
         fom_fig = plotter.plot_fom_trace(self.figure_of_merit_evolution, folder, self.epoch_list)
         quad_trans_fig = plotter.plot_quadrant_transmission_trace(self.fom_evolution['transmission'], folder, self.epoch_list)
-        
-        self.runner_sim.fdtd.load(self.sim_files[0].name)
-        E_focal = self.runner_sim.getresult('transmission_focal_monitor_','E')
-        intensity_fig = plotter.plot_Enorm_focal(np.sum(np.abs(np.squeeze(E_focal['E']))**2, axis=-1),
-                                                E_focal['x'], E_focal['lambda'],
-                                                folder, self.iteration, wl_idxs=[7,22])
-        
-        # plotter.plot_individual_quadrant_transmission(self.fom_evolution['intensity'], 
-        #                     self.cfg['lambda_values_um'], folder, self.epoch_list)	# continuously produces only one plot per epoch to save space
         overall_trans_fig = plotter.plot_quadrant_transmission_trace(self.fom_evolution['overall_transmission'], folder, self.epoch_list,
                                                                 filename='overall_trans_trace')
+        
+        # todo: code this to pull the forward sim for FoM_0 i.e. forward_src_x in this case but not EVERY case.
+        # self.runner_sim.fdtd.load(self.foms[0].fom_monitors[0].sim.info['path'])  # untested
+        self.runner_sim.fdtd.load(self.sim_files[0].name)
+        E_focal = self.runner_sim.getresult('transmission_focal_monitor_','E')
+        if self.cfg['simulator_dimension'] == '2D':
+            intensity_fig = plotter.plot_Enorm_focal_2d(np.sum(np.abs(np.squeeze(E_focal['E']))**2, axis=-1),
+                                                    E_focal['x'], E_focal['lambda'],
+                                                    folder, self.iteration, wl_idxs=[7,22])
+        elif self.cfg['simulator_dimension'] == '3D':
+            intensity_fig = plotter.plot_Enorm_focal_3d(np.sum(np.abs(np.squeeze(E_focal['E']))**2, axis=-1),
+                                                    E_focal['x'], E_focal['y'], E_focal['lambda'],
+                                                    folder, self.iteration, wl_idxs=[9,29,49])
+        
+            indiv_trans_fig = plotter.plot_individual_quadrant_transmission(self.fom_evolution['transmission'], 
+                                self.cfg['lambda_values_um'], folder, self.iteration)	# continuously produces only one plot per epoch to save space
         
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
         final_device_layer_fig, _ = plotter.visualize_device(cur_index, folder, iteration=self.iteration)
@@ -178,6 +185,8 @@ class Optimization:
             pickle.dump(overall_trans_fig, f)
         with (folder / 'enorm.pkl').open('wb') as f:
             pickle.dump(intensity_fig, f)
+        with (folder / 'indiv_trans.pkl').open('wb') as f:
+            pickle.dump(indiv_trans_fig, f)
         with (folder / 'final_device_layer.pkl').open('wb') as f:
             pickle.dump(final_device_layer_fig, f)
         # todo: rest of the plots
@@ -260,10 +269,9 @@ class Optimization:
 
         vipdopt.logger.info("Beginning Step 3: Setting up Forward and Adjoint Jobs")
         
-        
         for sim_idx, sim in enumerate(self.sims):
-            # self.runner_sim.fdtd.load(sim.info['name'])
-            self.runner_sim.fdtd.load(self.sim_files[sim_idx].name)
+            self.runner_sim.fdtd.load(sim.info['name'])
+            # self.runner_sim.fdtd.load(self.sim_files[sim_idx].name)
             # Switch to Layout
             self.runner_sim.fdtd.switchtolayout()
     
@@ -273,17 +281,18 @@ class Optimization:
                                             )
             cur_index = self.device.index_from_permittivity(cur_permittivity)
                             
-            self.runner_sim.save_lumapi(os.path.abspath(self.sim_files[sim_idx]))
+            self.runner_sim.save_lumapi(os.path.abspath(self.sim_files[sim_idx]), debug_mode=False) #! Debug using test_dev folder
             
         # Use dummy simulation to run all of them at once using lumapi
         # self.runner_sim.promise_env_setup(self.sims[0]._env_vars)
-        self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
+        if os.getenv('SLURM_JOB_NODELIST') is None:
+            self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
         for fname in self.sim_files:
             # self.runner_sim.fdtd.addjob(str(fname), 'FDTD')
             self.runner_sim.fdtd.addjob(fname.name, 'FDTD')     #! Has to just add the filename
 
         vipdopt.logger.debug('Running all simulations...')
-        self.runner_sim.fdtd.runjobs('FDTD')
+        self.runner_sim.fdtd.runjobs('FDTD') #! Debug using test_dev folder
         # todo: still running the linux mpi files. Fix this
         # todo: also check sims 0-6 to see if they're running correctly
         vipdopt.logger.debug('Done running simulations')
@@ -349,12 +358,18 @@ class Optimization:
                         m._h = None
                         m._trans_mag = None
                 
+                # #! Debug using test_dev folder
+                # self.sim_files = [self.dirs['debug_completed_jobs'] / f'{sim.info["name"]}.fsp' for sim in self.sims]
+                # for sim in self.sims:
+                #     sim.info['path'] = self.dirs['debug_completed_jobs'] / Path(sim.info['path']).name
+                
                 vipdopt.logger.info("Beginning Step 4: Computing Figure of Merit")
                 
                 tempfile_fwd_name_arr = [file.name for file in self.sim_files if any(x in file.name for x in ['forward','fwd'])]
                 tempfile_adj_name_arr = [file.name for file in self.sim_files if any(x in file.name for x in ['adjoint','adj'])]
                 
                 for tempfile_fwd_name in tempfile_fwd_name_arr:
+                    # self.runner_sim.fdtd.load(os.path.abspath(self.dirs['debug_completed_jobs'] / tempfile_fwd_name))   #! Debug using test_dev folder
                     self.runner_sim.fdtd.load(tempfile_fwd_name)
                     # efield_test = self.runner_sim.get_efield('design_efield_monitor')
                     # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_fwd_name} is {efield_test[1,2,2,0,15]}')
@@ -528,9 +543,14 @@ class Optimization:
                     gradient_region_z = 1e-6 * np.linspace(self.device.coords['z'][0], self.device.coords['z'][-1], 3)
                 design_region_geometry = np.array(np.meshgrid(1e-6*self.device.coords['x'], 1e-6*self.device.coords['y'], 1e-6*self.device.coords['z'], indexing='ij')
                                     ).transpose((1,2,3,0))
-    
-                design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
-                                                       np.repeat(get_grad_density[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
+
+                if self.cfg['simulator_dimension'] in '2D':
+                    design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                        np.repeat(get_grad_density[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
+                                                        design_region_geometry, method='linear' )
+                elif self.cfg['simulator_dimension'] in '3D':
+                    design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                       get_grad_density,
                                                        design_region_geometry, method='linear' )
                 # design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ), device_gradient, bayer_filter_region, method='linear' )
 

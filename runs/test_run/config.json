@@ -173,8 +173,8 @@
         3
     ],
     "fixed_layers_density": 0,
-    "mpi_exe": "/central/software/mpich/4.0.0/bin/mpirun",
-    "solver_exe": "/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem",
+    "mpi_exe": "C:\\ProgramData\\Miniconda3\\envs\\def2\\Library\\bin\\mpiexec.exe",
+    "solver_exe": "C:\\Program Files\\Lumerical\\v212\\bin\\fdtd-engine-msmpi.exe",
     "nprocs": 8,
     "fom_dict": [
         {
@@ -411,7 +411,6 @@
         -0.51,
         -0.51
     ],
-    "total_iters": 100,
     "epoch_range_design_change_max": 0.09999999999999999,
     "epoch_range_design_change_min": 0.05,
     "spectral_focal_plane_map": [

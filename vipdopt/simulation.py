@@ -336,9 +336,10 @@ class LumericalSimulation(ISimulation):
 
     @_sync_fdtd_solver
     @ensure_path
-    def save_lumapi(self, fname: Path):
+    def save_lumapi(self, fname: Path, debug_mode=False):
         """Save using Lumerical's simulation file type (.fsp)."""
-        self.fdtd.save(os.path.abspath(str(fname.with_suffix(''))))
+        if not debug_mode:
+            self.fdtd.save(os.path.abspath(str(fname.with_suffix(''))))
         self.info['path'] = str(os.path.abspath(str(fname.with_suffix(''))))
 
     def as_dict(self) -> dict:
@@ -697,7 +698,7 @@ class LumericalSimulation(ISimulation):
         """Return the shape of a property returned from this simulation's monitors."""
         
         vipdopt.logger.info(f'Loading {self.info["path"]}')
-        self.fdtd.load(self.info['path'])           #! 20240227 Ian - Had to add this
+        self.fdtd.load(os.path.abspath(self.info['path']))           #! 20240227 Ian - Had to add this
         prop = self.getresult(monitor_name, value, dataset_value)
         if isinstance(prop, dict):
             vipdopt.logger.debug(f'Need to access one level deeper. Args passed: {monitor_name}, {value}, {dataset_value}.')
@@ -736,7 +737,7 @@ class LumericalSimulation(ISimulation):
             dtype=np.complex128,
         )
         data_xfer_size_mb = fields.nbytes / (1024 ** 2)
-        elapsed = time.time() - start
+        elapsed = time.time() - start +1e-8   # avoid zero error
 
         vipdopt.logger.debug(f'Transferred {data_xfer_size_mb} MB')
         vipdopt.logger.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')

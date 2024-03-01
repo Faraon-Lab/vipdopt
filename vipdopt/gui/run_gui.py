@@ -18,11 +18,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QToolButton,
-    QLayout
+    QVBoxLayout
 )
 
 import pickle
-from typing import Callable
 
 import vipdopt
 from vipdopt.gui.config_editor import ConfigModel
@@ -30,39 +29,18 @@ from vipdopt.gui.ui_fom_dialog import Ui_Dialog as Ui_FomDialog
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
 from vipdopt.gui.ui_dashboard import Ui_MainWindow as Ui_DashboardWindow
 from vipdopt.monitor import Monitor
-from vipdopt.optimization import FoM, BayerFilterFoM, GradientOptimizer
+from vipdopt.optimization import FoM, BayerFilterFoM
 from vipdopt.project import Project
 from vipdopt.simulation import LumericalSimulation, ISimulation
 from vipdopt.utils import PathLike, read_config_file, subclasses
 
 import numpy as np
-import matplotlib as mpl
-import matplotlib.font_manager
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-import warnings
-
-warnings.filterwarnings( "ignore", module = 'matplotlib.*')
-
-font = {
-    'size': 12,
-    'family': 'serif',
-    'weight': 'bold',
-    'serif': ['cmr10'],
-}
-mpl.rc('font', **font)
 
 FOM_TYPES = subclasses(FoM)
 SIM_TYPES = subclasses(ISimulation)
-OPTIMIZER_TYPES = subclasses(GradientOptimizer)
-
-PLOT_NAMES = [
-    ['fom.pkl', 'quad_trans.pkl'],
-    ['enorm.pkl', 'final_device_layer.pkl'],
-]
-PLOT_DIMS = (len(PLOT_NAMES), len(PLOT_NAMES[0]))
-
 
 class FomDialog(QDialog, Ui_FomDialog):
     """Dialog window for configuring FoMs."""
@@ -422,37 +400,15 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
 
 class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, figure: Figure= None, width=2, height=2, dpi=100, fontsize=12):
+    def __init__(self, figure: Figure= None, width=5, height=4, dpi=100):
         # fig = Figure(figsize=(width, height), dpi=dpi)
-        self.fontsize = fontsize
         if figure is not None:
-            self.change_font(figure)
             self.fig = figure
+            self.axes = figure.axes
         else:
-            self.fig = Figure(figsize=(width, height), dpi=dpi)
-            self.fig.set_layout_engine('constrained')
+            self.fig, self.axes = plt.subplots(2, 2, figsize=(width, height), dpi=dpi)
         super().__init__(self.fig)
-        self.adjust_figure_size(2, 2)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-    
-    def change_font(self, fig: Figure):
-        for ax in fig.axes:
-            ax.set_title(ax.get_title(), fontsize=self.fontsize)
-            ax.set_xlabel(ax.get_xlabel(), fontsize=self.fontsize)
-            ax.set_ylabel(ax.get_ylabel(), fontsize=self.fontsize)
-            ax.set_xticklabels(ax.get_xticklabels(), fontsize=self.fontsize)
-            ax.set_yticklabels(ax.get_yticklabels(), fontsize=self.fontsize)
-    
-    def adjust_figure_size(self, fig_width, fig_height=None):
-        if fig_height is None:
-            fig_height = fig_width*4/5
-        l = self.fig.subplotpars.left
-        r = self.fig.subplotpars.right
-        t = self.fig.subplotpars.top
-        b = self.fig.subplotpars.bottom
-        figw = float(fig_width)/(r-l)
-        figh = float(fig_height)/(t-b)
-        self.fig.figure.set_size_inches(figw, figh, forward=True)
+
 
 class StatusDashboard(QMainWindow, Ui_DashboardWindow):
     """Wrapper class for the status window."""
@@ -460,25 +416,18 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         """Initialize a StatusWindow."""
         super().__init__()
         self.setupUi(self)
-        self.horizontalLayout.setContentsMargins(5, 5, 5, 5)
-
 
         self.actionOpen.triggered.connect(self.open_project)
 
-        self.plots = [
-            [MplCanvas() for _ in range(PLOT_DIMS[1])] for _ in range(PLOT_DIMS[0])
-        ]
-        for i in range(PLOT_DIMS[0]):
-            for j in range(PLOT_DIMS[1]):
-                self.gridLayout.addWidget(self.plots[i][j], i, j)
+        self.plot_canvas = MplCanvas()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
 
         self.project = Project()
         self.running = False
 
-        self.start_stop_pushButton.setText('Start Optimization')
+        # self._update_values()
 
         self.start_stop_pushButton.clicked.connect(self.toggle_optimization)
-        self.edit_pushButton.clicked.connect(self.settings_window)
 
     def open_project(self):
         """Load optimization project into the GUI."""
@@ -493,43 +442,31 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
             vipdopt.logger.info(f'Loaded project from {proj_dir}')
             self._update_values()
             vipdopt.logger.info(f'Updated GUI with values from {proj_dir}')
-
-    def settings_window(self):
-        win = SettingsWindow()
-        win.project = self.project
-        try:
-            win._update_values()
-        except BaseException:
-            pass
-        win.setWindowModality(Qt.WindowModality.ApplicationModal)
-        def wrap_func(f: Callable):
-            def override_close(*args):
-                f(*args)
-                self._update_values()
-            return override_close
-
-        win.closeEvent = wrap_func(win.closeEvent)
-        win.show()
-
+    
     def toggle_optimization(self):
         self.project.optimization.loop = not self.running
         self.running = not self.running
-        self._update_values()
     
     def _update_plots(self):
         plots_folder = self.project.subdirectories['opt_plots']
+        # refractive_index_plot = plots_folder / 'index.png'
+        # # efield_plot = plots_folder / 'efield.png'
+        self.horizontalLayout.removeWidget(self.plot_canvas)
+        # self.plot_canvas = MplCanvas()
+        for ax in self.plot_canvas.axes.flat:
+            ax.clear()
+        with (plots_folder / 'fom.pkl').open('rb') as f:
+            fom_fig = pickle.load(f)
+        self.plot_canvas = MplCanvas(fom_fig)
+        # self.plot_canvas.axes[0, 0] = fom_plot
+        # with (plots_folder / 'fom.png').open('w') as f:
+        #     self.plot_canvas.fig.savefig(f)
 
-        for i in range(PLOT_DIMS[0]):
-            for j, name in enumerate(PLOT_NAMES[i]):
-                self.gridLayout.removeWidget(self.plots[i][j])
-                fig_path = plots_folder / name
-                if fig_path.exists():
-                    self.plots[i][j].deleteLater()
-                    # old_fig.clear()
-                    self.plots[i][j] = MplCanvas(
-                        pickle.load(fig_path.open('rb'))
-                    )
-                self.gridLayout.addWidget(self.plots[i][j], i, j)
+
+        # self.plot_canvas.draw()
+        self.horizontalLayout.insertWidget(0, self.plot_canvas)
+    
+        # transmission_plot = plots_folder / 'transmission.png'
 
     def _update_values(self):
 
@@ -538,7 +475,7 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         if self.running:
             self.start_stop_pushButton.setText('Stop Optimization')
         else:
-            self.start_stop_pushButton.setText('Start Optimization')
+            self.start_stop_pushButton.setText('Sart Optimization')
 
 
 if __name__ == '__main__':
