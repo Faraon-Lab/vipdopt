@@ -96,7 +96,10 @@ if __name__ == '__main__':
     # project.save()
 
     # Now that config is loaded, set up lumapi
-    vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_local'])   #todo: If Windows
+    if os.getenv('SLURM_JOB_NODELIST') is None:
+        vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_local'])   # Windows (local machine)
+    else:
+        vipdopt.lumapi = import_lumapi(project.config.data['lumapi_filepath_hpc'])   # HPC (Linux)
 
     # Debug that base_sim is correctly created...
     project.base_sim.connect(license_checked=False)		

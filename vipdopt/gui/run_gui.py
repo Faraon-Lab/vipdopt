@@ -52,7 +52,7 @@ SIM_TYPES = subclasses(ISimulation)
 OPTIMIZER_TYPES = subclasses(GradientOptimizer)
 
 PLOT_NAMES = [
-    ['fom.pkl', 'quad_trans.pkl'],
+    ['fom.pkl', 'overall_trans.pkl'],
     ['enorm.pkl', 'final_device_layer.pkl'],
 ]
 PLOT_DIMS = (len(PLOT_NAMES), len(PLOT_NAMES[0]))

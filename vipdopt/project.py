@@ -20,8 +20,7 @@ from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import PathLike, ensure_path, glob_first
 
 
-
-def create_internal_folder_structure(root_dir: Path,debug_mode=False):
+def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     # global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
     # global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
     
@@ -142,8 +141,6 @@ class Project:
         """Load and setup optimization from an appropriate JSON config file."""
         
         # Load config file
-        # if isinstance(config, dict):
-        #     config = self.config_type(config)
         cfg = copy(config)
 
         try:
@@ -159,7 +156,6 @@ class Project:
         except Exception as e:
             self.optimizer = None
 
-
         try:
             # Setup base simulation -
             # Are we running using Lumerical or ceviche or fdtd-z or SPINS or?
@@ -169,7 +165,6 @@ class Project:
             vipdopt.logger.info('...successfully loaded base simulation!')
         except Exception as e:
             base_sim = LumericalSimulation()
-
         
         # TODO: Are we running it locally or on SLURM or on AWS or?
         base_sim.promise_env_setup(
@@ -192,6 +187,8 @@ class Project:
         # Setup FoMs
         self.foms = []
         for name, fom_dict in cfg.pop('figures_of_merit').items():
+            # Overwrite 'freq' and 'opt_ids' keys for now with the entire wavelength vector. Spectral sorting comes from spectral weighting
+            fom_dict['freq'] = cfg['lambda_values_um']
             self.weights.append(fom_dict['weight'])
             self.foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))
         full_fom = sum(np.multiply(self.weights, self.foms))
@@ -204,7 +201,6 @@ class Project:
         spectral_weights_by_fom = np.zeros((cfg['num_bands'], cfg['num_design_frequency_points']))
         # Each wavelength band needs a left, right, and peak (usually center).
         wl_band_bounds = {'left': [], 'peak': [], 'right': []}
-
 
         def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
             # Reminder that wl_band_bounds is a dictionary {'left': [], 'peak': [], 'right': []}
@@ -248,11 +244,21 @@ class Project:
                     wl_idxs = range(spectral_weights_by_fom.shape[-1])
                     fom[:] = np.exp( -( wl_idxs - band_peak)**2 / ( scaling_exp * band_width )**2 )
 
+            # # Plotting code to check weighting shapes
+            # import matplotlib.pyplot as plt
+            # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
+            # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
+            # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
+            # for fom in spectral_weights_by_fom:
+            # 	plt.plot(fom)
+            # plt.show()
+            # print(3)
         
             return spectral_weights_by_fom
 
         wl_band_bounds = assign_bands(wl_band_bounds, cfg['lambda_values_um'], cfg['num_bands'])
         vipdopt.logger.info(f'Desired peak locations per band are: {wl_band_bounds["peak"]}')
+        #! TODO: Assign wl_band_bounds to either project.py or optimization.py. Need to keep track of it for plotting
 
         # Convert to the nearest matching indices of lambda_values_um
         wl_band_bound_idxs = wl_band_bounds.copy()
@@ -263,6 +269,7 @@ class Project:
         # Repeat green weighting for other FoM such that green weighting applies to FoMs 1,3
         if cfg['simulator_dimension'] == '3D':      #! Bayer Filter Functionality
             spectral_weights_by_fom = np.insert(spectral_weights_by_fom, 3, spectral_weights_by_fom[1,:], axis=0)
+        vipdopt.logger.info('Spectral weights assigned.')
 
         self.weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
 
@@ -297,6 +304,7 @@ class Project:
                 init_seed=0,
                 filters=[Sigmoid(0.5, 1.0), Scale((cfg['min_device_permittivity'], cfg['max_device_permittivity']))],
             )
+        vipdopt.logger.info('Device loaded.')
 
         # Setup Folder Structure
         work_dir = self.dir / '.tmp'
@@ -309,6 +317,7 @@ class Project:
             running_on_local_machine = True
         
         self.subdirectories = create_internal_folder_structure(self.dir, running_on_local_machine)
+        vipdopt.logger.info('Internal folder substructure created.')
 
         # Setup Optimization
         self.optimization = Optimization(
@@ -328,6 +337,7 @@ class Project:
             env_vars=self.base_sim._env_vars.copy(),
             dirs=self.subdirectories,
         )
+        vipdopt.logger.info('Optimization initialized.')
 
         self.config = cfg
 
