@@ -285,7 +285,7 @@ class Optimization:
             
         # Use dummy simulation to run all of them at once using lumapi
         # self.runner_sim.promise_env_setup(self.sims[0]._env_vars)
-        if True: # os.getenv('SLURM_JOB_NODELIST') is None:
+        if os.getenv('SLURM_JOB_NODELIST') is None: # True
             self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
         for fname in self.sim_files:
             # self.runner_sim.fdtd.addjob(str(fname), 'FDTD')
