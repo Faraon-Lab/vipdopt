@@ -699,7 +699,10 @@ class LumericalSimulation(ISimulation):
         
         vipdopt.logger.info(f'Loading {self.info["path"]}')
         path: Path = self.info['path']
-        self.fdtd.load(str(path.absolute()))
+        try:
+            self.fdtd.load(str(path.absolute()))
+        except Exception as e:
+            self.fdtd.load(str(path))
         prop = self.getresult(monitor_name, value, dataset_value)
         if isinstance(prop, dict):
             vipdopt.logger.debug(f'Need to access one level deeper. Args passed: {monitor_name}, {value}, {dataset_value}.')

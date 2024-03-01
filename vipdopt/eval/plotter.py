@@ -689,7 +689,7 @@ def plot_Enorm_focal_3d(f, x, y, wl, plot_directory_location, iteration, wl_idxs
         Y_grid, X_grid = np.meshgrid(np.squeeze(r_vectors[0]['var_values'])*1e6, np.squeeze(r_vectors[1]['var_values'])*1e6)
         c = ax.pcolormesh(X_grid, Y_grid, f_vectors[0]['var_values'][0:max_spatial_idx,0:max_spatial_idx,wl_idx],
                             cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
-        plt.gca().set_aspect('equal')
+        # plt.gca().set_aspect('equal')
         
         wl_str = f'{plot_wl*1e9:.0f}nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f}um'
         title_string = r'$E_{norm}$' + ' at Focal Plane: $\lambda = $ ' + f'{wl_str}'
@@ -721,7 +721,7 @@ def plot_Enorm_focal_3d(f, x, y, wl, plot_directory_location, iteration, wl_idxs
 
         plt.close()
         
-    return fig, ax
+    return fig
 
 #* Evaluation after Optimization
 

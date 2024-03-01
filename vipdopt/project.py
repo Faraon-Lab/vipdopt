@@ -187,7 +187,8 @@ class Project:
         # Setup FoMs
         self.foms = []
         for name, fom_dict in cfg.pop('figures_of_merit').items():
-            # Overwrite 'freq' and 'opt_ids' keys for now with the entire wavelength vector. Spectral sorting comes from spectral weighting
+            # Overwrite 'opt_ids' key for now with the entire wavelength vector, by commenting out in config. 
+            # Spectral sorting comes from spectral weighting
             fom_dict['freq'] = cfg['lambda_values_um']
             self.weights.append(fom_dict['weight'])
             self.foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))

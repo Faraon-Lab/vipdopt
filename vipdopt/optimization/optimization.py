@@ -285,10 +285,11 @@ class Optimization:
             
         # Use dummy simulation to run all of them at once using lumapi
         # self.runner_sim.promise_env_setup(self.sims[0]._env_vars)
-        if os.getenv('SLURM_JOB_NODELIST') is None:
+        if True: # os.getenv('SLURM_JOB_NODELIST') is None:
             self.runner_sim.fdtd.setresource("FDTD", 1, "Job launching preset", "Local Computer")
         for fname in self.sim_files:
             # self.runner_sim.fdtd.addjob(str(fname), 'FDTD')
+            vipdopt.logger.debug(f'Adding {fname.name} to Lumerical job queue.')
             self.runner_sim.fdtd.addjob(fname.name, 'FDTD')     #! Has to just add the filename
 
         vipdopt.logger.debug('Running all simulations...')
