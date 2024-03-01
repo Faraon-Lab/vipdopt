@@ -37,7 +37,6 @@ from vipdopt.utils import PathLike, read_config_file, subclasses, StoppableThrea
 
 import matplotlib as mpl
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 font = {
@@ -126,7 +125,6 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         super().__init__()
         self.setupUi(self)
 
-
         self.config_model = ConfigModel()
         self.config_treeView.setModel(self.config_model)
         self.sim_model = ConfigModel()
@@ -150,15 +148,111 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
         self.fom_widget_rows: list[tuple[QLineEdit, QComboBox, QPushButton, QPushButton, QLineEdit, QComboBox, QComboBox, QToolButton]]= []
         self.fom_locs: dict[str, tuple[int, int]] = {}  # index, row of each FoM
-        # self.fom_indices = {}  # Which index corresponds to each FoM
         self.new_fom()
-
 
     # General Methods
     def new_project(self):
         """Create a new project."""
         self.project = Project()
         self._update_values()
+
+    def open_project(self):
+        """Load optimization project into the GUI."""
+        proj_dir = QFileDialog.getExistingDirectory(
+            self,
+            'Select Project Directory',
+            './',
+            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
+        )
+        if proj_dir:
+            self.project.load_project(proj_dir)
+            vipdopt.logger.info(f'Loaded project from {proj_dir}')
+            self._update_values()
+            vipdopt.logger.info(f'Updated GUI with values from {proj_dir}')
+
+    def _update_values(self):
+        """Update GUI to match values in Project."""
+        # Config Tab
+        self.config_model.load(self.project.config)
+
+        # Simulation Tab
+        self.sim_model.load(self.project.base_sim.as_dict())
+
+        self.sim_config_treeWidget.clear()
+        sim: LumericalSimulation
+        for i, sim in enumerate(self.project.optimization.sims):
+            sim_node = QTreeWidgetItem((f'Simulation {i}', ))
+            source_nodes = [QTreeWidgetItem((src,)) for src in sim.source_names()]
+            for src in source_nodes:
+                src.setCheckState(1, Qt.CheckState.Unchecked)
+            source_nodes[i].setCheckState(1, Qt.CheckState.Checked)
+            sim_node.addChildren(source_nodes)
+            self.sim_config_treeWidget.addTopLevelItem(sim_node)
+
+        # FoM Tab
+        self.clear_fom_rows()
+        for i, fom in enumerate(self.project.foms):
+            self.add_fom(i, fom)
+            self.fom_widget_rows[i][4].setText(str(self.project.weights[i]))
+            self.fom_widget_rows[i][5].addItems([f'Simulation {i}' for i in range(len(self.project.optimization.sims))])
+            self.fom_widget_rows[i][6].addItems([f'Simulation {i}' for i in range(len(self.project.optimization.sims))])
+        # Device Tab
+        self.device_model.load(self.project.device.as_dict())
+
+        # Optimization Tab
+        self.opt_iter_lineEdit.setText(str(self.project.optimization.iteration))
+        self.opt_iter_per_epoch_lineEdit.setText(str(self.project.optimization.iter_per_epoch))
+        self.opt_max_epoch_lineEdit.setText(str(self.project.optimization.max_epochs))
+
+    # Configuration Tab
+    def load_yaml(self):
+        """Load a yaml config file into the configuration tab."""
+        fname, _ = QFileDialog.getOpenFileName(
+            self,
+            'Select Configuration File',
+            './',
+            'YAML (*.yaml *.yml);;All Files(*.*)',
+            'YAML (*.yaml *.yml)',
+        )
+        if fname:
+            cfg = read_config_file(fname)
+            self.config_lineEdit.setText(fname)
+            self.config_model.load(cfg)
+
+    # Simulation Tab
+    def load_json(self):
+        """Load a yaml config file into the configuration tab."""
+        fname, _ = QFileDialog.getOpenFileName(
+            self,
+            'Select Configuration File',
+            './',
+            'JSON (*.json);;All Files(*.*)',
+            'JSON (*.json)',
+        )
+        if fname:
+            cfg = read_config_file(fname)
+            self.sim_lineEdit.setText(fname)
+            self.sim_model.load(cfg)
+
+    # FoM Tab
+    def fom_dialog(self, name: str, mode: str='fom'):
+        """Create a dialog for selecting monitors for FoMs."""
+        dialog = FomDialog(self)
+        dialog.populate_tree(self.project.optimization.sims)
+        idx, _ = self.fom_locs[name]
+        fom = self.project.foms[idx]
+        match mode.lower():
+            case 'fom':
+                monitors = fom.fom_monitors
+            case 'grad':
+                monitors = fom.grad_monitors
+            case _:
+                raise ValueError(
+                    'fom_dialog can only be called with mode "fom" or "grad"'
+                )
+
+        dialog.check_monitors(self.project.src_to_sim_map, *monitors)
+        dialog.exec()
 
     def new_fom_row(self, name: str):
         """Create a new FoM row."""
@@ -216,7 +310,6 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         adj_sim_comboBox.setObjectName(f'fom_adj_sim_comboBox_{name}')
         adj_sim_comboBox.clear()
         self.fom_gridLayout.addWidget(adj_sim_comboBox, rows, 6, 1, 1)
-
 
         # Delete Row button
         delrow_toolButton = QToolButton()
@@ -286,130 +379,12 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
                 layout.widget().deleteLater()
                 self.fom_gridLayout.removeItem(layout)
 
-        
-        # index = self.fom_gridLayout.indexOf(self.sender())
-        # row = self.fom_gridLayout.getItemPosition(index)[0] + 1
         # Shift remaining rows up
         for name, (i, r) in self.fom_locs.items():
-        # for i, widgets in enumerate(self.project.foms[idx:]):
-            # r = row + i
             if i > idx:
                 self.fom_locs[name] = (i - 1, r)
-            # for widg in widgets:
-            #     # self.fom_gridLayout.removeWidget(widg)
-            #     if isinstance(widg, QPushButton):
-            #         widg.clicked.disconnect()
-            #         widg.clicked.connect(lambda: self.fom_dialog(idx + i, 'fom'))
-            #     if isinstance(widg, QToolButton):
-            #         widg.clicked.disconnect()
-            #         widg.clicked.connect(lambda: self.remove_fom(idx + i))
-                # self.fom_gridLayout.addWidget(widg, row, col)
+
         self.add_fom_add_button()
-
-    def open_project(self):
-        """Load optimization project into the GUI."""
-        proj_dir = QFileDialog.getExistingDirectory(
-            self,
-            'Select Project Directory',
-            './',
-            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
-        )
-        if proj_dir:
-            self.project.load_project(proj_dir)
-            vipdopt.logger.info(f'Loaded project from {proj_dir}')
-            self._update_values()
-            vipdopt.logger.info(f'Updated GUI with values from {proj_dir}')
-
-    def fom_dialog(self, name: str, mode: str='fom'):
-        """Create a dialog for selecting monitors for FoMs."""
-        dialog = FomDialog(self)
-        dialog.populate_tree(self.project.optimization.sims)
-        idx, _ = self.fom_locs[name]
-        fom = self.project.foms[idx]
-        match mode.lower():
-            case 'fom':
-                monitors = fom.fom_monitors
-            case 'grad':
-                monitors = fom.grad_monitors
-            case _:
-                raise ValueError(
-                    'fom_dialog can only be called with mode "fom" or "grad"'
-                )
-
-        dialog.check_monitors(self.project.src_to_sim_map, *monitors)
-        dialog.exec()
-
-    def _update_values(self):
-        """Update GUI to match values in Project."""
-        # Config Tab
-        self.config_model.load(self.project.config)
-
-        # Simulation Tab
-        self.sim_model.load(self.project.base_sim.as_dict())
-
-        self.sim_config_treeWidget.clear()
-        sim: LumericalSimulation
-        for i, sim in enumerate(self.project.optimization.sims):
-            sim_node = QTreeWidgetItem((f'Simulation {i}', ))
-            source_nodes = [QTreeWidgetItem((src,)) for src in sim.source_names()]
-            for src in source_nodes:
-                src.setCheckState(1, Qt.CheckState.Unchecked)
-            source_nodes[i].setCheckState(1, Qt.CheckState.Checked)
-            sim_node.addChildren(source_nodes)
-            self.sim_config_treeWidget.addTopLevelItem(sim_node)
-
-        # FoM Tab
-        self.clear_fom_rows()
-        for i, fom in enumerate(self.project.foms):
-            self.add_fom(i, fom)
-            self.fom_widget_rows[i][4].setText(str(self.project.weights[i]))
-            self.fom_widget_rows[i][5].addItems([f'Simulation {i}' for i in range(len(self.project.optimization.sims))])
-            self.fom_widget_rows[i][6].addItems([f'Simulation {i}' for i in range(len(self.project.optimization.sims))])
-        # Device Tab
-        self.device_model.load(self.project.device.as_dict())
-
-        # Optimization Tab
-        self.opt_iter_lineEdit.setText(str(self.project.optimization.iteration))
-        self.opt_iter_per_epoch_lineEdit.setText(str(self.project.optimization.iter_per_epoch))
-        self.opt_max_epoch_lineEdit.setText(str(self.project.optimization.max_epochs))
-
-
-    # Configuration Tab
-    def load_yaml(self):
-        """Load a yaml config file into the configuration tab."""
-        fname, _ = QFileDialog.getOpenFileName(
-            self,
-            'Select Configuration File',
-            './',
-            'YAML (*.yaml *.yml);;All Files(*.*)',
-            'YAML (*.yaml *.yml)',
-        )
-        if fname:
-            cfg = read_config_file(fname)
-            self.config_lineEdit.setText(fname)
-            self.config_model.load(cfg)
-
-    # Simulation Tab
-    def load_json(self):
-        """Load a yaml config file into the configuration tab."""
-        fname, _ = QFileDialog.getOpenFileName(
-            self,
-            'Select Configuration File',
-            './',
-            'JSON (*.json);;All Files(*.*)',
-            'JSON (*.json)',
-        )
-        if fname:
-            cfg = read_config_file(fname)
-            self.sim_lineEdit.setText(fname)
-            self.sim_model.load(cfg)
-
-    # FoM Tab
-    def add_fom_row(self):
-        """Add a FoM to the FoM tab."""
-
-    def remove_fom_row(self):
-        """Remove the selected FoM from the FoM tab."""
 
     # Optimization Tab
     def load_optimization_settings(self, fname: PathLike):
