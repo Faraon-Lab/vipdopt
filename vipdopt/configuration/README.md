@@ -106,7 +106,7 @@ If you'd like to provide your own device specification, you have two options:
     - `init_seed` (int): The random seed to use when initializing the device
     - `symmetric` (bool): Whther the initial device should be symmetric
     - `filters`: A List of filter objects to use with format
-        ```json
+        ```
         {
             "type": TYPE,
             "parameters": {
@@ -135,7 +135,7 @@ This contains general information about a simulation. The values are
 The objects dictionary contains all of the simulation objects to create in the FDTD software.
 
 Each object has the format:
-```json
+```
 NAME: {
     "name": NAME,
     "obj_type": TYPE,
