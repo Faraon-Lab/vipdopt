@@ -7,6 +7,5 @@ overrides==7.4.*
 PyYAML
 types-PyYAML
 python-magic
-dill
 Jinja2
 PySide6==6.6.1

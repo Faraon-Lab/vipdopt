@@ -12,10 +12,8 @@ dependencies:
   - PyYAML
   - types-PyYAML
   - python-magic
-  - dill
   - Jinja2
   - pip
-  - pyside6=6.6.1
   # For Linting
   - ruff=0.0.287
   # For static type checking
