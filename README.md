@@ -25,7 +25,7 @@ To run an optimization, Vipdopt requires a project_directory containing two file
 - A configuration file containing optimization parameters
 - A `sim.json` file containing the base simulation file to run with Lumerical
 
-More details regarding configuration files are located [here](vipdopt/configuration/readme.md).
+More details regarding configuration files are located [here](vipdopt/configuration/README.md).
 
 To run an optimization from a pre-existing project directory, run:
 ```sh
