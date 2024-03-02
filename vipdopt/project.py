@@ -124,14 +124,14 @@ class Project:
         return proj
 
     @ensure_path
-    def load_project(self, project_dir: Path, file_name:str ='processed_config.yaml'):
+    def load_project(self, project_dir: Path, config_name:str ='config.yaml'):
         """Load settings from a project directory - or creates them if initializing for the first time. 
         MUST have a config file in the project directory."""
         self.dir = project_dir
-        cfg_file = project_dir / file_name
+        cfg_file = project_dir / config_name
         if not cfg_file.exists():
             # Search the directory for a configuration file
-            cfg_file = glob_first(project_dir, '**/*config*.{json,yaml,yml}')
+            cfg_file = glob_first(project_dir, '**/*config*.{yaml,yml,json}')
         cfg = Config.from_file(cfg_file)
         cfg_sim = Config.from_file(project_dir / 'sim.json')
         cfg.data['base_simulation'] = cfg_sim.data              #! 20240221: Hacked together to combine the two outputs of template.py

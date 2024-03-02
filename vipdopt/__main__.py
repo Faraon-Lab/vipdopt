@@ -22,6 +22,7 @@ sys.path.insert(0, path)
 from pathlib import Path
 
 from vipdopt.project import Project
+from vipdopt.gui import start_gui
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -33,12 +34,13 @@ if __name__ == '__main__':
     parser.add_argument(
          '--log',
         type=Path,
-        default=None,
+        default='dev.log',
         help='Path to the log file.'
     )
 
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(help='commands', dest='command')
     opt_parser = subparsers.add_parser('optimize')
+    gui_parser = subparsers.add_parser('gui')
 
     opt_parser.add_argument('-v', '--verbose', action='store_const', const=True,
                             default=SUPPRESS, help='Enable verbose output.')
@@ -55,18 +57,29 @@ if __name__ == '__main__':
     )
     
     opt_parser.add_argument(
-        'config',
+        '--config',
         type=str,
-        help='Configuration file to use in the optimization',
+        default='config.yaml',
+        help='Configuration file to use in the optimization; defaults to config.yaml',
     )
 
     args = parser.parse_args()
-    if args.log is None:
-        args.log = args.directory / 'dev.log'
+
+    if args.command == 'optimize':
+        log_file = args.directory / args.log
+    else:
+        log_file = args.log
 
     # Set verbosity
     level = logging.DEBUG if args.verbose else logging.INFO
-    vipdopt.logger = setup_logger('global_logger', level, log_file=args.log)
+    vipdopt.logger = setup_logger('global_logger', level, log_file=log_file)
+
+    if args.command == 'gui':
+        sys.exit(start_gui([]))
+    elif args.command is None:
+        print(parser.format_usage())
+        sys.exit(1)
+
     vipdopt.logger.info(f'Starting up optimization file: {os.path.basename(__file__)}')
     vipdopt.logger.info("All modules loaded.")
     vipdopt.logger.debug(f'Current working directory: {os.getcwd()}')
@@ -92,7 +105,7 @@ if __name__ == '__main__':
     # project.optimizer = AdamOptimizer()
     # project.foms = some list of FoMs
     # project.save_as('test_project')
-    project.load_project(args.directory, file_name=args.config)
+    project.load_project(args.directory, config_name=args.config)
     # project.save()
 
     # Now that config is loaded, set up lumapi

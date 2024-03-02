@@ -493,8 +493,6 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         )
         subprocess.call(['sbatch', str(slurm_script)])
 
-
-
     def toggle_optimization(self):
         self.running = not self.running
         if self.running:
@@ -526,6 +524,7 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         self._update_plots()
 
+        self.running = self.project.optimization.loop 
         if self.running:
             self.start_stop_pushButton.setText('Stop Optimization')
         else:
@@ -537,14 +536,13 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
         self.avg_power_label.setText('unknown')
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+def start_gui(args: list[str]):
+    app = QApplication(args)
 
-    app = QApplication(sys.argv)
-
-    # Create application windows
+    # Create application window
     status_window = StatusDashboard()
     status_window.show()
-    # settings_window = SettingsWindow()
-    # settings_window.show()
     app.exec()
+
+if __name__ == '__main__':
+    start_gui(sys.argv)
