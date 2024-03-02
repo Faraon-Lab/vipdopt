@@ -1,45 +1,41 @@
 """Entrypoint running the GUI. Mainly for testing right now."""
 from __future__ import annotations
 
-import logging
+import contextlib
+import pickle
+import subprocess
 import sys
+from collections.abc import Callable
 
-from PySide6.QtCore import Qt, QCoreApplication
-from PySide6.QtGui import QPixmap
+import matplotlib as mpl
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QDialog,
     QFileDialog,
-    QMainWindow,
-    QTreeWidgetItem,
-    QWidget,
-    QComboBox,
     QLineEdit,
+    QMainWindow,
     QPushButton,
     QSizePolicy,
     QToolButton,
-    QLayout
+    QTreeWidgetItem,
+    QWidget,
 )
-
-import pickle
-from typing import Callable
-import subprocess
 
 import vipdopt
 from vipdopt.gui.config_editor import ConfigModel
+from vipdopt.gui.ui_dashboard import Ui_MainWindow as Ui_DashboardWindow
 from vipdopt.gui.ui_fom_dialog import Ui_Dialog as Ui_FomDialog
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
-from vipdopt.gui.ui_dashboard import Ui_MainWindow as Ui_DashboardWindow
 from vipdopt.monitor import Monitor
-from vipdopt.optimization import FoM, BayerFilterFoM, GradientOptimizer
+from vipdopt.optimization import BayerFilterFoM, FoM, GradientOptimizer
 from vipdopt.project import Project
-from vipdopt.simulation import LumericalSimulation, ISimulation
-from vipdopt.utils import PathLike, read_config_file, subclasses, StoppableThread
+from vipdopt.simulation import ISimulation, LumericalSimulation
 from vipdopt.submit_job import generate_script
-
-import matplotlib as mpl
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from vipdopt.utils import PathLike, StoppableThread, read_config_file, subclasses
 
 font = {
     'size': 12,
@@ -143,9 +139,9 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.project = Project()
 
         self.fom_addrow_toolButton = QToolButton()
-        self.fom_addrow_toolButton.setObjectName(u"fom_addrow_toolButton")
+        self.fom_addrow_toolButton.setObjectName('fom_addrow_toolButton')
         self.fom_gridLayout.addWidget(self.fom_addrow_toolButton, 1, 0, 1, 1)
-        self.fom_addrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Add Row", None))
+        self.fom_addrow_toolButton.setText(QCoreApplication.translate('MainWindow', 'Add Row', None))
         self.fom_addrow_toolButton.clicked.connect(lambda: self.new_fom())
 
         self.fom_widget_rows: list[tuple[QLineEdit, QComboBox, QPushButton, QPushButton, QLineEdit, QComboBox, QComboBox, QToolButton]]= []
@@ -268,7 +264,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(name_lineEdit.sizePolicy().hasHeightForWidth())
         name_lineEdit.setSizePolicy(sizePolicy)
-        name_lineEdit.setPlaceholderText(QCoreApplication.translate("MainWindow", name, None))
+        name_lineEdit.setPlaceholderText(QCoreApplication.translate('MainWindow', name, None))
         self.fom_gridLayout.addWidget(name_lineEdit, rows, 0, 1, 1)
 
         # Type Combo Box
@@ -277,17 +273,17 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         type_comboBox.clear()
         type_comboBox.addItems(FOM_TYPES)
         self.fom_gridLayout.addWidget(type_comboBox, rows, 1, 1, 1)
-        
+
         # Monitor Buttons
         fom_pushButton = QPushButton()
         fom_pushButton.setObjectName(f'fom_fom_pushButton_{name}')
-        fom_pushButton.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
+        fom_pushButton.setText(QCoreApplication.translate('MainWindow', 'Choose Monitors...', None))
         self.fom_gridLayout.addWidget(fom_pushButton, rows, 2, 1, 1)
         fom_pushButton.clicked.connect(lambda: self.fom_dialog(name, 'fom'))
-        
+
         grad_pushButton = QPushButton()
         grad_pushButton.setObjectName(f'fom_grad_pushButton_{name}')
-        grad_pushButton.setText(QCoreApplication.translate("MainWindow", u"Choose Monitors...", None))
+        grad_pushButton.setText(QCoreApplication.translate('MainWindow', 'Choose Monitors...', None))
         self.fom_gridLayout.addWidget(grad_pushButton, rows, 3, 1, 1)
         grad_pushButton.clicked.connect(lambda: self.fom_dialog(name, 'grad'))
 
@@ -299,7 +295,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         sizePolicy1.setVerticalStretch(0)
         sizePolicy1.setHeightForWidth(weight_lineEdit.sizePolicy().hasHeightForWidth())
         weight_lineEdit.setSizePolicy(sizePolicy1)
-        name_lineEdit.setPlaceholderText(QCoreApplication.translate("MainWindow", u"1.0", None))
+        name_lineEdit.setPlaceholderText(QCoreApplication.translate('MainWindow', '1.0', None))
         self.fom_gridLayout.addWidget(weight_lineEdit, rows, 4, 1, 1)
 
         # Simulation Combo Boxes
@@ -317,7 +313,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         delrow_toolButton = QToolButton()
         delrow_toolButton.setObjectName(f'fom_delrow_toolButton_{name}')
         self.fom_gridLayout.addWidget(delrow_toolButton, rows, 7, 1, 1)
-        delrow_toolButton.setText(QCoreApplication.translate("MainWindow", u"Remove Row", None))
+        delrow_toolButton.setText(QCoreApplication.translate('MainWindow', 'Remove Row', None))
         delrow_toolButton.clicked.connect(lambda: self.remove_fom(name))
 
         self.fom_widget_rows.append(
@@ -334,13 +330,13 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         )
         self.add_fom_add_button()
         return rows
-    
+
     def new_fom(self):
         """Create a new FoM."""
         fom = BayerFilterFoM([], [], '', [])
         self.add_fom(len(self.fom_widget_rows), fom)
         self.project.foms.append(fom)
-    
+
     def add_fom(self, idx: int, fom: FoM):
         """Create a new FoM row and populate with data from a FoM."""
         self.fom_gridLayout.removeWidget(self.fom_addrow_toolButton)
@@ -351,7 +347,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
         name_lineEdit.setText(fom.name)
         type_comboBox.setCurrentIndex(FOM_TYPES.index(type(fom).__name__))
-    
+
     def add_fom_add_button(self):
         """Move the FoM add buttons to the correct location."""
         row = self.fom_gridLayout.rowCount()
@@ -360,7 +356,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
     def clear_fom_rows(self):
         """Remove all FoMs."""
-        for _, (_, r) in self.fom_locs.items():
+        for (_, r) in self.fom_locs.values():
             for c in range(self.fom_gridLayout.columnCount()):
                 layout = self.fom_gridLayout.itemAtPosition(r, c)
                 if layout is not None:
@@ -372,7 +368,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
     def remove_fom(self, name: str):
         if len(self.fom_locs) == 1:
-            raise ValueError(f'There must be at least one FoM.')
+            raise ValueError('There must be at least one FoM.')
 
         idx, row = self.fom_locs.pop(name)
         for c in range(self.fom_gridLayout.columnCount()):
@@ -395,7 +391,6 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
 class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, figure: Figure= None, width=3, height=12/5, dpi=100, fontsize=12):
-        # fig = Figure(figsize=(width, height), dpi=dpi)
         self.fontsize = fontsize
         if figure is not None:
             self.change_font(figure)
@@ -406,7 +401,7 @@ class MplCanvas(FigureCanvasQTAgg):
         super().__init__(self.fig)
         self.adjust_figure_size(width)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-    
+
     def change_font(self, fig: Figure):
         for ax in fig.axes:
             ax.set_title(ax.get_title(), fontsize=self.fontsize)
@@ -414,7 +409,7 @@ class MplCanvas(FigureCanvasQTAgg):
             ax.set_ylabel(ax.get_ylabel(), fontsize=self.fontsize)
             ax.set_xticklabels(ax.get_xticklabels(), fontsize=self.fontsize)
             ax.set_yticklabels(ax.get_yticklabels(), fontsize=self.fontsize)
-    
+
     def adjust_figure_size(self, fig_width, fig_height=None):
         if fig_height is None:
             fig_height = fig_width*4/5
@@ -470,10 +465,9 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
     def settings_window(self):
         win = SettingsWindow()
         win.project = self.project
-        try:
+        with contextlib.suppress(BaseException):
             win._update_values()
-        except BaseException:
-            pass
+
         win.setWindowModality(Qt.WindowModality.ApplicationModal)
         def wrap_func(f: Callable):
             def override_close(*args):
@@ -504,7 +498,7 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
             self.opt_thread = StoppableThread(target=self.project.stop_optimization)
             self.opt_thread.run()
         self._update_values()
-    
+
     def _update_plots(self):
         plots_folder = self.project.subdirectories['opt_plots']
 
@@ -524,12 +518,12 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         self._update_plots()
 
-        self.running = self.project.optimization.loop 
+        self.running = self.project.optimization.loop
         if self.running:
             self.start_stop_pushButton.setText('Stop Optimization')
         else:
             self.start_stop_pushButton.setText('Start Optimization')
-        
+
         self.iter_label.setText(str(self.project.optimization.iteration))
         self.epoch_label.setText(str(self.project.optimization.epoch))
         self.avg_e_label.setText('unknown')

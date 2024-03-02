@@ -57,7 +57,7 @@ To describe the figures of merit (FoMs) to use in your optimization, a dictionar
 
 ### Miscellaneous Parameters
 - `num_bands`: The number of frequency bands
-- `num_design_frequency_points`: 
+- `num_design_frequency_points`:
 - `lambda_values_um`: The wavelengths of light to use in the optimization
 - `simulator_dimension`: Whether the simulator is `2D` or `3D`
 
@@ -73,7 +73,7 @@ You're also welcome to include your own parameters.
 
 The following are some parameters in [`config_example.yaml`](/vipdopt/configuration/config_example.yml) that are often adjusted, and their default values:
 ```yaml
-mesh_spacing_um: 0.017 
+mesh_spacing_um: 0.017
 geometry_spacing_lateral_um: 0.085
 device_scale_um: 0.051    # Controls vertical dimensions e.g. focal length, device vertical layer voxels, and FDTD gap sizes.
 num_vertical_layers: 10
@@ -89,7 +89,7 @@ source_angle_phi_deg: 0
 num_epochs: 10
 num_iterations_per_epoch: 30
 desired_peaks_per_band_um: [ 0.48, 0.52, 0.59 ]
-```  
+```
 
 ### `device`
 While technically the `device` parameter is optional, not including one will result in using our default device.

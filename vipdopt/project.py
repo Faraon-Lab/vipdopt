@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-import sys
 import os
-from copy import copy
 import shutil
+import sys
+from copy import copy
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 sys.path.append(os.getcwd())
+import contextlib
+
 import vipdopt
 from vipdopt.configuration import Config, SonyBayerConfig
 from vipdopt.optimization import Device, FoM, GradientOptimizer, Optimization
-from vipdopt.optimization.filter import Sigmoid, Scale
+from vipdopt.optimization.filter import Scale, Sigmoid
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import PathLike, ensure_path, glob_first
 
@@ -23,10 +25,10 @@ from vipdopt.utils import PathLike, ensure_path, glob_first
 def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     # global DATA_FOLDER, SAVED_SCRIPTS_FOLDER, OPTIMIZATION_INFO_FOLDER, OPTIMIZATION_PLOTS_FOLDER
     # global DEBUG_COMPLETED_JOBS_FOLDER, PULL_COMPLETED_JOBS_FOLDER, EVALUATION_FOLDER, EVALUATION_CONFIG_FOLDER, EVALUATION_UTILS_FOLDER
-    
+
     directories: dict[str, Path] = {'main': root_dir}
 
-    #* Output / Save Paths 
+    #* Output / Save Paths
     data_folder = root_dir / 'data'
     temp_folder = root_dir / '.tmp'
     checkpoint_folder = data_folder / 'checkpoints'
@@ -42,38 +44,27 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     evaluation_config_folder = evaluation_folder / 'configs'
     evaluation_utils_folder = evaluation_folder / 'utils'
 
-    # parameters['MODEL_PATH'] = DATA_FOLDER / 'model.pth'
-    # parameters['OPTIMIZER_PATH'] = DATA_FOLDER / 'optimizer.pth'
 
 
     # #* Save out the various files that exist right before the optimization runs for debugging purposes.
     # # If these files have changed significantly, the optimization should be re-run to compare to anything new.
 
-    try:
-        shutil.copy2( root_dir + "/slurm_vis10lyr.sh", saved_scripts_folder + "/slurm_vis10lyr.sh" )
-    except Exception as ex:
-        pass
-    # shutil.copy2( cfg.python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
-    # shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
-    # shutil.copy2( python_src_directory + "/configs/SonyBayerFilterParameters.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterParameters.py" )
+    with contextlib.suppress(Exception):
+        shutil.copy2( root_dir + '/slurm_vis10lyr.sh', saved_scripts_folder + '/slurm_vis10lyr.sh' )
+
+    # shutil.copy2( os.path.join(python_src_directory, yaml_filename),
     # # TODO: et cetera... might have to save out various scripts from each folder
 
     #  Create convenient folder for evaluation code
     # if not os.path.isdir( evaluation_folder ):
-    #     evaluation_folder.mkdir(exist_ok=True)
-    
-    
-    # TODO: finalize this when the Project directory internal structure is finalized    
-    # if os.path.exists(EVALUATION_CONFIG_FOLDER):
-    #     shutil.rmtree(EVALUATION_CONFIG_FOLDER)
-    # shutil.copytree(os.path.join(main_dir, "configs"), EVALUATION_CONFIG_FOLDER)
-    # if os.path.exists(EVALUATION_UTILS_FOLDER):
-    #     shutil.rmtree(EVALUATION_UTILS_FOLDER)
-    # shutil.copytree(os.path.join(main_dir, "utils"), EVALUATION_UTILS_FOLDER)
 
-    #shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
-    
-    
+
+    # TODO: finalize this when the Project directory internal structure is finalized
+    # if os.path.exists(EVALUATION_CONFIG_FOLDER):
+    # if os.path.exists(EVALUATION_UTILS_FOLDER):
+
+
+
 
     directories = {
         'root': root_dir,
@@ -125,8 +116,9 @@ class Project:
 
     @ensure_path
     def load_project(self, project_dir: Path, config_name:str ='config.yaml'):
-        """Load settings from a project directory - or creates them if initializing for the first time. 
-        MUST have a config file in the project directory."""
+        """Load settings from a project directory - or creates them if initializing for the first time.
+        MUST have a config file in the project directory.
+        """
         self.dir = project_dir
         cfg_file = project_dir / config_name
         if not cfg_file.exists():
@@ -139,7 +131,6 @@ class Project:
 
     def _load_config(self, config: Config | dict):
         """Load and setup optimization from an appropriate JSON config file."""
-        
         # Load config file
         cfg = copy(config)
 
@@ -153,19 +144,19 @@ class Project:
                 raise NotImplementedError(f'Optimizer {optimizer} not currently supported')\
                 from None
             self.optimizer = optimizer_type(**optimizer_settings)
-        except Exception as e:
+        except Exception:
             self.optimizer = None
 
         try:
             # Setup base simulation -
             # Are we running using Lumerical or ceviche or fdtd-z or SPINS or?
-            vipdopt.logger.info(f'Loading base simulation from sim.json...')
+            vipdopt.logger.info('Loading base simulation from sim.json...')
             base_sim = LumericalSimulation(cfg.pop('base_simulation'))
             #! TODO: IT'S NOT LOADING cfg.data['base_simulation']['objects']['FDTD']['dimension'] properly!
             vipdopt.logger.info('...successfully loaded base simulation!')
-        except Exception as e:
+        except Exception:
             base_sim = LumericalSimulation()
-        
+
         # TODO: Are we running it locally or on SLURM or on AWS or?
         base_sim.promise_env_setup(
             mpi_exe=cfg['mpi_exe'],
@@ -173,7 +164,7 @@ class Project:
             solver_exe=cfg['solver_exe'],
             nsims=len(base_sim.source_names())
         )
-            
+
         self.base_sim = base_sim
         self.src_to_sim_map = {
             src: base_sim.with_enabled([src], name=src) for src in base_sim.source_names()
@@ -187,44 +178,42 @@ class Project:
         # Setup FoMs
         self.foms = []
         for name, fom_dict in cfg.pop('figures_of_merit').items():
-            # Overwrite 'opt_ids' key for now with the entire wavelength vector, by commenting out in config. 
+            # Overwrite 'opt_ids' key for now with the entire wavelength vector, by commenting out in config.
             # Spectral sorting comes from spectral weighting
             fom_dict['freq'] = cfg['lambda_values_um']
             self.weights.append(fom_dict['weight'])
             self.foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))
         full_fom = sum(np.multiply(self.weights, self.foms))
-        
+
         # Overall Weights for each FoM
         self.weights = np.array(self.weights)
-        
+
         # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM (e.g. spectral sorting)
-        # spectral_weights_by_fom = np.zeros((len(fom_dict), cfg.pv.num_design_frequency_points))
         spectral_weights_by_fom = np.zeros((cfg['num_bands'], cfg['num_design_frequency_points']))
         # Each wavelength band needs a left, right, and peak (usually center).
         wl_band_bounds = {'left': [], 'peak': [], 'right': []}
 
         def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
             # Reminder that wl_band_bounds is a dictionary {'left': [], 'peak': [], 'right': []}
-            
+
             # Naive method: Split lambda_values_um into num_bands and return lefts, centers, and rights accordingly.
             # i.e. assume all bands are equally spread across all of lambda_values_um without missing any values
 
-            for key in wl_band_bounds.keys():				# Reassign empty lists to be numpy arrays
+            for key in wl_band_bounds:				# Reassign empty lists to be numpy arrays
                 wl_band_bounds[key] = np.zeros(num_bands)
-            
+
             wl_bands = np.array_split(lambda_values_um, num_bands)
-            # wl_bands = np.array_split(lambda_values_um, [3,7,12,14])  # https://stackoverflow.com/a/67294512 
             # e.g. would give a list of arrays with length 3, 4, 5, 2, and N-(3+4+5+2)
 
             for band_idx, band in enumerate(wl_bands):
                 wl_band_bounds['left'][band_idx] = band[0]
                 wl_band_bounds['right'][band_idx] = band[-1]
                 wl_band_bounds['peak'][band_idx] = band[(len(band)-1)//2]
-            
+
             return wl_band_bounds
 
         def determine_spectral_weights(spectral_weights_by_fom, wl_band_bound_idxs, mode='identity', *args, **kwargs):
-            
+
             # Right now we have it set up to send specific wavelength bands to specific FoMs
             # This can be thought of as creating a desired transmission spectra for each FoM
             # The bounds of each band are controlled by wl_band_bound_idxs
@@ -237,7 +226,7 @@ class Project:
 
                 elif mode in ['hat']:		# 1 everywhere, 0 otherwise
                     fom[ wl_band_bound_idxs['left'][fom_idx] : wl_band_bound_idxs['right'][fom_idx]+1 ] = 1
-        
+
                 elif mode in ['gaussian']:	# gaussians centered on peaks
                     scaling_exp = - (4/7) / np.log( 0.5 )
                     band_peak = wl_band_bound_idxs['peak'][fom_idx]
@@ -246,15 +235,9 @@ class Project:
                     fom[:] = np.exp( -( wl_idxs - band_peak)**2 / ( scaling_exp * band_width )**2 )
 
             # # Plotting code to check weighting shapes
-            # import matplotlib.pyplot as plt
-            # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
-            # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
-            # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
             # for fom in spectral_weights_by_fom:
             # 	plt.plot(fom)
-            # plt.show()
-            # print(3)
-        
+
             return spectral_weights_by_fom
 
         wl_band_bounds = assign_bands(wl_band_bounds, cfg['lambda_values_um'], cfg['num_bands'])
@@ -279,8 +262,8 @@ class Project:
         try:
             device_source = cfg.pop('device')
             self.device = Device.from_source(device_source)
-        except Exception as e:
-      
+        except Exception:
+
             #* Design Region(s) + Constraints
             # e.g. feature sizes, bridging/voids, permittivity constraints, corresponding E-field monitor regions
             region_coordinates = {'x': np.linspace(-0.5 * cfg['device_size_lateral_bordered_um'], 0.5 * cfg['device_size_lateral_bordered_um'], cfg['device_voxels_lateral_bordered'])}
@@ -296,7 +279,7 @@ class Project:
                     'y': np.linspace(-0.5 * cfg['device_size_lateral_bordered_um'], 0.5 * cfg['device_size_lateral_bordered_um'], cfg['device_voxels_lateral_bordered']),
                     'z': np.linspace(cfg['device_vertical_minimum_um'], cfg['device_vertical_maximum_um'], cfg['device_voxels_vertical'])
                 })
-                
+
             self.device = Device(
                 voxel_array_size,       # (cfg['device_voxels_simulation_mesh_vertical'], cfg['device_voxels_simulation_mesh_lateral']),
                 (cfg['min_device_permittivity'], cfg['max_device_permittivity']),
@@ -310,13 +293,13 @@ class Project:
         # Setup Folder Structure
         work_dir = self.dir / '.tmp'
         work_dir.mkdir(exist_ok=True, mode=0o777)
-        vipdopt_dir = os.path.dirname(__file__)         # Go up one folder
-        
+        os.path.dirname(__file__)         # Go up one folder
+
         running_on_local_machine = False
         slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
         if slurm_job_env_variable is None:
             running_on_local_machine = True
-        
+
         self.subdirectories = create_internal_folder_structure(self.dir, running_on_local_machine)
         vipdopt.logger.info('Internal folder substructure created.')
 
@@ -403,13 +386,12 @@ class Project:
 
         # Device
         cfg['device'] = self.current_device_path()    #! 20240221 Ian: Edited this to match config.json in test_project
-        # cfg['device'] = vars(self.device)
 
         # Simulation
         cfg['base_simulation'] = self.base_sim.as_dict()
 
         return cfg
-    
+
     def start_optimization(self):
         """Start this project's optimization."""
         try:
@@ -418,7 +400,7 @@ class Project:
         finally:
             vipdopt.logger.info('Saving optimization after early stop...')
             self.save()
-    
+
     def stop_optimization(self):
         """Stop this project's optimization."""
         vipdopt.logger.info('stopping optimization early')

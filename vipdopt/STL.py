@@ -1,14 +1,14 @@
 import numpy as np
-from stl import mesh
+from matplotlib import pyplot as plt
 from mpl_toolkits import mplot3d
-from matplotlib import pyplot
+from stl import mesh
 
-class STL():
+
+class STL:
 	def __init__( self, density_3d ):
 		self.density_3d = density_3d
 		self.density_shape = density_3d.shape
 
-		# self.generate_stl()
 
 	def generate_stl( self ):
 		pad_density = np.pad( self.density_3d, ( ( 1, 1 ), ( 1, 1 ), ( 1, 1 ) ), mode='constant' )
@@ -128,13 +128,14 @@ class STL():
 									triangles.append( [ [ v5_x, v5_y, v5_z ], [ v4_x, v4_y, v4_z ], [ v3_x, v3_y, v3_z ] ] )
 
 
-		z_compare = lambda triangle: np.min( [ triangle[ 0 ][ 2 ], triangle[ 1 ][ 2 ], triangle[ 2 ][ 2 ] ] )
+		def z_compare(triangle):
+			return np.min([triangle[0][2], triangle[1][2], triangle[2][2]])
 		sorted_triangles = sorted( triangles, key=z_compare )
 
 		num_triangles = len( sorted_triangles )
 		mesh_data = np.zeros( num_triangles, dtype=mesh.Mesh.dtype )
 
-		for triangle_idx in range( 0, num_triangles ):
+		for triangle_idx in range( num_triangles ):
 			mesh_data[ 'vectors' ][ triangle_idx ] = np.array( sorted_triangles[ triangle_idx ] )
 
 		self.stl_mesh = mesh.Mesh( mesh_data, remove_empty_areas=False )
@@ -144,7 +145,7 @@ class STL():
 		self.stl_mesh.save( filename )
 
 	def viz_stl( self ):
-		figure = pyplot.figure()
+		figure = plt.figure()
 		axes = mplot3d.Axes3D( figure )
 
 		axes.add_collection3d( mplot3d.art3d.Poly3DCollection( self.stl_mesh.vectors ) )
@@ -152,29 +153,27 @@ class STL():
 		scale = self.stl_mesh.points.flatten()
 		axes.auto_scale_xyz(scale, scale, scale)
 
-		pyplot.show()
+		plt.show()
 
 
 
 
-class Layered_STL():
+class Layered_STL:
 	def __init__( self, density_3d, layer_increment ):
 		self.density_3d = density_3d
 		self.density_shape = density_3d.shape
 		self.layer_increment = layer_increment
 
-		assert ( self.density_3d.shape[ 2 ] % self.layer_increment ) == 0, "This density does not divide equally into the given layer increment!"
+		assert ( self.density_3d.shape[ 2 ] % self.layer_increment ) == 0, 'This density does not divide equally into the given layer increment!'
 
 		self.num_layers = self.density_3d.shape[ 2 ] // self.layer_increment
 
-		# self.generate_stl()
 
 	def generate_stl( self ):
 		pad_density = np.pad( self.density_3d, ( ( 1, 1 ), ( 1, 1 ), ( self.layer_increment, self.layer_increment ) ), mode='constant' )
 
 		triangles = []
-		for layered_z in range( 0, self.num_layers ):
-			# print( 'Working on layer ' + str( layered_z ) )
+		for layered_z in range( self.num_layers ):
 
 			z = ( 1 + layered_z ) * self.layer_increment
 
@@ -291,13 +290,14 @@ class Layered_STL():
 									triangles.append( [ [ v5_x, v5_y, v5_z ], [ v4_x, v4_y, v4_z ], [ v3_x, v3_y, v3_z ] ] )
 
 
-		z_compare = lambda triangle: np.min( [ triangle[ 0 ][ 2 ], triangle[ 1 ][ 2 ], triangle[ 2 ][ 2 ] ] )
+		def z_compare(triangle):
+			return np.min([triangle[0][2], triangle[1][2], triangle[2][2]])
 		sorted_triangles = sorted( triangles, key=z_compare )
 
 		num_triangles = len( sorted_triangles )
 		mesh_data = np.zeros( num_triangles, dtype=mesh.Mesh.dtype )
 
-		for triangle_idx in range( 0, num_triangles ):
+		for triangle_idx in range( num_triangles ):
 			mesh_data[ 'vectors' ][ triangle_idx ] = np.array( sorted_triangles[ triangle_idx ] )
 
 		self.stl_mesh = mesh.Mesh( mesh_data, remove_empty_areas=False )
@@ -307,7 +307,7 @@ class Layered_STL():
 		self.stl_mesh.save( filename )
 
 	def viz_stl( self ):
-		figure = pyplot.figure()
+		figure = plt.figure()
 		axes = mplot3d.Axes3D( figure )
 
 		axes.add_collection3d( mplot3d.art3d.Poly3DCollection( self.stl_mesh.vectors ) )
@@ -315,4 +315,4 @@ class Layered_STL():
 		scale = self.stl_mesh.points.flatten()
 		axes.auto_scale_xyz(scale, scale, scale)
 
-		pyplot.show()
+		plt.show()

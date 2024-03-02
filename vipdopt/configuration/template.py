@@ -1,6 +1,8 @@
 """Library of code for working with Jinja and rendering templates."""
 
 import logging
+import os
+import sys
 from argparse import ArgumentParser
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -10,8 +12,6 @@ import numpy.typing as npt
 from jinja2 import Environment, FileSystemLoader, Undefined
 from overrides import override
 
-import sys
-import os
 sys.path.append(os.getcwd())
 
 import vipdopt

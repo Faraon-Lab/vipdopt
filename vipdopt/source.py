@@ -1,8 +1,8 @@
-import numpy as np
 import pickle
 
-class Src():
-	
+
+class Src:
+
 	def __init__(self, src_object, monitor_object=None, sim_id=None):
 		self.src_dict = src_object		# Every Src class instance must be tied to a corresponding simulation object / dictionary containing parameters and values.
 		self.monitor_dict = monitor_object	# Every source (esp. an adjoint source) is located at a monitor, which may be a point or a surface. NOTE: This is also a SimObj/dictionary
@@ -17,7 +17,7 @@ class Src():
 class Fwd_Src(Src):
 
 	def __init__(self, src_object, polarization=None, monitor_object=None, sim_id=None):
-		super(Fwd_Src, self).__init__(src_object, monitor_object=monitor_object, sim_id=sim_id)
+		super().__init__(src_object, monitor_object=monitor_object, sim_id=sim_id)
 
 		self.Ex_fwd = None
 		self.Ey_fwd = None
@@ -35,7 +35,7 @@ class Fwd_Src(Src):
 class Adj_Src(Src):
 
 	def __init__(self, src_object, polarization=None, monitor_object=None, sim_id=None):
-		super(Adj_Src, self).__init__(src_object, monitor_object=monitor_object, sim_id=sim_id)
+		super().__init__(src_object, monitor_object=monitor_object, sim_id=sim_id)
 
 		self.Ex_adj = None
 		self.Ey_adj = None

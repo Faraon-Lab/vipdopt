@@ -1,19 +1,20 @@
 """Module containing common functions used throughout the package."""
 
+import contextlib
 import functools
 import importlib.util as imp
+import itertools
 import json
 import logging
 import os
-from collections.abc import Callable
+import threading
+import time
+from collections.abc import Callable, Generator, Iterable
 from importlib.abc import Loader
-import itertools
+from multiprocessing.pool import AsyncResult
 from numbers import Number
 from pathlib import Path
-from typing import Any, Concatenate, ParamSpec, TypeVar, Iterable, Iterator, Generator
-from multiprocessing.pool import AsyncResult
-import time
-import threading
+from typing import Any, Concatenate, ParamSpec, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -78,10 +79,9 @@ def setup_logger(
     # Create a handler for putting info into a .log file. Includes time stamps etc.
     # Will write EVERYTHING to the log (i.e. level = debug)
     if not os.path.exists(os.path.dirname(log_file)):
-        try:
+        with contextlib.suppress(Exception):
             os.makedirs(os.path.dirname(log_file))
-        except Exception as e:
-            pass
+
     fhandler = logging.FileHandler(log_file, mode='a')
     fhandler.setFormatter(
         logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -237,7 +237,7 @@ def ladd_to_all(l: Iterable[T], val: T) -> Generator[T, None, None]:
     """Add a value to all memebers of a list on the left."""
     for item in l:
         yield val + item
-        
+
 def radd_to_all(l: Iterable[T], val: T) -> Generator[T, None, None]:
     """Add a value to all memebers of a list on the right."""
     for item in l:
@@ -252,8 +252,7 @@ def split_glob(pattern: str) -> Generator[str, None, None]:
         prefix = pattern[:start]
         choices = pattern[start + 1:end].split(',')
         for choice in choices:
-            for p in ladd_to_all(split_glob(pattern[end + 1:]), prefix + choice.strip()):
-                yield p
+            yield from ladd_to_all(split_glob(pattern[end + 1:]), prefix + choice.strip())
     else:
         yield pattern
 
@@ -272,10 +271,11 @@ def glob_first(search_dir: PathLike, pattern: str) -> Path | None:
 
 class StoppableThread(threading.Thread):
     """Thread class with a stop() method. The thread itself has to check
-    regularly for the stopped() condition."""
+    regularly for the stopped() condition.
+    """
 
     def __init__(self,  *args, **kwargs):
-        super(StoppableThread, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._stop_event = threading.Event()
 
     def stop(self):
