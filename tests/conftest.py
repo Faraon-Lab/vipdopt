@@ -55,9 +55,9 @@ _mock_sim_file_data = """{
 }"""
 
 _mock_device_dict = {
-        'size': (40, 40),
+        'size': (40, 40, 5),
         'permittivity_constraints': (0.0, 1.0),
-        'coords': (0, 0, 0),
+        'coords': {'x': [0, 1], 'y': [0, 1], 'z': [0, 1]},
         'name': 'device',
         'init_density': 0.5,
         'randomize': True,

@@ -142,8 +142,8 @@ enforce_xy_gradient_symmetry: False #True#False#True
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-num_epochs: 5 # 10
-num_iterations_per_epoch: 30 #30
+max_epochs: 5 # 10
+iter_per_epoch: 30 #30
 
 optimizer_algorithm: 'ADAM' #'Gradient Descent'
 adam_betas: !!python/tuple [0.9, 0.999]

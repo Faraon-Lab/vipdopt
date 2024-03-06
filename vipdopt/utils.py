@@ -14,7 +14,7 @@ from importlib.abc import Loader
 from multiprocessing.pool import AsyncResult
 from numbers import Number
 from pathlib import Path
-from typing import Any, Concatenate, ParamSpec, TypeVar
+from typing import Any, Concatenate, ParamSpec, TypeVar, TypedDict
 
 import numpy as np
 import numpy.typing as npt
@@ -283,3 +283,9 @@ class StoppableThread(threading.Thread):
 
     def stopped(self):
         return self._stop_event.is_set()
+
+
+class Coordinates(TypedDict):
+    x: npt.NDArray
+    y: npt.NDArray
+    z: npt.NDArray

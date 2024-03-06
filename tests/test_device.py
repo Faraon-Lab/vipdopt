@@ -12,24 +12,29 @@ ETA = 0.5
 BETA = 1
 FILTER_LIST = [Sigmoid(ETA, BETA), Sigmoid(ETA, BETA)]
 INITIAL_DENSITY = 0.6
+BASE_COORDS = {
+    'x': np.array([0, 1]),
+    'y': np.array([0, 1]),
+    'z': np.array([0, 1]),
+}
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
         'size, match',
         [
-            ((1, 1, 1), r'Device size must be 2 dimensional.*'),
-            ((0, 1, 1), r'Device size must be 2 dimensional.*'),
-            ((0, 1), r'Expected positive, integer dimensions;.*'),
-            ((1, 0), r'Expected positive, integer dimensions;.*'),
-            ((-1, 1), r'Expected positive, integer dimensions;.*'),
-            ((1, -1), r'Expected positive, integer dimensions;.*'),
-            ((1.1, 1.1), r'Expected positive, integer dimensions;.*'),
-            ((1.0, 1.0), r'Expected positive, integer dimensions;.*'),
+            ((1, 1), r'Device size must be 3 dimensional.*'),
+            ((0, 1), r'Device size must be 3 dimensional.*'),
+            ((1, 0, 1), r'Expected positive, integer dimensions;.*'),
+            ((1, 1, 0), r'Expected positive, integer dimensions;.*'),
+            ((1, -1, 1), r'Expected positive, integer dimensions;.*'),
+            ((1, 1, -1), r'Expected positive, integer dimensions;.*'),
+            ((1, 1.1, 1.1), r'Expected positive, integer dimensions;.*'),
+            ((1, 1.0, 1.0), r'Expected positive, integer dimensions;.*'),
         ],
 )
 def test_bad_size(size: tuple[Number, ...], match):
     with pytest.raises(ValueError, match=match):
-        Device(size, (1, 1), (1, 1, 1))
+        Device(size, (1, 1), BASE_COORDS)
 
 
 @pytest.mark.smoke()
@@ -53,56 +58,72 @@ def test_bad_size(size: tuple[Number, ...], match):
 )
 def test_bad_permittivity(permittivity: tuple[Number, Number], match):
     with pytest.raises(ValueError, match=match):
-        Device((1, 1), permittivity, (1, 1, 1))
+        Device((1, 1, 1), permittivity, BASE_COORDS)
 
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
         'coords, match',
         [
-            ((1, 1, 1, 1), r'Expected device coordinates to be 3 dimensional;.*'),
-            ((1, 1), r'Expected device coordinates to be 3 dimensional;.*'),
-            ((1.0, 1j, 1), r'Expected device coordinates to be rational;.*'),
-            ((0.0, 1.1, np.pi), r'Expected device coordinates to be rational;.*'),
             (
-                (0.0, 1.1, np.exp(1j * np.pi / 3)),
-                r'Expected device coordinates to be rational;.*',
+                (1, 1, 1),
+                r'Expected device coordinates to be a dictionary with.*',
+            ),
+            (
+                {'x': 1, 'y': 1, 'z': 1, 'a': 1},
+                r'Expected device coordinates to be a dictionary with.*',
+            ),
+            (
+                {'x': 1, 'y': 1},
+                r'Expected device coordinates to be a dictionary with.*',
+            ),
+            (
+                {'a': 1, 'b': 1, 'c': 1},
+                r'Expected device coordinates to be a dictionary with.*',
+            ),
+            (
+                {'x': 1, 'y': 1, 'z': 1},
+                r'Expected device coordinates to be ndarrays;.*',
+            ),
+            (
+                {'x': np.array(1), 'y': np.array(1), 'z': 1},
+                r'Expected device coordinates to be ndarrays;.*',
             ),
         ],
 )
 def test_bad_coords(coords: tuple[Number, ...], match):
     with pytest.raises(ValueError, match=match):
-        Device((1, 1), (0, 1), coords)
+        Device((1, 1, 1), (0, 1), coords)
 
 
 @pytest.mark.smoke()
 def test_init_vars():
     device = Device(
-        (3, 3),
+        (3, 3, 1),
         (0, 1),
-        (0, 0, 0),
+        BASE_COORDS,
         init_density=INITIAL_DENSITY,
         filters=FILTER_LIST,
     )
-    x = INITIAL_DENSITY * np.ones((3, 3), dtype=np.complex128)
-    assert_equal(device.w[..., 0], x)
-    assert_equal(device.w.shape, (3, 3, 3))
+    x = INITIAL_DENSITY * np.ones((3, 3, 1), dtype=np.complex128)
+    assert_close(device.w[..., 0], x)
+    assert_equal(device.w.shape, (3, 3, 1, 3))
 
 @pytest.mark.smoke()
 def test_init_random():
     d1 = Device(
-        (3, 3),
+        (3, 3, 1),
         (0, 1),
-        (0, 0, 0),
+        BASE_COORDS,
         init_density=INITIAL_DENSITY,
         filters=FILTER_LIST,
         randomize=True,
         init_seed=0,
     )
     d2 = Device(
-        (3, 3),
+        (3, 3, 1),
         (0, 1),
-        (0, 0, 0),
+        BASE_COORDS,
         init_density=INITIAL_DENSITY,
         filters=FILTER_LIST,
         randomize=True,
@@ -114,9 +135,9 @@ def test_init_random():
 @pytest.mark.smoke()
 def test_init_symmetric():
     device = Device(
-        (3, 3),
+        (3, 3, 1),
         (0, 1),
-        (0, 0, 0),
+        BASE_COORDS,
         init_density=INITIAL_DENSITY,
         filters=FILTER_LIST,
         randomize=True,
@@ -126,20 +147,20 @@ def test_init_symmetric():
 
     # check symmetry
     w = device.w
-    a = w[..., 0] = np.flip(w[..., 0], axis=1)
+    a = np.flip(w[..., 0, 0], axis=1)
     assert np.allclose(a, a.T, rtol=1e-5, atol=1e-8)
 
 
 @pytest.mark.smoke()
 def test_update_density():
     device = Device(
-        (3, 3),
+        (3, 3, 1),
         (0, 1),
-        (0, 0, 0),
+        BASE_COORDS,
         init_density=INITIAL_DENSITY,
         filters=FILTER_LIST,
     )
-    x = np.ones((3, 3, 3), dtype=np.complex128)
+    x = np.ones((3, 3, 1, 3), dtype=np.complex128)
     x[..., 0] *= 0.6
     x[..., 1] *= 0.607838
     x[..., 2] *= 0.616228
@@ -152,9 +173,9 @@ def test_update_density():
 @pytest.mark.smoke()
 def test_pass_through_filters():
     device = Device(
-        (3, 3),
+        (3, 3, 1),
         (0, 1),
-        (0, 0, 0),
+        BASE_COORDS,
         init_density=INITIAL_DENSITY,
         filters=FILTER_LIST,
     )
@@ -180,14 +201,14 @@ def test_save_load(tmpdir, device_dict):
     dev2 = Device.from_source(p)
 
     # Should still work when loading a device with different size (i.e. 4x4 vs 40x40)
-    dev3 = Device((4, 4), (0, 1), (0, 0, 0))
+    dev3 = Device((4, 4, 5), (0, 1), BASE_COORDS)
     dev3.load_file(p)
 
-    dev4 = Device((4, 4), (0, 1), (0, 0, 0))
+    dev4 = Device((4, 4, 5), (0, 1), BASE_COORDS)
     dev4.load_dict(device_dict)
 
     for attr in vars(dev1):
-        assert_equal(dev2.__getattribute__(attr), dev1.__getattribute__(attr))
-        assert_equal(dev3.__getattribute__(attr), dev1.__getattribute__(attr))
-        assert_equal(dev4.__getattribute__(attr), dev1.__getattribute__(attr))
+        assert_close(dev2.__getattribute__(attr), dev1.__getattribute__(attr))
+        assert_close(dev3.__getattribute__(attr), dev1.__getattribute__(attr))
+        assert_close(dev4.__getattribute__(attr), dev1.__getattribute__(attr))
 

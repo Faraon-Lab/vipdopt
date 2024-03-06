@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 
 from vipdopt.optimization.filter import Filter, Scale, Sigmoid
-from vipdopt.utils import PathLike, ensure_path
+from vipdopt.utils import PathLike, ensure_path, Coordinates
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
@@ -24,8 +24,7 @@ class Device:
         size (tuple[int, int]): The (x, y) dimensions of the device
             region in voxels.
         permittivity_constraints (tuple[Rational, Rational]): Min and max permittivity.
-        coords (tuple[Rational, Rational, Rational]): The 3D coordinates in space of
-            the device.
+        coords (Coordinates): The 3D coordinates in space of the device.
         name (str): Name of the device; defaults to 'device'.
         init_density (float): The initial density to use in the device; defaults to 0.5.
         randomize (bool): Whether to initialize with random values; Defaults to False.
@@ -41,7 +40,7 @@ class Device:
             self,
             size: tuple[int, int, int] ,                            #! 20240227 Ian - Added second device
             permittivity_constraints: tuple[Real, Real],
-            coords: dict | tuple[Rational, Rational, Rational],     #! 20240227 Ian - Had to change this to a Dict(NDArray(Float)) of 'x','y','z'
+            coords: Coordinates,     #! 20240227 Ian - Had to change this to a Dict(NDArray(Float)) of 'x','y','z'
             name: str='device',
             init_density: float=0.5,
             randomize: bool=False,
@@ -70,12 +69,13 @@ class Device:
             raise ValueError('Maximum permittivity must be greater than minimum')
         self.permittivity_constraints = permittivity_constraints
 
-        if len(coords) != 3:  # noqa: PLR2004
-            raise ValueError('Expected device coordinates to be 3 dimensional; '
-                             f'got {len(coords)}')
-        # if any(not isinstance(coord, Rational) for coord in coords.values()):     #! 20240227 Ian - Commented this out for now
-        #     raise ValueError('Expected device coordinates to be rational;'
-        #                      f' got {coords}')
+        if not isinstance(coords, dict) or len(coords) != 3 or \
+            any(not dim in coords for dim in 'xyz'):
+            raise ValueError('Expected device coordinates to be a dictionary with '
+                             f'entries {{x, y, z}}; got {coords}')
+        if any(not isinstance(coord, np.ndarray) for coord in coords.values()):
+            raise ValueError('Expected device coordinates to be ndarrays;'
+                             f' got {coords}')
         self.coords = coords
 
         # Optional arguments
@@ -112,8 +112,8 @@ class Device:
             w[:] = rng.normal(self.init_density, GAUSSIAN_SCALE, size=w.shape)
 
             if self.symmetric:
-                w[..., 0] = np.tril(w[..., 0]) + np.triu(w[..., 0].T, 1)
-                w[..., 0] = np.flip(w[..., 0], axis=1)
+                w[..., 0, 0] = np.tril(w[..., 0, 0]) + np.triu(w[..., 0, 0].T, 1)
+                w[..., 0, 0] = np.flip(w[..., 0, 0], axis=1)
 
             w[..., 0] = np.maximum(np.minimum(w[..., 0], 1), 0)
         else:
@@ -126,6 +126,9 @@ class Device:
 
         # Design variable is stored separately
         del data['w']
+
+        del data['coords']
+        data['coords'] = {k: list(v) for k, v in self.coords.items()}
 
         # Add all filters
         filters: list[Filter] = []
@@ -146,6 +149,7 @@ class Device:
     def _from_dict(cls, device_data: dict) -> Device:
         """Create a new device from a dictionary."""
         data = copy(device_data)
+        data['coords'] = {k: np.array(v) for k, v in data['coords'].items()}
         filters: list[Filter] = []
         filt_dict: dict
         for filt_dict in data.pop('filters'):

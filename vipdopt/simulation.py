@@ -12,8 +12,8 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 from collections.abc import Callable
 from copy import copy
-from enum import StrEnum
 from functools import partial
+from enum import Enum
 from pathlib import Path
 from typing import Any, Concatenate
 
@@ -72,10 +72,7 @@ class ISimulation(abc.ABC):
     def run(self):
         """Run the simulation."""
 
-
-
-
-class LumericalSimObjectType(StrEnum):
+class LumericalSimObjectType(str, Enum):
     """Types of simulation objects in Lumerical."""
     FDTD = 'fdtd'
     MESH = 'mesh'
@@ -107,6 +104,16 @@ MONITOR_TYPES = [
 IMPORT_TYPES = [
     LumericalSimObjectType.IMPORT
 ]
+
+OBJECT_TYPE_NAME_MAP = {
+    'FDTD': LumericalSimObjectType.FDTD,
+    'GaussianSource': LumericalSimObjectType.GAUSSIAN,
+    'DipoleSource': LumericalSimObjectType.DIPOLE,
+    'Rectangle': LumericalSimObjectType.RECT,
+    'Mesh': LumericalSimObjectType.MESH,
+    'Import': LumericalSimObjectType.IMPORT,
+    'IndexMonitor': LumericalSimObjectType.INDEX,
+}
 
 class LumericalEncoder(json.JSONEncoder):
     """Encodes LumericalSim objects in JSON format."""

@@ -80,7 +80,7 @@ def test_sigmoid_forward(eta: Number, beta: Number, x: Number, expected: Number)
 )
 def test_sigmoid_chain_rule(eta: Number, beta: Number, x: Number, expected: Number):
     sig = Sigmoid(eta, beta)
-    assert_close(sig.chain_rule(0, 0, x), expected)  # 0's are dummy values
+    assert_close(sig.chain_rule(1, 0, x), expected)  # 0's are dummy values
 
 
 @pytest.mark.smoke()
