@@ -8,7 +8,8 @@ import sys
 from collections.abc import Callable
 
 import matplotlib as mpl
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+mpl.use('QtAgg')
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import (
@@ -420,6 +421,7 @@ class MplCanvas(FigureCanvasQTAgg):
         figw = float(fig_width)/(r-l)
         figh = float(fig_height)/(t-b)
         self.fig.figure.set_size_inches(figw, figh, forward=True)
+        self.fig.tight_layout()
 
 class StatusDashboard(QMainWindow, Ui_DashboardWindow):
     """Wrapper class for the status window."""
@@ -508,7 +510,7 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
                 fig_path = plots_folder / name
                 if fig_path.exists():
                     self.plots[i][j].deleteLater()
-                    new_fig = pickle.load(fig_path.open('rb'))
+                    new_fig: Figure = pickle.load(fig_path.open('rb'))
                     if isinstance(new_fig, tuple):
                         new_fig = new_fig[0]
                     self.plots[i][j] = MplCanvas(new_fig)
