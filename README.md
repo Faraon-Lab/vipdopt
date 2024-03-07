@@ -14,9 +14,10 @@ See [docs/](docs/)
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.10
 - Ansys Lumerical FDTD
 - An installation of MPI, for running simulations in parallel
+- Qt6
 - Dependencies listed in `build_requirements.txt`
 
 If creating a conda environment, there is not official PySide6 package yet. After activating your environment, you will need to install PySide6 with pip.
