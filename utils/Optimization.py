@@ -282,10 +282,10 @@ class Optimization:
 		
 								logging.debug(f'Accessing FoM {self.foms.index(f)} in list.')
 								logging.debug(f'File being accessed: {tempfile_adj_name} should match FoM tempfile {f.tempfile_adj_name}')
-								logging.debug(f'TrueFoM before has shape{f.gradient.shape}')
+								logging.debug(f'Gradient before has shape{f.gradient.shape}')
 								logging.debug(f'freq_index_opt is {f.freq_index_opt}')
 								f.compute_gradient()
-								logging.debug(f'TrueFoM after has shape{f.gradient.shape}')
+								logging.debug(f'Gradient after has shape{f.gradient.shape}')
 	
 								# Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
 								f.gradient /= cfg.pv.max_intensity_by_wavelength #[f.freq_index_opt]
@@ -325,6 +325,7 @@ class Optimization:
 				logging.info("Completed Step 4: Computed Figure of Merit.")
 				# utility.backup_all_vars(globals(), cfg.cv.shelf_fn)
 
+				logging.info("Beginning Step 5: Adjoint Optimization Jobs and Gradient Computation.")
 				list_overall_adjoint_gradient = self.grad_func(self.foms, self.weights)
 				# list_overall_adjoint_gradient = env_constr.overall_adjoint_gradient( indiv_foms, weights )	# Gives a wavelength vector
 				design_gradient = np.sum(list_overall_adjoint_gradient, -1)									# Sum over wavelength
@@ -374,7 +375,8 @@ class Optimization:
 									).transpose((1,2,3,0))
 	
 				design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
-													   np.repeat(get_grad_density[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
+														# get_grad_density											# 3D case
+                										np.repeat(get_grad_density[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
 													   design_region_geometry, method='linear' )
 				# design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ), device_gradient, bayer_filter_region, method='linear' )
 
