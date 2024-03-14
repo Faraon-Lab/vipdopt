@@ -13,9 +13,10 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.ticker import (
-    AutoMinorLocator,
-)
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, PercentFormatter,
+                               AutoMinorLocator)
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Custom Classes and Imports
@@ -56,12 +57,24 @@ TEMPLATE_PLOT_DATA = {'r':copy.deepcopy(sweep_parameters),
 
 
 #* Plot Style Params
-# if not running_on_local_machine:
+# if not running_on_local_machine:	
+#     from matplotlib import font_manager
+#     font_manager._rebuild()
+#     fp = font_manager.FontProperties(fname=r"/central/home/ifoo/.fonts/Helvetica-Neue-Medium-Extended.ttf")
+#     print('Font name is ' + fp.get_name())
+#     plt.rcParams.update({'font.sans-serif':fp.get_name()}) 
 
 # plt.rcParams.update({'font.sans-serif':'Helvetica Neue',            # Change this based on whatever custom font you have installed
 #                      'font.weight': 'normal', 'font.size':20})
-plt.rcParams.update({'font.weight': 'normal', 'font.size':20})
+plt.rcParams.update({'font.weight': 'normal', 'font.size':20})              
+# plt.rcParams['font.family'] = 'sans-serif'
+# plt.rcParams['mathtext.fontset'] = 'custom'
+# plt.rcParams['mathtext.rm'] = 'Helvetica Neue'
+# plt.rcParams['mathtext.it'] = 'Helvetica Neue:italic'
+# plt.rcParams['text.usetex'] = True
 
+# mpl.rcParams['font.sans-serif'] = 'Helvetica Neue'
+# mpl.rcParams['font.family'] = 'sans-serif'
 
 marker_style = {'linestyle': '-', 'linewidth': 2.2, 'marker': 'o', 'markersize': 4.5}
 vline_style = {'color': 'gray', 'linestyle': '--', 'linewidth': 1}
@@ -93,6 +106,7 @@ def apply_common_plot_style(ax=None, plt_kwargs=None, show_legend=True):
 
     # Creates legend
     if show_legend:
+        #ax.legend(prop={'size': 10})
         ax.legend(prop={'size': 10}, loc='center left', bbox_to_anchor=(1.1,.5))
 
     # Figure size
@@ -132,8 +146,10 @@ def enter_plot_data_1d(plot_config, fig=None, ax=None):
 
     ax = apply_common_plot_style(ax, {})
     plt.tight_layout()
-
-
+    
+    # # plt.show(block=False)
+    # # plt.show()
+    
     return fig, ax
 
 class BasicPlot:
@@ -164,7 +180,8 @@ class BasicPlot:
             line_data['x_axis']['values'] = self.r_vectors['var_values']
             line_data['y_axis']['values'] = self.f_vectors[plot_idx]['var_values']
             line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
-
+            # line_data['cutoff'] = slice(8,-8)
+            
             if plot_colors is not None:
                 line_data['color'] = plot_colors[plot_idx]
             if plot_labels is not None:
@@ -275,9 +292,10 @@ class SweepPlot(BasicPlot):
         # Whichever entry is a slice means that variable in r_vectors is the x-axis of this plot
         r_vector_value_idx = next(index for (index , item) in enumerate(slice_coords) if isinstance(item, slice))
         self.r_vectors = list(plot_data['r'][0].values())[r_vector_value_idx]
-
-
-    def append_line_data(self, slice_coords, plot_stdDev, plot_colors=None, plot_labels=None,
+        #f_vectors = plot_data['f']              # This is a list of N-D arrays, containing the function values for each parameter combination
+    
+    
+    def append_line_data(self, slice_coords, plot_stdDev, plot_colors=None, plot_labels=None, 
                           normalize_against_max=False):
         """Appends all line data stored in the f_vectors to the plot_config. Here we can assign colors and legend labels all at once.
         Overwriting the method in BasePlot.
@@ -299,6 +317,7 @@ class SweepPlot(BasicPlot):
             normalization_factor = np.max(y_plot_data) if normalize_against_max else 1
             line_data['y_axis']['values'] = y_plot_data / normalization_factor
             line_data['x_axis']['values'] = self.r_vectors['var_values']
+            # line_data['cutoff'] = slice(0, len(line_data['x_axis']['values']))
             line_data['cutoff'] = slice(0 + lmp.cutoff_1d_sweep_offset[0], len(line_data['x_axis']['values']) + lmp.cutoff_1d_sweep_offset[1])
 
             line_data['color'] = plot_colors[plot_idx]
@@ -319,6 +338,7 @@ class SweepPlot(BasicPlot):
 
                 line_data_2['x_axis']['values'] = self.r_vectors['var_values']
                 line_data_2['y_axis']['values'] = (y_plot_data + self.f_vectors[plot_idx]['var_stdevs']) / normalization_factor
+                # line_data_2['cutoff'] = slice(0, len(line_data_2['x_axis']['values']))
                 line_data_2['cutoff'] = slice(0 + lmp.cutoff_1d_sweep_offset[0], len(line_data_2['x_axis']['values']) + lmp.cutoff_1d_sweep_offset[1])
 
                 colors_so_far = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -435,9 +455,11 @@ def plot_quadrant_transmission_trace(f, plot_directory_location, epoch_list=None
                 'f': quad_trace,
                 'title': 'Quadrant Transmissions - Trace'}
 
+    # colors = [ 'b', 'g', 'r', 'm' ]
     # for quad_idx in range( 0, 4 ):
     # 	plt.plot( quad_trace[quad_idx]['var_values'], color=colors[ quad_idx ] )
-
+    # plt.show()
+ 
     bp = BasicPlot(plot_data)
     bp.append_line_data(plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'])
     bp.assign_title()
@@ -453,7 +475,7 @@ def plot_quadrant_transmission_trace(f, plot_directory_location, epoch_list=None
 def plot_individual_quadrant_transmission(f, r, plot_directory_location, iteration):
     """Plot the most updated quadrant transmission."""
     f = f[iteration]
-    np.max(f)
+    upperRange = np.max(f)
 
     num_adjoint_src = 4
     lambda_vector = copy.deepcopy(TEMPLATE_R_VECTOR)
@@ -466,8 +488,11 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, iterati
     plot_data = {'r':[lambda_vector],
                 'f': quad_trace,
                 'title': 'Quadrant Transmissions - Trace'}
-
+    
+    # plot_subfolder_name = 'quad_trans'
+    # plot_directory_location = plot_directory_location / plot_subfolder_name
     # if not os.path.isdir(plot_directory_location):
+    #     os.makedirs(plot_directory_location)
 
     bp = BasicPlot(plot_data)
     fig, ax = bp.fig, bp.ax
@@ -489,7 +514,8 @@ def visualize_device(cur_data, plot_directory_location, num_visualize_layers=1, 
     output_plot = {}
     r_vectors = []      # Variables
     f_vectors = []      # Functions
-
+    lambda_vectors = [] # Wavelengths
+    
     r_vectors.append({'var_name': 'x-axis',
                       'var_values': range(cur_data.shape[0])
                       })
@@ -504,8 +530,10 @@ def visualize_device(cur_data, plot_directory_location, num_visualize_layers=1, 
     output_plot['r'] = r_vectors
     output_plot['f'] = f_vectors
     output_plot['title'] = 'Device Visualization'
-
+    
+    # plot_layers = np.linspace(0, cur_data.shape[2]-1, num_visualize_layers).astype(int)
     plot_layers = np.linspace(0, 1, num_visualize_layers).astype(int)
+    # actual_layers = np.linspace(0, gp.cv.num_vertical_layers, num_visualize_layers).astype(int)
     actual_layers = plot_layers		# todo: replace with above
     for layer_idx, layer in enumerate(plot_layers):
         fig, ax = plt.subplots()
@@ -516,11 +544,15 @@ def visualize_device(cur_data, plot_directory_location, num_visualize_layers=1, 
 
         c = ax.pcolormesh(X_grid, Y_grid,
                             np.transpose(np.real(f_vectors[0]['var_values'][:,:,layer])),
+                            # f_vectors[0]['var_values'][:,:,layer],
+                            # f_vectors[0]['var_values'][:,:,layer][:-1, :-1],	# compensate for error when shading='flat'
                             cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
         plt.gca().set_aspect('equal')
 
         title_string = f'Device Layer {actual_layers[layer_idx]}'
         plt.title(title_string)
+        # plt.xlabel('x (um)')
+        # plt.ylabel('y (um)')
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.25)
@@ -557,8 +589,8 @@ def plot_overall_transmission_trace(f, plot_directory_location, epoch_list=None)
         epoch_list = np.linspace(0, len(f), 10)
     upperRange = np.ceil(np.max(f))
 
-    f.shape[1]
-    trace = np.zeros(f.shape[0])
+    num_adjoint_src = f.shape[1]
+    trace = np.zeros((f.shape[0]))
 
     for iteration in range(f.shape[0]):
         trace[iteration] = np.max( np.sum(f[iteration], 0) )
@@ -587,7 +619,7 @@ def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs = 
     """Plot the most updated quadrant transmission."""
     if wl_idxs is None:
         wl_idxs = [0, -1]
-    np.max(f)
+    upperRange = np.max(f)
 
     num_adjoint_src = 1 #f.shape[0]
     f = f[np.newaxis, ...]
@@ -604,6 +636,7 @@ def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs = 
                     'title': 'E-field Plot'}
 
         bp = BasicPlot(plot_data)
+        # bp.plot_config['y_axis']['limits'] = [0.0, 1.0]
         bp.append_line_data(plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'])
         bp.assign_title()
         bp.assign_axis_labels(y_label_string='Intensity')
@@ -635,6 +668,7 @@ def plot_Enorm_focal_3d(f, x, y, wl, plot_directory_location, iteration, wl_idxs
         fig, ax = plt.subplots()
 
         # Find the index of plot_wl in the wl_vector
+        # wl_index = min(range(len(wl_vector)), key=lambda i: abs(wl_vector[i]-plot_wl))
 
         # If the monitor area is rectangular, truncate to a square
         max_spatial_idx = np.min(np.shape(f_vectors[0]['var_values'])[0:2])
@@ -644,7 +678,8 @@ def plot_Enorm_focal_3d(f, x, y, wl, plot_directory_location, iteration, wl_idxs
         Y_grid, X_grid = np.meshgrid(np.squeeze(r_vectors[0]['var_values'])*1e6, np.squeeze(r_vectors[1]['var_values'])*1e6)
         c = ax.pcolormesh(X_grid, Y_grid, f_vectors[0]['var_values'][0:max_spatial_idx,0:max_spatial_idx,wl_idx],
                             cmap='jet', shading='auto')      # cmap='RdYlBu_r' is also good
-
+        # plt.gca().set_aspect('equal')
+        
         wl_str = f'{plot_wl*1e9:.0f}nm' if plot_wl < 1e-6 else f'{plot_wl*1e6:.3f}um'
         title_string = r'$E_{norm}$' + r' at Focal Plane: $\lambda = $ ' + f'{wl_str}'
         plt.title(title_string)
@@ -666,7 +701,9 @@ def plot_Enorm_focal_3d(f, x, y, wl, plot_directory_location, iteration, wl_idxs
         ax.figure.set_size_inches(figw, figh, forward=True)
         plt.tight_layout()
 
-
+        #plt.show(block=False)
+        #plt.show()
+            
         plt.savefig(plot_directory_location / f'Enorm_{wl_str}_i{iteration}.png',
             bbox_inches='tight')
         vipdopt.logger.info('Exported: Enorm Focal Plane Image at wavelength ' + wl_str)
@@ -681,6 +718,8 @@ def plot_Enorm_focal_3d(f, x, y, wl, plot_directory_location, iteration, wl_idxs
 
 def plot_sorting_eff_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder, include_overall=False):
     """For the given job index, plots the sorting efficiency (transmission) spectrum corresponding to that job."""
+    # plot_colors = ['blue', 'green', 'red', 'pink']
+    # plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
     plot_colors = ['blue', 'green', 'red']
     plot_labels = ['Blue', 'Green', 'Red']
 
@@ -702,6 +741,8 @@ def plot_sorting_eff_spectrum(plot_data, job_idx, sweep_parameters, job_names, p
 
 def plot_sorting_transmission_spectrum(plot_data, job_idx, sweep_parameters, job_names, plot_folder, include_overall=False, normalize_against='input_power'):
     """For the given job index, plots the sorting efficiency (transmission) spectrum corresponding to that job."""
+    # plot_colors = ['blue', 'green', 'red', 'pink']
+    # plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
     plot_colors = ['blue', 'green', 'red']
     plot_labels = ['Blue', 'Green', 'Red']
 
@@ -792,8 +833,10 @@ def plot_Enorm_focal_plane_image_spectrum(plot_data, job_idx, sweep_parameters, 
         figh = float(fig_height)/(t-b)
         ax.figure.set_size_inches(figw, figh, forward=True)
         plt.tight_layout()
-
-
+        
+        #plt.show(block=False)
+        #plt.show()
+        
         plot_subfolder_name = 'Enorm_fp_image_spectra'
         if not os.path.isdir(plot_folder + '/' + plot_subfolder_name):
             os.makedirs(plot_folder + '/' + plot_subfolder_name)
@@ -878,8 +921,10 @@ def plot_device_cross_section_spectrum(plot_data, job_idx, sweep_parameters, job
             figh = float(fig_height)/(t-b)
             ax.figure.set_size_inches(figw, figh, forward=True)
             plt.tight_layout()
-
-
+            
+            #plt.show(block=False)
+            #plt.show()
+            
             plot_subfolder_name = 'device_cross_section_spectra'
             if not os.path.isdir(plot_folder + '/' + plot_subfolder_name):
                 os.makedirs(plot_folder + '/' + plot_subfolder_name)
@@ -944,8 +989,10 @@ def plot_device_cross_section_spectrum(plot_data, job_idx, sweep_parameters, job
                 figh = float(fig_height)/(t-b)
                 ax.figure.set_size_inches(figw, figh, forward=True)
                 plt.tight_layout()
-
-
+                
+                #plt.show(block=False)
+                #plt.show()
+                
                 plot_subfolder_name = 'device_cross_section_spectra'
                 if not os.path.isdir(plot_folder + '/' + plot_subfolder_name):
                     os.makedirs(plot_folder + '/' + plot_subfolder_name)
@@ -1001,8 +1048,10 @@ def plot_sorting_transmission_sweep_1d(plot_data, slice_coords, plot_folder,
     if cutoff_1d_sweep_offset is None:
         cutoff_1d_sweep_offset = [0, 0]
     sp = SweepPlot(plot_data, slice_coords)
-
-    plot_colors = ['blue', 'green', 'red']
+    
+    # plot_colors = ['blue', 'green', 'red', 'gray']
+    # plot_labels = ['Blue', 'Green (x-pol.)', 'Red', 'Green (y-pol.)']
+    plot_colors = ['blue', 'green', 'red']	
     plot_labels = ['Blue', 'Green', 'Red']
 
     if include_overall:

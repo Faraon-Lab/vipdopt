@@ -44,6 +44,8 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     evaluation_config_folder = evaluation_folder / 'configs'
     evaluation_utils_folder = evaluation_folder / 'utils'
 
+    # parameters['MODEL_PATH'] = DATA_FOLDER / 'model.pth'
+    # parameters['OPTIMIZER_PATH'] = DATA_FOLDER / 'optimizer.pth'
 
 
     # #* Save out the various files that exist right before the optimization runs for debugging purposes.
@@ -52,19 +54,27 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     with contextlib.suppress(Exception):
         shutil.copy2( root_dir + '/slurm_vis10lyr.sh', saved_scripts_folder + '/slurm_vis10lyr.sh' )
 
-    # shutil.copy2( os.path.join(python_src_directory, yaml_filename),
+    # shutil.copy2( cfg.python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
+    # shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
+    # shutil.copy2( python_src_directory + "/configs/SonyBayerFilterParameters.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterParameters.py" )
     # # TODO: et cetera... might have to save out various scripts from each folder
 
     #  Create convenient folder for evaluation code
     # if not os.path.isdir( evaluation_folder ):
-
-
-    # TODO: finalize this when the Project directory internal structure is finalized
+    #     evaluation_folder.mkdir(exist_ok=True)
+    
+    
+    # TODO: finalize this when the Project directory internal structure is finalized    
     # if os.path.exists(EVALUATION_CONFIG_FOLDER):
+    #     shutil.rmtree(EVALUATION_CONFIG_FOLDER)
+    # shutil.copytree(os.path.join(main_dir, "configs"), EVALUATION_CONFIG_FOLDER)
     # if os.path.exists(EVALUATION_UTILS_FOLDER):
+    #     shutil.rmtree(EVALUATION_UTILS_FOLDER)
+    # shutil.copytree(os.path.join(main_dir, "utils"), EVALUATION_UTILS_FOLDER)
 
-
-
+    #shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
+    
+    
 
     directories = {
         'root': root_dir,
@@ -189,6 +199,7 @@ class Project:
         self.weights = np.array(self.weights)
 
         # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM (e.g. spectral sorting)
+        # spectral_weights_by_fom = np.zeros((len(fom_dict), cfg.pv.num_design_frequency_points))
         spectral_weights_by_fom = np.zeros((cfg['num_bands'], cfg['num_design_frequency_points']))
         # Each wavelength band needs a left, right, and peak (usually center).
         wl_band_bounds = {'left': [], 'peak': [], 'right': []}
@@ -203,6 +214,7 @@ class Project:
                 wl_band_bounds[key] = np.zeros(num_bands)
 
             wl_bands = np.array_split(lambda_values_um, num_bands)
+            # wl_bands = np.array_split(lambda_values_um, [3,7,12,14])  # https://stackoverflow.com/a/67294512 
             # e.g. would give a list of arrays with length 3, 4, 5, 2, and N-(3+4+5+2)
 
             for band_idx, band in enumerate(wl_bands):
@@ -235,9 +247,15 @@ class Project:
                     fom[:] = np.exp( -( wl_idxs - band_peak)**2 / ( scaling_exp * band_width )**2 )
 
             # # Plotting code to check weighting shapes
+            # import matplotlib.pyplot as plt
+            # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
+            # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
+            # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
             # for fom in spectral_weights_by_fom:
             # 	plt.plot(fom)
-
+            # plt.show()
+            # print(3)
+        
             return spectral_weights_by_fom
 
         wl_band_bounds = assign_bands(wl_band_bounds, cfg['lambda_values_um'], cfg['num_bands'])
@@ -293,8 +311,8 @@ class Project:
         # Setup Folder Structure
         work_dir = self.dir / '.tmp'
         work_dir.mkdir(exist_ok=True, mode=0o777)
-        os.path.dirname(__file__)         # Go up one folder
-
+        vipdopt_dir = os.path.dirname(__file__)         # Go up one folder
+        
         running_on_local_machine = False
         slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
         if slurm_job_env_variable is None:
@@ -386,6 +404,7 @@ class Project:
 
         # Device
         cfg['device'] = self.current_device_path()    #! 20240221 Ian: Edited this to match config.json in test_project
+        # cfg['device'] = vars(self.device)
 
         # Simulation
         cfg['base_simulation'] = self.base_sim.as_dict()

@@ -259,6 +259,9 @@ class LumericalSimulation(ISimulation):
         self.fdtd.load(str(fname))
         self.fdtd.selectall()
         objects = self.fdtd.getAllSelectedObjects()
+        # vipdopt.logger.debug(list(vars(objects[0]).keys()))
+        # vipdopt.logger.debug(list(objects[0].__dict__.keys()))
+        # print(objects[0]['type'])
         for o in objects:
             otype = o['type']
             if otype == 'DFTMonitor':
@@ -568,9 +571,10 @@ class LumericalSimulation(ISimulation):
         if binary_design:
             cur_density_import_interp = design.binarize(cur_density_import_interp)
 
-        for _dispersive_range_idx in range(1):		# todo: Add dispersion. Account for dispersion by using the dispersion_model
+        for dispersive_range_idx in range(0, 1):		# todo: Add dispersion. Account for dispersion by using the dispersion_model
+            # dispersive_max_permittivity = dispersion_model.average_permittivity( dispersive_ranges_um[ dispersive_range_idx ] )
             dispersive_max_permittivity = design.permittivity_constraints[-1] # max_device_permittivity
-            design.index_from_permittivity( dispersive_max_permittivity )
+            dispersive_max_index = design.index_from_permittivity( dispersive_max_permittivity )
 
             # Convert device to permittivity and then index
             cur_permittivity = design.density_to_permittivity(cur_density_import_interp, design.permittivity_constraints[0], dispersive_max_permittivity)
@@ -749,7 +753,8 @@ class LumericalSimulation(ISimulation):
 
         vipdopt.logger.debug(f'Transferred {data_xfer_size_mb} MB')
         vipdopt.logger.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
-
+        
+        # return fields.squeeze()                   #! 20240228 Ian - Maybe we shouldn't squeeze - need to account for 2D/3D
         return fields
 
     def get_hfield(self, monitor_name: str) -> npt.NDArray:
@@ -801,6 +806,7 @@ if __name__ == '__main__':
 
     # with LumericalSimulation(Path(args.simulation_json)) as sim:
     with LumericalSimulation() as sim:
+        # sim.promise_env_setup()
         sim._load_fsp('test_project/.tmp/sim_0.fsp')
         sys.exit()
 

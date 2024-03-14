@@ -3,24 +3,28 @@ from matplotlib import pyplot as plt
 from mpl_toolkits import mplot3d
 from stl import mesh
 
+#! todo: account for n-material design.
 
 class STL:
 	def __init__( self, density_3d ):
 		self.density_3d = density_3d
 		self.density_shape = density_3d.shape
-
+		# self.generate_stl()
 
 	def generate_stl( self ):
 		pad_density = np.pad( self.density_3d, ( ( 1, 1 ), ( 1, 1 ), ( 1, 1 ) ), mode='constant' )
 
 		triangles = []
+		# For each coordinate...
 		for z in range( 1, 1 + self.density_shape[ 2 ] ):
 			for y in range( 1, 1 + self.density_shape[ 1 ] ):
 				for x in range( 1, 1 + self.density_shape[ 0 ] ):
 
+					# Is there a material point here?
 					if pad_density[ x, y, z ]:
 
 						for neighbor_x in [ -1, 1 ]:
+							# Check the neighbors. If there's nothing, then this is an edge. We therefore define a facet (triangle).
 							if not pad_density[ x + neighbor_x, y, z ]:
 
 								v2_x = x + 0.5 * neighbor_x
@@ -55,7 +59,7 @@ class STL:
 									triangles.append( [ [ v2_x, v2_y, v2_z ], [ v1_x, v1_y, v1_z ], [ v0_x, v0_y, v0_z ] ] )
 									triangles.append( [ [ v5_x, v5_y, v5_z ], [ v4_x, v4_y, v4_z ], [ v3_x, v3_y, v3_z ] ] )
 
-
+						# Same thing in the y-dimension
 						for neighbor_y in [ -1, 1 ]:
 							if not pad_density[ x, y + neighbor_y, z ]:
 
@@ -92,7 +96,7 @@ class STL:
 									triangles.append( [ [ v0_x, v0_y, v0_z ], [ v1_x, v1_y, v1_z ], [ v2_x, v2_y, v2_z ] ] )
 									triangles.append( [ [ v3_x, v3_y, v3_z ], [ v4_x, v4_y, v4_z ], [ v5_x, v5_y, v5_z ] ] )
 
-
+						# Same thing in the z-dimension
 						for neighbor_z in [ -1, 1 ]:
 							if not pad_density[ x, y, z + neighbor_z ]:
 
@@ -136,6 +140,7 @@ class STL:
 		mesh_data = np.zeros( num_triangles, dtype=mesh.Mesh.dtype )
 
 		for triangle_idx in range( num_triangles ):
+			# Recall that each element of vectors is a 3x3 array i.e. 3 points each with 3 coordinates.
 			mesh_data[ 'vectors' ][ triangle_idx ] = np.array( sorted_triangles[ triangle_idx ] )
 
 		self.stl_mesh = mesh.Mesh( mesh_data, remove_empty_areas=False )
@@ -145,8 +150,11 @@ class STL:
 		self.stl_mesh.save( filename )
 
 	def viz_stl( self ):
+		# https://numpy-stl.readthedocs.io/en/latest/usage.html#plotting-using-matplotlib-is-equally-easy
+		
 		figure = plt.figure()
-		axes = mplot3d.Axes3D( figure )
+		axes = figure.add_subplot( projection='3d' )
+		# axes = mplot3d.Axes3D( figure )
 
 		axes.add_collection3d( mplot3d.art3d.Poly3DCollection( self.stl_mesh.vectors ) )
 
@@ -167,13 +175,14 @@ class Layered_STL:
 		assert ( self.density_3d.shape[ 2 ] % self.layer_increment ) == 0, 'This density does not divide equally into the given layer increment!'
 
 		self.num_layers = self.density_3d.shape[ 2 ] // self.layer_increment
-
+		# self.generate_stl()
 
 	def generate_stl( self ):
 		pad_density = np.pad( self.density_3d, ( ( 1, 1 ), ( 1, 1 ), ( self.layer_increment, self.layer_increment ) ), mode='constant' )
 
 		triangles = []
 		for layered_z in range( self.num_layers ):
+			# print( 'Working on layer ' + str( layered_z ) )
 
 			z = ( 1 + layered_z ) * self.layer_increment
 

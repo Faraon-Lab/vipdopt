@@ -224,8 +224,11 @@ class Device:
 
     def get_permittivity(self) -> npt.NDArray[np.complex128]:
         """Return the permittivity of the design variable."""
+        
         # # Now that there is a Scale filter, this is unnecessary.
-
+        # eps_min, eps_max = self.permittivity_constraints
+        # return self.get_density() * (eps_max - eps_min) + eps_min
+        
         return self.w[...,-1]
 
     def update_density(self):
@@ -298,6 +301,10 @@ class Device:
 
         #! 20240228 Ian - Fixed, previous version had something wrong
         # for i in range(self.num_filters() - 1, -1, -1):
+        #     filt = self.filters[i]
+        #     y = self.w[..., i]
+        #     x = self.w[..., i - 1]
 
+        #     grad = filt.chain_rule(grad, y, x)
 
         return grad

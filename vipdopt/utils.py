@@ -110,7 +110,8 @@ def import_lumapi(loc: str):
         lumapi = imp.module_from_spec(spec_lin)
         spec_lin.loader.exec_module(lumapi)
     except FileNotFoundError:
-        logging.exception('lumapi not found. Using dummy values\n')
+        # logging.exception('lumapi not found. Using dummy values\n')
+        pass
     return lumapi
 
 

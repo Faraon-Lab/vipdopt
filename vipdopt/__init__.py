@@ -8,8 +8,11 @@ from typing import Any
 
 from vipdopt.utils import import_lumapi
 
-lumapi: ModuleType = import_lumapi(
-    f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
-)
+try:
+    lumapi: ModuleType = import_lumapi(
+        f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
+    )
+except Exception as e:
+    lumapi: Any = None
 fdtd: Any = None
 logger: logging.Logger = logging.getLogger()
