@@ -1,6 +1,9 @@
 # Developer files
 *.out
-
+*.log
+*.json
+*.yaml
+*.yml
 !runs/
 !vipdopt/configuration/config_example.yml
 !environment.yml
