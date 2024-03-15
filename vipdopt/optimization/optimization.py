@@ -13,7 +13,7 @@ import numpy.typing as npt
 from scipy import interpolate
 
 import vipdopt
-from vipdopt import STL, GDS
+from vipdopt import GDS, STL
 from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.optimizer import GradientOptimizer
@@ -157,7 +157,7 @@ class Optimization:
                                                     E_focal['x'], E_focal['y'], E_focal['lambda'],
                                                     folder, self.true_iteration, wl_idxs=[9,29,49])
 
-            indiv_trans_fig = plotter.plot_individual_quadrant_transmission(self.fom_evolution['transmission'], 
+            indiv_trans_fig = plotter.plot_individual_quadrant_transmission(self.fom_evolution['transmission'],
                                 self.cfg['lambda_values_um'], folder, self.true_iteration)	# continuously produces only one plot per epoch to save space
 
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
@@ -202,7 +202,6 @@ class Optimization:
 
     def run_simulations(self):
         """Run all of the simulations in parallel."""
-
         # jobs = [
         #     (i, self.dir, sim.as_dict(), sim.get_env_vars())
         #     for i, sim in enumerate(self.sims)
@@ -220,7 +219,7 @@ class Optimization:
         )
 
         # self.save_sims()      #! 20240227 Ian - Seems to be overwriting with blanks.
-        
+
         # Loading device
         # Each epoch the filters get stronger and so the permittivity must be passed through the new filters
         # todo: test once you get a filter online
@@ -287,16 +286,16 @@ class Optimization:
         vipdopt.logger.debug('Done running simulations')
 
         # self.load_sims()          #! 20240227 Ian - Not Working
-        
+
         # self.sims[0].connect()
         # vipdopt.logger.info(f'field_shape before: {self.sims[0].get_field_shape()}')
         # self.sims[0].load(self.dir / 'sim_0.fsp')
         # vipdopt.logger.info(f'field_shape after: {self.sims[0].get_field_shape()}')
         # Use a thread pool for this part so that state is shared
-        
+
         # self.sims[0].connect()
         # self.sims[0].load(sim_files[0])
-        # vipdopt.logger.debug(self.sims[0].fdtd.getresult('design_index_monitor'))        
+        # vipdopt.logger.debug(self.sims[0].fdtd.getresult('design_index_monitor'))
 
     def run(self):
         """Run the optimization."""
@@ -313,7 +312,7 @@ class Optimization:
                     f'=========\nEpoch {self.epoch}, iter {self.iteration}: Running simulations...'
                 )
                 self.true_iteration = self.epoch * self.iter_per_epoch + self.true_iteration
-                
+
                 vipdopt.logger.debug(
                     f'\tDesign Variable: {self.device.get_design_variable()}'
                 )
@@ -331,12 +330,12 @@ class Optimization:
                 # #! 20240227 Ian - Gradient seems to be returned in tuple form, which is weird
                 # # e.g. tuple of len (41), each element being an array (42, 3) - instead of np.array((41,42,3))
                 # # We need to reshape the gradient
-                
+
                 # vipdopt.logger.debug(
                 #     f'FoM at epoch {self.epoch}, iter {self.iteration}: {fom}\n'
                 #     f'Gradient {self.epoch}, iter {self.iteration}: {gradient}'
                 # )
-                
+
                 #! ESSENTIAL STEP - MUST CLEAR THE E-FIELDS OTHERWISE THEY WON'T UPDATE (see monitor.e function)
                 for f in self.foms:
                     for m in f.fom_monitors:
@@ -352,7 +351,7 @@ class Optimization:
                 # self.sim_files = [self.dirs['debug_completed_jobs'] / f'{sim.info["name"]}.fsp' for sim in self.sims]
                 # for sim in self.sims:
                 #     sim.info['path'] = self.dirs['debug_completed_jobs'] / Path(sim.info['path']).name
-                
+
                 vipdopt.logger.info('Beginning Step 4: Computing Figure of Merit')
 
                 tempfile_fwd_name_arr = [file.name for file in self.sim_files if any(x in file.name for x in ['forward','fwd'])]
@@ -363,14 +362,14 @@ class Optimization:
                     self.runner_sim.fdtd.load(tempfile_fwd_name)
                     # efield_test = self.runner_sim.get_efield('design_efield_monitor')
                     # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_fwd_name} is {efield_test[1,2,2,0,15]}')
-                
+
                     # print(3)
 
                     for f_idx, f in enumerate(self.foms):
                         if f.fom_monitors[-1].sim.info['name'] in tempfile_fwd_name:      # todo: might need to account for file extensions
                             # todo: rewrite this to hook to whichever device the FoM is tied to
-                            # print(f'FoM property has length {len(f.fom)}')	
-                            
+                            # print(f'FoM property has length {len(f.fom)}')
+
                             f.design_fwd_fields = f.grad_monitors[0].e
                             vipdopt.logger.info(f'Accessed design E-field monitor. NOTE: Field shape obtained is: {f.grad_monitors[0].fshape}')
                             # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_fwd_name} is alternately {f.design_fwd_fields[1,2,2,0,15]}')
@@ -410,7 +409,7 @@ class Optimization:
                             # 	get_focal_data[adj_src_idx][xy_idx, 0, 0, 0, spectral_indices[0]:spectral_indices[1]:1]
                             # ) )
                         # gc.collect()
-            
+
                 for tempfile_adj_name in tempfile_adj_name_arr:
                     self.runner_sim.fdtd.load(tempfile_adj_name)
                     # efield_test = self.runner_sim.get_efield('design_efield_monitor')
@@ -419,19 +418,19 @@ class Optimization:
                     #* Process the various figures of merit for performance weighting.
                     # Copy everything so as not to disturb the original data
                     # process_fom_evolution = copy.deepcopy(self.fom_evolution)
-    
+
                     for f_idx, f in enumerate(self.foms):
                         if f.grad_monitors[-1].sim.info['name'] in tempfile_adj_name:      # todo: might need to account for file extensions
                             # todo: rewrite this to hook to whichever device the FoM is tied to
-                            # print(f'FoM property has length {len(f.fom)}')	
-                            
+                            # print(f'FoM property has length {len(f.fom)}')
+
                             f.design_adj_fields = f.grad_monitors[-1].e
                             vipdopt.logger.info('Accessed design E-field monitor.')
                             # vipdopt.logger.debug(f'Test value of design_efield_monitor in file {tempfile_adj_name} is alternately {f.design_adj_fields[1,2,2,0,15]}')
 
                             #* Compute gradient
                             # f.compute_gradient()
-    
+
                             vipdopt.logger.info(f'Accessing FoM {self.foms.index(f)} in list.')
                             vipdopt.logger.info(f'File being accessed: {tempfile_adj_name} should match FoM tempfile {f.grad_monitors[-1].sim.info["name"]}')
                             f.gradient = f.compute_gradient()
@@ -441,7 +440,7 @@ class Optimization:
 
                             # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
                             f.gradient /= np.array(self.cfg['max_intensity_by_wavelength'])[list(f.opt_ids)]
-    
+
                         # gc.collect()
 
                 #! TODO: sort this out
@@ -556,18 +555,18 @@ class Optimization:
                 vipdopt.logger.info('Beginning Step 6: Stepping Design Variable.')
                 #* DEBUG: Device+Optimizer Working===================
                 # self.device.gradient = np.zeros(self.device.get_permittivity().shape)
-                
+
                 # def function_4( optimization_variable_, grad):
                 #     '''f(x) = Σ(abs(y-x))'''
                 #     y_const = 4.00
                 #     figure_of_merit_total = 0.0
-                    
+
                 #     figure_of_merit_total = np.abs(y_const- optimization_variable_)
                 #     grad[:] = -1 * (y_const - optimization_variable_) / np.abs(y_const - optimization_variable_)
 
                 #     vipdopt.logger.info(f'N={self.iteration} - Figure of Merit: {np.sum(figure_of_merit_total)}')
                 #     return np.sum(figure_of_merit_total)
-                
+
                 # self.figure_of_merit_evolution[self.iteration] = function_4(self.device.get_permittivity(), self.device.gradient)
 
                 # plt.imshow(np.real(self.device.get_permittivity()[..., 1]))
@@ -598,7 +597,7 @@ class Optimization:
 
                 # todo: saving out
                 # self.optimizer.save_opt()
-                
+
                 self.generate_plots()
                 self.iteration += 1
 
@@ -614,13 +613,13 @@ class Optimization:
         final_params = self.param_hist[-1]
         vipdopt.logger.info(f'Final Parameters: {final_params}')
         self._post_run()
-        
+
         # STL Export requires density to be fully binarized
         full_density = self.device.binarize(self.device.get_density())
         stl_generator = STL.STL(full_density)
         stl_generator.generate_stl()
         stl_generator.save_stl( self.dirs['data'] / 'final_device.stl' )
-        
+
         # GDS Export must be done in layers. We split the full design into individual layers, (not related to design layers)
         # Express each layer as polygons in an STL Mesh object and write that layer into its own cell of the GDS file
         layer_mesh_array = []
@@ -628,9 +627,9 @@ class Optimization:
             stl_generator = STL.STL(full_density[..., z_layer][..., np.newaxis])
             stl_generator.generate_stl()
             layer_mesh_array.append(stl_generator.stl_mesh)
-        
+
         # Create a GDS object that contains a Library with Cells corresponding to each 2D layer in the 3D device.
-        gds_generator = GDS.GDS().set_layers(full_density.shape[2], 
+        gds_generator = GDS.GDS().set_layers(full_density.shape[2],
                 unit = 1e-6 * np.abs(self.device.coords['x'][-1] - self.device.coords['x'][0])/self.device.size[0])
         gds_generator.assemble_device(layer_mesh_array, listed=False)
 
@@ -644,16 +643,16 @@ class Optimization:
         # for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
         #     gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
         #     gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
-        
+
         # # Here is a function for GDS device import - be warned this takes maybe 3-5 minutes per layer.
         # def import_gds(sim, device, gds_layer_dir):
         #     import time
-            
+
         #     sim.fdtd.load(sim.info['name'])
         #     sim.fdtd.switchtolayout()
         #     device_name = device.import_names()[0]
         #     sim.disable([device_name])
-            
+
         #     z_vals = device.coords['z']
         #     for z_idx in range(len(z_vals)):
         #         t = time.time()

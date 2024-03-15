@@ -8,6 +8,7 @@ import sys
 from collections.abc import Callable
 
 import matplotlib as mpl
+
 mpl.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure

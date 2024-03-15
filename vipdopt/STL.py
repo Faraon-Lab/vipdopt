@@ -151,7 +151,7 @@ class STL:
 
 	def viz_stl( self ):
 		# https://numpy-stl.readthedocs.io/en/latest/usage.html#plotting-using-matplotlib-is-equally-easy
-		
+
 		figure = plt.figure()
 		axes = figure.add_subplot( projection='3d' )
 		# axes = mplot3d.Axes3D( figure )

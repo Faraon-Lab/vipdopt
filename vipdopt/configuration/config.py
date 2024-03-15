@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections import UserDict
 from pathlib import Path
 
+import yaml
+
 import vipdopt
-from vipdopt.utils import ensure_path, read_config_file, save_config_file
+from vipdopt.utils import convert_path, ensure_path, read_config_file
 
 
 class Config(UserDict):
@@ -46,5 +49,26 @@ class Config(UserDict):
 
     @ensure_path
     def save(self, fname: Path, cfg_format: str='auto', **kwargs) -> None:
-        """Save a config file to a file."""
-        save_config_file(self, fname, cfg_format, **kwargs)
+        """Save a configuration file."""
+        path_filename = convert_path(fname)
+        if cfg_format == 'auto':
+            cfg_format = path_filename.suffix
+
+        config_data = self.data
+
+        match cfg_format.lower():
+            case '.yaml' | '.yml':
+                with path_filename.open('w') as f:
+                    yaml.dump(config_data, f, **kwargs)
+            case '.json':
+                with path_filename.open('w') as f:
+                    json.dump(
+                        config_data,
+                        f,
+                        indent=4,
+                        ensure_ascii=True,
+                        **kwargs
+                    )
+            case _:
+                msg = f'{cfg_format} file saving not yet supported.'
+                raise NotImplementedError(msg)

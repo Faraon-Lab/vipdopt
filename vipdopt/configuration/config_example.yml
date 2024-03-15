@@ -136,6 +136,8 @@ adjoint_src_to_dispersive_range_map: [
 
 #* Optimization
 
+max_epochs: 10
+iter_per_epoch: 100
 enforce_xy_gradient_symmetry: False #True#False#True
 
 # Alternative is to weight by focal intensity - need to check max intensity weighting thing

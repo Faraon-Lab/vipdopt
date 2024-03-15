@@ -205,7 +205,7 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
                     2,
                 ),
                 axis = 0,
-            )
+            ),
 }
 
 @pytest.fixture(scope='session')

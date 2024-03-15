@@ -55,16 +55,16 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
         shutil.copy2( root_dir + '/slurm_vis10lyr.sh', saved_scripts_folder + '/slurm_vis10lyr.sh' )
 
     # shutil.copy2( cfg.python_src_directory + "/SonyBayerFilterOptimization.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterOptimization.py" )
-    # shutil.copy2( os.path.join(python_src_directory, yaml_filename), 
+    # shutil.copy2( os.path.join(python_src_directory, yaml_filename),
     # shutil.copy2( python_src_directory + "/configs/SonyBayerFilterParameters.py", SAVED_SCRIPTS_FOLDER + "/SonyBayerFilterParameters.py" )
     # # TODO: et cetera... might have to save out various scripts from each folder
 
     #  Create convenient folder for evaluation code
     # if not os.path.isdir( evaluation_folder ):
     #     evaluation_folder.mkdir(exist_ok=True)
-    
-    
-    # TODO: finalize this when the Project directory internal structure is finalized    
+
+
+    # TODO: finalize this when the Project directory internal structure is finalized
     # if os.path.exists(EVALUATION_CONFIG_FOLDER):
     #     shutil.rmtree(EVALUATION_CONFIG_FOLDER)
     # shutil.copytree(os.path.join(main_dir, "configs"), EVALUATION_CONFIG_FOLDER)
@@ -73,8 +73,8 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     # shutil.copytree(os.path.join(main_dir, "utils"), EVALUATION_UTILS_FOLDER)
 
     #shutil.copy2( os.path.abspath(python_src_directory + "/evaluation/plotter.py"), EVALUATION_UTILS_FOLDER + "/plotter.py" )
-    
-    
+
+
 
     directories = {
         'root': root_dir,
@@ -214,7 +214,7 @@ class Project:
                 wl_band_bounds[key] = np.zeros(num_bands)
 
             wl_bands = np.array_split(lambda_values_um, num_bands)
-            # wl_bands = np.array_split(lambda_values_um, [3,7,12,14])  # https://stackoverflow.com/a/67294512 
+            # wl_bands = np.array_split(lambda_values_um, [3,7,12,14])  # https://stackoverflow.com/a/67294512
             # e.g. would give a list of arrays with length 3, 4, 5, 2, and N-(3+4+5+2)
 
             for band_idx, band in enumerate(wl_bands):
@@ -255,7 +255,7 @@ class Project:
             # 	plt.plot(fom)
             # plt.show()
             # print(3)
-        
+
             return spectral_weights_by_fom
 
         wl_band_bounds = assign_bands(wl_band_bounds, cfg['lambda_values_um'], cfg['num_bands'])
@@ -311,8 +311,8 @@ class Project:
         # Setup Folder Structure
         work_dir = self.dir / '.tmp'
         work_dir.mkdir(exist_ok=True, mode=0o777)
-        vipdopt_dir = os.path.dirname(__file__)         # Go up one folder
-        
+        os.path.dirname(__file__)         # Go up one folder
+
         running_on_local_machine = False
         slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
         if slurm_job_env_variable is None:

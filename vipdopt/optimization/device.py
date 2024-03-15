@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import sys
 from copy import copy
-from numbers import Number, Rational, Real
+from numbers import Number, Real
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 
 from vipdopt.optimization.filter import Filter, Scale, Sigmoid
-from vipdopt.utils import PathLike, ensure_path, Coordinates
+from vipdopt.utils import Coordinates, PathLike, ensure_path
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
@@ -70,7 +70,7 @@ class Device:
         self.permittivity_constraints = permittivity_constraints
 
         if not isinstance(coords, dict) or len(coords) != 3 or \
-            any(not dim in coords for dim in 'xyz'):
+            any(dim not in coords for dim in 'xyz'):
             raise ValueError('Expected device coordinates to be a dictionary with '
                              f'entries {{x, y, z}}; got {coords}')
         if any(not isinstance(coord, np.ndarray) for coord in coords.values()):
@@ -224,11 +224,10 @@ class Device:
 
     def get_permittivity(self) -> npt.NDArray[np.complex128]:
         """Return the permittivity of the design variable."""
-        
         # # Now that there is a Scale filter, this is unnecessary.
         # eps_min, eps_max = self.permittivity_constraints
         # return self.get_density() * (eps_max - eps_min) + eps_min
-        
+
         return self.w[...,-1]
 
     def update_density(self):

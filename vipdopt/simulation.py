@@ -12,8 +12,8 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 from collections.abc import Callable
 from copy import copy
-from functools import partial
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import Any, Concatenate
 
@@ -571,10 +571,10 @@ class LumericalSimulation(ISimulation):
         if binary_design:
             cur_density_import_interp = design.binarize(cur_density_import_interp)
 
-        for dispersive_range_idx in range(0, 1):		# todo: Add dispersion. Account for dispersion by using the dispersion_model
+        for _dispersive_range_idx in range(1):		# todo: Add dispersion. Account for dispersion by using the dispersion_model
             # dispersive_max_permittivity = dispersion_model.average_permittivity( dispersive_ranges_um[ dispersive_range_idx ] )
             dispersive_max_permittivity = design.permittivity_constraints[-1] # max_device_permittivity
-            dispersive_max_index = design.index_from_permittivity( dispersive_max_permittivity )
+            design.index_from_permittivity( dispersive_max_permittivity )
 
             # Convert device to permittivity and then index
             cur_permittivity = design.density_to_permittivity(cur_density_import_interp, design.permittivity_constraints[0], dispersive_max_permittivity)
@@ -753,7 +753,7 @@ class LumericalSimulation(ISimulation):
 
         vipdopt.logger.debug(f'Transferred {data_xfer_size_mb} MB')
         vipdopt.logger.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
-        
+
         # return fields.squeeze()                   #! 20240228 Ian - Maybe we shouldn't squeeze - need to account for 2D/3D
         return fields
 

@@ -153,8 +153,8 @@ class FoM:
                 first.grad_monitors,
                 # lambda *args, **kwargs: func(og_fom_func(*args, **kwargs), second),
                 # lambda *args, **kwargs: func(og_grad_func(*args, **kwargs), second),
-                lambda *args, **kwargs: tuple(map(lambda x: func(x, second), og_fom_func(*args, **kwargs))),
-                lambda *args, **kwargs: tuple(map(lambda x: func(x, second), og_grad_func(*args, **kwargs))),
+                lambda *args, **kwargs: tuple(func(x, second) for x in og_fom_func(*args, **kwargs)),
+                lambda *args, **kwargs: tuple(func(x, second) for x in og_grad_func(*args, **kwargs)),
                 first.polarization,
                 first.freq,
                 first.opt_ids,
@@ -167,8 +167,8 @@ class FoM:
                 second.grad_monitors,
                 # lambda *args, **kwargs: func(first[..., np.newaxis], og_fom_func(*args, **kwargs)),
                 # lambda *args, **kwargs: func(first, og_grad_func(*args, **kwargs)),
-                lambda *args, **kwargs: tuple(map(lambda x: func(first, x), og_fom_func(*args, **kwargs))),
-                lambda *args, **kwargs: tuple(map(lambda x: func(first, x), og_grad_func(*args, **kwargs))),
+                lambda *args, **kwargs: tuple(func(first, x) for x in og_fom_func(*args, **kwargs)),
+                lambda *args, **kwargs: tuple(func(first, x) for x in og_grad_func(*args, **kwargs)),
                 second.polarization,
                 second.freq,
                 second.opt_ids,
@@ -384,7 +384,7 @@ class BayerFilterFoM(FoM):
 
             source_weight += np.expand_dims(np.conj(efield[:,0,0,0, :]), axis=(1,2,3))
             # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])       # We'll apply opt_ids slice when gradient is fully calculated.
-        
+
         # # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's function[design_efield from adj_src simulation]
         # # Reshape source weight (nλ) to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj)
         # # https://stackoverflow.com/a/30032182
@@ -394,7 +394,7 @@ class BayerFilterFoM(FoM):
         #* Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with direction along the polarization
         # This is going to be the amplitude of the dipole-adjoint source driven at the focal plane
         #! Reminder that this is only applicable for dipole-based adjoint sources!!!
-        # # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1		# x-polarized if phi = 0, y-polarized if phi = 90.	
+        # # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1		# x-polarized if phi = 0, y-polarized if phi = 90.
         # todo: REDO - direction of source_weight vector potential error.
 
         # # self.source_weight = np.squeeze( np.conj(
@@ -402,7 +402,7 @@ class BayerFilterFoM(FoM):
         # # 		#get_focal_data[adj_src_idx][xy_idx, 0, 0, 0, spectral_indices[0]:spectral_indices[1]:1]
         # # 		) )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
-        
+
 
         return total_tfom, total_ffom
 
@@ -412,18 +412,18 @@ class BayerFilterFoM(FoM):
         e_adj = self.grad_monitors[1].e
 
         # #! DEBUG: Check orthogonality and direction of E-fields in the design monitor
-        vipdopt.logger.info((f'Forward design fields have average absolute xyz-components: '
+        vipdopt.logger.info(f'Forward design fields have average absolute xyz-components: '
                     f'{np.mean(np.abs(e_fwd[0]))}, {np.mean(np.abs(e_fwd[1]))}, '
                     f'{np.mean(np.abs(e_fwd[2]))}.'
-                    ))
-        vipdopt.logger.info((f'Adjoint design fields have average absolute xyz-components: '
+                    )
+        vipdopt.logger.info(f'Adjoint design fields have average absolute xyz-components: '
         			f'{np.mean(np.abs(e_adj[0]))}, {np.mean(np.abs(e_adj[1]))}, '
         			f'{np.mean(np.abs(e_adj[2]))}.'
-        			))
-        vipdopt.logger.info((f'Source weight has average absolute xyz-components: '
+        			)
+        vipdopt.logger.info(f'Source weight has average absolute xyz-components: '
         		f'{np.mean(np.abs(self.source_weight[0]))}, {np.mean(np.abs(self.source_weight[1]))}, '
         		f'{np.mean(np.abs(self.source_weight[2]))}.'
-        			))
+        			)
 
         # df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
         e_adj = e_adj * self.source_weight
@@ -445,7 +445,7 @@ class BayerFilterFoM(FoM):
         # # self.restricted_gradient = df_dev[..., neg_gradient_indices] * self.enabled_restricted
 
         # return df_dev
-        
+
         return df_dev[..., self.opt_ids]
 
 

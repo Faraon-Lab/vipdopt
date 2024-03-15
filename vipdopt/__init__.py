@@ -12,7 +12,7 @@ try:
     lumapi: ModuleType = import_lumapi(
         f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
     )
-except Exception as e:
+except Exception:
     lumapi: Any = None
 fdtd: Any = None
 logger: logging.Logger = logging.getLogger()

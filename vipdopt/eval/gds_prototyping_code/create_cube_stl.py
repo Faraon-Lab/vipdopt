@@ -1,7 +1,9 @@
-import sys
 import os
+import sys
+
 import numpy as np
 from stl import mesh
+
 sys.path.append(os.getcwd())
 current_dir = os.path.dirname(__file__)
 sys.path.append(current_dir)
@@ -9,13 +11,13 @@ sys.path.append(current_dir)
 
 def viz_stl(mesh):
     # Optionally render the rotated cube faces
-    import matplotlib
-    matplotlib.use('TKAgg')
-    from matplotlib import pyplot
+    import matplotlib as mpl
+    mpl.use('TKAgg')
+    from matplotlib import pyplot as plt
     from mpl_toolkits import mplot3d
 
     # Create a new plot
-    figure = pyplot.figure()
+    figure = plt.figure()
     axes = figure.add_subplot(projection='3d')
 
     # Render the cube
@@ -26,7 +28,7 @@ def viz_stl(mesh):
     axes.auto_scale_xyz(scale, scale, scale)
 
     # Show the plot to the screen
-    pyplot.show()
+    plt.show()
 
 
 # Define the 8 vertices of the cube
@@ -66,28 +68,30 @@ for i, f in enumerate(faces):
 # cube.save('cube.stl')
 
 # Write to GDS
-from vipdopt import GDS
 import gdstk
+
+from vipdopt import GDS
+
 g = GDS.GDS().from_stl_mesh(cube)
 
 # # The GDSII file is called a library, which contains multiple cells.
 # lib = gdstk.Library()
 
 # Geometry must be placed in cells.
-cell = g.lib.new_cell("FIRST")
+cell = g.lib.new_cell('FIRST')
 
 # Create the geometry (using single triangles as polygons) and add it to the cell.
 for v in cube.vectors:
     d = v[:,:-1]
-    f = list(tuple(e) for e in d.astype(int))
+    f = [tuple(e) for e in d.astype(int)]
     rect = gdstk.Polygon(f)
     cell.add(rect)
 
 # Save the library in a GDSII or OASIS file.
-g.lib.write_gds(os.path.join(current_dir, "first.gds"))
+g.lib.write_gds(os.path.join(current_dir, 'first.gds'))
 
 # Optionally, save an image of the cell as SVG.
-cell.write_svg(os.path.join(current_dir, "first.svg"))
+cell.write_svg(os.path.join(current_dir, 'first.svg'))
 
 
 print(3)
