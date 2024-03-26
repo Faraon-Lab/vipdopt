@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import abc
+import contextlib
 import functools
 import json
 import logging
 import os
 import sys
 import time
+import typing
 from argparse import ArgumentParser
 from collections import OrderedDict
 from collections.abc import Callable
@@ -20,7 +22,7 @@ from typing import Any, Concatenate
 import numpy as np
 import numpy.typing as npt
 from overrides import override
-from scipy import interpolate
+from scipy import interpolate  # type: ignore
 
 import vipdopt
 from vipdopt.utils import P, PathLike, R, ensure_path, read_config_file
@@ -36,6 +38,7 @@ def _check_fdtd(
                 f'Cannot call {func.__name__} before `fdtd` is instantiated.'
                 ' Has `connect()` been called?'
             )
+        assert sim.fdtd is not None
         return func(sim, *args, **kwargs)
     return wrapped
 
@@ -180,10 +183,14 @@ class LumericalSimulation(ISimulation):
     """Lumerical FDTD Simulation Code.
 
     Attributes:
-        fdtd (vipdopt.lumapi.FDTD): Lumerical session
-        info (OrderedDict[str]: Info about this simulation - filename, path, simulator, coordinates.
+        fdtd (vipdopt.lumapi.FDTD | None): Lumerical session
+        info (OrderedDict[str]): Info about this simulation. Contains the keys
+            "filename", "path", "simulator", and "coordinates".
         objects (OrderedDict[str, LumericalSimObject]): The objects within
             the simulation
+        _synced (bool): Flag for whether fdtd needs to be synced.
+        _env_vars (dict | None): Environment variables to be passed into `set_env_vars`
+            upon the next sync.
     """
 
     def __init__(self, source: PathLike | dict | None=None) -> None:
@@ -192,11 +199,10 @@ class LumericalSimulation(ISimulation):
         Arguments:
             source (PathLike | dict | None): optional source to load the simulation from
         """
-        self.fdtd: vipdopt.lumapi.FDTD | None = None
+        self.fdtd: vipdopt.lumapi.FDTD | None = None  # type: ignore
         self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
         self._clear_objects()
-        self._synced = False  # Flag for whether fdtd needs to be synced
-        # Parameters to pass into set_env_vars in the future
+        self._synced: bool = False
         self._env_vars: dict | None = None
 
         if source:
@@ -228,7 +234,6 @@ class LumericalSimulation(ISimulation):
             try:
                 vipdopt.fdtd = vipdopt.lumapi.FDTD(hide=True)
                 vipdopt.logger.info('Verified license with Lumerical servers.\n')
-                vipdopt.fdtd = vipdopt.lumapi.FDTD(hide=False)             #! Need to turn the GUI on for debugging
                 self.fdtd = vipdopt.fdtd
             except (AttributeError, vipdopt.lumapi.LumApiError) as e:
                 logging.exception(
@@ -246,19 +251,20 @@ class LumericalSimulation(ISimulation):
     def load(self, source: PathLike | dict):
         if isinstance(source, dict):
             self._load_dict(source)
-        elif source.suffix == '.fsp':
+        elif '.fsp' in source:
             self._load_fsp(source)
         else:
             self._load_file(source)
 
     @_check_fdtd
-    def _load_fsp(self, fname: PathLike):
+    @ensure_path
+    def _load_fsp(self, fname: Path):
         """Load a simulation from a Lumerical .fsp file."""
         vipdopt.logger.debug(f'Loading simulation from {fname}...')
         self._clear_objects()
-        self.fdtd.load(str(fname))
-        self.fdtd.selectall()
-        objects = self.fdtd.getAllSelectedObjects()
+        self.fdtd.load(str(fname))  # type: ignore
+        self.fdtd.selectall()  # type: ignore
+        objects = self.fdtd.getAllSelectedObjects()  # type: ignore
         # vipdopt.logger.debug(list(vars(objects[0]).keys()))
         # vipdopt.logger.debug(list(objects[0].__dict__.keys()))
         # print(objects[0]['type'])
@@ -270,17 +276,18 @@ class LumericalSimulation(ISimulation):
                 else:
                     obj_type = LumericalSimObjectType.POWER
             else:
-                obj_type = OBJECT_TYPE_NAME_MAP[otype]      #! 20240227 Ian - Can't find a reference to this? As a result this function doesn't work
-            oname = o._id.name.split('::')[-1]
+                obj_type = OBJECT_TYPE_NAME_MAP[otype]
+            oname = o._id.name.split('::')[-1]  # noqa: SLF001
             sim_obj = LumericalSimObject(oname, obj_type)
-            for name in o._nameMap:
+            for name in o._nameMap:  # noqa: SLF001
                 sim_obj[name] = o[name]
 
             self.objects[oname] = sim_obj
         vipdopt.logger.debug(self.as_json())
 
 
-    def _load_file(self, fname: PathLike):
+    @ensure_path
+    def _load_file(self, fname: Path):
         """Load a simulation from a JSON file."""
         vipdopt.logger.debug(f'Loading simulation from {fname}...')
         sim = read_config_file(fname)
@@ -308,22 +315,25 @@ class LumericalSimulation(ISimulation):
         for obj_name, obj in self.objects.items():
             # Create object if needed
             if self.fdtd.getnamednumber(obj_name) == 0:
-                kwargs = {'name':obj_name} if obj_name not in ['FDTD'] else {}
-                try:
+                kwargs = {'name': obj_name} if obj_name not in ['FDTD'] else {}
+                with contextlib.suppress(BaseException):
                     LumericalSimObjectType.get_add_function(obj.obj_type)(
-                        self.fdtd, **kwargs #,**obj.properties,
-                        #! 20240223 Ian: Had to take this out because OrderedDict properties that were inactive in Lumerical were returning errors
-                        #! and sometimes that needs to happen, but lumapi.py offers no pass statement.
+                        self.fdtd,
+                        **kwargs
+                        #,**obj.properties,
+                        #! 20240223 Ian: Had to take this out because OrderedDict
+                        #! properties that were inactive in Lumerical were returning
+                        #! errors and sometimes that needs to happen, but lumapi.py
+                        #! offers no pass statement.
                     )
-                except Exception:
-                    pass
             for key, val in obj.properties.items():
                 try:
                     self.fdtd.setnamed(obj_name, key, val)
-                except Exception as ex:
+                except (AttributeError, vipdopt.lumapi.LumApiError) as e:
                     template = 'An exception of type {0} occurred. Arguments:\n{1!r}\n'
-                    message = template.format(type(ex).__name__, ex.args)
-                    logging.debug(message + f' Property {key} in FDTD Object {obj_name} is inactive / cannot be changed.')
+                    message = template.format(type(e).__name__, e.args)
+                    logging.debug(message + f' Property {key} in FDTD Object {obj_name}'
+                                  ' is inactive / cannot be changed.')
 
         if self._env_vars is not None:
             self.setup_env_resources(**self._env_vars)
@@ -347,7 +357,7 @@ class LumericalSimulation(ISimulation):
     def save_lumapi(self, fname: Path, debug_mode=False):
         """Save using Lumerical's simulation file type (.fsp)."""
         if not debug_mode:
-            self.fdtd.save(os.path.abspath(str(fname.with_suffix(''))))
+            self.fdtd.save(os.path.abspath(str(fname.with_suffix(''))))  # type: ignore
         self.info['path'] = str(os.path.abspath(str(fname.with_suffix(''))))
 
     def as_dict(self) -> dict:
@@ -371,7 +381,7 @@ class LumericalSimulation(ISimulation):
     @_check_fdtd
     def set_resource(self, resource_num: int, resource: str, value: Any):
         """Set the specified job manager resource for this simulation."""
-        self.fdtd.setresource('FDTD', resource_num, resource, value)
+        self.fdtd.setresource('FDTD', resource_num, resource, value)  # type: ignore
 
     def _clear_info(self):
         """Clear all existing simulation info and create a new project."""
@@ -401,10 +411,15 @@ class LumericalSimulation(ISimulation):
         for obj in objs:
             self.update_object(obj, enabled=1)
 
-    def with_enabled(self, objs: list[str], name:str|None = None) -> LumericalSimulation:
+    def with_enabled(
+            self,
+            objs: list[str],
+            name: str | None = None,
+    ) -> LumericalSimulation:
         """Return copy of this simulation with only objects in objs enabled."""
-        new_sim = self.copy()               # Unlinked
+        new_sim = self.copy()  # Unlinked
         if name is not None:
+            # Create the simulation with the provided name
             new_sim.info['name'] = name
         new_sim.disable_all_sources()
         new_sim.enable(objs)
@@ -497,69 +512,155 @@ class LumericalSimulation(ISimulation):
             self._synced = False
         obj.update(**properties)
 
-    def import_nk_material(self, cur_index, device_region_import_x, device_region_import_y, device_region_import_z):
+    def import_nk_material(
+            self,
+            cur_index,
+            device_region_import_x,
+            device_region_import_y,
+            device_region_import_z,
+    ):
+        """Import the nk2 material."""
         device_name = self.import_names()[0]
         self.fdtd.select(device_name)
         self.fdtd.importnk2( cur_index, device_region_import_x,
                                         device_region_import_y, device_region_import_z )
 
-    def import_cur_index(self, design,
-                        reinterpolate_permittivity_factor=1, reinterpolate_permittivity=False,
-                        binary_design=False):
+    def import_cur_index(
+            self,
+            design,
+            reinterpolate_permittivity_factor=1,
+            reinterpolate_permittivity=False,
+            binary_design=False
+    ):
         """Reinterpolate and import cur_index into design regions."""
         if reinterpolate_permittivity_factor != 1:
             reinterpolate_permittivity = True
 
-        # Get current density of bayer filter after being passed through current extant filters.
-        # TODO: Might have to rewrite this to be performed on the entire device and NOT the subdesign / device. In which case
-        # todo: partitioning must happen after reinterpolating and converting to index.
-        cur_density = design.get_density()							# Here cur_density will have values between 0 and 1
+        # Get current density after being passed through current extant filters.
+        # TODO: Might have to rewrite this to be performed on the entire device and NOT
+        # the subdesign / device. In which case.
+        # TODO: partitioning must happen after reinterpolating and converting to index.
+
+        # Here cur_density will have values between 0 and 1
+        cur_density = design.get_density()
 
         # Reinterpolate
         if reinterpolate_permittivity:
-            cur_density_import = np.repeat( np.repeat( np.repeat( cur_density,
-                                                        int(np.ceil(reinterpolate_permittivity_factor)), axis=0 ),
-                                                    int(np.ceil(reinterpolate_permittivity_factor)), axis=1 ),
-                                                int(np.ceil(reinterpolate_permittivity_factor)), axis=2 )
+            cur_density_import = np.repeat(
+                np.repeat(
+                    np.repeat(
+                        cur_density,
+                        int(np.ceil(reinterpolate_permittivity_factor)),
+                        axis=0,
+                    ),
+                    int(np.ceil(reinterpolate_permittivity_factor)),
+                    axis=1,
+                ),
+                int(np.ceil(reinterpolate_permittivity_factor)),
+                axis=2,
+            )
 
             # Create the axis vectors for the reinterpolated 3D density region
-            design_region_reinterpolate_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], len(design.coords['x']) * reinterpolate_permittivity_factor)
-            design_region_reinterpolate_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], len(design.coords['y']) * reinterpolate_permittivity_factor)
-            design_region_reinterpolate_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], len(design.coords['z']) * reinterpolate_permittivity_factor)
+            design_region_reinterpolate_x = 1e-6 * \
+                np.linspace(
+                    design.coords['x'][0],
+                    design.coords['x'][-1],
+                    len(design.coords['x']) * reinterpolate_permittivity_factor
+                )
+            design_region_reinterpolate_y = 1e-6 * \
+                np.linspace(
+                    design.coords['y'][0],
+                    design.coords['y'][-1],
+                    len(design.coords['y']) * reinterpolate_permittivity_factor
+                )
+            design_region_reinterpolate_z = 1e-6 * \
+                np.linspace(
+                    design.coords['z'][0],
+                    design.coords['z'][-1],
+                    len(design.coords['z']) * reinterpolate_permittivity_factor
+                )
             # Create the 3D array for the 3D density region for final import
-            design_region_import_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], 300)
-            design_region_import_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], 300)
-            design_region_import_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], 306)
-            design_region_import = np.array( np.meshgrid(
-                        design_region_import_x, design_region_import_y, design_region_import_z,
-                    indexing='ij')
-                ).transpose((1,2,3,0))
+            design_region_import_x = 1e-6 * \
+                np.linspace(design.coords['x'][0], design.coords['x'][-1], 300)
+            design_region_import_y = 1e-6 * \
+                  np.linspace(design.coords['y'][0], design.coords['y'][-1], 300)
+            design_region_import_z = 1e-6 * \
+                  np.linspace(design.coords['z'][0], design.coords['z'][-1], 306)
+            design_region_import = np.array(
+                np.meshgrid(
+                    design_region_import_x,
+                    design_region_import_y,
+                    design_region_import_z,
+                    indexing='ij'
+                )
+            ).transpose((1,2,3,0))
 
             # Perform reinterpolation so as to fit into Lumerical mesh.
-            # NOTE: The imported array does not need to have the same size as the Lumerical mesh. Lumerical will perform its own reinterpolation (params. of which are unclear.)
-            cur_density_import_interp = interpolate.interpn( ( design_region_reinterpolate_x,
-                                                                design_region_reinterpolate_y,
-                                                                design_region_reinterpolate_z ),
-                                    cur_density_import, design_region_import,
-                                    method='linear' )
+            # NOTE: The imported array does not need to have the same size as the
+            # Lumerical mesh. Lumerical will perform its own reinterpolation
+            # (params. of which are unclear).
+            cur_density_import_interp = interpolate.interpn(
+                (design_region_reinterpolate_x,
+                 design_region_reinterpolate_y,
+                 design_region_reinterpolate_z,
+                ),
+                cur_density_import,
+                design_region_import,
+                method='linear',
+            )
 
         else:
             cur_density_import_interp = cur_density.copy()
 
-            design_region_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], cur_density_import_interp.shape[0])
-            design_region_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], cur_density_import_interp.shape[1])
-            design_region_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], cur_density_import_interp.shape[2])
+            design_region_x = 1e-6 * \
+                np.linspace(
+                    design.coords['x'][0],
+                    design.coords['x'][-1],
+                    cur_density_import_interp.shape[0]
+                )
+            design_region_y = 1e-6 * \
+                np.linspace(
+                    design.coords['y'][0],
+                    design.coords['y'][-1],
+                    cur_density_import_interp.shape[1]
+                )
+            design_region_z = 1e-6 * \
+                np.linspace(
+                    design.coords['z'][0],
+                    design.coords['z'][-1],
+                    cur_density_import_interp.shape[2]
+                )
 
-            design_region_import_x = 1e-6 * np.linspace(design.coords['x'][0], design.coords['x'][-1], design.field_shape[0])
-            design_region_import_y = 1e-6 * np.linspace(design.coords['y'][0], design.coords['y'][-1], design.field_shape[1])
+            design_region_import_x = 1e-6 * \
+                np.linspace(
+                    design.coords['x'][0],
+                    design.coords['x'][-1],
+                    design.field_shape[0],
+                )
+            design_region_import_y = 1e-6 * \
+                np.linspace(
+                    design.coords['y'][0],
+                    design.coords['y'][-1],
+                    design.field_shape[1],
+                )
             try:
-                design_region_import_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], design.field_shape[2])
+                design_region_import_z = 1e-6 * \
+                    np.linspace(
+                        design.coords['z'][0],
+                        design.coords['z'][-1],
+                        design.field_shape[2]
+                    )
             except IndexError:	# 2D case
-                design_region_import_z = 1e-6 * np.linspace(design.coords['z'][0], design.coords['z'][-1], 3)
-            design_region_import = np.array( np.meshgrid(
-                        design_region_import_x, design_region_import_y, design_region_import_z,
-                    indexing='ij')
-                ).transpose((1,2,3,0))
+                design_region_import_z = 1e-6 * \
+                    np.linspace(design.coords['z'][0], design.coords['z'][-1], 3)
+            design_region_import = np.array(
+                np.meshgrid(
+                    design_region_import_x,
+                    design_region_import_y,
+                    design_region_import_z,
+                    indexing='ij',
+                )
+            ).transpose((1,2,3,0))
 
             cur_density_import_interp = interpolate.interpn( ( design_region_x,
                                                                 design_region_y,
@@ -571,27 +672,39 @@ class LumericalSimulation(ISimulation):
         if binary_design:
             cur_density_import_interp = design.binarize(cur_density_import_interp)
 
-        for _dispersive_range_idx in range(1):		# todo: Add dispersion. Account for dispersion by using the dispersion_model
-            # dispersive_max_permittivity = dispersion_model.average_permittivity( dispersive_ranges_um[ dispersive_range_idx ] )
-            dispersive_max_permittivity = design.permittivity_constraints[-1] # max_device_permittivity
+        # TODO: Add dispersion. Account for dispersion by using the dispersion_model
+        for _dispersive_range_idx in range(1):
+            # max_device_permittivity
+            # dispersive_max_permittivity = dispersion_model.average_permittivity(
+            #     dispersive_ranges_um[dispersive_range_idx]
+            # )
+            dispersive_max_permittivity = design.permittivity_constraints[-1]
             design.index_from_permittivity( dispersive_max_permittivity )
 
             # Convert device to permittivity and then index
-            cur_permittivity = design.density_to_permittivity(cur_density_import_interp, design.permittivity_constraints[0], dispersive_max_permittivity)
-            # todo: Another way to do this that can include dispersion is to update the Scale filter with new permittivity constraint maximum
+            cur_permittivity = design.density_to_permittivity(
+                cur_density_import_interp,
+                design.permittivity_constraints[0],
+                dispersive_max_permittivity,
+            )
+            # TODO: Another way to do this that can include dispersion is to update the
+            # Scale filter with new permittivity constraint maximum
             cur_index = design.index_from_permittivity(cur_permittivity)
 
-            #?:	maybe todo: cut cur_index by region
+            # TODO (maybe): cut cur_index by region
             # Import to simulation
-            self.import_nk_material(cur_index,
-                            design_region_import_x, design_region_import_y, design_region_import_z)
+            self.import_nk_material(
+                cur_index,
+                design_region_import_x,
+                design_region_import_y,
+                design_region_import_z,
+            )
             # Disable device index monitor to save memory
             self.disable(['design_index_monitor'])
 
             self._sync_fdtd()
             return cur_density, cur_permittivity
         return None
-
 
     def close(self):
         """Close fdtd conenction."""
@@ -619,6 +732,7 @@ class LumericalSimulation(ISimulation):
         self.close()
 
     @_check_fdtd
+    @typing.no_type_check
     def get_env_resources(self) -> dict:
         """Return a dictionary containing all job manager resources."""
         resources = {}
@@ -679,6 +793,7 @@ class LumericalSimulation(ISimulation):
             vipdopt.logger.debug(f'\t"{resource}" = {value}')
 
     @_check_fdtd
+    @typing.no_type_check
     def getresult(
         self,
         object_name: str,
@@ -687,16 +802,18 @@ class LumericalSimulation(ISimulation):
     ) -> Any:
         """Get a result from the FDTD solver, accesing a specific value if desired."""
         if property_name is None:
-            res = self.fdtd.getresult(object_name)  # Gets all named results
+            res = self.getresult(object_name)  # Gets all named results
             vipdopt.logger.debug(f'Available results from {object_name}:\n{res}')
             return res
 
-        res = self.fdtd.getresult(object_name, property_name)
+        res = self.getresult(object_name, property_name)
         if dataset_value is not None:
             res = res[dataset_value]
         vipdopt.logger.debug(f'Got "{property_name}" from "{object_name}": {res}')
         return res
 
+    @_check_fdtd
+    @typing.no_type_check
     def get_shape(
             self,
             monitor_name: str,
@@ -708,21 +825,26 @@ class LumericalSimulation(ISimulation):
         path: Path = self.info['path']
         try:
             self.fdtd.load(str(path.absolute()))
-        except Exception:
+        except vipdopt.lumapi.LumApiError:
             self.fdtd.load(str(path))
         prop = self.getresult(monitor_name, value, dataset_value)
         if isinstance(prop, dict):
-            vipdopt.logger.debug(f'Need to access one level deeper. Args passed: {monitor_name}, {value}, {dataset_value}.')
+            vipdopt.logger.debug(
+                'Need to access one level deeper.'
+                f' Args passed: {monitor_name}, {value}, {dataset_value}.'
+            )
             return None
-        else:
-            return np.squeeze(prop).shape
+        return np.squeeze(prop).shape
 
+    @_check_fdtd
+    @typing.no_type_check
     def get_field_shape(self) -> tuple[int, ...]:
-        """Return the shape of the fields returned from this simulation's design index monitors."""
-        index_prev = self.fdtd.getresult('design_index_monitor', 'index preview')
+        """Return the shape of the fields returned from design index monitors."""
+        index_prev = self.getresult('design_index_monitor', 'index preview')
         return np.squeeze(index_prev['index_x']).shape
 
     @_check_fdtd
+    @typing.no_type_check
     def get_transmission_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the transmission for a given monitor."""
         # Ensure this is a transmission monitor
@@ -730,11 +852,15 @@ class LumericalSimulation(ISimulation):
         transmission = self.getresult(monitor_name, 'T', 'T')
         return np.abs(transmission)
 
+    @_check_fdtd
+    @typing.no_type_check
     def get_transmission_shape(self, monitor_name: str) -> npt.NDArray:
+        """Get the shape of the transmission field from the given monitor."""
         monitor_name = monitor_name.replace('focal', 'transmission')
         return self.get_shape(monitor_name, 'T', 'T')
 
     @_check_fdtd
+    @typing.no_type_check
     def get_field(self, monitor_name: str, field_indicator: str) -> npt.NDArray:
         """Return the E or H field from a monitor."""
         if field_indicator not in 'EH':
@@ -754,7 +880,6 @@ class LumericalSimulation(ISimulation):
         vipdopt.logger.debug(f'Transferred {data_xfer_size_mb} MB')
         vipdopt.logger.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
 
-        # return fields.squeeze()                   #! 20240228 Ian - Maybe we shouldn't squeeze - need to account for 2D/3D
         return fields
 
     def get_hfield(self, monitor_name: str) -> npt.NDArray:
@@ -777,6 +902,7 @@ class LumericalSimulation(ISimulation):
         return np.sqrt(enorm_squared)
 
     @_check_fdtd
+    @typing.no_type_check
     def get_source_power(self) -> npt.NDArray:
         """Return the source power of a given monitor."""
         f = self.getresult('focal_monitor_0', 'f')
@@ -807,7 +933,7 @@ if __name__ == '__main__':
     # with LumericalSimulation(Path(args.simulation_json)) as sim:
     with LumericalSimulation() as sim:
         # sim.promise_env_setup()
-        sim._load_fsp('test_project/.tmp/sim_0.fsp')
+        sim.load('test_project/.tmp/sim_0.fsp')
         sys.exit()
 
         vipdopt.logger.info('Saving Simulation')

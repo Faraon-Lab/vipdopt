@@ -53,7 +53,9 @@ exclude = [
     # More specific ignores
     "*.ui",
     "*ui_*.py",
-    "*.sh"
+    "*.sh",
+    "*.lsfx",
+    "*.md"
 ]
 
 # Same as Black.

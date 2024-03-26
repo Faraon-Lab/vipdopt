@@ -4,7 +4,7 @@ import pickle
 
 class Source:
     """Representation of a Lumerical source object.
-    
+
     Attributes:
         src_dict (dict): The source data, from the corresponding simulation object or
             dictionary containing parameters and values.

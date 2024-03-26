@@ -141,7 +141,7 @@ def ensure_path(
     return wrapper
 
 
-def read_config_file(fname: PathLike, cfg_format: str='auto') -> dict[str, Any] | None:
+def read_config_file(fname: PathLike, cfg_format: str='auto') -> dict:
     """Read a configuration file."""
     path_filename = convert_path(fname)
     if cfg_format == 'auto':
