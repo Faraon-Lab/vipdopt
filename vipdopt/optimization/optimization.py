@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import pickle
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 
@@ -14,8 +14,10 @@ from scipy import interpolate
 
 import vipdopt
 from vipdopt import GDS, STL
+from vipdopt.configuration import Config
 from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
+from vipdopt.optimization.fom import FoM
 from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.simulation import LumericalSimulation
 
@@ -25,11 +27,11 @@ class Optimization:
 
     def __init__(
             self,
-            sims: list[LumericalSimulation],
+            sims: Iterable[LumericalSimulation],
             device: Device,
             optimizer: GradientOptimizer,
-            fom: FoM|None,
-            cfg: dict,
+            fom: FoM | None,
+            cfg: Config,
             start_epoch: int=0,
             start_iter: int=0,
             max_epochs: int=1,

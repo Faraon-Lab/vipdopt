@@ -103,7 +103,7 @@ class FoM:
         name: str,
         og_data: dict,
         src_to_sim_map: dict[str, LumericalSimulation],
-    ) -> type[FoM]:
+    ) -> FoM:
         """Create a figure of merit from a dictionary and list of simulations."""
         data = copy(og_data)
         fom_cls: type[FoM] = getattr(sys.modules[__name__], data.pop('type'))

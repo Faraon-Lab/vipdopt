@@ -41,7 +41,7 @@ class Config(UserDict):
 
     @classmethod
     @ensure_path
-    def from_file(cls: type[Config], fname: Path) -> type[Config]:
+    def from_file(cls: Config, fname: Path) -> Config:
         """Create config object from a file."""
         cfg = cls()
         cfg.read_file(fname)

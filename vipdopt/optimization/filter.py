@@ -1,7 +1,7 @@
 """Module for the abstract Filter class and all its implementations."""
 
 import abc
-from numbers import Number, Rational
+from numbers import Number
 
 import numpy as np
 import numpy.typing as npt
@@ -78,7 +78,7 @@ class Sigmoid(Filter):
     def init_vars(self) -> dict:
         return {'eta': self.eta, 'beta': self.beta}
 
-    def __init__(self, eta: Rational, beta: Rational) -> None:
+    def __init__(self, eta: float, beta: float) -> None:
         """Initialize a sigmoid filter based on eta and beta values."""
         if not self.verify_bounds(eta):
             raise ValueError('Eta must be in the range [0, 1]')

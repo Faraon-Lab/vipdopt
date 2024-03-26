@@ -208,7 +208,7 @@ def split_glob(pattern: str) -> Generator[str, None, None]:
     else:
         yield pattern
 
-def glob_first(search_dir: PathLike, pattern: str) -> Path | None:
+def glob_first(search_dir: PathLike, pattern: str) -> Path:
     """Find the first file to match the given pattern."""
     patterns = list(split_glob(pattern))
     search_path = convert_path(search_dir)
