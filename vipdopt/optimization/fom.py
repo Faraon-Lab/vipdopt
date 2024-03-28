@@ -412,26 +412,30 @@ class BayerFilterFoM(FoM):
         e_adj = self.grad_monitors[1].e
 
         # #! DEBUG: Check orthogonality and direction of E-fields in the design monitor
-        vipdopt.logger.info(f'Forward design fields have average absolute xyz-components: '
-                    f'{np.mean(np.abs(e_fwd[0]))}, {np.mean(np.abs(e_fwd[1]))}, '
-                    f'{np.mean(np.abs(e_fwd[2]))}.'
-                    )
-        vipdopt.logger.info(f'Adjoint design fields have average absolute xyz-components: '
-        			f'{np.mean(np.abs(e_adj[0]))}, {np.mean(np.abs(e_adj[1]))}, '
-        			f'{np.mean(np.abs(e_adj[2]))}.'
-        			)
-        vipdopt.logger.info(f'Source weight has average absolute xyz-components: '
-        		f'{np.mean(np.abs(self.source_weight[0]))}, {np.mean(np.abs(self.source_weight[1]))}, '
-        		f'{np.mean(np.abs(self.source_weight[2]))}.'
-        			)
+        vipdopt.logger.info(
+            f'Forward design fields have average absolute xyz-components: '
+            f'{np.mean(np.abs(e_fwd[0]))}, {np.mean(np.abs(e_fwd[1]))}, '
+            f'{np.mean(np.abs(e_fwd[2]))}.'
+        )
+        vipdopt.logger.info(
+            f'Adjoint design fields have average absolute xyz-components: '
+            f'{np.mean(np.abs(e_adj[0]))}, {np.mean(np.abs(e_adj[1]))}, '
+            f'{np.mean(np.abs(e_adj[2]))}.'
+        )
+        vipdopt.logger.info(
+            f'Source weight has average absolute xyz-components: '
+            f'{np.mean(np.abs(self.source_weight[0]))}, '
+            f'{np.mean(np.abs(self.source_weight[1]))}, '
+            f'{np.mean(np.abs(self.source_weight[2]))}.'
+        )
 
         # df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
         e_adj = e_adj * self.source_weight
         df_dev = 1 * (e_fwd[0]*e_adj[0] + \
-        		e_fwd[1]*e_adj[1] + \
-        		e_fwd[2]*e_adj[2]
-        	)
-        # Taking the real part comes when multiplying by Δε0 i.e. change in permittivity.
+                e_fwd[1]*e_adj[1] + \
+                e_fwd[2]*e_adj[2]
+            )
+        # Taking real part comes when multiplying by Δε0 i.e. change in permittivity.
 
         vipdopt.logger.info('Computing Gradient')
 
@@ -439,10 +443,12 @@ class BayerFilterFoM(FoM):
         # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
 
         self.gradient[..., self.opt_ids] = df_dev[..., self.opt_ids] # * self.enabled
-        # self.restricted_gradient[..., self.freq_index_restricted_opt] = df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
+        # self.restricted_gradient[..., self.freq_index_restricted_opt] = \
+        #     df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
 
         # self.gradient = df_dev[..., pos_gradient_indices] * self.enabled
-        # # self.restricted_gradient = df_dev[..., neg_gradient_indices] * self.enabled_restricted
+        # self.restricted_gradient = df_dev[..., neg_gradient_indices] * \
+        #       self.enabled_restricted
 
         # return df_dev
 
@@ -450,6 +456,8 @@ class BayerFilterFoM(FoM):
 
 
 class UniformFoM(FoM):
+    """A figure of merit for a device with uniform density."""
+
     def __init__(
             self,
             fom_monitors: Sequence[Monitor],
@@ -460,6 +468,7 @@ class UniformFoM(FoM):
             name: str = '',
             constant: float=0.5,
     ) -> None:
+        """Initialize a UniformFoM."""
         self.constant = constant
         super().__init__(
             fom_monitors,

@@ -23,9 +23,15 @@ class GradientDescentOptimizer(GradientOptimizer):
     """Optimizer for doing basic gradient descent."""
 
     def __init__(self, step_size=0.01, **kwargs):
+        """Initialize a GradientDescentOptimizer."""
         super().__init__(step_size=step_size, **kwargs)
 
-    def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
+    def step(
+            self,
+            device: Device,
+            gradient: npt.ArrayLike,
+            iteration: int,  # noqa: ARG002
+    ):
         """Step with the gradient."""
         grad = device.backpropagate(gradient)
         w_hat = device.get_design_variable() - self.step_size * grad

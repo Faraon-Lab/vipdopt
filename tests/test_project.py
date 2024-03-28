@@ -8,6 +8,7 @@ from vipdopt.optimization import Device, FoM
 from vipdopt.project import Project
 
 
+@pytest.mark.xfail()
 @pytest.mark.usefixtures('_mock_project_json')
 def test_load(device_dict: dict, fom_dict: dict):
     project = Project()

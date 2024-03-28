@@ -251,10 +251,12 @@ class LumericalSimulation(ISimulation):
     def load(self, source: PathLike | dict):
         if isinstance(source, dict):
             self._load_dict(source)
-        elif '.fsp' in source:
-            self._load_fsp(source)
         else:
-            self._load_file(source)
+            src = Path(source)
+            if src.suffix == '.fsp':
+                self._load_fsp(source)
+            else:
+                self._load_file(source)
 
     @_check_fdtd
     @ensure_path

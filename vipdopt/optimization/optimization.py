@@ -311,9 +311,10 @@ class Optimization:
                     callback(self)
 
                 vipdopt.logger.info(
-                    f'=========\nEpoch {self.epoch}, iter {self.iteration}: Running simulations...'
+                    f'=========\nEpoch {self.epoch}, iter {self.iteration}:'
+                    ' Running simulations...'
                 )
-                self.true_iteration = self.epoch * self.iter_per_epoch + self.true_iteration
+                self.true_iteration = self.epoch * self.iter_per_epoch + self.iteration
 
                 vipdopt.logger.debug(
                     f'\tDesign Variable: {self.device.get_design_variable()}'
