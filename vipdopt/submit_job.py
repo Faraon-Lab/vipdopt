@@ -1,4 +1,5 @@
 """Run the Vipdopt software package."""
+
 import re
 import subprocess
 import sys
@@ -15,8 +16,9 @@ def generate_script(filename: str, nnodes: int, *args, **kwargs):
 
 
 if __name__ == '__main__':
-    if re.search(r'-h(?!\S)', ' '.join(sys.argv)) or \
-          re.search(r'--help', ' '.join(sys.argv)):
+    if re.search(r'-h(?!\S)', ' '.join(sys.argv)) or re.search(
+        r'--help', ' '.join(sys.argv)
+    ):
         print(  # noqa: T201
             'Usage: submit_job OUTPUT NUMBER_OF_NODES PROJECT_DIRECTORY [ARGS]...'
         )

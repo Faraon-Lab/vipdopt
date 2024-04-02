@@ -7,12 +7,12 @@ from vipdopt.optimization.fom import BayerFilterFoM, FoM
 from vipdopt.optimization.optimization import Optimization
 
 __all__ = [
-    'Optimization',
-    'GradientOptimizer',
     'AdamOptimizer',
     'BayerFilterFoM',
-    'FoM',
     'Device',
     'Filter',
+    'FoM',
+    'GradientOptimizer',
+    'Optimization',
     'Sigmoid',
 ]

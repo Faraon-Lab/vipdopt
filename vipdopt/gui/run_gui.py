@@ -1,4 +1,5 @@
 """Entrypoint running the GUI. Mainly for testing right now."""
+
 from __future__ import annotations
 
 import contextlib
@@ -60,11 +61,12 @@ PLOT_DIMS = (len(PLOT_NAMES), len(PLOT_NAMES[0]))
 
 class FomDialog(QDialog, Ui_FomDialog):
     """Dialog window for configuring FoMs."""
+
     def __init__(
-            self,
-            parent: QWidget | None,
-            f: Qt.WindowType = Qt.WindowType.Dialog,
-    )-> None:
+        self,
+        parent: QWidget | None,
+        f: Qt.WindowType = Qt.WindowType.Dialog,
+    ) -> None:
         """Initialize a FomDialog."""
         super().__init__(parent, f)
 
@@ -75,7 +77,7 @@ class FomDialog(QDialog, Ui_FomDialog):
         self.treeWidget.clear()
         sim: LumericalSimulation
         for i, sim in enumerate(sims):
-            sim_node = QTreeWidgetItem((f'Simulation {i}', ))
+            sim_node = QTreeWidgetItem((f'Simulation {i}',))
             source_nodes = [QTreeWidgetItem((src,)) for src in sim.monitor_names()]
             self.uncheck_items(*source_nodes)
             sim_node.addChildren(source_nodes)
@@ -93,9 +95,9 @@ class FomDialog(QDialog, Ui_FomDialog):
             item.setExpanded(False)
 
     def check_monitors(
-            self,
-            src_to_sim_map: dict[str, LumericalSimulation],
-            *monitors: Monitor,
+        self,
+        src_to_sim_map: dict[str, LumericalSimulation],
+        *monitors: Monitor,
     ):
         """Check all of the monitors."""
         all_children: list[QTreeWidgetItem] = self.treeWidget.findChildren(
@@ -109,9 +111,7 @@ class FomDialog(QDialog, Ui_FomDialog):
                 Qt.MatchFlag.MatchRecursive | Qt.MatchFlag.MatchExactly,
                 0,
             )
-            mon_node = mon_nodes[
-                list(src_to_sim_map.keys()).index(monitor.source_name)
-            ]
+            mon_node = mon_nodes[list(src_to_sim_map.keys()).index(monitor.source_name)]
             mon_node.parent().setExpanded(True)
 
             mon_items.append(mon_node)
@@ -120,6 +120,7 @@ class FomDialog(QDialog, Ui_FomDialog):
 
 class SettingsWindow(QMainWindow, Ui_SettingsWindow):
     """Wrapper class for the settings window."""
+
     fom_widget_rows: list[
         tuple[
             QLineEdit,
@@ -129,7 +130,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             QLineEdit,
             QComboBox,
             QComboBox,
-            QToolButton
+            QToolButton,
         ]
     ]
     fom_locs: dict[str, tuple[int, int]]  # index, row of each FoM
@@ -197,7 +198,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.sim_config_treeWidget.clear()
         sim: LumericalSimulation  # type: ignore
         for i, sim in enumerate(self.project.optimization.sims):
-            sim_node = QTreeWidgetItem((f'Simulation {i}', ))
+            sim_node = QTreeWidgetItem((f'Simulation {i}',))
             source_nodes = [QTreeWidgetItem((src,)) for src in sim.source_names()]
             for src in source_nodes:
                 src.setCheckState(1, Qt.CheckState.Unchecked)
@@ -210,18 +211,20 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         for i, fom in enumerate(self.project.foms):
             self.add_fom(i, fom)
             self.fom_widget_rows[i][4].setText(str(self.project.weights[i]))
-            self.fom_widget_rows[i][5].addItems(
-                [f'Simulation {i}' for i in range(len(self.project.optimization.sims))]
-            )
-            self.fom_widget_rows[i][6].addItems(
-                [f'Simulation {i}' for i in range(len(self.project.optimization.sims))]
-            )
+            self.fom_widget_rows[i][5].addItems([
+                f'Simulation {i}' for i in range(len(self.project.optimization.sims))
+            ])
+            self.fom_widget_rows[i][6].addItems([
+                f'Simulation {i}' for i in range(len(self.project.optimization.sims))
+            ])
         # Device Tab
         self.device_model.load(self.project.device.as_dict())
 
         # Optimization Tab
         self.opt_iter_lineEdit.setText(str(self.project.optimization.iteration))
-        self.opt_iter_per_epoch_lineEdit.setText(str(self.project.optimization.iter_per_epoch))
+        self.opt_iter_per_epoch_lineEdit.setText(
+            str(self.project.optimization.iter_per_epoch)
+        )
         self.opt_max_epoch_lineEdit.setText(str(self.project.optimization.max_epochs))
 
     # Configuration Tab
@@ -255,7 +258,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
             self.sim_model.load(cfg)
 
     # FoM Tab
-    def fom_dialog(self, name: str, mode: str='fom'):
+    def fom_dialog(self, name: str, mode: str = 'fom'):
         """Create a dialog for selecting monitors for FoMs."""
         dialog = FomDialog(self)
         dialog.populate_tree(self.project.optimization.sims)
@@ -350,18 +353,16 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         )
         delrow_tool_button.clicked.connect(lambda: self.remove_fom(name))
 
-        self.fom_widget_rows.append(
-            (
-                name_line_edit,
-                type_combo_box,
-                fom_push_button,
-                grad_push_button,
-                weight_line_edit,
-                fwd_sim_combo_box,
-                adj_sim_combo_box,
-                delrow_tool_button
-            )
-        )
+        self.fom_widget_rows.append((
+            name_line_edit,
+            type_combo_box,
+            fom_push_button,
+            grad_push_button,
+            weight_line_edit,
+            fwd_sim_combo_box,
+            adj_sim_combo_box,
+            delrow_tool_button,
+        ))
         self.add_fom_add_button()
         return rows
 
@@ -376,8 +377,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         self.fom_gridLayout.removeWidget(self.fom_addrow_toolButton)
         row = self.new_fom_row(fom.name)
         self.fom_locs[fom.name] = (idx, row)
-        name_line_edit, type_combo_box, _, _, _, _, _, _ = \
-              self.fom_widget_rows[idx]
+        name_line_edit, type_combo_box, _, _, _, _, _, _ = self.fom_widget_rows[idx]
 
         name_line_edit.setText(fom.name)
         type_combo_box.setCurrentIndex(FOM_TYPES.index(type(fom).__name__))
@@ -390,7 +390,7 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
     def clear_fom_rows(self):
         """Remove all FoMs."""
-        for (_, r) in self.fom_locs.values():
+        for _, r in self.fom_locs.values():
             for c in range(self.fom_gridLayout.columnCount()):
                 layout = self.fom_gridLayout.itemAtPosition(r, c)
                 if layout is not None:
@@ -426,7 +426,10 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
 
 class MplCanvas(FigureCanvasQTAgg):
     """A QtWidget for displaying plots from matplotlib."""
-    def __init__(self, figure: Figure=None, width=3, height=12/5, dpi=100, fontsize=12):
+
+    def __init__(
+        self, figure: Figure = None, width=3, height=12 / 5, dpi=100, fontsize=12
+    ):
         """Initialize an MplCanvas."""
         self.fontsize = fontsize
         if figure is not None:
@@ -451,24 +454,25 @@ class MplCanvas(FigureCanvasQTAgg):
     def adjust_figure_size(self, fig_width, fig_height=None):
         """Adjust the size of the figure to fit inside the GUI window."""
         if fig_height is None:
-            fig_height = fig_width*4/5
+            fig_height = fig_width * 4 / 5
         left = self.fig.subplotpars.left
         right = self.fig.subplotpars.right
         top = self.fig.subplotpars.top
         bottom = self.fig.subplotpars.bottom
-        figw = float(fig_width)/(right-left)
-        figh = float(fig_height)/(top-bottom)
+        figw = float(fig_width) / (right - left)
+        figh = float(fig_height) / (top - bottom)
         self.fig.figure.set_size_inches(figw, figh, forward=True)
         self.fig.tight_layout()
 
+
 class StatusDashboard(QMainWindow, Ui_DashboardWindow):
     """Wrapper class for the status window."""
+
     def __init__(self):
         """Initialize a StatusWindow."""
         super().__init__()
         self.setupUi(self)
         self.horizontalLayout.setContentsMargins(5, 5, 5, 5)
-
 
         self.actionOpen.triggered.connect(self.open_project)
 
@@ -511,11 +515,14 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
 
         # Make closing the settings window update the dashboard
         win.setWindowModality(Qt.WindowModality.ApplicationModal)
+
         def wrap_func(f: Callable):
             def override_close(*args):
                 f(*args)
                 self._update_values()
+
             return override_close
+
         win.closeEvent = wrap_func(win.closeEvent)
 
         win.show()
@@ -560,7 +567,6 @@ class StatusDashboard(QMainWindow, Ui_DashboardWindow):
                 self.gridLayout.addWidget(self.plots[i][j], i, j)
 
     def _update_values(self):
-
         self._update_plots()
 
         self.running = self.project.optimization.loop
@@ -583,6 +589,7 @@ def start_gui(args: list[str]):
     status_window = StatusDashboard()
     status_window.show()
     app.exec()
+
 
 if __name__ == '__main__':
     start_gui(sys.argv)

@@ -1,6 +1,5 @@
 """Tests for vipdopt.configuration.template"""
 
-
 import numpy as np
 import pytest
 import yaml

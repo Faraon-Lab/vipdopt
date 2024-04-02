@@ -1,4 +1,5 @@
 """Module for representing sources in Lumerical simulations."""
+
 import pickle
 
 
@@ -23,6 +24,7 @@ class Source:
         """Pickles this Source to a file."""
         with open(fname, 'wb') as f:
             pickle.dump(self, f)
+
 
 class ForwardSource(Source):
     """Source object used in forward simulations."""

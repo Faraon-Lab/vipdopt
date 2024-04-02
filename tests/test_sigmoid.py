@@ -12,6 +12,7 @@ from vipdopt.optimization.filter import Sigmoid
 ETA = 0.5
 BETA = 0.05
 
+
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
     'var, expected',
@@ -22,12 +23,11 @@ BETA = 0.05
         (0.5, True),
         (-1.0, False),
         (1.1, False),
-
         # Works on arrays too
         ([0.0, 1.0, 0.5], True),
         ([-0.1, 1.1], False),
         ([-0.1, 0.5, 1.1], False),
-    ]
+    ],
 )
 def test_verify_bounds_sigmoid(var: npt.ArrayLike | Number, expected: bool):
     # Sigmoid always has bounds [0, 1]
@@ -50,13 +50,12 @@ def test_sigmoid_bad_eta(eta: Number):
         # Check that \rho=0.5 always get projected to 0.5, for lare and small beta
         (0.5, 1, 0.5, 0.5),
         (0.5, 1e9, 0.5, 0.5),
-
         # Check that going around the center pushes towards the ends
         (0.5, 1, 0.4, 0.39216),
         (0.5, 1, 0.6, 0.607838),
         (0.5, 1e3, 0.4, 0),
         (0.5, 1e3, 0.6, 1),
-    ]
+    ],
 )
 def test_sigmoid_forward(eta: Number, beta: Number, x: Number, expected: Number):
     sig = Sigmoid(eta, beta)
@@ -76,7 +75,7 @@ def test_sigmoid_forward(eta: Number, beta: Number, x: Number, expected: Number)
         (0.5, 1e3, 0.4, 0),
         (0.5, 1e3, 0.6, 0),
         (0.5, 1e3, 1.0, 0),
-    ]
+    ],
 )
 def test_sigmoid_chain_rule(eta: Number, beta: Number, x: Number, expected: Number):
     sig = Sigmoid(eta, beta)
@@ -94,7 +93,6 @@ def test_sigmoid_chain_rule(eta: Number, beta: Number, x: Number, expected: Numb
         (0.0, 1e9, 0.0, 0.0),
         (1.0, 1, 1.0, 0.0),
         (1.0, 1e9, 1.0, 0.0),
-
         # Check that moving from eta pushes all values to 0 or 1
         (0.5, 1, 0.0, 0),
         (0.5, 1, 0.4, 0),
@@ -104,16 +102,15 @@ def test_sigmoid_chain_rule(eta: Number, beta: Number, x: Number, expected: Numb
         (0.5, 1e3, 0.4, 0),
         (0.5, 1e3, 0.6, 1),
         (0.5, 1e3, 1.0, 1),
-
         # Works for arrays
         (0.5, 1, [0, 0.4, 0.6, 1.0], [0, 0, 1, 1]),
-    ]
+    ],
 )
 def test_sigmoid_fabricate(
     eta: Number,
     beta: Number,
     x: npt.ArrayLike | Number,
-    expected: npt.ArrayLike | Number
+    expected: npt.ArrayLike | Number,
 ):
     sig = Sigmoid(eta, beta)
     assert_equal(sig.fabricate(x), expected)

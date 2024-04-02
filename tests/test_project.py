@@ -1,6 +1,5 @@
 """Tests for project.py"""
 
-
 import pytest
 
 from testing import assert_equal
@@ -24,4 +23,3 @@ def test_load(device_dict: dict, fom_dict: dict):
         FoM.from_dict(name, data, src_to_sim_map) for name, data in fom_dict.items()
     ]
     assert_equal(project.foms[0], foms[0])
-

@@ -20,6 +20,7 @@ def binarize(variable_in):
     """Assumes density - if not, convert explicitly."""
     return 1.0 * np.greater_equal(variable_in, 0.5)
 
+
 current_dir = Path(current_dir)
 lumapi_filepath_local = 'C:\\Program Files\\Lumerical\\v212\\api\\python\\lumapi.py'
 vipdopt.lumapi = import_lumapi(lumapi_filepath_local)
@@ -33,7 +34,7 @@ full_density = binarize(np.real(full_density))
 stl_generator = STL.STL(full_density)
 stl_generator.generate_stl()
 # stl_generator.viz_stl()
-stl_generator.save_stl( current_dir / 'final_device.stl' )
+stl_generator.save_stl(current_dir / 'final_device.stl')
 
 # Find out how Lumerical exports GDSii data - mirror that
 # And see if the final GDSii can be imported back in to achieve the same effect
@@ -57,7 +58,9 @@ for z_layer in range(full_density.shape[2]):
 
 # # Create a Layered GDS object that holds a list of GDS objects converted from each Mesh.
 # Create a GDS object that contains a Library with Cells corresponding to each 2D layer in the 3D device.
-gds_generator = GDS.GDS().set_layers(full_density.shape[2], unit=(2.04e-6)/(40e-6)*(1e-6)) # , unit=0.051e-9)
+gds_generator = GDS.GDS().set_layers(
+    full_density.shape[2], unit=(2.04e-6) / (40e-6) * (1e-6)
+)  # , unit=0.051e-9)
 gds_generator.assemble_device(layer_mesh_array, listed=False)
 
 # Directory for export
@@ -84,17 +87,35 @@ fdtd.load(os.path.join(current_dir, 'forward_src_x'))
 dev_name = 'design_import'
 num_voxel_side = [41, 41, 42]
 fdtd.setnamed(dev_name, 'enabled', 0)
-x_vals = np.linspace(fdtd.getnamed(dev_name, 'x min'), fdtd.getnamed(dev_name, 'x max'), num_voxel_side[0])
-y_vals = np.linspace(fdtd.getnamed(dev_name, 'y min'), fdtd.getnamed(dev_name, 'y max'), num_voxel_side[1])
-z_vals = np.linspace(fdtd.getnamed(dev_name, 'z min'), fdtd.getnamed(dev_name, 'z max'), num_voxel_side[2])
+x_vals = np.linspace(
+    fdtd.getnamed(dev_name, 'x min'),
+    fdtd.getnamed(dev_name, 'x max'),
+    num_voxel_side[0],
+)
+y_vals = np.linspace(
+    fdtd.getnamed(dev_name, 'y min'),
+    fdtd.getnamed(dev_name, 'y max'),
+    num_voxel_side[1],
+)
+z_vals = np.linspace(
+    fdtd.getnamed(dev_name, 'z min'),
+    fdtd.getnamed(dev_name, 'z max'),
+    num_voxel_side[2],
+)
 
 for layer_idx in range(num_voxel_side[2]):
     t = time.time()
     # fdtd.gdsimport(os.path.join(gds_layer_dir, 'device.gds'), f'L{layer_idx}', 0)
-    fdtd.gdsimport(os.path.join(gds_layer_dir, 'device.gds'), f'L{layer_idx}', 0, 'Si (Silicon) - Palik',
-                z_vals[layer_idx], z_vals[layer_idx+1])
+    fdtd.gdsimport(
+        os.path.join(gds_layer_dir, 'device.gds'),
+        f'L{layer_idx}',
+        0,
+        'Si (Silicon) - Palik',
+        z_vals[layer_idx],
+        z_vals[layer_idx + 1],
+    )
     fdtd.set({'x': -1.02e-6, 'y': -1.02e-6})
-    print(f'Layer {layer_idx} imported in {time.time()-t} seconds.')
+    print(f'Layer {layer_idx} imported in {time.time() - t} seconds.')
 
 
 print('End of code reached.')

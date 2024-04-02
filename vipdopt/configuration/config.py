@@ -27,7 +27,7 @@ class Config(UserDict):
         return f'Config with parameters {super().__str__()}'
 
     @ensure_path
-    def read_file(self, fname: Path, cfg_format: str='auto') -> None:
+    def read_file(self, fname: Path, cfg_format: str = 'auto') -> None:
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
         config = read_config_file(fname, cfg_format)
@@ -48,7 +48,7 @@ class Config(UserDict):
         return cfg
 
     @ensure_path
-    def save(self, fname: Path, cfg_format: str='auto', **kwargs) -> None:
+    def save(self, fname: Path, cfg_format: str = 'auto', **kwargs) -> None:
         """Save a configuration file."""
         path_filename = convert_path(fname)
         if cfg_format == 'auto':
@@ -62,13 +62,7 @@ class Config(UserDict):
                     yaml.dump(config_data, f, **kwargs)
             case '.json':
                 with path_filename.open('w') as f:
-                    json.dump(
-                        config_data,
-                        f,
-                        indent=4,
-                        ensure_ascii=True,
-                        **kwargs
-                    )
+                    json.dump(config_data, f, indent=4, ensure_ascii=True, **kwargs)
             case _:
                 msg = f'{cfg_format} file saving not yet supported.'
                 raise NotImplementedError(msg)

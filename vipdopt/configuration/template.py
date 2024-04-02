@@ -76,13 +76,16 @@ class SonyBayerRenderer(TemplateRenderer):
 
 if __name__ == '__main__':
     parser = ArgumentParser('Create a simulation YAML file from a template.')
-    parser.add_argument('template', type=Path,
-                        help='Jinja2 template file to use')
-    parser.add_argument('data_file', type=Path,
-                        help='File containing values to substitute into template'
+    parser.add_argument('template', type=Path, help='Jinja2 template file to use')
+    parser.add_argument(
+        'data_file',
+        type=Path,
+        help='File containing values to substitute into template',
     )
-    parser.add_argument('output', type=Path,
-                        help='File to output rendered template to.',
+    parser.add_argument(
+        'output',
+        type=Path,
+        help='File to output rendered template to.',
     )
     parser.add_argument(
         '-s',
@@ -92,16 +95,28 @@ if __name__ == '__main__':
         help='Directory to search for the jinja template.'
         ' Defaults to "jinja_templates/"',
     )
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='Enable verbose output. Takes priority over quiet.')
-    parser.add_argument('-q', '--quiet', action='store_true',
-                        help='Enable quiet output. Will only show critical logs.')
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        action='store_true',
+        help='Enable verbose output. Takes priority over quiet.',
+    )
+    parser.add_argument(
+        '-q',
+        '--quiet',
+        action='store_true',
+        help='Enable quiet output. Will only show critical logs.',
+    )
 
     args = parser.parse_args()
 
-    log_level = logging.DEBUG if args.verbose \
-        else logging.WARNING if args.quiet \
-            else logging.INFO
+    log_level = (
+        logging.DEBUG
+        if args.verbose
+        else logging.WARNING
+        if args.quiet
+        else logging.INFO
+    )
     logger = setup_logger('template_logger', log_level)
 
     rndr = SonyBayerRenderer(args.src_directory)

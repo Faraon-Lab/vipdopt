@@ -1,4 +1,6 @@
 """Tests for device.py"""
+
+import math
 from numbers import Number
 
 import numpy as np
@@ -18,19 +20,20 @@ BASE_COORDS = {
     'z': np.array([0, 1]),
 }
 
+
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-        'size, match',
-        [
-            ((1, 1), r'Device size must be 3 dimensional.*'),
-            ((0, 1), r'Device size must be 3 dimensional.*'),
-            ((1, 0, 1), r'Expected positive, integer dimensions;.*'),
-            ((1, 1, 0), r'Expected positive, integer dimensions;.*'),
-            ((1, -1, 1), r'Expected positive, integer dimensions;.*'),
-            ((1, 1, -1), r'Expected positive, integer dimensions;.*'),
-            ((1, 1.1, 1.1), r'Expected positive, integer dimensions;.*'),
-            ((1, 1.0, 1.0), r'Expected positive, integer dimensions;.*'),
-        ],
+    'size, match',
+    [
+        ((1, 1), r'Device size must be 3 dimensional.*'),
+        ((0, 1), r'Device size must be 3 dimensional.*'),
+        ((1, 0, 1), r'Expected positive, integer dimensions;.*'),
+        ((1, 1, 0), r'Expected positive, integer dimensions;.*'),
+        ((1, -1, 1), r'Expected positive, integer dimensions;.*'),
+        ((1, 1, -1), r'Expected positive, integer dimensions;.*'),
+        ((1, 1.1, 1.1), r'Expected positive, integer dimensions;.*'),
+        ((1, 1.0, 1.0), r'Expected positive, integer dimensions;.*'),
+    ],
 )
 def test_bad_size(size: tuple[Number, ...], match):
     with pytest.raises(ValueError, match=match):
@@ -39,22 +42,22 @@ def test_bad_size(size: tuple[Number, ...], match):
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-        'permittivity, match',
-        [
-            ((1, 1, 1), r'Expected 2 permittivity constraints;.*'),
-            ((1, 1j, 1), r'Expected 2 permittivity constraints;.*'),
-            ((0, 1, 2.0), r'Expected 2 permittivity constraints;.*'),
-            ((1j, 1), r'Expected real permittivity;.*'),
-            ((1, 1j), r'Expected real permittivity;.*'),
-            ((1j, 1j), r'Expected real permittivity;.*'),
-            ((1, 1), r'Maximum permittivity must be greater than minimum'),
-            ((1.0, 1.0), r'Maximum permittivity must be greater than minimum'),
-            ((0, 0), r'Maximum permittivity must be greater than minimum'),
-            ((1, 0), r'Maximum permittivity must be greater than minimum'),
-            ((1+2j, 0), r'Expected real permittivity;.*'),
-            ((1.0, 1), r'Maximum permittivity must be greater than minimum'),
-            ((np.pi, 3.14), r'Maximum permittivity must be greater than minimum'),
-        ],
+    'permittivity, match',
+    [
+        ((1, 1, 1), r'Expected 2 permittivity constraints;.*'),
+        ((1, 1j, 1), r'Expected 2 permittivity constraints;.*'),
+        ((0, 1, 2.0), r'Expected 2 permittivity constraints;.*'),
+        ((1j, 1), r'Expected real permittivity;.*'),
+        ((1, 1j), r'Expected real permittivity;.*'),
+        ((1j, 1j), r'Expected real permittivity;.*'),
+        ((1, 1), r'Maximum permittivity must be greater than minimum'),
+        ((1.0, 1.0), r'Maximum permittivity must be greater than minimum'),
+        ((0, 0), r'Maximum permittivity must be greater than minimum'),
+        ((1, 0), r'Maximum permittivity must be greater than minimum'),
+        ((1 + 2j, 0), r'Expected real permittivity;.*'),
+        ((1.0, 1), r'Maximum permittivity must be greater than minimum'),
+        ((np.pi, math.pi), r'Maximum permittivity must be greater than minimum'),
+    ],
 )
 def test_bad_permittivity(permittivity: tuple[Number, Number], match):
     with pytest.raises(ValueError, match=match):
@@ -63,33 +66,33 @@ def test_bad_permittivity(permittivity: tuple[Number, Number], match):
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-        'coords, match',
-        [
-            (
-                (1, 1, 1),
-                r'Expected device coordinates to be a dictionary with.*',
-            ),
-            (
-                {'x': 1, 'y': 1, 'z': 1, 'a': 1},
-                r'Expected device coordinates to be a dictionary with.*',
-            ),
-            (
-                {'x': 1, 'y': 1},
-                r'Expected device coordinates to be a dictionary with.*',
-            ),
-            (
-                {'a': 1, 'b': 1, 'c': 1},
-                r'Expected device coordinates to be a dictionary with.*',
-            ),
-            (
-                {'x': 1, 'y': 1, 'z': 1},
-                r'Expected device coordinates to be ndarrays;.*',
-            ),
-            (
-                {'x': np.array(1), 'y': np.array(1), 'z': 1},
-                r'Expected device coordinates to be ndarrays;.*',
-            ),
-        ],
+    'coords, match',
+    [
+        (
+            (1, 1, 1),
+            r'Expected device coordinates to be a dictionary with.*',
+        ),
+        (
+            {'x': 1, 'y': 1, 'z': 1, 'a': 1},
+            r'Expected device coordinates to be a dictionary with.*',
+        ),
+        (
+            {'x': 1, 'y': 1},
+            r'Expected device coordinates to be a dictionary with.*',
+        ),
+        (
+            {'a': 1, 'b': 1, 'c': 1},
+            r'Expected device coordinates to be a dictionary with.*',
+        ),
+        (
+            {'x': 1, 'y': 1, 'z': 1},
+            r'Expected device coordinates to be ndarrays;.*',
+        ),
+        (
+            {'x': np.array(1), 'y': np.array(1), 'z': 1},
+            r'Expected device coordinates to be ndarrays;.*',
+        ),
+    ],
 )
 def test_bad_coords(coords: tuple[Number, ...], match):
     with pytest.raises(ValueError, match=match):
@@ -108,6 +111,7 @@ def test_init_vars():
     x = INITIAL_DENSITY * np.ones((3, 3, 1), dtype=np.complex128)
     assert_close(device.w[..., 0], x)
     assert_equal(device.w.shape, (3, 3, 1, 3))
+
 
 @pytest.mark.smoke()
 def test_init_random():
@@ -131,6 +135,7 @@ def test_init_random():
     )
 
     assert_close(d1.w, d2.w)
+
 
 @pytest.mark.smoke()
 def test_init_symmetric():
@@ -182,7 +187,7 @@ def test_pass_through_filters():
 
     x_og = INITIAL_DENSITY * np.ones((3, 3), dtype=np.complex128)
     x_copy = INITIAL_DENSITY * np.ones((3, 3), dtype=np.complex128)
-    expected_output  = 0.616228 * np.ones((3, 3), dtype=np.complex128)
+    expected_output = 0.616228 * np.ones((3, 3), dtype=np.complex128)
 
     y = device.pass_through_filters(x_og)
 
@@ -211,4 +216,3 @@ def test_save_load(tmpdir, device_dict):
         assert_close(dev2.__getattribute__(attr), dev1.__getattribute__(attr))
         assert_close(dev3.__getattribute__(attr), dev1.__getattribute__(attr))
         assert_close(dev4.__getattribute__(attr), dev1.__getattribute__(attr))
-

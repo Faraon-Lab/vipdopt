@@ -52,6 +52,7 @@ class Filter(abc.ABC):
     ) -> npt.NDArray | Number:
         """Apply the chain rule and propagate the derivative back one step."""
 
+
 class Sigmoid(Filter):
     """Applies a sigmoidal projection filter to binarize an input.
 
@@ -68,6 +69,7 @@ class Sigmoid(Filter):
         _denominator (Number | npt.NDArray): The denominator used in various methods;
             for reducing re-computation.
     """
+
     @property
     @override
     def _bounds(self):
@@ -83,7 +85,7 @@ class Sigmoid(Filter):
         if not self.verify_bounds(eta):
             raise ValueError('Eta must be in the range [0, 1]')
 
-        self.eta  = eta
+        self.eta = eta
         self.beta = beta
 
         # Calculate denominator for use in methods
@@ -105,8 +107,9 @@ class Sigmoid(Filter):
         All input values of x above the threshold eta, are projected to 1, and the
         values below, projected to 0. This is Eq. (9) of https://doi.org/10.1007/s00158-010-0602-y.
         """
-        numerator = np.tanh(self.beta * self.eta) + \
-            np.tanh(self.beta * (np.copy(np.array(x)) - self.eta))
+        numerator = np.tanh(self.beta * self.eta) + np.tanh(
+            self.beta * (np.copy(np.array(x)) - self.eta)
+        )
         return numerator / self._denominator
 
     @override  # type: ignore
@@ -124,9 +127,10 @@ class Sigmoid(Filter):
         """
         del var_out  # not needed for sigmoid filter
 
-        numerator = self.beta * \
-            np.power(sech(self.beta * (var_in - self.eta)), 2) # type: ignore
-        return deriv_out * numerator / self._denominator            #! 20240228 Ian - Fixed, was missing a deriv_out factor
+        numerator = self.beta * np.power(sech(self.beta * (var_in - self.eta)), 2)  # type: ignore
+        return (
+            deriv_out * numerator / self._denominator
+        )  # ! 20240228 Ian - Fixed, was missing a deriv_out factor
 
     @override
     def fabricate(self, x: npt.NDArray | Number) -> npt.NDArray | Number:
@@ -141,6 +145,7 @@ class Sigmoid(Filter):
         if isinstance(x, Number):  # type: ignore
             return fab.item()
         return fab
+
 
 class Scale(Filter):
     """Assuming that there is an input between 0 and 1, scales it to the range, min, and max, that are declared during initialization.
@@ -183,11 +188,7 @@ class Scale(Filter):
         return np.add(self.min_value, np.multiply(self.range, x))
 
     # @override  # type: ignore
-    def chain_rule(
-        self,
-        deriv_out,
-        var_out,
-        var_in	):
+    def chain_rule(self, deriv_out, var_out, var_in):
         """Apply the chain rule and propagate the derivative back one step."""
         return np.multiply(self.range, deriv_out)
 

@@ -1,4 +1,5 @@
 """Code for representing optimizers."""
+
 import abc
 
 import numpy.typing as npt
@@ -27,10 +28,10 @@ class GradientDescentOptimizer(GradientOptimizer):
         super().__init__(step_size=step_size, **kwargs)
 
     def step(
-            self,
-            device: Device,
-            gradient: npt.ArrayLike,
-            iteration: int,  # noqa: ARG002
+        self,
+        device: Device,
+        gradient: npt.ArrayLike,
+        iteration: int,  # noqa: ARG002
     ):
         """Step with the gradient."""
         grad = device.backpropagate(gradient)

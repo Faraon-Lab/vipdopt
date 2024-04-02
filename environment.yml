@@ -17,7 +17,7 @@ dependencies:
   - gdstk==0.9.50
   - pip
   # For Linting
-  - ruff=0.0.287
+  - ruff=0.3.5
   # For static type checking
   - mypy=1.8.*
   - overrides=7.7.*

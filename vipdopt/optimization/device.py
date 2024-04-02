@@ -16,6 +16,7 @@ from vipdopt.utils import Coordinates, PathLike, ensure_path
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
 
+
 # TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
 class Device:
     """An optical device / object that can be optimized.
@@ -37,17 +38,17 @@ class Device:
     """
 
     def __init__(
-            self,
-            size: tuple[int, int, int] ,                            #! 20240227 Ian - Added second device
-            permittivity_constraints: tuple[Real, Real],
-            coords: Coordinates,     #! 20240227 Ian - Had to change this to a Dict(NDArray(Float)) of 'x','y','z'
-            name: str='device',
-            init_density: float=0.5,
-            randomize: bool=False,
-            init_seed: None | int=None,
-            symmetric: bool=False,
-            filters: list[Filter] | None=None,
-            **kwargs
+        self,
+        size: tuple[int, int, int],  # ! 20240227 Ian - Added second device
+        permittivity_constraints: tuple[Real, Real],
+        coords: Coordinates,  # ! 20240227 Ian - Had to change this to a Dict(NDArray(Float)) of 'x','y','z'
+        name: str = 'device',
+        init_density: float = 0.5,
+        randomize: bool = False,
+        init_seed: None | int = None,
+        symmetric: bool = False,
+        filters: list[Filter] | None = None,
+        **kwargs,
     ):
         """Initialize Device object."""
         if filters is None:
@@ -55,27 +56,36 @@ class Device:
         if len(size) != 3:  # noqa: PLR2004                         #! 20240227 Ian - Changed this to 3-dimensions so it'll work for now
             raise ValueError(f'Device size must be 3 dimensional; got {len(size)}')
         if any(d < 1 for d in size) or any(not isinstance(d, int) for d in size):
-            raise ValueError('Expected positive, integer dimensions;'
-                             f' received {size}')
+            raise ValueError(
+                'Expected positive, integer dimensions;' f' received {size}'
+            )
         self.size = size
 
         if len(permittivity_constraints) != 2:  # noqa: PLR2004
-            raise ValueError('Expected 2 permittivity constraints;'
-                             f'got {permittivity_constraints}')
+            raise ValueError(
+                'Expected 2 permittivity constraints;' f'got {permittivity_constraints}'
+            )
         if any(not isinstance(pc, Real) for pc in permittivity_constraints):
-            raise ValueError('Expected real permittivity;'
-                             f' got {permittivity_constraints}')
+            raise ValueError(
+                'Expected real permittivity;' f' got {permittivity_constraints}'
+            )
         if permittivity_constraints[0] >= permittivity_constraints[1]:
             raise ValueError('Maximum permittivity must be greater than minimum')
         self.permittivity_constraints = permittivity_constraints
 
-        if not isinstance(coords, dict) or len(coords) != 3 or \
-            any(dim not in coords for dim in 'xyz'):
-            raise ValueError('Expected device coordinates to be a dictionary with '
-                             f'entries {{x, y, z}}; got {coords}')
+        if (
+            not isinstance(coords, dict)
+            or len(coords) != 3
+            or any(dim not in coords for dim in 'xyz')
+        ):
+            raise ValueError(
+                'Expected device coordinates to be a dictionary with '
+                f'entries {{x, y, z}}; got {coords}'
+            )
         if any(not isinstance(coord, np.ndarray) for coord in coords.values()):
-            raise ValueError('Expected device coordinates to be ndarrays;'
-                             f' got {coords}')
+            raise ValueError(
+                'Expected device coordinates to be ndarrays;' f' got {coords}'
+            )
         self.coords = coords
 
         # Optional arguments
@@ -107,7 +117,7 @@ class Device:
         n_var = self.num_filters() + 1
 
         w = np.zeros((*self.size, n_var), dtype=np.complex128)
-        if self.randomize:                                                 #! 20240228 Ian - Fixed randomize
+        if self.randomize:  # ! 20240228 Ian - Fixed randomize
             rng = np.random.default_rng(self.init_seed)
             w[:] = rng.normal(self.init_density, GAUSSIAN_SCALE, size=w.shape)
 
@@ -157,14 +167,16 @@ class Device:
                 sys.modules['vipdopt.optimization.filter'],
                 filt_dict['type'],
             )
-            filters.append(filter_cls(
-                **filt_dict['parameters'],
-            ))
+            filters.append(
+                filter_cls(
+                    **filt_dict['parameters'],
+                )
+            )
         data['filters'] = filters
         return cls(**data)
 
     @ensure_path
-    def save(self, fname: Path, binarize: bool=False):
+    def save(self, fname: Path, binarize: bool = False):
         """Save device to a .npz file."""
         with fname.open('wb') as f:
             np.save(f, self.as_dict())
@@ -214,9 +226,12 @@ class Device:
         return len(self.filters)
 
     def update_filters(self, epoch=0):
-        sigmoid_beta = 0.0625* (2**epoch)
+        sigmoid_beta = 0.0625 * (2**epoch)
         sigmoid_eta = 0.5
-        self.filters=[Sigmoid(sigmoid_eta, sigmoid_beta), Scale(self.permittivity_constraints)]
+        self.filters = [
+            Sigmoid(sigmoid_eta, sigmoid_beta),
+            Scale(self.permittivity_constraints),
+        ]
 
     def get_density(self):
         """Return the density of the device region (i.e. last layer)."""
@@ -228,7 +243,7 @@ class Device:
         # eps_min, eps_max = self.permittivity_constraints
         # return self.get_density() * (eps_max - eps_min) + eps_min
 
-        return self.w[...,-1]
+        return self.w[..., -1]
 
     def update_density(self):
         """Pass each layer of density through the devices filters."""
@@ -237,10 +252,11 @@ class Device:
             var_out = self.filters[i].forward(var_in)
             self.w[..., i + 1] = var_out
 
-
     def index_from_permittivity(self, permittivity_):
         """Checks all permittivity values are real and then takes square root to give index."""
-        assert np.all(np.imag(permittivity_) == 0), 'Not expecting complex index values right now!'
+        assert np.all(
+            np.imag(permittivity_) == 0
+        ), 'Not expecting complex index values right now!'
 
         return np.sqrt(permittivity_)
 
@@ -248,24 +264,22 @@ class Device:
         return (eps - eps_min) / (eps_max - eps_min)
 
     def density_to_permittivity(self, density, eps_min, eps_max):
-        return density*(eps_max - eps_min) + eps_min
+        return density * (eps_max - eps_min) + eps_min
 
     def binarize(self, variable_in):
         """Assumes density - if not, convert explicitly."""
         return 1.0 * np.greater_equal(variable_in, 0.5)
 
-    def compute_binarization(self, input_variable, set_point=0.5 ):
+    def compute_binarization(self, input_variable, set_point=0.5):
         # todo: rewrite for multiple materials
         input_variable = np.real(input_variable)
-        total_shape = np.prod( input_variable.shape )
-        return ( 2. / total_shape ) * np.sum( np.sqrt( ( input_variable - set_point )**2 ) )
-
-
+        total_shape = np.prod(input_variable.shape)
+        return (2.0 / total_shape) * np.sum(np.sqrt((input_variable - set_point) ** 2))
 
     def pass_through_filters(
-            self,
-            x: npt.NDArray | Number,
-            binarize=False,
+        self,
+        x: npt.NDArray | Number,
+        binarize=False,
     ) -> npt.NDArray | Number:
         """Pass x through the device filters, returning the output.
 
@@ -281,10 +295,8 @@ class Device:
         """
         y = np.copy(np.array(x))
         for i in range(self.num_filters()):
-            y = self.filters[i].fabricate(y) if binarize \
-                else self.filters[i].forward(y)  # type: ignore
+            y = self.filters[i].fabricate(y) if binarize else self.filters[i].forward(y)  # type: ignore
         return y
-
 
     def backpropagate(self, gradient):
         """Backpropagate a gradient to be applied to pre-filtered design variables."""
@@ -298,7 +310,7 @@ class Device:
 
             grad = get_filter.chain_rule(gradient, variable_out, variable_in)
 
-        #! 20240228 Ian - Fixed, previous version had something wrong
+        # ! 20240228 Ian - Fixed, previous version had something wrong
         # for i in range(self.num_filters() - 1, -1, -1):
         #     filt = self.filters[i]
         #     y = self.w[..., i]

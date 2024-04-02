@@ -27,7 +27,7 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     """Create the subdirectories of the project folder."""
     directories: dict[str, Path] = {'main': root_dir}
 
-    #* Output / Save Paths
+    # * Output / Save Paths
     data_folder = root_dir / 'data'
     temp_folder = root_dir / '.tmp'
     checkpoint_folder = data_folder / 'checkpoints'
@@ -65,7 +65,6 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     # if not os.path.isdir( evaluation_folder ):
     #     evaluation_folder.mkdir(exist_ok=True)
 
-
     # TODO: finalize this when the Project directory internal structure is finalized
     # if os.path.exists(EVALUATION_CONFIG_FOLDER):
     #     shutil.rmtree(EVALUATION_CONFIG_FOLDER)
@@ -77,8 +76,6 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     # shutil.copy2(
     #     os.path.abspath(python_src_directory + "/evaluation/plotter.py"),
     #     EVALUATION_UTILS_FOLDER + "/plotter.py" )
-
-
 
     directories = {
         'root': root_dir,
@@ -103,7 +100,7 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
 class Project:
     """Class for managing the loading and saving of projects."""
 
-    def __init__(self, config_type: type[Config]=SonyBayerConfig) -> None:
+    def __init__(self, config_type: type[Config] = SonyBayerConfig) -> None:
         """Initialize a Project."""
         self.dir = Path('.')  # Project directory; defaults to root
         self.config = config_type()
@@ -122,7 +119,7 @@ class Project:
     def from_dir(
         cls: type[Project],
         project_dir: PathLike,
-        config_type: type[Config]=SonyBayerConfig,
+        config_type: type[Config] = SonyBayerConfig,
     ) -> Project:
         """Create a new Project from an existing project directory."""
         proj = Project(config_type=config_type)
@@ -130,7 +127,7 @@ class Project:
         return proj
 
     @ensure_path
-    def load_project(self, project_dir: Path, config_name:str ='config.yaml'):
+    def load_project(self, project_dir: Path, config_name: str = 'config.yaml'):
         """Load settings from a project directory - or create them if initializing.
 
         MUST have a config file in the project directory.
@@ -154,8 +151,9 @@ class Project:
         try:
             optimizer_type = getattr(sys.modules['vipdopt.optimization'], optimizer)
         except AttributeError:
-            raise NotImplementedError(f'Optimizer {optimizer} not currently supported')\
-            from None
+            raise NotImplementedError(
+                f'Optimizer {optimizer} not currently supported'
+            ) from None
         self.optimizer = optimizer_type(**optimizer_settings)
 
     def _load_base_sim(self, cfg: Config):
@@ -176,15 +174,12 @@ class Project:
             mpi_exe=cfg['mpi_exe'],
             nprocs=cfg['nprocs'],
             solver_exe=cfg['solver_exe'],
-            nsims=len(base_sim.source_names())
+            nsims=len(base_sim.source_names()),
         )
 
         self.base_sim = base_sim
         self.src_to_sim_map = {
-            src: base_sim.with_enabled(
-                [src],
-                name=src
-            )
+            src: base_sim.with_enabled([src], name=src)
             for src in base_sim.source_names()
         }
 
@@ -211,12 +206,15 @@ class Project:
         # spectral_weights_by_fom = np.zeros(
         #     (len(fom_dict), cfg.pv.num_design_frequency_points)
         # )
-        spectral_weights_by_fom = np.zeros(
-            (cfg['num_bands'], cfg['num_design_frequency_points'])
-        )
+        spectral_weights_by_fom = np.zeros((
+            cfg['num_bands'],
+            cfg['num_design_frequency_points'],
+        ))
         # Each wavelength band needs a left, right, and peak (usually center).
         wl_band_bounds: dict[str, npt.NDArray | list] = {
-            'left': [], 'peak': [], 'right': []
+            'left': [],
+            'peak': [],
+            'right': [],
         }
 
         wl_band_bounds = assign_bands(
@@ -234,13 +232,14 @@ class Project:
             wl_band_bound_idxs[key] = np.searchsorted(cfg['lambda_values_um'], val)
 
         spectral_weights_by_fom = determine_spectral_weights(
-            spectral_weights_by_fom, wl_band_bound_idxs, mode='gaussian')
+            spectral_weights_by_fom, wl_band_bound_idxs, mode='gaussian'
+        )
 
         # Repeat green weighting for other FoM such that green weighting applies to
         # FoMs 1,3
         if cfg['simulator_dimension'] == '3D':  # Bayer Filter Functionality
             spectral_weights_by_fom = np.insert(
-                spectral_weights_by_fom, 3, spectral_weights_by_fom[1,:], axis=0
+                spectral_weights_by_fom, 3, spectral_weights_by_fom[1, :], axis=0
             )
         vipdopt.logger.info('Spectral weights assigned.')
 
@@ -252,53 +251,53 @@ class Project:
             device_source = cfg.pop('device')
             self.device = Device.from_source(device_source)
         else:
-            #* Design Region(s) + Constraints
+            # * Design Region(s) + Constraints
             # e.g. feature sizes, bridging/voids, permittivity constraints,
             # corresponding E-field monitor regions
-            region_coordinates = Coordinates(
-                {'x': np.linspace(
+            region_coordinates = Coordinates({
+                'x': np.linspace(
                     -0.5 * cfg['device_size_lateral_bordered_um'],
                     0.5 * cfg['device_size_lateral_bordered_um'],
-                    cfg['device_voxels_lateral_bordered']
+                    cfg['device_voxels_lateral_bordered'],
                 ),
                 'y': np.array([]),
-                'z': np.array([])
+                'z': np.array([]),
             })
             if cfg['simulator_dimension'] == '2D':
                 voxel_array_size = (
                     cfg['device_voxels_lateral_bordered'],
                     cfg['device_voxels_vertical'],
-                    3
+                    3,
                 )
                 region_coordinates.update({
                     'y': np.linspace(
                         cfg['device_vertical_minimum_um'],
                         cfg['device_vertical_maximum_um'],
-                        cfg['device_voxels_vertical']
+                        cfg['device_voxels_vertical'],
                     ),
                     'z': np.linspace(
                         -0.5 * cfg['mesh_spacing_um'] * 1e-6,
                         0.5 * cfg['mesh_spacing_um'] * 1e-6,
-                        3
-                    )
+                        3,
+                    ),
                 })
             elif cfg['simulator_dimension'] == '3D':
                 voxel_array_size = (
                     cfg['device_voxels_lateral_bordered'],
                     cfg['device_voxels_lateral_bordered'],
-                    cfg['device_voxels_vertical']
+                    cfg['device_voxels_vertical'],
                 )
                 region_coordinates.update({
                     'y': np.linspace(
                         -0.5 * cfg['device_size_lateral_bordered_um'],
                         0.5 * cfg['device_size_lateral_bordered_um'],
-                        cfg['device_voxels_lateral_bordered']
+                        cfg['device_voxels_lateral_bordered'],
                     ),
                     'z': np.linspace(
                         cfg['device_vertical_minimum_um'],
                         cfg['device_vertical_maximum_um'],
-                        cfg['device_voxels_vertical']
-                    )
+                        cfg['device_voxels_vertical'],
+                    ),
                 })
 
             self.device = Device(
@@ -309,11 +308,11 @@ class Project:
                 init_seed=0,
                 filters=[
                     Sigmoid(0.5, 1.0),
-                    Scale(
-                        (
-                            cfg['min_device_permittivity'],
-                            cfg['max_device_permittivity']
-                ))],
+                    Scale((
+                        cfg['min_device_permittivity'],
+                        cfg['max_device_permittivity'],
+                    )),
+                ],
             )
         vipdopt.logger.info('Device loaded.')
 
@@ -347,12 +346,11 @@ class Project:
             running_on_local_machine = True
 
         self.subdirectories = create_internal_folder_structure(
-            self.dir,
-            running_on_local_machine
+            self.dir, running_on_local_machine
         )
         vipdopt.logger.info('Internal folder substructure created.')
 
-        os.path.dirname(__file__)         # Go up one folder
+        os.path.dirname(__file__)  # Go up one folder
 
         # Setup Optimization
         assert self.device is not None
@@ -362,8 +360,8 @@ class Project:
             sims,
             self.device,
             self.optimizer,
-            full_fom,                # full_fom
-            #will be filled in once full_fom is calculated
+            full_fom,  # full_fom
+            # will be filled in once full_fom is calculated
             # might need to load the array of foms[] as well...
             # and the weights AS WELL AS the full_fom()
             # and the gradient function
@@ -379,7 +377,7 @@ class Project:
 
         self.config = cfg
 
-    def get(self, prop: str, default: Any=None) -> Any | None:
+    def get(self, prop: str, default: Any = None) -> Any | None:
         """Get parameter and return None if it doesn't exist."""
         return self.config.get(prop, default)
 
@@ -419,8 +417,7 @@ class Project:
         self.device.save(self.current_device_path())
         cfg.save(project_dir / 'config.json', cls=LumericalEncoder)
 
-
-        #! TODO: Save histories and plots
+        # ! TODO: Save histories and plots
 
     def _generate_config(self) -> Config:
         """Create a JSON config for this project's settings."""
@@ -472,6 +469,7 @@ class Project:
 # Useful Functions
 #
 
+
 # TODO: Better docstring
 def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
     """Assign bands."""
@@ -481,7 +479,7 @@ def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
     # and rights accordingly. i.e. assume all bands are equally spread across all of
     # lambda_values_um without missing any values.
 
-    for key in wl_band_bounds:				# Reassign empty lists to be numpy arrays
+    for key in wl_band_bounds:  # Reassign empty lists to be numpy arrays
         wl_band_bounds[key] = np.zeros(num_bands)
 
     wl_bands = np.array_split(lambda_values_um, num_bands)
@@ -491,44 +489,43 @@ def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
     for band_idx, band in enumerate(wl_bands):
         wl_band_bounds['left'][band_idx] = band[0]
         wl_band_bounds['right'][band_idx] = band[-1]
-        wl_band_bounds['peak'][band_idx] = band[(len(band)-1)//2]
+        wl_band_bounds['peak'][band_idx] = band[(len(band) - 1) // 2]
 
     return wl_band_bounds
 
 
 # TODO: Better docstring
 def determine_spectral_weights(
-        spectral_weights_by_fom,
-        wl_band_bound_idxs,
-        mode='identity',
-        *args,
-        **kwargs
+    spectral_weights_by_fom, wl_band_bound_idxs, mode='identity', *args, **kwargs
 ):
     """Determine spectral weights."""
     # Right now we have it set up to send specific wavelength bands to specific FoMs
     # This can be thought of as creating a desired transmission spectra for each FoM
     # The bounds of each band are controlled by wl_band_bound_idxs
 
-
     for fom_idx, fom in enumerate(spectral_weights_by_fom):
         # We can choose different modes here
-        if mode in ['identity']:	# 1 everywhere
+        if mode == 'identity':  # 1 everywhere
             fom[:] = 1
 
-        elif mode in ['hat']:		# 1 everywhere, 0 otherwise
+        elif mode == 'hat':  # 1 everywhere, 0 otherwise
             fom[
-                wl_band_bound_idxs['left'][fom_idx]:
-                wl_band_bound_idxs['right'][fom_idx] + 1
+                wl_band_bound_idxs['left'][fom_idx] : wl_band_bound_idxs['right'][
+                    fom_idx
+                ]
+                + 1
             ] = 1
 
-        elif mode in ['gaussian']:	# gaussians centered on peaks
-            scaling_exp = - (4/7) / np.log( 0.5 )
+        elif mode == 'gaussian':  # gaussians centered on peaks
+            scaling_exp = -(4 / 7) / np.log(0.5)
             band_peak = wl_band_bound_idxs['peak'][fom_idx]
-            band_width = wl_band_bound_idxs['left'][fom_idx] - \
-                  wl_band_bound_idxs['right'][fom_idx]
+            band_width = (
+                wl_band_bound_idxs['left'][fom_idx]
+                - wl_band_bound_idxs['right'][fom_idx]
+            )
             wl_idxs = range(spectral_weights_by_fom.shape[-1])
             fom[:] = np.exp(
-                -(wl_idxs - band_peak) **2 / (scaling_exp * band_width ) **2
+                -((wl_idxs - band_peak) ** 2) / (scaling_exp * band_width) ** 2
             )
 
     # # Plotting code to check weighting shapes
@@ -542,6 +539,7 @@ def determine_spectral_weights(
     # print(3)
 
     return spectral_weights_by_fom
+
 
 if __name__ == '__main__':
     project_dir = Path('./test_project/')

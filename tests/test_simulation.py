@@ -1,4 +1,5 @@
 """Tests for vipdopt.simulation"""
+
 import pytest
 
 from testing import assert_equal
@@ -15,7 +16,6 @@ from vipdopt.simulation import (
 
 @pytest.mark.lumapi()
 def test_load_sim(simulation_json):
-
     source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.RECT)
     source_aperture.update(**{
         'name': 'source_aperture',
@@ -34,7 +34,6 @@ def test_load_sim(simulation_json):
         'y': 0,
         'y span': 1.5e-6,
     })
-
 
     with LumericalSimulation(source=simulation_json) as s:
         assert 'source_aperture' in s.objects
