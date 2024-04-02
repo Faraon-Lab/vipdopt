@@ -177,8 +177,6 @@ class FoM:
             return FoM(
                 second.fom_monitors,
                 second.grad_monitors,
-                # lambda *args, **kwargs: func(first[..., np.newaxis], og_fom_func(*args, **kwargs)),
-                # lambda *args, **kwargs: func(first, og_grad_func(*args, **kwargs)),
                 lambda *args, **kwargs: tuple(
                     func(first, x) for x in og_fom_func(*args, **kwargs)
                 ),
@@ -210,60 +208,30 @@ class FoM:
         # og_grad_func_2 = second.gradient_func
 
         def new_compute(*args, **kwargs):
-            try:
-                return tuple(
-                    starmap(
-                        func,
-                        zip(
-                            first.compute_fom(*args, **kwargs),
-                            second.compute_fom(*args, **kwargs),
-                            strict=False,
-                        ),
-                    )
-                )
-            except Exception:
-                try:
-                    return tuple(
-                        func(first.compute_fom(*args, **kwargs), x)
-                        for x in second.compute_fom(*args, **kwargs)
-                    )
-                except Exception:
-                    return tuple(
-                        func(x, second.compute_fom(*args, **kwargs))
-                        for x in first.compute_fom(*args, **kwargs)
-                    )
-            # return func(
-            #     first.compute(*args, **kwargs),
-            #     second.compute(*args, **kwargs),
-            # )
+            first_fom = first.compute_fom(*args, **kwargs)
+            second_fom = second.compute_fom(*args, **kwargs)
+            if len(first_fom) == len(second_fom) > 1:
+                res = tuple(starmap(func, zip(first_fom, second_fom, strict=True)))
+            elif len(first_fom) > len(second_fom):
+                res = tuple(func(x, second_fom) for x in first_fom)
+            elif len(first_fom) < len(second_fom):
+                res = tuple(func(first_fom, x) for x in second_fom)
+            else:
+                res = tuple(func(first_fom, second_fom))
+            return res
 
         def new_gradient(*args, **kwargs):
-            try:
-                return tuple(
-                    starmap(
-                        func,
-                        zip(
-                            first.compute_gradient(*args, **kwargs),
-                            second.compute_gradient(*args, **kwargs),
-                            strict=False,
-                        ),
-                    )
-                )
-            except Exception:
-                try:
-                    return tuple(
-                        func(first.compute_gradient(*args, **kwargs), x)
-                        for x in second.compute_gradient(*args, **kwargs)
-                    )
-                except Exception:
-                    return tuple(
-                        func(x, second.compute_gradient(*args, **kwargs))
-                        for x in first.compute_gradient(*args, **kwargs)
-                    )
-            # return func(
-            #     first.gradient(*args, **kwargs),
-            #     second.gradient(*args, **kwargs),
-            # )
+            first_grad = first.compute_gradient(*args, **kwargs)
+            second_grad = second.compute_gradient(*args, **kwargs)
+            if len(first_grad) == len(second_grad) > 1:
+                res = tuple(starmap(func, zip(first_grad, second_grad, strict=True)))
+            elif len(first_grad) > len(second_grad):
+                res = tuple(func(x, second_grad) for x in first_grad)
+            elif len(first_grad) < len(second_grad):
+                res = tuple(func(first_grad, x) for x in second_grad)
+            else:
+                res = tuple(func(first_grad, second_grad))
+            return res
 
         return FoM(
             first.grad_monitors + second.grad_monitors,
@@ -370,25 +338,37 @@ class FoM:
         )
 
 
-# todo: add the following
-# 		self.freq_index_negative_opt: Specify and array of frequency indices that should be optimized with a negative gradient. This is useful for making sure light does not focus to a point, for example.
-# 		self.fom = np.array([]) # The more convenient way to look at fom. For example, power transmission through a monitor even if you're optimizing for a point source.
-# 		self.restricted_fom = np.array([]) # FOM that is being restricted. For instance, frequencies that should not be focused.
-# 		self.true_fom = np.array([]) # The true FoM being used to define the adjoint source.
-# 		self.gradient = np.array([])
-# 		self.restricted_gradient = np.array([])
+""" TODO: add the following
+self.freq_index_negative_opt:
+    Specify and array of frequency indices that should be optimized with a negative
+    gradient. This is useful for making sure light does not focus to a point,
+    for example.
+self.fom = np.array([]):
+    The more convenient way to look at fom. For example, power transmission through a
+    monitor even if you're optimizing for a point source.
+self.restricted_fom = np.array([])
+    FOM that is being restricted. For instance, frequencies that should not be focused.
+self.true_fom = np.array([])
+    The true FoM being used to define the adjoint source.
+self.gradient = np.array([])
+self.restricted_gradient = np.array([])
 
-# 		self.tempfile_fwd_name = ''
-# 		self.tempfile_adj_name = ''
+self.tempfile_fwd_name = ''
+self.tempfile_adj_name = ''
 
-# 		self.design_fwd_fields = None
-# 		self.design_adj_fields = None
+self.design_fwd_fields = None
+self.design_adj_fields = None
 
-# 		# Boolean array specifying which frequencies are active.
-# 		# This is a bit confusing. Almost deprecated really. enabled means of the frequencies being optimized, which are enabled. Useful in rare circumstances where some things need to be fully disable to help catch up.
-# 		self.enabled = np.ones((len(self.freq_index_opt)))
-# 		# Adding this once I started optimizing for functions we DONT want (i.e. restricted_gradient). This is of the freq_index_opt_restricted values, which do we want to optimize?
-# 		self.enabled_restricted = np.ones((len(self.freq_index_restricted_opt)))
+Boolean array specifying which frequencies are active. This is a bit confusing. Almost
+deprecated really. Enabled means of the frequencies being optimized, which are enabled.
+Useful in rare circumstances where some things need to be fully disable to help catch up
+self.enabled = np.ones((len(self.freq_index_opt)))
+
+Adding this once I started optimizing for functions we DONT want
+(i.e. restricted_gradient). This is of the freq_index_opt_restricted values,
+which do we want to optimize?
+self.enabled_restricted = np.ones((len(self.freq_index_restricted_opt)))
+"""
 
 
 class BayerFilterFoM(FoM):
@@ -417,18 +397,14 @@ class BayerFilterFoM(FoM):
 
     def _bayer_fom(self):
         """Compute bayer filter figure of merit."""
-        # ! Here we need to figure out which FoM belongs to which file
-        total_tfom = np.zeros(self.fom_monitors[0].tshape)[
-            ..., self.opt_ids
-        ]  # FoM for transmission monitor
-        total_ffom = np.zeros(
-            self.fom_monitors[0].fshape[1:]
-        )[
-            ..., self.opt_ids
-        ]  # FoM for focal monitor - need to take [1:] because intensity sums over first axis
-        source_weight = np.zeros(
-            self.fom_monitors[0].fshape, dtype=np.complex128
-        )  # Source weight calculation - Apply opt_ids slice when gradient is fully calculated.
+        # Here we need to figure out which FoM belongs to which file
+        # FoM for transmission monitor
+        total_tfom = np.zeros(self.fom_monitors[0].tshape)[..., self.opt_ids]
+        # FoM for focal monitor - take [1:] because intensity sums over first axis
+        total_ffom = np.zeros(self.fom_monitors[0].fshape[1:])[..., self.opt_ids]
+
+        # Source weight calculation.
+        source_weight = np.zeros(self.fom_monitors[0].fshape, dtype=np.complex128)
         for monitor in self.fom_monitors:
             transmission = monitor.trans_mag
             vipdopt.logger.info(f'Accessing monitor {monitor.monitor_name}')
@@ -445,26 +421,38 @@ class BayerFilterFoM(FoM):
             source_weight += np.expand_dims(
                 np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3)
             )
-            # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])       # We'll apply opt_ids slice when gradient is fully calculated.
+            # We'll apply opt_ids slice when gradient is fully calculated.
+            # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])
 
-        # # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's function[design_efield from adj_src simulation]
-        # # Reshape source weight (nλ) to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj)
-        # # https://stackoverflow.com/a/30032182
+        # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
+        # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
+        # to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj) https://stackoverflow.com/a/30032182
         self.source_weight = (
             source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
         )
-        # ! 20240228 Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
+        # TODO: Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
 
-        # * Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with direction along the polarization
-        # This is going to be the amplitude of the dipole-adjoint source driven at the focal plane
-        # ! Reminder that this is only applicable for dipole-based adjoint sources!!!
-        # # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1		# x-polarized if phi = 0, y-polarized if phi = 90.
-        # todo: REDO - direction of source_weight vector potential error.
+        # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
+        # direction along the polarization. This is going to be the amplitude of the
+        # dipole-adjoint source driven at the focal plane. Reminder that this is only
+        # applicable for dipole-based adjoint sources
 
-        # # self.source_weight = np.squeeze( np.conj(
-        # # 		focal_data[pol_xy_idx, 0, 0, 0, :]			# shape: (3, nx, ny, nz, nλ)
-        # # 		#get_focal_data[adj_src_idx][xy_idx, 0, 0, 0, spectral_indices[0]:spectral_indices[1]:1]
-        # # 		) )
+        # x-polarized if phi = 0, y-polarized if phi = 90.
+        # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1
+        # TODO: REDO - direction of source_weight vector potential error.
+
+        # self.source_weight = np.squeeze(
+        #     np.conj(
+        #         focal_data[pol_xy_idx, 0, 0, 0, :]  # shape: (3, nx, ny, nz, nλ)
+        # 		get_focal_data[adj_src_idx][
+        #             xy_idx,
+        #             0,
+        #             0,
+        #             0,
+        #             spectral_indices[0]:spectral_indices[1]:1,
+        #         ]
+        #     )
+        # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
 
         return total_tfom, total_ffom
