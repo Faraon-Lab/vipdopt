@@ -66,36 +66,42 @@ def test_bad_permittivity(permittivity: tuple[Number, Number], match):
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-    'coords, match',
+    'err_type, coords, match',
     [
         (
+            TypeError,
             (1, 1, 1),
             r'Expected device coordinates to be a dictionary with.*',
         ),
         (
+            TypeError,
             {'x': 1, 'y': 1, 'z': 1, 'a': 1},
             r'Expected device coordinates to be a dictionary with.*',
         ),
         (
+            TypeError,
             {'x': 1, 'y': 1},
             r'Expected device coordinates to be a dictionary with.*',
         ),
         (
+            TypeError,
             {'a': 1, 'b': 1, 'c': 1},
             r'Expected device coordinates to be a dictionary with.*',
         ),
         (
+            TypeError,
             {'x': 1, 'y': 1, 'z': 1},
             r'Expected device coordinates to be ndarrays;.*',
         ),
         (
+            TypeError,
             {'x': np.array(1), 'y': np.array(1), 'z': 1},
             r'Expected device coordinates to be ndarrays;.*',
         ),
     ],
 )
-def test_bad_coords(coords: tuple[Number, ...], match):
-    with pytest.raises(ValueError, match=match):
+def test_bad_coords(err_type: type[BaseException], coords: tuple[Number, ...], match):
+    with pytest.raises(err_type, match=match):
         Device((1, 1, 1), (0, 1), coords)
 
 

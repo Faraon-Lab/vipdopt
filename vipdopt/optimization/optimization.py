@@ -285,13 +285,12 @@ class Optimization:
         # Calculate material % and binarization level, store away
         # TODO: redo this section once you get sigmoid filters up and can start counting materials
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
-        vipdopt.logger.info(
-            f'TiO2% is {
-                100
-                * np.count_nonzero(self.device.get_design_variable() < TI02_THRESHOLD)
-                / cur_index.size
-            }%.'
+        tio02_pct = (
+            100
+            * np.count_nonzero(self.device.get_design_variable() < TI02_THRESHOLD)
+            / cur_index.size
         )
+        vipdopt.logger.info(f'TiO2% is {tio02_pct}%.')
         # vipdopt.logger.info(
         #     f'Binarization is {
         #         100 * np.sum(np.abs(cur_density - 0.5)) / (cur_density.size * 0.5)

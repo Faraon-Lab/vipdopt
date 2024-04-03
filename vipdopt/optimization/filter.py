@@ -148,12 +148,19 @@ class Sigmoid(Filter):
 
 
 class Scale(Filter):
-    """Assuming that there is an input between 0 and 1, scales it to the range, min, and max, that are declared during initialization.
-    See OPTICA paper supplement Section IIA, https://doi.org/10.1364/OPTICA.384228,  for details.
+    """Filter for scaling an input to a specified range.
+
+    Assuming that there is an input between 0 and 1, scales it to the range, min, and
+    max, that are declared during initialization. See OPTICA paper supplement Section
+    IIA, https://doi.org/10.1364/OPTICA.384228,  for details
+
     This class is used directly after the sigmoid filter is applied.
 
     Attributes:
-        variable_bounds: here they will denote the permittivity bounds
+        _bounds (tuple[Number]): The min/max permittivity
+        variable_bounds (tuple[Number]): The min/max permittivity
+            (equivalent to `_bounds`).
+        range (float): The total range of the bounds of the filter.
     """
 
     @property
@@ -167,32 +174,33 @@ class Scale(Filter):
         return {'variable_bounds': self.variable_bounds}
 
     def __init__(self, variable_bounds):
+        """Initialize a Scale filter."""
         self.variable_bounds = variable_bounds
 
-        #
-        # variable_bounds specifies the minimum and maximum value of the scaled variable.
-        # We assume we are scaling an input that is between 0 and 1 -> between min_permittivity and max_permittivity
-        #
-
-        self.min_value = variable_bounds[0]
-        self.max_value = variable_bounds[1]
-        self.range = self.max_value - self.min_value
+        self.range = self._bounds[1] - self._bounds[0]
 
     def __repr__(self):
         """Return a string representation of the filter."""
-        return f'Scale filter with minimum={self.min_value:0.3f} and max={self.max_value:0.3f}'
+        return 'Scale filter with range: [{:0.3f}, {:0.3f}]'.format(*self._bounds)
 
-    # @override
-    def forward(self, x):
-        """Performs scaling according to min and max values declared. Assumed that input is between 0 and 1."""
-        return np.add(self.min_value, np.multiply(self.range, x))
+    @override
+    def forward(self, x: npt.NDArray | Number) -> npt.NDArray | Number:
+        """Performs scaling according to min and max values declared.
 
-    # @override  # type: ignore
-    def chain_rule(self, deriv_out, var_out, var_in):
+        Assumes that input is between 0 and 1."""
+        return np.add(self._bounds[0], np.multiply(self.range, x))
+
+    @override  # type: ignore
+    def chain_rule(
+        self,
+        deriv_out: npt.NDArray | Number,
+        var_out: npt.NDArray | Number,  # noqa: ARG002
+        var_in: npt.NDArray | Number,  # noqa: ARG002
+    ) -> npt.NDArray | Number:
         """Apply the chain rule and propagate the derivative back one step."""
         return np.multiply(self.range, deriv_out)
 
-    # @override
-    def fabricate(self, x):
+    @override
+    def fabricate(self, x: npt.NDArray | Number) -> npt.NDArray | Number:
         """Calls forward()."""
         return self.forward(x)

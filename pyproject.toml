@@ -9,6 +9,10 @@ show-fixes = true
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
+    "vipdopt/eval/*",
+    "vipdopt/__main__.py",
+    "vipdopt/GDS.py",
+    "vipdopt/STL.py",
     ".bzr",
     ".direnv",
     ".eggs",

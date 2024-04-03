@@ -17,10 +17,12 @@ _mock_bad_config_data = {
     'bad_config_1.yml': 'border_optimization: true\nuse_smooth_blur: true',
     'bad_config_2.yml': 'border_optimization: true\nnum_sidewalls: 1',
     'bad_config_3.yml': 'add_pdaf: true',
-    'bad_config_4.yml': 'add_pdaf: true\ndevice_size_lateral_um: 3\ngeometry_spacing_lateral_um: 1',
+    'bad_config_4.yml': 'add_pdaf: true\ndevice_size_lateral_um: 3\n'
+    'geometry_spacing_lateral_um: 1',
     'bad_config_5.yml': 'add_pdaf: true\ndevice_voxels_lateral_um: 4\n'
     'geometry_spacing_lateral_um: 1\nadd_infrared: true',
-    'bad_config_6.yml': 'reinterpolate_permittivity: False\nreinterpolate_permittivity_factor: 2',
+    'bad_config_6.yml': 'reinterpolate_permittivity: False\n'
+    'reinterpolate_permittivity_factor: 2',
 }
 
 _mock_sim_file_data = """{

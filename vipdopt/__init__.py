@@ -8,11 +8,13 @@ from typing import Any
 
 from vipdopt.utils import import_lumapi
 
+fdtd: Any = None
+logger: logging.Logger = logging.getLogger()
+
 try:
     lumapi: ModuleType = import_lumapi(
         f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
     )
-except Exception:
-    lumapi: Any = None
-fdtd: Any = None
-logger: logging.Logger = logging.getLogger()
+except FileNotFoundError:
+    # logger.exception('lumapi not found. Using dummy values\n')
+    lumapi: ModuleType = None

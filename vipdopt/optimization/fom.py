@@ -312,7 +312,7 @@ class FoM:
         """
 
         def zero_func(*args, **kwargs):
-            return 0
+            return np.zeros(1)
 
         return FoM(
             [],

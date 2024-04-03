@@ -30,5 +30,4 @@ def test_render_example_config(
 
     for k, v in example_derived_properties.items():
         assert k in rendered_data
-        print(k)
         assert_close(rendered_data[k], v)

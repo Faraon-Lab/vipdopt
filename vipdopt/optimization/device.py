@@ -41,7 +41,7 @@ class Device:
         self,
         size: tuple[int, int, int],  # ! 20240227 Ian - Added second device
         permittivity_constraints: tuple[Real, Real],
-        coords: Coordinates,  # ! 20240227 Ian - Had to change this to a Dict(NDArray(Float)) of 'x','y','z'
+        coords: Coordinates,
         name: str = 'device',
         init_density: float = 0.5,
         randomize: bool = False,
@@ -53,7 +53,7 @@ class Device:
         """Initialize Device object."""
         if filters is None:
             filters = []
-        if len(size) != 3:  # noqa: PLR2004                         #! 20240227 Ian - Changed this to 3-dimensions so it'll work for now
+        if len(size) != 3:  # noqa: PLR2004
             raise ValueError(f'Device size must be 3 dimensional; got {len(size)}')
         if any(d < 1 for d in size) or any(not isinstance(d, int) for d in size):
             raise ValueError(
@@ -75,15 +75,15 @@ class Device:
 
         if (
             not isinstance(coords, dict)
-            or len(coords) != 3
-            or any(dim not in coords for dim in 'xyz')
+            or any(c not in coords for c in 'xyz')
+            or any(k not in 'xyz' for k in coords)
         ):
-            raise ValueError(
+            raise TypeError(
                 'Expected device coordinates to be a dictionary with '
                 f'entries {{x, y, z}}; got {coords}'
             )
         if any(not isinstance(coord, np.ndarray) for coord in coords.values()):
-            raise ValueError(
+            raise TypeError(
                 'Expected device coordinates to be ndarrays;' f' got {coords}'
             )
         self.coords = coords
@@ -226,6 +226,7 @@ class Device:
         return len(self.filters)
 
     def update_filters(self, epoch=0):
+        """Update the filters of the device."""
         sigmoid_beta = 0.0625 * (2**epoch)
         sigmoid_eta = 0.5
         self.filters = [
@@ -252,18 +253,23 @@ class Device:
             var_out = self.filters[i].forward(var_in)
             self.w[..., i + 1] = var_out
 
-    def index_from_permittivity(self, permittivity_):
-        """Checks all permittivity values are real and then takes square root to give index."""
-        assert np.all(
-            np.imag(permittivity_) == 0
-        ), 'Not expecting complex index values right now!'
+    def index_from_permittivity(self, permittivity):
+        """Takes square root of permittivty to give the index.
 
-        return np.sqrt(permittivity_)
+        Raises:
+            (ValueError): If any permittivity values are not real.
+        """
+        if np.any(np.imag(permittivity)):
+            raise ValueError(f'Expected real permittivty values; got {permittivity}.')
+
+        return np.sqrt(permittivity)
 
     def permittivity_to_density(self, eps, eps_min, eps_max):
+        """Convert permittivity to density."""
         return (eps - eps_min) / (eps_max - eps_min)
 
     def density_to_permittivity(self, density, eps_min, eps_max):
+        """Convert density to permittivity."""
         return density * (eps_max - eps_min) + eps_min
 
     def binarize(self, variable_in):
@@ -271,7 +277,8 @@ class Device:
         return 1.0 * np.greater_equal(variable_in, 0.5)
 
     def compute_binarization(self, input_variable, set_point=0.5):
-        # todo: rewrite for multiple materials
+        """Compute what percentage of the device is binarized."""
+        # TODO: rewrite for multiple materials
         input_variable = np.real(input_variable)
         total_shape = np.prod(input_variable.shape)
         return (2.0 / total_shape) * np.sum(np.sqrt((input_variable - set_point) ** 2))
