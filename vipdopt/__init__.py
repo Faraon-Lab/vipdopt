@@ -12,9 +12,9 @@ fdtd: Any = None
 logger: logging.Logger = logging.getLogger()
 
 try:
-    lumapi: ModuleType = import_lumapi(
+    lumapi: ModuleType | None = import_lumapi(
         f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
     )
 except FileNotFoundError:
     # logger.exception('lumapi not found. Using dummy values\n')
-    lumapi: ModuleType = None
+    lumapi = None

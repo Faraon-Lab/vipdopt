@@ -5,9 +5,9 @@ import subprocess
 import sys
 
 
-def generate_script(filename: str, nnodes: int, *args, **kwargs):
+def generate_script(filename: str, nnodes: str, *args, **kwargs):
     """Generate the submission script."""
-    bash_args = ['bash', 'vipdopt/submit.sh', filename, str(nnodes)]
+    bash_args = ['bash', 'vipdopt/submit.sh', filename, nnodes]
     bash_args += [str(arg) for arg in args]
     for k, v in kwargs.items():
         bash_args += [f'--{k}', str(v)]

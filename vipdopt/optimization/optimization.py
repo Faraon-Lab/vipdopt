@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
-from scipy import interpolate
+from scipy import interpolate  # type: ignore
 
 import vipdopt
 from vipdopt import GDS, STL

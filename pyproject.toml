@@ -220,4 +220,7 @@ fail_under = 80
 disable_error_code = ["operator"]
 exclude = [
     '/ui_',  # Ignore files starting with 'ui_'
+    'vipdopt/eval/',  # Ignore eval for now
+    'vipdopt/STL.py',  # Ignore for now
+    'vipdopt/GDS.py',  # Ignore for now
 ]

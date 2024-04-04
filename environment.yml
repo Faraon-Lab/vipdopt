@@ -7,13 +7,14 @@ dependencies:
   - scipy=1.12.0
   - numpy=1.26.*
   - numpy-stl=3.1.*
-  - matplotlib=3.7.*
+  - matplotlib=3.8.*
   - scikit-image=0.22.*
   - PyYAML=6.*
   - types-PyYAML=6.*
   - python-magic=0.4.*
   - Jinja2=3.1.*
-  - PySide6=6.*
+  - PySide6=6.3.0
+  - PySide6-stubs=6.4.2
   - gdstk==0.9.50
   - pip
   # For Linting
