@@ -48,6 +48,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+*.png
+!docs/
 
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
