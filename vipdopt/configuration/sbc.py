@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, overload
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsKeysAndGetItem
 
 import numpy as np
 import yaml
@@ -36,11 +39,6 @@ VERTICAL_LAYERS = 10
 class SonyBayerConfig(Config):
     """Config object specifically for use with the Sony bayer filter optimization."""
 
-    # def __init__(self, data: dict | Config | None=None):
-    #     """Initialize SonyBayerConfig object."""
-
-    # @override
-    # def __copy__(self) -> SonyBayerConfig:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._do_validation = True
@@ -57,10 +55,22 @@ class SonyBayerConfig(Config):
         super().read_file(fname, cfg_format=cfg_format)
         self._validate()
 
-    def update(self, __m: Mapping, **kwargs):
+    @overload
+    def update(self, __m: SupportsKeysAndGetItem, **kwargs: Any) -> None: ...
+
+    @overload
+    def update(self, __m: Iterable[tuple[Any, Any]], **kwargs) -> None: ...
+
+    @overload
+    def update(self, **kwargs: Any) -> None: ...
+
+    def update(self, *args, **kwargs: Any) -> None:
         """Update self with values from another dictionary-like object."""
         self._do_validation = False
-        super().update(__m, **kwargs)
+        if len(args) == 0:
+            super().update(**kwargs)
+        else:
+            super().update(args[0], **kwargs)
         self._do_validation = True
         self._validate()
 

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterable
 from copy import copy
-from numbers import Number, Real
+from numbers import Real
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import numpy.typing as npt
@@ -138,10 +140,12 @@ class Device:
         del data['w']
 
         del data['coords']
-        data['coords'] = {k: list(v) for k, v in self.coords.items()}
+        data['coords'] = {
+            k: list(v) for k, v in cast(Iterable[npt.NDArray], self.coords.items())
+        }
 
         # Add all filters
-        filters: list[Filter] = []
+        filters: list[dict] = []
         for filt in data.pop('filters'):
             filt_dict = {}
             filt_dict['type'] = type(filt).__name__
@@ -179,7 +183,7 @@ class Device:
     def save(self, fname: Path, binarize: bool = False):
         """Save device to a .npz file."""
         with fname.open('wb') as f:
-            np.save(f, self.as_dict())
+            np.save(f, self.as_dict())  # type: ignore
             if binarize:
                 np.save(f, self.pass_through_filters(self.get_design_variable(), True))
             else:
@@ -285,20 +289,20 @@ class Device:
 
     def pass_through_filters(
         self,
-        x: npt.NDArray | Number,
+        x: npt.NDArray | float,
         binarize=False,
-    ) -> npt.NDArray | Number:
+    ) -> npt.NDArray | float:
         """Pass x through the device filters, returning the output.
 
         Does NOT modify the original x, but instead operates on a copy.
 
         Attributes:
-            x: (npt.NDArray | Number): The input density to pass through the filters.
+            x: (npt.NDArray | float): The input density to pass through the filters.
             binarize (bool): Whether to binarize values.
 
 
         Returns:
-            (npt.NDArray | Number): The density after passing through filters.
+            (npt.NDArray | float): The density after passing through filters.
         """
         y = np.copy(np.array(x))
         for i in range(self.num_filters()):

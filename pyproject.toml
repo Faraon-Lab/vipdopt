@@ -217,10 +217,12 @@ fail_under = 80
 # mypy Settings
 #
 [tool.mypy]
+python_version = "3.10"
 disable_error_code = ["operator"]
+files = "vipdopt"
 exclude = [
-    '/ui_',  # Ignore files starting with 'ui_'
-    'vipdopt/eval/',  # Ignore eval for now
-    'vipdopt/STL.py',  # Ignore for now
-    'vipdopt/GDS.py',  # Ignore for now
+    '/ui_.*\.py',  # Ignore files starting with 'ui_'
+    '^vipdopt/eval/',  # Ignore eval for now
+    'vipdopt/STL\.py',  # Ignore for now
+    'vipdopt/GDS\.py',  # Ignore for now
 ]

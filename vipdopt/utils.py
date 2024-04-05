@@ -13,7 +13,7 @@ from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Concatenate, ParamSpec, TypedDict, TypeVar, Type
+from typing import Any, Concatenate, ParamSpec, TypedDict, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -174,18 +174,19 @@ def _json_loader(fname: PathLike) -> dict:
 
 def _yaml_loader(fname: PathLike) -> dict:
     """Config file loader for YAML files."""
+
     # Allow the safeloader to convert sequences to tuples
     def new_constructor(self, x: yaml.SequenceNode):
         return tuple(SafeConstructor.construct_sequence(self, x))
+
     SafeConstructor.add_constructor(  # type: ignore
-        'tag:yaml.org,2002:python/tuple',
-        new_constructor
+        'tag:yaml.org,2002:python/tuple', new_constructor
     )
     with open(fname, 'rb') as stream:
         return yaml.safe_load(stream)
 
 
-def subclasses(cls: Type[T]) -> list[str]:
+def subclasses(cls: type[T]) -> list[str]:
     """Get all subclasses of a given class."""
     return [scls.__name__ for scls in cls.__subclasses__()]
 

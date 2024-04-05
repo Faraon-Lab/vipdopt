@@ -23,6 +23,8 @@ class GradientOptimizer(abc.ABC):
 class GradientDescentOptimizer(GradientOptimizer):
     """Optimizer for doing basic gradient descent."""
 
+    step_size: float
+
     def __init__(self, step_size=0.01, **kwargs):
         """Initialize a GradientDescentOptimizer."""
         super().__init__(step_size=step_size, **kwargs)

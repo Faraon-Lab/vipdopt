@@ -10,6 +10,11 @@ from vipdopt.optimization.optimizer import GradientOptimizer
 class AdamOptimizer(GradientOptimizer):
     """Optimizer implementing the Adaptive Moment Estimation (Adam) algorithm."""
 
+    betas: tuple[float, float]
+    moments: npt.NDArray
+    step_size: float
+    eps: float
+
     def __init__(
         self,
         step_size: float = 0.01,

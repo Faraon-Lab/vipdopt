@@ -15,13 +15,6 @@ from vipdopt.utils import convert_path, ensure_path, read_config_file
 class Config(UserDict):
     """A generic class for storing parameters from a configuration file."""
 
-    # def __init__(self, data: dict | Config | None=None):
-    #     """Initialize a Config object.
-
-    #     Creates an attribute for each parameter in a provided config file.
-    #     """
-    #     if data is not None:
-
     def __str__(self):
         """Return shorter string version of the Config object."""
         return f'Config with parameters {super().__str__()}'
@@ -40,8 +33,7 @@ class Config(UserDict):
         vipdopt.logger.info(f'\nSuccesfully loaded configuration from {fname}')
 
     @classmethod
-    @ensure_path
-    def from_file(cls: Config, fname: Path) -> Config:
+    def from_file(cls: type[Config], fname: Path) -> Config:
         """Create config object from a file."""
         cfg = cls()
         cfg.read_file(fname)

@@ -1,6 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from mpl_toolkits import mplot3d
+from mpl_toolkits import mplot3d  # type: ignore
 from stl import mesh
 
 # ! todo: account for n-material design.
