@@ -7,7 +7,13 @@ from collections.abc import Mapping
 from typing import Any
 
 from overrides import override
-from PySide6.QtCore import QAbstractItemModel, QModelIndex, QObject, Qt
+from PySide6.QtCore import (
+    QAbstractItemModel,
+    QModelIndex,
+    QObject,
+    QPersistentModelIndex,
+    Qt,
+)
 from PySide6.QtWidgets import QApplication, QHeaderView, QTreeView
 
 from vipdopt.utils import read_config_file
@@ -16,13 +22,13 @@ from vipdopt.utils import read_config_file
 class TreeItem:
     """A config item corresponding to a line in QTreeView."""
 
-    def __init__(self, parent: TreeItem = None):
+    def __init__(self, parent: TreeItem | None = None):
         """Initialize a TreeItem."""
         self._parent = parent
         self._key = ''
         self._value = ''
         self._value_type = None
-        self._children = []
+        self._children: list[TreeItem] = []
 
     def append_child(self, item: TreeItem):
         """Add item as a child."""
@@ -32,7 +38,7 @@ class TreeItem:
         """Return the child of the current item from the given row."""
         return self._children[row]
 
-    def parent(self) -> TreeItem:
+    def parent(self) -> TreeItem | None:
         """Return the parent of the current item."""
         return self._parent
 
@@ -76,7 +82,7 @@ class TreeItem:
 
     @classmethod
     def load(
-        cls, value: list | tuple | Mapping, parent: TreeItem = None, sort=True
+        cls, value: list | tuple | Mapping, parent: TreeItem | None = None, sort=True
     ) -> TreeItem:
         """Create a 'root' TreeItem from a nested list or a nested dictonary.
 
@@ -104,7 +110,7 @@ class TreeItem:
         elif isinstance(value, list | tuple):
             for index, val in enumerate(value):
                 child = cls.load(val, root_item)
-                child.key = index
+                child.key = str(index)
                 child.value_type = type(val)
                 root_item.append_child(child)
         else:
@@ -117,7 +123,7 @@ class TreeItem:
 class ConfigModel(QAbstractItemModel):
     """An editable model of configuration data."""
 
-    def __init__(self, parent: QObject = None):
+    def __init__(self, parent: QObject | None = None):
         """Initialize a ConfigModel."""
         super().__init__(parent)
 
@@ -144,7 +150,11 @@ class ConfigModel(QAbstractItemModel):
         return True
 
     @override
-    def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> Any:
+    def data(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         """Override from QAbstractItemModel.
 
         Return data from a config item according index and role
@@ -155,20 +165,25 @@ class ConfigModel(QAbstractItemModel):
 
         item = index.internalPointer()
 
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
-                return item.key
+                return item.key  # type: ignore
 
             if index.column() == 1:
-                return item.value
+                return item.value  # type: ignore
 
-        if role == Qt.EditRole and index.column() == 1:
-            return item.value
+        if role == Qt.ItemDataRole.EditRole and index.column() == 1:
+            return item.value  # type: ignore
 
         return None
 
     @override
-    def setData(self, index: QModelIndex, value: Any, role: Qt.ItemDataRole):
+    def setData(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        value: Any,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> bool:
         """Override from QAbstractItemModel.
 
         Set config item according index and role
@@ -179,11 +194,11 @@ class ConfigModel(QAbstractItemModel):
             role (Qt.ItemDataRole)
 
         """
-        if role == Qt.EditRole and index.column() == 1:
+        if role == Qt.ItemDataRole.EditRole and index.column() == 1:
             item = index.internalPointer()
-            item.value = str(value)
+            item.value = str(value)  # type: ignore
 
-            self.dataChanged.emit(index, index, [Qt.EditRole])
+            self.dataChanged.emit(index, index, [Qt.ItemDataRole.EditRole])
 
             return True
 
@@ -191,17 +206,20 @@ class ConfigModel(QAbstractItemModel):
 
     @override
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: Qt.ItemDataRole
-    ):
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         """Override from QAbstractItemModel.
 
         For the ConfigModel, it returns only data for columns (orientation = Horizontal)
 
         """
-        if role != Qt.DisplayRole:
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
 
-        if orientation == Qt.Horizontal:
+        if orientation == Qt.Orientation.Horizontal:
             return self._headers[section]
         return None
 
@@ -229,17 +247,20 @@ class ConfigModel(QAbstractItemModel):
         return QModelIndex()
 
     @override
-    def parent(self, index: QModelIndex) -> QModelIndex:
+    def parent(self, index: QModelIndex | QPersistentModelIndex) -> QModelIndex:  # type: ignore
         """Override from QAbstractItemModel.
 
         Return parent index of index
 
         """
+        # if len(child) == 0:
+        #     return QModelIndex()
+
         if not index.isValid():
             return QModelIndex()
 
         child_item = index.internalPointer()
-        parent_item = child_item.parent()
+        parent_item = child_item.parent()  # type: ignore
 
         if parent_item == self._rootItem:
             return QModelIndex()
@@ -274,7 +295,7 @@ class ConfigModel(QAbstractItemModel):
         return 2
 
     @override
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         """Override from QAbstractItemModel.
 
         Return flags of index
@@ -282,7 +303,7 @@ class ConfigModel(QAbstractItemModel):
         flags = super().flags(index)
 
         if index.column() == 1:
-            return Qt.ItemIsEditable | flags
+            return Qt.ItemFlag.ItemIsEditable | flags
         return flags
 
     def to_json(self, item=None):
@@ -323,7 +344,7 @@ if __name__ == '__main__':
         model.load(document)
 
     view.show()
-    view.header().setSectionResizeMode(0, QHeaderView.Stretch)
+    view.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
     view.setAlternatingRowColors(True)
     view.resize(500, 300)
     app.exec()

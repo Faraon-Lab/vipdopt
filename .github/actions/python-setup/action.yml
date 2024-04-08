@@ -1,13 +1,17 @@
 name: Setup Python and Install All Dependencies
+description: "Setup Python and isntall dependencies in requirements files."
 
 inputs:
   python-version:
+    description: "Version range or exact version of Python or PyPy to use, using SemVer's version range syntax. Reads from .python-version if unset."
     required: false
-    default: 3.11
+    default: "3.10"
   cache:
+    description: "Used to specify a package manager for caching in the default directory. Supported values: pip, pipenv, poetry."
     required: false 
     default: 'pip'
   cache-dependency-path:
+    description: "Used to specify the path to dependency files. Supports wildcards or a list of file names for caching multiple dependencies."
     required: false
     default: '*requirements.txt'
     

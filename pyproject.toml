@@ -221,8 +221,15 @@ python_version = "3.10"
 disable_error_code = ["operator"]
 files = "vipdopt"
 exclude = [
-    '/ui_.*\.py',  # Ignore files starting with 'ui_'
-    '^vipdopt/eval/',  # Ignore eval for now
-    'vipdopt/STL\.py',  # Ignore for now
-    'vipdopt/GDS\.py',  # Ignore for now
+    'ui_.*\.py$',  # Ignore files starting with 'ui_'
+    'vipdopt/__main__.py',  # Ignore for now
+    '^vipdopt/eval/.*',  # Ignore for now
+    'STL\.py$',  # Ignore for now
+    'GDS\.py$',  # Ignore for now
 ]
+show_error_codes = true
+show_error_code_links = true
+
+[[tool.mypy.overrides]]
+module = "vipdopt.simulation"
+strict_optional = true

@@ -47,7 +47,7 @@ class Optimization:
         if env_vars is None:
             env_vars = {}
         self.sims = list(sims)
-        self.nsims = len(sims)
+        self.nsims = len(self.sims)
         self.device = device
         self.optimizer = optimizer
         self.fom = fom
@@ -57,8 +57,8 @@ class Optimization:
         self.cfg = (
             cfg  # ! 20240228 Ian - Optimization needs to call a few config variables
         )
-        self.foms = []
-        self.weights = []
+        self.foms: list[FoM] = []
+        self.weights: npt.NDArray = np.array([])
         self.env_vars = env_vars
         self.loop = True
 
@@ -78,7 +78,7 @@ class Optimization:
             range(0, max_epochs * iter_per_epoch + 1, iter_per_epoch)
         )
 
-        self.stats = {}
+        # self.stats = {}
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""

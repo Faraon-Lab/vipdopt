@@ -1,5 +1,5 @@
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt  # type: ignore
 from mpl_toolkits import mplot3d  # type: ignore
 from stl import mesh
 

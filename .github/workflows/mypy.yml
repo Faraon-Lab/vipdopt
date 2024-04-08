@@ -29,8 +29,8 @@ jobs:
     strategy:
       matrix:
         os_python:
-          - [ubuntu-latest, '3.11']  # switch to 3.12-dev after mypy is upgraded (see gh-23764)
-          - [macos-latest, '3.11.2']
+          - [ubuntu-latest, '3.10']
+          - [macos-latest, '3.10']
     steps:
       - uses: actions/checkout@v4
 
@@ -48,4 +48,4 @@ jobs:
 
       - name: Run MyPy 
         run: |
-          mypy vipdopt
+          mypy --config-file pyproject.toml

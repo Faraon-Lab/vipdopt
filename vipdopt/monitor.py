@@ -24,7 +24,7 @@ class Monitor:
         """Test equality."""
         if isinstance(__value, Monitor):
             return self.sim == __value.sim and self.monitor_name == __value.monitor_name
-        return None
+        return super().__eq__(__value)
 
     def reset(self):
         """Reset all cached values from the simulation."""

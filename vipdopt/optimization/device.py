@@ -99,6 +99,9 @@ class Device:
         self.filters = filters
         vars(self).update(kwargs)
 
+        # Give default value for the shape of the field.
+        self.field_shape: tuple[int, int, int] = self.size
+
         self._init_variables()
         self.update_density()
 

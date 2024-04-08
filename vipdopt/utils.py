@@ -59,7 +59,7 @@ def setup_logger(
     name: str,
     level: int = logging.INFO,
     log_file: str = 'dev.log',
-) -> logging.Logger | logging.LoggerAdapter:
+) -> logging.Logger:
     """Setup logger to use across the program."""
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
@@ -186,7 +186,7 @@ def _yaml_loader(fname: PathLike) -> dict:
         return yaml.safe_load(stream)
 
 
-def subclasses(cls: type[T]) -> list[str]:
+def subclasses(cls: type) -> list[str]:
     """Get all subclasses of a given class."""
     return [scls.__name__ for scls in cls.__subclasses__()]
 

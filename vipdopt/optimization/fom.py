@@ -88,7 +88,7 @@ class FoM:
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this FoM."""
-        data = {}
+        data: dict[str, Any] = {}
         data['type'] = type(self).__name__
         data['fom_monitors'] = [
             (mon.source_name, mon.monitor_name) for mon in self.fom_monitors
@@ -324,7 +324,7 @@ class FoM:
             fom.opt_ids,
         )
 
-    def __copy__(self) -> type[FoM]:
+    def __copy__(self) -> FoM:
         """Return a copy of this FoM."""
         return self.__class__(
             self.fom_monitors,

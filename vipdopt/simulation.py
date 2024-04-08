@@ -27,7 +27,7 @@ from scipy import interpolate  # type: ignore
 
 import vipdopt
 from vipdopt.optimization import Device
-from vipdopt.utils import P, PathLike, R, ensure_path, read_config_file
+from vipdopt.utils import P, PathLike, R, convert_path, ensure_path, read_config_file
 
 
 def _check_fdtd(
@@ -97,6 +97,10 @@ class LumericalSimObjectType(str, Enum):
 
     def get_add_function(self) -> Callable:
         """Get the correct lumapi function to add an object."""
+        if vipdopt.lumapi is None:
+            raise ModuleNotFoundError(
+                'Module "vipdopt.lumapi" has not yet been instatiated.'
+            )
         return getattr(vipdopt.lumapi.FDTD, f'add{self.value}')
 
 
@@ -233,6 +237,10 @@ class LumericalSimulation(ISimulation):
 
     @override
     def connect(self, license_checked: bool = True) -> None:
+        if vipdopt.lumapi is None:
+            raise ModuleNotFoundError(
+                'Module "vipdopt.lumapi" has not yet been instatiated.'
+            )
         vipdopt.logger.debug('Attempting to connect to Lumerical servers...')
 
         if license_checked:
@@ -262,7 +270,7 @@ class LumericalSimulation(ISimulation):
         if isinstance(source, dict):
             self._load_dict(source)
         else:
-            src = Path(source)
+            src = convert_path(source)
             if src.suffix == '.fsp':
                 self._load_fsp(source)
             else:
@@ -923,6 +931,9 @@ class LumericalSimulation(ISimulation):
         source_power = self.get_source_power()
         t = self.get_transmission_magnitude(monitor_name)
         return source_power * t.T
+
+
+ISimulation.register(LumericalSimulation)
 
 
 if __name__ == '__main__':
