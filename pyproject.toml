@@ -7,23 +7,12 @@ include = ["vipdopt/*", "tests/*"]
 fix = true
 show-fixes = true
 
-select = ["E", "F", "W", "I", "N", "D", "UP", "BLE", "FBT", "B", "A", "COM", "CPY",
-    "C4", "ISC", "ICN", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID",
-    "ARG", "ERA", "PL", "TRY", "NPY", "PERF", "FURB", "RUF"]
-ignore = [
-    "ANN",  # Type hints / annotations; handled by mypy
-    "COM812",  # "Trailing Comma Missing"
-    "TRY003",  # "Avoid specifying long messages outside the exception class"
-    "PLR0913",  # Too many arguments to function call
-    "FBT001",  # Boolean-typed positional argument in function definitions
-    "FBT002",  # Boolean default positional argument in function definitions
-]
-
-# Allow autofix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-
 # Exclude a variety of commonly ignored directories.
 exclude = [
+    "vipdopt/eval/*",
+    "vipdopt/__main__.py",
+    "vipdopt/GDS.py",
+    "vipdopt/STL.py",
     ".bzr",
     ".direnv",
     ".eggs",
@@ -48,18 +37,62 @@ exclude = [
     "tmp",
     "*.yml",
     "*.yaml",
+    # More specific ignores
+    "*.ui",
+    "*ui_*.py",
+    "*.sh",
+    "*.lsfx",
+    "*.md",
+    "*.gds",
+    "*.GDS",
+    "*.stl",
+    "*.ldev"
 ]
 
 # Same as Black.
 line-length = 88
 
+indent-width = 4
+
+# Assume Python 3.11
+target-version = "py310"
+
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "preserve"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "D", "UP", "BLE", "FBT", "B", "A", "COM",
+    "C4", "ISC", "ICN", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID",
+    "ARG", "ERA", "PL", "TRY", "NPY", "PERF", "FURB", "RUF"]
+ignore = [
+    "ANN",  # Type hints / annotations; handled by mypy
+    "COM812",  # "Trailing Comma Missing"
+    "TRY003",  # "Avoid specifying long messages outside the exception class"
+    "PLR0913",  # Too many arguments to function call
+    "FBT001",  # Boolean-typed positional argument in function definitions
+    "FBT002",  # Boolean default positional argument in function definitions
+    "FBT003",  # Boolean positional value in function call,
+    "ERA001",  # Commented-out code
+    "ISC001",  # Single-line implicit string concatenation
+]
+
+task-tags = [
+    "TODO",
+    "NOTE",
+    "FIXME",
+    "XXX"
+]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.11
-target-version = "py311"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 # Ignore import violations in all `__init__.py` files and in other relevant folders
 "**/__init__.py" = ["E402", "F403", "F405"]
 "**/{testing,docs}/*" = ["E402"]
@@ -91,15 +124,24 @@ target-version = "py311"
 ]
 
 
-[tool.ruff.flake8-quotes]
-docstring-quotes = "double"
-inline-quotes = "single"
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
 
-[tool.ruff.flake8-pytest-style]
+[tool.ruff.lint.flake8-pytest-style]
 parametrize-names-type = "csv"
 parametrize-values-type = "list"
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "single"
+
+[tool.ruff.lint.flake8-unused-arguments]
+ignore-variadic-names = true
+
+[tool.ruff.lint.pep8-naming]
+extend-ignore-names = ["setData", "headerData", "rowCount", "columnCount"]
+
+[tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings.
 convention = "google"
 
@@ -107,7 +149,8 @@ convention = "google"
 ignore-decorators = ["overrides.override"]
 property-decorators = ["abc.abstractproperty"]
 
-[tool.ruff.mccabe]
+
+[tool.ruff.lint.mccabe]
 max-complexity = 15
 
 #
@@ -137,8 +180,18 @@ omit = [
     "*__main__.py",
     "vipdopt/simulation.py",
     "vipdopt/configuration/sbc.py",
+    # Ignoring until more set in stone
     "vipdopt/optimization/optimization.py",
-    "vipdopt/source.py"
+    "vipdopt/optimization/fom.py",
+    "vipdopt/monitor.py",
+    "vipdopt/gui/*",
+    "vipdopt/eval/*",
+    "vipdopt/STL.py",
+    "vipdopt/GDS.py",
+    "vipdopt/project.py",
+    "*device.py",
+    "*source.py",
+    "*adam.py",
 ]
 
 [tool.coverage.report]
@@ -173,4 +226,19 @@ fail_under = 80
 # mypy Settings
 #
 [tool.mypy]
+python_version = "3.10"
 disable_error_code = ["operator"]
+files = "vipdopt"
+exclude = [
+    'ui_.*\.py$',  # Ignore files starting with 'ui_'
+    'vipdopt/__main__.py',  # Ignore for now
+    '^vipdopt/eval/.*',  # Ignore for now
+    'STL\.py$',  # Ignore for now
+    'GDS\.py$',  # Ignore for now
+]
+show_error_codes = true
+show_error_code_links = true
+
+[[tool.mypy.overrides]]
+module = "vipdopt.simulation"
+strict_optional = true
