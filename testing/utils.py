@@ -10,7 +10,7 @@ import numpy.typing as npt
 
 from vipdopt.utils import Number
 
-__all__ = ['assert_equal', 'assert_close', 'catch_exits', 'sleep_and_raise']
+__all__ = ['assert_equal', 'assert_close', 'catch_exits', 'sleep_and_raise', 'assert_equal_dict']
 
 
 def assert_equal_dict(result: dict, expected: dict) -> bool:

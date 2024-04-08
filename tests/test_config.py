@@ -1,12 +1,14 @@
 """Tests for filter.py"""
 
+from contextlib import nullcontext as does_not_raise
 from re import Pattern
 from typing import Any
 
 import numpy as np
 import pytest
 
-from testing import assert_close, assert_equal
+from testing import assert_close, assert_equal, assert_equal_dict
+from tests.conftest import TEST_YAML_PATH
 from vipdopt.configuration import Config, SonyBayerConfig
 
 
@@ -35,6 +37,53 @@ def test_load_yaml():
 
     for k, v in expected_pairs:
         assert_equal(cfg[k], v)
+
+
+@pytest.mark.smoke()
+@pytest.mark.usefixtures('_mock_example_config')
+def test_from_file():
+    cfg = Config.from_file('fakefile.yaml')
+
+    expected_pairs = [
+        ('fixed_layers', [1, 3]),
+        ('do_rejection', False),
+        ('start_from_step', 0),
+        ('adam_betas', (0.9, 0.999)),
+    ]
+
+    for k, v in expected_pairs:
+        assert_equal(cfg[k], v)
+
+
+@pytest.mark.smoke()
+@pytest.mark.parametrize(
+    'filetype, expectation',
+    [
+        ('.yaml', does_not_raise()),
+        ('.yml', does_not_raise()),
+        ('.YAML', does_not_raise()),
+        ('.YML', does_not_raise()),
+        ('.json', does_not_raise()),
+        ('.JSON', does_not_raise()),
+        ('auto', does_not_raise()),
+        ('AUTO', does_not_raise()),
+        ('.html', pytest.raises(NotImplementedError)),
+    ],
+)
+def test_save_load_config(tmp_path, filetype: str, expectation):
+    og_cfg = Config.from_file(TEST_YAML_PATH)
+
+    save_file = tmp_path / 'save'
+    if filetype.lower() == 'auto':
+        save_file = save_file.with_suffix('.yaml')
+    else:
+        save_file = save_file.with_suffix(filetype)
+    with expectation:
+        og_cfg.save(save_file, filetype)
+
+        copy_cfg = Config.from_file(save_file)
+
+        assert_equal_dict(copy_cfg, og_cfg)
 
 
 @pytest.mark.usefixtures('_mock_example_config')

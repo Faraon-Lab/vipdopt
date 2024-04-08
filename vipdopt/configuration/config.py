@@ -43,7 +43,7 @@ class Config(UserDict):
     def save(self, fname: Path, cfg_format: str = 'auto', **kwargs) -> None:
         """Save a configuration file."""
         path_filename = convert_path(fname)
-        if cfg_format == 'auto':
+        if cfg_format.lower() == 'auto':
             cfg_format = path_filename.suffix
 
         config_data = self.data

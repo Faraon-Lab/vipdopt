@@ -1,6 +1,5 @@
 """Module containing common functions used throughout the package."""
 
-import contextlib
 import functools
 import importlib.util as imp
 import itertools
@@ -65,6 +64,12 @@ def setup_logger(
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
 
+    Path(log_file).touch()
+
+    # Reset logger
+    for _ in range(len(logger.handlers)):
+        logger.removeHandler(logger.handlers[0])
+
     # Handle stream output by truncating long messages.
     # Only prints messages with no additional info.
     shandler = logging.StreamHandler()
@@ -79,10 +84,6 @@ def setup_logger(
 
     # Create a handler for putting info into a .log file. Includes time stamps etc.
     # Will write EVERYTHING to the log (i.e. level = debug)
-    if not os.path.exists(os.path.dirname(log_file)):
-        with contextlib.suppress(Exception):
-            os.makedirs(os.path.dirname(log_file))
-
     fhandler = logging.FileHandler(log_file, mode='a')
     fhandler.setFormatter(
         logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -148,7 +149,7 @@ def ensure_path(
 def read_config_file(fname: PathLike, cfg_format: str = 'auto') -> dict:
     """Read a configuration file."""
     path_filename = convert_path(fname)
-    if cfg_format == 'auto':
+    if cfg_format.lower() == 'auto':
         cfg_format = path_filename.suffix
 
     config_loader = _get_config_loader(cfg_format)

@@ -17,7 +17,6 @@ LOG_REGEX = (
 )
 
 
-@pytest.mark.xfail()  # This fails, but I'm not sure why.
 @pytest.mark.parametrize(
     'level, msg',
     [

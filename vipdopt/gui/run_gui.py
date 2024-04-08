@@ -428,7 +428,7 @@ class MplCanvas(FigureCanvasQTAgg):
     """A QtWidget for displaying plots from matplotlib."""
 
     def __init__(
-        self, figure: Figure = None, width=3, height=12 / 5, dpi=100, fontsize=12
+        self, figure: Figure | None = None, width=3, height=12 / 5, dpi=100, fontsize=12
     ):
         """Initialize an MplCanvas."""
         self.fontsize = fontsize

@@ -180,9 +180,18 @@ omit = [
     "*__main__.py",
     "vipdopt/simulation.py",
     "vipdopt/configuration/sbc.py",
+    # Ignoring until more set in stone
     "vipdopt/optimization/optimization.py",
+    "vipdopt/optimization/fom.py",
     "vipdopt/monitor.py",
     "vipdopt/gui/*",
+    "vipdopt/eval/*",
+    "vipdopt/STL.py",
+    "vipdopt/GDS.py",
+    "vipdopt/project.py",
+    "*device.py",
+    "*source.py",
+    "*adam.py",
 ]
 
 [tool.coverage.report]
