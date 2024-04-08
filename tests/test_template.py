@@ -1,6 +1,5 @@
 """Tests for vipdopt.configuration.template"""
 
-
 import numpy as np
 import pytest
 import yaml
@@ -13,9 +12,6 @@ TEST_TEMPLATE_FILE = 'derived_simulation_properties.j2'
 
 
 @pytest.mark.smoke()
-def rest_render():
-    pass
-
 @pytest.mark.usefixtures('_mock_example_config')
 def test_render_example_config(
     template_renderer: TemplateRenderer,
@@ -35,6 +31,3 @@ def test_render_example_config(
     for k, v in example_derived_properties.items():
         assert k in rendered_data
         assert_close(rendered_data[k], v)
-
-
-

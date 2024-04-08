@@ -1,48 +1,60 @@
 """Module for handling configuration parameters."""
 
-import logging
-from typing import Any
+from __future__ import annotations
 
-from vipdopt.utils import PathLike, ensure_path, read_config_file
+import json
+from collections import UserDict
+from pathlib import Path
+
+import yaml
+
+import vipdopt
+from vipdopt.utils import convert_path, ensure_path, read_config_file
 
 
-class Config:
-    """A generic class for stroing parameters from a configuration file."""
-
-    def __init__(self):
-        """Initialize a Config object.
-
-        Creates an attribute for each parameter in a provided config file.
-        """
-        self._files = set()
-        self._parameters = {}
+class Config(UserDict):
+    """A generic class for storing parameters from a configuration file."""
 
     def __str__(self):
         """Return shorter string version of the Config object."""
-        return f'Config object for {self._files} with parameters {self._parameters}'
+        return f'Config with parameters {super().__str__()}'
 
-    def safe_get(self, prop: str) -> Any | None:
-        """Get parameter and return None if it doesn't exist."""
-        return self._parameters.get(prop, None)
-
-    def __getitem__(self, name: str) -> Any:
-        """Get value of a parameter."""
-        return self._parameters[name]
-
-    def __setitem__(self, name: str, value: Any) -> None:
-        """Set the value of an attribute, creating it if it doesn't already exist."""
-        self._parameters[name] = value
-
-    def read_file(self, fname: PathLike, cfg_format: str='auto') -> None:
+    @ensure_path
+    def read_file(self, fname: Path, cfg_format: str = 'auto') -> None:
         """Read a config file and update the dictionary."""
         # Get the correct loader method for the format and load the config file
-        fpath = ensure_path(fname)
-        config = read_config_file(fpath, cfg_format)
-        logging.debug(f'Loaded config file:\n {config}')
+        config = read_config_file(fname, cfg_format)
+        vipdopt.logger.debug(f'Loaded config file:\n {config}')
 
         # Create an attribute for each of the parameters in the config file
         if config is not None:
-            self._parameters.update(config)
+            self.update(config)
 
-        self._files.add(fpath)
-        logging.info(f'\nSuccesfully loaded configuration from {fpath}')
+        vipdopt.logger.info(f'\nSuccesfully loaded configuration from {fname}')
+
+    @classmethod
+    def from_file(cls: type[Config], fname: Path) -> Config:
+        """Create config object from a file."""
+        cfg = cls()
+        cfg.read_file(fname)
+        return cfg
+
+    @ensure_path
+    def save(self, fname: Path, cfg_format: str = 'auto', **kwargs) -> None:
+        """Save a configuration file."""
+        path_filename = convert_path(fname)
+        if cfg_format.lower() == 'auto':
+            cfg_format = path_filename.suffix
+
+        config_data = self.data
+
+        match cfg_format.lower():
+            case '.yaml' | '.yml':
+                with path_filename.open('w') as f:
+                    yaml.dump(config_data, f, **kwargs)
+            case '.json':
+                with path_filename.open('w') as f:
+                    json.dump(config_data, f, indent=4, ensure_ascii=True, **kwargs)
+            case _:
+                msg = f'{cfg_format} file saving not yet supported.'
+                raise NotImplementedError(msg)

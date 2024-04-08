@@ -1,9 +1,16 @@
-{
+{ 
+    "info": {
+        "name": "optimization",
+        "path": "",
+        "simulator_name": "LumericalFDTD",
+        "coordinates": {}
+    },
     "objects": {
         "FDTD": {
             "name": "FDTD",
             "obj_type": "fdtd",
             "properties": {
+                "dimension": "{{ data.simulator_dimension }}",
                 "x span": {{ data.fdtd_region_size_lateral_um * 1e-6 }},
                 "y span": {{data.fdtd_region_size_lateral_um * 1e-6 }},
                 "z max": {{ data.fdtd_region_maximum_vertical_um * 1e-6 }},
@@ -14,7 +21,7 @@
         },
         {#- Forward Sources -#}
         {%- for i in range(0, 2) -%}
-        {%- set fwrd_name = "forward_src" + data.xy_names[i] %}
+        {%- set fwrd_name = "forward_src_" + data.xy_names[i] %}
         "{{ fwrd_name }}": {
             "name": "{{ fwrd_name}}",
             {% if data.use_gaussian_sources -%}
@@ -83,7 +90,7 @@
                 "x": {{ data.adjoint_x_positions_um[adj_src] * 1e-6 }},
                 "y": {{ data.adjoint_y_positions_um[adj_src] * 1e-6 }},
                 "z": {{ data.adjoint_vertical_um * 1e-6 }},
-                "override global_monitor settings": 1,
+                "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
                 "frequency points": {{ data.num_design_frequency_points }}
@@ -103,7 +110,7 @@
                 "y": {{ data.adjoint_y_positions_um[adj_src] * 1e-6 }},
                 "y span": {{ 0.5 * data.device_size_lateral_um * 1e-6 }},
                 "z": {{ data.adjoint_vertical_um * 1e-6 }},
-                "override global_monitor settings": 1,
+                "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
                 "frequency points": {{ data.num_design_frequency_points }}
@@ -120,7 +127,7 @@
                 "y": 0,
                 "y span": {{ data.device_size_lateral_um * 1e-6 }},
                 "z": {{ data.adjoint_vertical_um * 1e-6 }},
-                "override global_monitor settings": 1,
+                "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
                 "frequency points": {{ data.num_design_frequency_points }}

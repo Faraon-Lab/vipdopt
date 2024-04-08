@@ -4,8 +4,11 @@
 *.json
 *.yaml
 *.yml
+!runs/
 !vipdopt/configuration/config_example.yml
 !environment.yml
+!test_project/config.json
+!uniform_project/*.json
 temp/
 tmp/
 
@@ -45,6 +48,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+*.png
+!docs/
 
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow

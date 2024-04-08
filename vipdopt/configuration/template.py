@@ -1,6 +1,8 @@
 """Library of code for working with Jinja and rendering templates."""
 
 import logging
+import os
+import sys
 from argparse import ArgumentParser
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -8,7 +10,11 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 from jinja2 import Environment, FileSystemLoader, Undefined
+from overrides import override
 
+sys.path.append(os.getcwd())
+
+import vipdopt
 from vipdopt.configuration.config import read_config_file
 from vipdopt.utils import ensure_path, setup_logger
 
@@ -16,29 +22,29 @@ from vipdopt.utils import ensure_path, setup_logger
 class TemplateRenderer:
     """Class for rendering Jinja Templates."""
 
+    @ensure_path
     def __init__(self, src_directory: Path) -> None:
         """Initialize and TemplateRenderer."""
-        p = ensure_path(src_directory)
-        self.env = Environment(loader=FileSystemLoader(str(p)))
+        self.env = Environment(loader=FileSystemLoader(str(src_directory)))
 
     def render(self, **kwargs) -> str:
         """Render template with provided data values."""
         return self.template.render(trim_blocks=True, lstrip_blocks=True, **kwargs)
 
-    def render_to_file(self, fname: Path | str, **kwargs):
+    @ensure_path
+    def render_to_file(self, fname: Path, **kwargs):
         """Render template with provided data values and save to file."""
         output = self.render(**kwargs)
 
         with open(fname, 'w') as f:
             f.write(output)
 
-        logger.debug(f'Succesfully rendered and saved output to {fname}')
+        vipdopt.logger.debug(f'Succesfully rendered and saved output to {fname}')
 
+    @ensure_path
     def set_template(self, template: Path) -> None:
         """Set the active template for the renderer."""
-        p = ensure_path(template)
-        """Set the current template to render."""
-        self.template = self.env.get_template(p.name)
+        self.template = self.env.get_template(template.name)
 
     def register_filter(self, name: str, func: Callable) -> None:
         """Add or reassign a filter to use in the environment."""
@@ -48,6 +54,8 @@ class TemplateRenderer:
 class SonyBayerRenderer(TemplateRenderer):
     """TemplateRenderer including various filters for ease of writing templates."""
 
+    @ensure_path
+    @override
     def __init__(self, src_directory: Path) -> None:
         """Initialize a SonyBayerRenderer."""
         super().__init__(src_directory)
@@ -68,13 +76,16 @@ class SonyBayerRenderer(TemplateRenderer):
 
 if __name__ == '__main__':
     parser = ArgumentParser('Create a simulation YAML file from a template.')
-    parser.add_argument('template', type=Path,
-                        help='Jinja2 template file to use')
-    parser.add_argument('data_file', type=Path,
-                        help='File containing values to substitute into template'
+    parser.add_argument('template', type=Path, help='Jinja2 template file to use')
+    parser.add_argument(
+        'data_file',
+        type=Path,
+        help='File containing values to substitute into template',
     )
-    parser.add_argument('output', type=Path,
-                        help='File to output rendered template to.',
+    parser.add_argument(
+        'output',
+        type=Path,
+        help='File to output rendered template to.',
     )
     parser.add_argument(
         '-s',
@@ -84,16 +95,28 @@ if __name__ == '__main__':
         help='Directory to search for the jinja template.'
         ' Defaults to "jinja_templates/"',
     )
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='Enable verbose output. Takes priority over quiet.')
-    parser.add_argument('-q', '--quiet', action='store_true',
-                        help='Enable quiet output. Will only show critical logs.')
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        action='store_true',
+        help='Enable verbose output. Takes priority over quiet.',
+    )
+    parser.add_argument(
+        '-q',
+        '--quiet',
+        action='store_true',
+        help='Enable quiet output. Will only show critical logs.',
+    )
 
     args = parser.parse_args()
 
-    log_level = logging.DEBUG if args.verbose \
-        else logging.WARNING if args.quiet \
-            else logging.INFO
+    log_level = (
+        logging.DEBUG
+        if args.verbose
+        else logging.WARNING
+        if args.quiet
+        else logging.INFO
+    )
     logger = setup_logger('template_logger', log_level)
 
     rndr = SonyBayerRenderer(args.src_directory)
@@ -107,4 +130,4 @@ if __name__ == '__main__':
     with open(args.output, 'w') as f:
         f.write(output)
 
-    logger.info(f'Succesfully saved output to {args.output}')
+    logger.info(f'Successfully saved output to {args.output}')

@@ -1,27 +1,30 @@
-name: vipdopt-dev
+name: vipdopt3.10
 channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.11.*
-  - scipy=1.11.*
-  - numpy=1.25.*
-  - matplotlib=3.7.*
-  - scikit-image=0.20.*
-  - PyYAML
-  - types-PyYAML
-  - python-magic
-  - dill
-  - Jinja2
+  - python=3.10.*
+  - scipy=1.12.0
+  - numpy=1.26.*
+  - numpy-stl=3.1.*
+  - matplotlib=3.8.*
+  - scikit-image=0.22.*
+  - PyYAML=6.*
+  - types-PyYAML=6.*
+  - python-magic=0.4.*
+  - Jinja2=3.1.*
+  - PySide6=6.3.0
+  - PySide6-stubs=6.4.2
+  - gdstk==0.9.50
   - pip
   # For Linting
-  - ruff=0.0.287
+  - ruff=0.3.5
   # For static type checking
-  - mypy=1.5.*
-  - overrides=7.4.*
+  - mypy=1.8.*
+  - overrides=7.7.*
   # For testing
-  - pytest=7.4.*
+  - pytest=8.*
   - pytest-cov=4.1.*
-  - pytest-xdist=3.3.*
-  - pytest-mock
-  - coverage[toml]=7.2.*
+  - pytest-xdist=3.5.*
+  - pytest-mock=3.12.*
+  - coverage[toml]=7.4.3

@@ -1,4 +1,5 @@
 """Tests for vipdopt.simulation"""
+
 import pytest
 
 from testing import assert_equal
@@ -15,7 +16,6 @@ from vipdopt.simulation import (
 
 @pytest.mark.lumapi()
 def test_load_sim(simulation_json):
-
     source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.RECT)
     source_aperture.update(**{
         'name': 'source_aperture',
@@ -35,8 +35,7 @@ def test_load_sim(simulation_json):
         'y span': 1.5e-6,
     })
 
-
-    with LumericalSimulation(fname=simulation_json) as s:
+    with LumericalSimulation(source=simulation_json) as s:
         assert 'source_aperture' in s.objects
         assert_equal(s.objects['source_aperture'], source_aperture)
         assert 'device_mesh' in s.objects
@@ -44,7 +43,7 @@ def test_load_sim(simulation_json):
 
 
 @pytest.mark.lumapi()
-def test_save_sim(tmp_path, mock_sim_file):
+def test_save_sim(tmp_path, sim_file):
     path = tmp_path / 'sim.json'
 
     source_aperture = LumericalSimObject('source_aperture', LumericalSimObjectType.RECT)
@@ -66,13 +65,13 @@ def test_save_sim(tmp_path, mock_sim_file):
         'y span': 1.5e-6,
     })
 
-    with LumericalSimulation(fname=None) as s:
+    with LumericalSimulation(source=None) as s:
         s.add_object(source_aperture)
         s.add_object(device_mesh)
         s.save(path)
 
     assert len(list(tmp_path.iterdir())) == 2  # noqa: PLR2004 Only two files written
-    assert_equal(path.read_text(), mock_sim_file)  # Correct contents
+    assert_equal(path.read_text(), sim_file)  # Correct contents
 
 
 @pytest.mark.lumapi()
@@ -88,7 +87,7 @@ def test_new_object():
     correct_mesh = LumericalSimObject('correct_mesh', LumericalSimObjectType.MESH)
     correct_mesh.update(**props)
 
-    with LumericalSimulation(fname=None) as s:
+    with LumericalSimulation(source=None) as s:
         s.new_object('device_mesh', LumericalSimObjectType.MESH, **props)
 
         assert 'device_mesh' in s.objects

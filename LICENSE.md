@@ -1,5 +1,5 @@
 ## SONY Volumetric Inverse Photonic (VIP) Design Optimizer
-Copyright © 2023, California Institute of Technology. All rights reserved.
+Copyright © 2024, California Institute of Technology. All rights reserved.
 
 Use in source and binary forms for nonexclusive, nonsublicenseable, commercial purposes with or without modification, is permitted provided that the following conditions are met:
 
