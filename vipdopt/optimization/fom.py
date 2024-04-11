@@ -12,9 +12,23 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.monitor import Monitor
-from vipdopt.simulation import LumericalSimulation
+from vipdopt.simulation import LumericalSimulation, Monitor
 from vipdopt.utils import Number
+
+
+class FoM2:
+    """Version 2 of FoM.
+
+    Attributes:
+        fom_srcs (list[Source]): The sources needed for computing the FoM
+        adj_srcs (list[Source]): The sources needed for computing the Adjoint
+        polarization (str): Polarization to use.
+        freq (npt.NDArray): The entire lambda vector.
+        opt_ids (list[int]): List of indices specifying which frequency bands are being
+            used in the optimization. Defaults to [0, ..., n_freq].
+        fom_func (Callable[..., npt.ArrayLike]): The function to compute the FoM.
+        grad_func (Callable[..., npt.ArrayLike]): The function to compute the gradient.
+    """
 
 
 # TODO: Strip down functionality in FoM.

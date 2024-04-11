@@ -31,6 +31,7 @@ from vipdopt.utils import P, PathLike, R, convert_path, ensure_path, read_config
 
 # TODO: Create simulation subpackage and add this, monitors, sources, and maybe devices
 
+
 def _check_fdtd(
     func: Callable[Concatenate[LumericalSimulation, P], R],
 ) -> Callable[Concatenate[LumericalSimulation, P], R]:

@@ -31,10 +31,10 @@ from vipdopt.gui.config_editor import ConfigModel
 from vipdopt.gui.ui_dashboard import Ui_MainWindow as Ui_DashboardWindow
 from vipdopt.gui.ui_fom_dialog import Ui_Dialog as Ui_FomDialog
 from vipdopt.gui.ui_settings import Ui_MainWindow as Ui_SettingsWindow
-from vipdopt.monitor import Monitor
 from vipdopt.optimization import BayerFilterFoM, FoM, GradientOptimizer
 from vipdopt.project import Project
 from vipdopt.simulation import ISimulation, LumericalSimulation
+from vipdopt.simulation.monitor import Monitor
 from vipdopt.submit_job import generate_script
 from vipdopt.utils import PathLike, StoppableThread, read_config_file, subclasses
 

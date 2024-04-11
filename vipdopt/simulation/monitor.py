@@ -2,7 +2,7 @@
 
 import numpy.typing as npt
 
-from vipdopt.simulation import LumericalSimulation
+from vipdopt.simulation.simulation import LumericalSimulation
 
 
 class Monitor:

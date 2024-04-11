@@ -20,7 +20,7 @@ sys.path.insert(0, path)
 import numpy as np
 
 from vipdopt.optimization.filter import Sigmoid
-from vipdopt.monitor import Monitor
+from vipdopt.simulation.monitor import Monitor
 from vipdopt.configuration import SonyBayerConfig
 from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer
 from vipdopt.optimization.device import Device
