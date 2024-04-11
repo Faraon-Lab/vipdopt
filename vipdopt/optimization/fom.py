@@ -17,6 +17,10 @@ from vipdopt.simulation import LumericalSimulation
 from vipdopt.utils import Number
 
 
+# TODO: Strip down functionality in FoM.
+# Currently, it's responsible for more than it should be in reality (storing frequency,
+# polarization, and opt_ids maybe?)
+# TODO: Create simulations from FoM's automatically
 class FoM:
     """Generic class for computing a figure of merit (FoM).
 
