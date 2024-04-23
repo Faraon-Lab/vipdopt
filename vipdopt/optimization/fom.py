@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from collections.abc import Callable, Sequence
 from copy import copy
 from itertools import starmap
@@ -12,23 +13,238 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.simulation import LumericalSimulation, Monitor
-from vipdopt.utils import Number
+from vipdopt.simulation import LumericalSimulation, Monitor, Source
+from vipdopt.utils import Number, starmap_with_kwargs
+
+POLARIZATIONS = ['TE', 'TM', 'TE+TM']
 
 
-class FoM2:
+class SuperFoM:
+    """Representation of a weighted sum of FoMs that take the same arguments."""
+
+    def __init__(self, foms: list[FoM2], weights: Sequence[float] = (1.0,)) -> None:
+        """Initialize a SuperFoM."""
+        self.foms: list[FoM2] = foms
+        self.weights: list[float] = list(weights)
+
+    def __copy__(self) -> SuperFoM:
+        """Create a copy of this FoM."""
+        return SuperFoM(self.foms, self.weights)
+
+    def __eq__(self, other: Any) -> bool:
+        """Test equality."""
+        if isinstance(other, SuperFoM):
+            return self.foms == other.foms and self.weights == other.weights
+        return super().__eq__(other)
+
+    def compute_fom(self, *args, **kwargs) -> npt.NDArray:
+        """Compute the weighted sum of the FoMs."""
+        fom_results = np.array(
+            list(
+                starmap_with_kwargs(
+                    FoM2.compute_fom,
+                    ((fom, *args) for fom in self.foms),
+                    (kwargs for _ in self.foms),
+                )
+            )
+        )
+        return np.einsum('i,i...->...', self.weights, fom_results)
+
+    def compute_grad(self, *args, **kwargs) -> npt.NDArray:
+        """Compute the weighted sum of the gradients."""
+        grad_results = np.array(
+            list(
+                starmap_with_kwargs(
+                    FoM2.compute_grad,
+                    ((fom, *args) for fom in self.foms),
+                    (kwargs for _ in self.foms),
+                )
+            )
+        )
+        return np.einsum('i,i...->...', self.weights, grad_results)
+
+    def __add__(self, second: SuperFoM) -> SuperFoM:
+        """Return self + second."""
+        return SuperFoM(self.foms + second.foms, self.weights + second.weights)
+
+    def __radd__(self, first: SuperFoM) -> SuperFoM:
+        """Return first + self."""
+        return SuperFoM(first.foms + self.foms, first.weights + self.weights)
+
+    def __iadd__(self, second: SuperFoM) -> SuperFoM:
+        """Implement self += second."""
+        self.foms += second.foms
+        self.weights += second.weights
+        # Have to create a new SuperFom so it doesn't return a FoM2
+        return SuperFoM(self.foms, self.weights)
+
+    def __sub__(self, second: SuperFoM) -> SuperFoM:
+        """Return self - second."""
+        return SuperFoM(
+            self.foms + second.foms, self.weights + [-w for w in second.weights]
+        )
+
+    def __rsub__(self, first: SuperFoM) -> SuperFoM:
+        """Return first - self."""
+        return SuperFoM(
+            first.foms + self.foms, first.weights + [-w for w in self.weights]
+        )
+
+    def __isub__(self, second: SuperFoM) -> SuperFoM:
+        """Implement self -= second."""
+        self.foms += second.foms
+        self.weights += [-w for w in second.weights]
+        return SuperFoM(self.foms, self.weights)
+
+    def __mul__(self, second: Number) -> SuperFoM:
+        """Return self * second."""
+        return SuperFoM(self.foms, [w * second for w in self.weights])
+
+    def __rmul__(self, first: Number) -> SuperFoM:
+        """Return first * self."""
+        return SuperFoM(self.foms, [first * w for w in self.weights])
+
+    def __imul__(self, second: Number) -> SuperFoM:
+        """Implement self *= second."""
+        # FoM list doesn't need to change. Just change weights.
+        self.weights = [w * second for w in self.weights]
+        return SuperFoM(self.foms, self.weights)
+
+    def __truediv__(self, second: Number) -> SuperFoM:
+        """Return self / second."""
+        return SuperFoM(self.foms, [w / second for w in self.weights])
+
+    def __rtruediv__(self, first: Number) -> SuperFoM:
+        """Return first / self."""
+        return SuperFoM(self.foms, [first / w for w in self.weights])
+
+    def __itruediv__(self, second: Number) -> SuperFoM:
+        """Implement self /= second."""
+        # FoM list doesn't need to change. Just change weights.
+        self.weights = [w / second for w in self.weights]
+        return SuperFoM(self.foms, self.weights)
+
+
+class FoM2(SuperFoM):
     """Version 2 of FoM.
 
     Attributes:
-        fom_srcs (list[Source]): The sources needed for computing the FoM
-        adj_srcs (list[Source]): The sources needed for computing the Adjoint
-        polarization (str): Polarization to use.
-        freq (npt.NDArray): The entire lambda vector.
-        opt_ids (list[int]): List of indices specifying which frequency bands are being
-            used in the optimization. Defaults to [0, ..., n_freq].
+        polarization (str): Polarization to use, can be "TE", "TM", or "TE+TM".
+        fwd_srcs (list[Source]): The sources needed for computing the FoM; used to
+            create the forward simulation.
+        adj_srcs (list[Source]): The sources needed for computing the adjoint; used to
+            create the adjoint simulation
+        fom_monitors (list[Monitor]): The monitors needed for computing the FoM
+        grad_monitors (list[Monitor]): The monitors needed for computing the gradient
         fom_func (Callable[..., npt.ArrayLike]): The function to compute the FoM.
         grad_func (Callable[..., npt.ArrayLike]): The function to compute the gradient.
+        pos_max_freqs (list[int]): List of indices specifying which frequency bands are
+            being maximized in the optimization.
+        neg_min_freqs (list[int]): List of indices specifying which frequency bands are
+            being minimized in the optimization.
     """
+
+    def __init__(
+        self,
+        polarization: str,
+        fwd_srcs: list[Source],
+        adj_srcs: list[Source],
+        fom_monitors: list[Monitor],
+        grad_monitors: list[Monitor],
+        fom_func: Callable[..., npt.NDArray],
+        grad_func: Callable[..., npt.NDArray],
+        pos_max_freqs: list[int],
+        neg_min_freqs: list[int],
+    ) -> None:
+        """Initialize a FoM2 object."""
+        super().__init__([self], [1.0])
+        self.fwd_srcs = fwd_srcs
+        self.adj_srcs = adj_srcs
+        self.fom_monitors = fom_monitors
+        self.grad_monitors = grad_monitors
+        self.fom_func = fom_func
+        self.grad_func = grad_func
+        if polarization not in POLARIZATIONS:
+            raise ValueError(
+                f'Polarization must be one of {POLARIZATIONS}; got {polarization}'
+            )
+        self.polarization = polarization
+        self.pos_max_freqs = pos_max_freqs
+        self.neg_min_reqs = neg_min_freqs
+
+    def __eq__(self, other: Any) -> bool:
+        """Test equality."""
+        if isinstance(other, FoM2):
+            return (
+                self.polarization == other.polarization
+                and self.fwd_srcs == other.fwd_srcs
+                and self.adj_srcs == other.adj_srcs
+                and self.fom_monitors == other.fom_monitors
+                and self.grad_monitors == other.grad_monitors
+                and self.fom_func == other.fom_func
+                and self.grad_func == other.grad_func
+                and self.pos_max_freqs == other.pos_max_freqs
+                and self.neg_min_reqs == other.neg_min_reqs
+            )
+        return super().__eq__(other)
+
+    def __copy__(self) -> FoM2:
+        """Return a copy of this FoM."""
+        return FoM2(
+            self.polarization,
+            self.fwd_srcs,
+            self.adj_srcs,
+            self.fom_monitors,
+            self.grad_monitors,
+            self.fom_func,
+            self.grad_func,
+            self.pos_max_freqs,
+            self.neg_min_reqs,
+        )
+
+    def compute_fom(self, *args, **kwargs) -> npt.NDArray:
+        """Compute the figure of merit."""
+        total_fom = self.fom_func(*args, **kwargs)
+        return self._subtract_neg(total_fom)
+
+    def compute_grad(self, *args, **kwargs) -> npt.NDArray:
+        """Compute the gradient of the figure of merit."""
+        total_grad = self.grad_func(*args, **kwargs)
+        return self._subtract_neg(total_grad)
+
+    def _subtract_neg(self, array: npt.NDArray) -> npt.NDArray:
+        """Subtract the restricted indices from the positive ones."""
+        if len(self.pos_max_freqs) == 0:
+            return 0 - array
+        if len(self.neg_min_reqs) == 0:
+            return array
+        return array[..., self.pos_max_freqs] - array[..., self.neg_min_reqs]
+
+    def create_forward_sim(self, base_sim: LumericalSimulation) -> LumericalSimulation:
+        """Create a simulation with only the forward sources enabled."""
+        return base_sim.with_enabled(self.fwd_srcs)
+
+    def create_adjoint_sim(self, base_sim: LumericalSimulation) -> LumericalSimulation:
+        """Create a simulation with only the adjoint sources enabled."""
+        return base_sim.with_enabled(self.adj_srcs)
+
+
+def unique_fwd_sim_map(foms: list[FoM2]) -> dict[frozenset[Source], list[FoM2]]:
+    """Creates a map of all the unique forward sims and their corresponding FoMs."""
+    sim_map: dict[frozenset[Source], list[FoM2]] = defaultdict(list)
+    for fom in foms:
+        fwd_srcs = frozenset(fom.fwd_srcs)
+        sim_map[fwd_srcs].append(fom)
+    return sim_map
+
+
+def unique_adj_sim_map(foms: list[FoM2]) -> dict[frozenset[Source], list[FoM2]]:
+    """Creates a map of all the unique adjoint sims and their corresponding FoMs."""
+    sim_map: dict[frozenset[Source], list[FoM2]] = defaultdict(list)
+    for fom in foms:
+        adj_srcs = frozenset(fom.adj_srcs)
+        sim_map[adj_srcs].append(fom)
+    return sim_map
 
 
 # TODO: Strip down functionality in FoM.

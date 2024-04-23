@@ -16,8 +16,13 @@ class Monitor:
     ) -> None:
         """Initialize a Monitor."""
         self.sim = sim
-        self.source_name = source_name
+        self.source_name = source_name  # TODO: Is this needed?
         self.monitor_name = monitor_name
+        self.reset()
+
+    def set_sim(self, sim: LumericalSimulation):
+        """Set which sim this monitor is connected to."""
+        self.sim = sim
         self.reset()
 
     def __eq__(self, __value: object) -> bool:

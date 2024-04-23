@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import threading
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
@@ -259,3 +259,18 @@ class Coordinates(TypedDict):
     x: npt.NDArray
     y: npt.NDArray
     z: npt.NDArray
+
+
+def starmap_with_kwargs(
+    function: Callable[P, R],
+    args_iter: Iterable[Iterable],
+    kwargs_iter: Iterable[Mapping],
+) -> Iterator[R]:
+    """Wrapper around itertools.starmap that can take kwargs."""
+    args_for_starmap = zip(itertools.repeat(function), args_iter, kwargs_iter)
+    return itertools.starmap(apply_args_and_kwargs, args_for_starmap)
+
+
+def apply_args_and_kwargs(function: Callable[P, R], args: tuple, kwargs: dict) -> R:
+    """Call a function with the provided args and kwargs."""
+    return function(*args, **kwargs)

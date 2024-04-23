@@ -27,6 +27,7 @@ from scipy import interpolate  # type: ignore
 
 import vipdopt
 from vipdopt.optimization import Device
+from vipdopt.simulation.source import Source
 from vipdopt.utils import P, PathLike, R, convert_path, ensure_path, read_config_file
 
 # TODO: Create simulation subpackage and add this, monitors, sources, and maybe devices
@@ -427,14 +428,15 @@ class LumericalSimulation(ISimulation):
 
         return new_sim
 
-    def enable(self, objs: list[str]):
+    def enable(self, objs: list[str] | list[Source]):
         """Enable all objects in provided list."""
         for obj in objs:
-            self.update_object(obj, enabled=1)
+            name = obj.name if isinstance(obj, Source) else obj
+            self.update_object(name, enabled=1)
 
     def with_enabled(
         self,
-        objs: list[str],
+        objs: list[str] | list[Source],
         name: str | None = None,
     ) -> LumericalSimulation:
         """Return copy of this simulation with only objects in objs enabled."""

@@ -3,6 +3,9 @@
 import pickle
 
 
+# TODO: Create an __eq__ function and also rework what a source stores. Basically
+# just needs to be the name of the source in the base_sim, or some unique identifier.
+# Could also just use the source names instead I suppose...
 class Source:
     """Representation of a Lumerical source object.
 
@@ -19,6 +22,7 @@ class Source:
         self.src_dict = src_object
         self.monitor_dict = monitor_object
         self.simulation = sim_id
+        self.name = src_object['name']  # TODO: Formalize this more
 
     def save_to_pickle(self, fname):
         """Pickles this Source to a file."""
