@@ -101,9 +101,8 @@ def test_compute_fom():
         (
             2 * (BASE_FOM2 + 2 * BASE_FOM2) + 3 * (BASE_FOM2 * BASE_FOM2),
             6 * SQUARED_ARRAY + 3 * SQUARED_ARRAY**2,
-            6 * GRADIENT_ARRAY + 3 * GRADIENT_ARRAY**2,
+            6 * GRADIENT_ARRAY + 6 * SQUARED_ARRAY * GRADIENT_ARRAY,
         ),
-
         # (2 * (BASE_FOM2 + BASE_FOM2), 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
         # ((BASE_FOM2 + BASE_FOM2) * 2, 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
         # (
@@ -239,11 +238,17 @@ def test_bad_op():
     with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for %'):
         BASE_FOM2 % 2
 
+    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for +'):
+        BASE_FOM2 + 1
+
+    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for /'):
+        BASE_FOM2 / BASE_FOM2
+
     # TODO: Enforce that only the supported operations are allowed
     # with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for %'):
     #     BASE_FOM2 * BASE_FOM2
-    # with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for %'):
-    #     BASE_FOM2 + 1
+    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for +'):
+        BASE_FOM2 + 1
 
 
 # def test_dict():
@@ -254,12 +259,13 @@ def test_bad_op():
 
 #     assert_equal(fom2, fom)
 
+
 @pytest.mark.smoke()
 def test_repeated_mult():
     fom1 = BASE_FOM2 * BASE_FOM2
 
     combined_fom = fom1 * BASE_FOM2
     output = combined_fom.compute_fom(INPUT_ARRAY)
-    assert_close(output, SQUARED_ARRAY ** 3)
+    assert_close(output, SQUARED_ARRAY**3)
     output = combined_fom.compute_grad(INPUT_ARRAY)
-    assert_close(output, GRADIENT_ARRAY ** 3)
+    assert_close(output, 3 * (SQUARED_ARRAY**2 * GRADIENT_ARRAY))

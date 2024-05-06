@@ -1,5 +1,7 @@
 """Module containing common functions used throughout the package."""
 
+from __future__ import annotations
+
 import functools
 import importlib.util as imp
 import itertools
@@ -12,7 +14,7 @@ from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Concatenate, ParamSpec, TypedDict, TypeVar
+from typing import Any, Concatenate, ParamSpec, TypedDict, TypeVar, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
@@ -25,7 +27,7 @@ PathLike = TypeVar('PathLike', str, Path, bytes, os.PathLike)
 T = TypeVar('T')
 R = TypeVar('R')
 
-Nested = T | Iterable['Nested[T]']
+Nested: TypeAlias = T | Iterable['Nested[T]']
 
 P = ParamSpec('P')
 Q = ParamSpec('Q')

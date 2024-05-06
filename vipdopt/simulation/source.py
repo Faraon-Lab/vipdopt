@@ -8,6 +8,7 @@ from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectT
 # Could also just use the source names instead I suppose...
 class Source(LumericalSimObject):
     """Representation of a Lumerical source object."""
+
     def __init__(self, name: str, obj_type: LumericalSimObjectType) -> None:
         super().__init__(name, obj_type)
 
@@ -16,13 +17,16 @@ class Source(LumericalSimObject):
             return self.name == __value.name and type(self) == type(__value)
         return super().__eq__(__value)
 
+
 class DipoleSource(Source):
     def __init__(self, name: str):
         super().__init__(name, LumericalSimObjectType.DIPOLE)
 
+
 class TFSFSource(Source):
     def __init__(self, name: str):
         super().__init__(name, LumericalSimObjectType.TFSF)
+
 
 class GaussianSource(Source):
     def __init__(self, name: str):

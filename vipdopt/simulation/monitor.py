@@ -13,7 +13,7 @@ class Monitor(LumericalSimObject):
         self,
         name: str,
         type: LumericalSimObjectType,
-        sim: LumericalSimulation | None=None,
+        sim: LumericalSimulation | None = None,
     ) -> None:
         """Initialize a Monitor."""
         super().__init__(name, type)
@@ -77,26 +77,26 @@ class Monitor(LumericalSimObject):
 
 class Proflie(Monitor):
     def __init__(
-            self,
-            name: str,
-            sim: LumericalSimulation | None = None,
+        self,
+        name: str,
+        sim: LumericalSimulation | None = None,
     ) -> None:
         super().__init__(name, LumericalSimObjectType.PROFILE, sim)
 
 
 class Power(Monitor):
     def __init__(
-            self,
-            name: str,
-            sim: LumericalSimulation | None = None,
+        self,
+        name: str,
+        sim: LumericalSimulation | None = None,
     ) -> None:
         super().__init__(name, LumericalSimObjectType.POWER, sim)
 
 
 class Index(Monitor):
     def __init__(
-            self,
-            name: str,
-            sim: LumericalSimulation | None = None,
+        self,
+        name: str,
+        sim: LumericalSimulation | None = None,
     ) -> None:
         super().__init__(name, LumericalSimObjectType.INDEX, sim)
