@@ -6,7 +6,8 @@ import sys
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from copy import copy
-from itertools import starmap
+from functools import reduce
+from itertools import product, starmap
 from typing import Any, no_type_check
 
 import numpy as np
@@ -14,7 +15,7 @@ import numpy.typing as npt
 
 import vipdopt
 from vipdopt.simulation import LumericalSimulation, Monitor, Source
-from vipdopt.utils import Number, starmap_with_kwargs
+from vipdopt.utils import Number, flatten, starmap_with_kwargs
 
 POLARIZATIONS = ['TE', 'TM', 'TE+TM']
 
@@ -22,9 +23,9 @@ POLARIZATIONS = ['TE', 'TM', 'TE+TM']
 class SuperFoM:
     """Representation of a weighted sum of FoMs that take the same arguments."""
 
-    def __init__(self, foms: list[FoM2], weights: Sequence[float] = (1.0,)) -> None:
+    def __init__(self, foms: list[Sequence[FoM2]], weights: Sequence[float] = (1.0,)) -> None:
         """Initialize a SuperFoM."""
-        self.foms: list[FoM2] = foms
+        self.foms: list[tuple[FoM2, ...]] = [tuple(f) for f in foms]
         self.weights: list[float] = list(weights)
 
     def __copy__(self) -> SuperFoM:
@@ -41,73 +42,136 @@ class SuperFoM:
         """Compute the weighted sum of the FoMs."""
         fom_results = np.array(
             list(
-                starmap_with_kwargs(
+                SuperFoM._compute_prod(
                     FoM2.compute_fom,
-                    ((fom, *args) for fom in self.foms),
-                    (kwargs for _ in self.foms),
-                )
+                    fom_tup,
+                    *args,
+                    **kwargs,
+                ) for fom_tup in self.foms
             )
         )
         return np.einsum('i,i...->...', self.weights, fom_results)
+
+    def _compute_prod(function: Callable, foms: tuple[FoM2, ...], *args, **kwargs) -> npt.NDArray:
+        factors = np.array(list(
+            starmap_with_kwargs(
+                function,
+                ((fom, *args) for fom in foms),
+                (kwargs for _ in foms)
+            )
+        ))
+        return np.prod(factors, axis=0)
 
     def compute_grad(self, *args, **kwargs) -> npt.NDArray:
         """Compute the weighted sum of the gradients."""
         grad_results = np.array(
             list(
-                starmap_with_kwargs(
+                SuperFoM._compute_prod(
                     FoM2.compute_grad,
-                    ((fom, *args) for fom in self.foms),
-                    (kwargs for _ in self.foms),
-                )
+                    fom_tup,
+                    *args,
+                    **kwargs,
+                ) for fom_tup in self.foms
             )
         )
         return np.einsum('i,i...->...', self.weights, grad_results)
 
-    def __add__(self, second: SuperFoM) -> SuperFoM:
+    def create_forward_sim(self, base_sim: LumericalSimulation) -> list[LumericalSimulation]:
+        """Create all unique forward simulations needed to compute this FoM."""
+        fwd_sim_map = unique_fwd_sim_map(self.foms)
+        return [base_sim.with_enabled(srcs) for srcs in fwd_sim_map]
+
+    def create_adjoint_sim(self, base_sim: LumericalSimulation) -> list[LumericalSimulation]:
+        """Create all unique adjoint simulations needed to compute this FoM."""
+        adj_sim_map = unique_adj_sim_map(self.foms)
+        return [base_sim.with_enabled(srcs) for srcs in adj_sim_map]
+
+    def _math_helper(first: SuperFoM | Number, second: SuperFoM | Number, operator: str) -> SuperFoM:
+        """Helper function for computing arithmetic functions."""
+        foms = []
+        weights = []
+        if isinstance(first, SuperFoM) and isinstance(second, SuperFoM):
+            match operator:
+                case '+':
+                    foms = first.foms + second.foms
+                    weights = first.weights + second.weights
+                case '-':
+                    foms = first.foms + second.foms
+                    weights = first.weights + [-w for w in second.weights]
+                case '*':
+                    foms = list(flatten(tup) for tup in product(first.foms, second.foms))
+                    weights = [reduce(lambda x, y: x * y, tup) for tup in product(first.weights, second.weights)]
+                case _:
+                    raise NotImplementedError
+        elif isinstance(first, SuperFoM) and isinstance(second, Number):
+            match operator:
+                case '*':
+                    foms = first.foms
+                    weights = [w * second for w in first.weights]
+                case '/':
+                    foms = first.foms
+                    weights = [w / second for w in first.weights]
+                case _:
+                    raise NotImplementedError
+        else:
+            assert isinstance(first, Number) and isinstance(second, SuperFoM)
+            match operator:
+                case '*':
+                    foms = second.foms
+                    weights = [first * w for w in second.weights]
+                case '/':
+                    foms = second.foms
+                    weights = [first / w for w in second.weights]
+                case _:
+                    raise NotImplementedError
+        return SuperFoM(foms, weights)
+
+    def __add__(self, second: Any) -> SuperFoM:
         """Return self + second."""
-        return SuperFoM(self.foms + second.foms, self.weights + second.weights)
+        return SuperFoM._math_helper(self, second, '+')
 
-    def __radd__(self, first: SuperFoM) -> SuperFoM:
+    def __radd__(self, first: Any) -> SuperFoM:
         """Return first + self."""
-        return SuperFoM(first.foms + self.foms, first.weights + self.weights)
+        return SuperFoM._math_helper(first, self, '+')
 
-    def __iadd__(self, second: SuperFoM) -> SuperFoM:
+    def __iadd__(self, second: Any) -> SuperFoM:
         """Implement self += second."""
-        self.foms += second.foms
-        self.weights += second.weights
+        new_fom = SuperFoM._math_helper(self, second, '+')
+        self.foms = new_fom.foms
+        self.weights = new_fom.weights
         # Have to create a new SuperFom so it doesn't return a FoM2
         return SuperFoM(self.foms, self.weights)
 
-    def __sub__(self, second: SuperFoM) -> SuperFoM:
+    def __sub__(self, second: Any) -> SuperFoM:
         """Return self - second."""
-        return SuperFoM(
-            self.foms + second.foms, self.weights + [-w for w in second.weights]
-        )
+        return SuperFoM._math_helper(self, second, '-')
 
-    def __rsub__(self, first: SuperFoM) -> SuperFoM:
+    def __rsub__(self, first: Any) -> SuperFoM:
         """Return first - self."""
-        return SuperFoM(
-            first.foms + self.foms, first.weights + [-w for w in self.weights]
-        )
+        return SuperFoM._math_helper(first, self, '-')
 
-    def __isub__(self, second: SuperFoM) -> SuperFoM:
+    def __isub__(self, second: Any) -> SuperFoM:
         """Implement self -= second."""
-        self.foms += second.foms
-        self.weights += [-w for w in second.weights]
+        new_fom = SuperFoM._math_helper(self, second, '-')
+        self.foms = new_fom.foms
+        self.weights = new_fom.weights
+        # Have to create a new SuperFom so it doesn't return a FoM2
         return SuperFoM(self.foms, self.weights)
 
-    def __mul__(self, second: Number) -> SuperFoM:
+    def __mul__(self, second: SuperFoM | Number) -> SuperFoM:
         """Return self * second."""
-        return SuperFoM(self.foms, [w * second for w in self.weights])
+        return SuperFoM._math_helper(self, second, '*')
 
     def __rmul__(self, first: Number) -> SuperFoM:
         """Return first * self."""
-        return SuperFoM(self.foms, [first * w for w in self.weights])
+        return SuperFoM._math_helper(first, self, '*')
 
     def __imul__(self, second: Number) -> SuperFoM:
         """Implement self *= second."""
-        # FoM list doesn't need to change. Just change weights.
-        self.weights = [w * second for w in self.weights]
+        new_fom = SuperFoM._math_helper(self, second, '*')
+        self.foms = new_fom.foms
+        self.weights = new_fom.weights
+        # Have to create a new SuperFom so it doesn't return a FoM2
         return SuperFoM(self.foms, self.weights)
 
     def __truediv__(self, second: Number) -> SuperFoM:
@@ -157,7 +221,7 @@ class FoM2(SuperFoM):
         neg_min_freqs: list[int],
     ) -> None:
         """Initialize a FoM2 object."""
-        super().__init__([self], [1.0])
+        super().__init__([(self,)], [1.0])
         self.fwd_srcs = fwd_srcs
         self.adj_srcs = adj_srcs
         self.fom_monitors = fom_monitors
@@ -245,6 +309,19 @@ def unique_adj_sim_map(foms: list[FoM2]) -> dict[frozenset[Source], list[FoM2]]:
         adj_srcs = frozenset(fom.adj_srcs)
         sim_map[adj_srcs].append(fom)
     return sim_map
+
+# TODO: Make this work for getting the lists of sources in sims
+FOM_ONE = FoM2(
+    'TE+TM',
+    [],
+    [],
+    [],
+    [],
+    lambda _: np.ones(1),
+    lambda _: np.ones(1),
+    [1],
+    []
+)
 
 
 # TODO: Strip down functionality in FoM.

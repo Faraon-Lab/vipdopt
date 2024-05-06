@@ -25,6 +25,8 @@ PathLike = TypeVar('PathLike', str, Path, bytes, os.PathLike)
 T = TypeVar('T')
 R = TypeVar('R')
 
+Nested = T | Iterable['Nested[T]']
+
 P = ParamSpec('P')
 Q = ParamSpec('Q')
 
@@ -274,3 +276,11 @@ def starmap_with_kwargs(
 def apply_args_and_kwargs(function: Callable[P, R], args: tuple, kwargs: dict) -> R:
     """Call a function with the provided args and kwargs."""
     return function(*args, **kwargs)
+
+
+def flatten(data: Nested[T]) -> Iterable[T]:
+    if isinstance(data, Iterable):
+        for x in data:
+            yield from flatten(x)
+    else:
+        yield data

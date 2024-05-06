@@ -94,13 +94,23 @@ def test_compute_fom():
         (0.5 * BASE_FOM2, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
         (1 / (2 * BASE_FOM2), SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
         # Distributive property / linearity
+        (BASE_FOM2 * (2 + 3), 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),
+        ((2 + 3) * BASE_FOM2, 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),
         (2 * (BASE_FOM2 + BASE_FOM2), 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
         ((BASE_FOM2 + BASE_FOM2) * 2, 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
         (
-            2 * (BASE_FOM2 + 2 * BASE_FOM2),
-            6 * SQUARED_ARRAY,
-            6 * GRADIENT_ARRAY,
+            2 * (BASE_FOM2 + 2 * BASE_FOM2) + 3 * (BASE_FOM2 * BASE_FOM2),
+            6 * SQUARED_ARRAY + 3 * SQUARED_ARRAY**2,
+            6 * GRADIENT_ARRAY + 3 * GRADIENT_ARRAY**2,
         ),
+
+        # (2 * (BASE_FOM2 + BASE_FOM2), 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
+        # ((BASE_FOM2 + BASE_FOM2) * 2, 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
+        # (
+        #     2 * (BASE_FOM2 + 2 * BASE_FOM2),
+        #     6 * SQUARED_ARRAY,
+        #     6 * GRADIENT_ARRAY,
+        # ),
     ],
 )
 def test_arithmetic2(fom: FoM2, exp_fom: npt.ArrayLike, exp_grad: npt.ArrayLike):
@@ -152,7 +162,7 @@ def test_sum2():
 def test_weights2():
     n = 10
     weights = np.linspace(0.0, 1.0, num=n)
-    foms = [BASE_FOM2] * n
+    foms = [(BASE_FOM2,)] * n
     combined_fom = SuperFoM(foms, weights)
 
     output = combined_fom.compute_fom(INPUT_ARRAY)
@@ -243,3 +253,13 @@ def test_bad_op():
 #     fom2 = FoM.from_dict(f'{fom.name}', fdict, {})
 
 #     assert_equal(fom2, fom)
+
+@pytest.mark.smoke()
+def test_repeated_mult():
+    fom1 = BASE_FOM2 * BASE_FOM2
+
+    combined_fom = fom1 * BASE_FOM2
+    output = combined_fom.compute_fom(INPUT_ARRAY)
+    assert_close(output, SQUARED_ARRAY ** 3)
+    output = combined_fom.compute_grad(INPUT_ARRAY)
+    assert_close(output, GRADIENT_ARRAY ** 3)

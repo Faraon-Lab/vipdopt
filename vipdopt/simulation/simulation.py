@@ -13,9 +13,8 @@ import time
 import typing
 from argparse import ArgumentParser
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
 from copy import copy
-from enum import Enum
 from functools import partial
 from pathlib import Path
 from typing import Any, Concatenate
@@ -27,6 +26,14 @@ from scipy import interpolate  # type: ignore
 
 import vipdopt
 from vipdopt.optimization import Device
+from vipdopt.simulation.simobject import (
+    IMPORT_TYPES,
+    MONITOR_TYPES,
+    OBJECT_TYPE_NAME_MAP,
+    SOURCE_TYPES,
+    LumericalSimObject,
+    LumericalSimObjectType,
+)
 from vipdopt.simulation.source import Source
 from vipdopt.utils import P, PathLike, R, convert_path, ensure_path, read_config_file
 
@@ -84,54 +91,6 @@ class ISimulation(abc.ABC):
         """Run the simulation."""
 
 
-class LumericalSimObjectType(str, Enum):
-    """Types of simulation objects in Lumerical."""
-
-    FDTD = 'fdtd'
-    MESH = 'mesh'
-    GAUSSIAN = 'gaussian'
-    TFSF = 'tfsf'
-    DIPOLE = 'dipole'
-    POWER = 'power'
-    PROFILE = 'profile'
-    INDEX = 'index'
-    IMPORT = 'import'
-    RECT = 'rect'
-
-    def get_add_function(self) -> Callable:
-        """Get the correct lumapi function to add an object."""
-        if vipdopt.lumapi is None:
-            raise ModuleNotFoundError(
-                'Module "vipdopt.lumapi" has not yet been instatiated.'
-            )
-        return getattr(vipdopt.lumapi.FDTD, f'add{self.value}')
-
-
-SOURCE_TYPES = [
-    LumericalSimObjectType.DIPOLE,
-    LumericalSimObjectType.TFSF,
-    LumericalSimObjectType.GAUSSIAN,
-]
-
-MONITOR_TYPES = [
-    LumericalSimObjectType.POWER,
-    LumericalSimObjectType.PROFILE,
-    LumericalSimObjectType.INDEX,
-]
-
-IMPORT_TYPES = [LumericalSimObjectType.IMPORT]
-
-OBJECT_TYPE_NAME_MAP = {
-    'FDTD': LumericalSimObjectType.FDTD,
-    'GaussianSource': LumericalSimObjectType.GAUSSIAN,
-    'DipoleSource': LumericalSimObjectType.DIPOLE,
-    'Rectangle': LumericalSimObjectType.RECT,
-    'Mesh': LumericalSimObjectType.MESH,
-    'Import': LumericalSimObjectType.IMPORT,
-    'IndexMonitor': LumericalSimObjectType.INDEX,
-}
-
-
 class LumericalEncoder(json.JSONEncoder):
     """Encodes LumericalSim objects in JSON format."""
 
@@ -146,54 +105,6 @@ class LumericalEncoder(json.JSONEncoder):
         if isinstance(o, Path):
             return str(o)
         return super().default(o)
-
-
-class LumericalSimObject:
-    """Lumerical Simulation Object.
-
-    Attributes:
-        name (str): name of the object
-        obj_type (LumericalSimObjectType): the type of object
-        properties (OrderedDict[str, Any]): Map of named properties and their values
-    """
-
-    def __init__(self, name: str, obj_type: LumericalSimObjectType) -> None:
-        """Create a LumericalSimObject."""
-        self.name = name
-        self.obj_type = obj_type
-        self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
-        self.properties: OrderedDict[str, Any] = OrderedDict()
-        if obj_type != LumericalSimObjectType.FDTD:
-            self.properties['name'] = name
-
-    def __str__(self) -> str:
-        """Return string representation of object."""
-        return json.dumps(
-            vars(self),
-            indent=4,
-            ensure_ascii=True,
-        )
-
-    def __setitem__(self, key: str, val: Any) -> None:
-        """Set the value of a property of the object."""
-        self.properties[key] = val
-
-    def __getitem__(self, key: str) -> Any:
-        """Retrieve a property from an object."""
-        return self.properties[key]
-
-    def update(self, **vals):
-        """Update properties with values in a dictionary."""
-        self.properties.update(vals)
-
-    def __eq__(self, __value: object) -> bool:
-        """Test equality of LumericalSimObjects."""
-        if isinstance(__value, LumericalSimObject):
-            return (
-                self.obj_type == __value.obj_type
-                and self.properties == __value.properties
-            )
-        return super().__eq__(__value)
 
 
 class LumericalSimulation(ISimulation):
@@ -428,15 +339,14 @@ class LumericalSimulation(ISimulation):
 
         return new_sim
 
-    def enable(self, objs: list[str] | list[Source]):
+    def enable(self, names: Iterable[str]):
         """Enable all objects in provided list."""
-        for obj in objs:
-            name = obj.name if isinstance(obj, Source) else obj
+        for name in names:
             self.update_object(name, enabled=1)
 
     def with_enabled(
         self,
-        objs: list[str] | list[Source],
+        objs: Iterable[Source] | Iterable[str],
         name: str | None = None,
     ) -> LumericalSimulation:
         """Return copy of this simulation with only objects in objs enabled."""
@@ -445,19 +355,28 @@ class LumericalSimulation(ISimulation):
             # Create the simulation with the provided name
             new_sim.info['name'] = name
         new_sim.disable_all_sources()
-        new_sim.enable(objs)
+        names = [o.name if isinstance(o, LumericalSimObject) else o for o in objs]
+        new_sim.enable(names)
         return new_sim
 
-    def disable(self, objs: list[str]):
+    def disable(self, names: Iterable[str]):
         """Disable all objects in provided list."""
-        for obj in objs:
-            self.update_object(obj, enabled=0)
+        for name in names:
+            self.update_object(name, enabled=0)
 
-    def with_disabled(self, objs: list[str]) -> LumericalSimulation:
+    def with_disabled(
+        self,
+        objs: Iterable[Source] | Iterable[str],
+        name: str | None = None,
+    ) -> LumericalSimulation:
         """Return copy of this simulation with only objects in objs disabled."""
-        new_sim = self.copy()
+        new_sim = self.copy()  # Unlinked
+        if name is not None:
+            # Create the simulation with the provided name
+            new_sim.info['name'] = name
         new_sim.enable_all_sources()
-        new_sim.disable(objs)
+        names = [o.name if isinstance(o, LumericalSimObject) else o for o in objs]
+        new_sim.disable(names)
         return new_sim
 
     def enable_all_sources(self):
@@ -472,25 +391,28 @@ class LumericalSimulation(ISimulation):
         """Return a list of all source objects."""
         return [obj for _, obj in self.objects.items() if obj.obj_type in SOURCE_TYPES]
 
-    def source_names(self) -> list[str]:
+    def source_names(self) -> Iterator[str]:
         """Return a list of all source object names."""
-        return [obj.name for obj in self.sources()]
+        for obj in self.sources():
+            yield obj.name
 
     def monitors(self) -> list[LumericalSimObject]:
         """Return a list of all monitor objects."""
         return [obj for _, obj in self.objects.items() if obj.obj_type in MONITOR_TYPES]
 
-    def monitor_names(self) -> list[str]:
+    def monitor_names(self) -> Iterator[str]:
         """Return a list of all monitor object names."""
-        return [obj.name for obj in self.monitors()]
+        for obj in self.monitors():
+            yield obj.name
 
     def imports(self) -> list[LumericalSimObject]:
         """Return a list of all import objects."""
         return [obj for _, obj in self.objects.items() if obj.obj_type in IMPORT_TYPES]
 
-    def import_names(self) -> list[str]:
+    def import_names(self) -> Iterator[str]:
         """Return a list of all import object names."""
-        return [obj.name for obj in self.imports()]
+        for obj in self.imports():
+            yield obj.name
 
     def new_object(
         self,

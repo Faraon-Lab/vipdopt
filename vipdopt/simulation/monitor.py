@@ -2,23 +2,23 @@
 
 import numpy.typing as npt
 
+from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
 from vipdopt.simulation.simulation import LumericalSimulation
 
 
-class Monitor:
+class Monitor(LumericalSimObject):
     """Class representing the different source monitors in a simulation."""
 
     def __init__(
         self,
-        sim: LumericalSimulation,
-        source_name: str,
-        monitor_name: str,
+        name: str,
+        type: LumericalSimObjectType,
+        sim: LumericalSimulation | None=None,
     ) -> None:
         """Initialize a Monitor."""
-        self.sim = sim
-        self.source_name = source_name  # TODO: Is this needed?
-        self.monitor_name = monitor_name
-        self.reset()
+        super().__init__(name, type)
+        if sim is not None:
+            self.set_sim(sim)
 
     def set_sim(self, sim: LumericalSimulation):
         """Set which sim this monitor is connected to."""
@@ -28,7 +28,7 @@ class Monitor:
     def __eq__(self, __value: object) -> bool:
         """Test equality."""
         if isinstance(__value, Monitor):
-            return self.sim == __value.sim and self.monitor_name == __value.monitor_name
+            return self.sim == __value.sim and self.name == __value.name
         return super().__eq__(__value)
 
     def reset(self):
@@ -55,21 +55,48 @@ class Monitor:
 
     @property
     def e(self) -> npt.NDArray:
-        """Return the e field produced by this source."""
+        """Return the e field measured by this monitor."""
         if self._e is None:
             self._e = self.sim.get_efield(self.monitor_name)
         return self._e
 
     @property
     def h(self) -> npt.NDArray:
-        """Return the h field produced by this source."""
+        """Return the h field measured by this monitor."""
         if self._h is None:
             self._h = self.sim.get_hfield(self.monitor_name)
         return self._h
 
     @property
     def trans_mag(self) -> npt.NDArray:
-        """Return the transmission magnitude of this source."""
+        """Return the transmission magnitude measured by this monitor."""
         if self._trans_mag is None:
             self._trans_mag = self.sim.get_transmission_magnitude(self.monitor_name)
         return self._trans_mag
+
+
+class Proflie(Monitor):
+    def __init__(
+            self,
+            name: str,
+            sim: LumericalSimulation | None = None,
+    ) -> None:
+        super().__init__(name, LumericalSimObjectType.PROFILE, sim)
+
+
+class Power(Monitor):
+    def __init__(
+            self,
+            name: str,
+            sim: LumericalSimulation | None = None,
+    ) -> None:
+        super().__init__(name, LumericalSimObjectType.POWER, sim)
+
+
+class Index(Monitor):
+    def __init__(
+            self,
+            name: str,
+            sim: LumericalSimulation | None = None,
+    ) -> None:
+        super().__init__(name, LumericalSimObjectType.INDEX, sim)
