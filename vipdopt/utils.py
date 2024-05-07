@@ -14,7 +14,7 @@ from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Concatenate, ParamSpec, TypedDict, TypeVar, TypeAlias
+from typing import Any, Concatenate, ParamSpec, TypeAlias, TypedDict, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -281,6 +281,7 @@ def apply_args_and_kwargs(function: Callable[P, R], args: tuple, kwargs: dict) -
 
 
 def flatten(data: Nested[T]) -> Iterable[T]:
+    """Return a copy of the data as single, collapsed iterator."""
     if isinstance(data, Iterable):
         for x in data:
             yield from flatten(x)

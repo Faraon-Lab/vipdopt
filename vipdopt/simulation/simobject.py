@@ -1,3 +1,5 @@
+"""Abstractions of Lumerical simulation objects."""
+
 import json
 from collections import OrderedDict
 from collections.abc import Callable
@@ -75,7 +77,7 @@ class LumericalSimObject:
     def __str__(self) -> str:
         """Return string representation of object."""
         return json.dumps(
-            vars(self),
+            self.as_dict(),
             indent=4,
             ensure_ascii=True,
         )
@@ -100,3 +102,7 @@ class LumericalSimObject:
                 and self.properties == __value.properties
             )
         return super().__eq__(__value)
+
+    def as_dict(self) -> dict:
+        """Return a dictionary representation of this object."""
+        return vars(self)
