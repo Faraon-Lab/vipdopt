@@ -836,7 +836,7 @@ class LumericalSimulation(ISimulation):
 
     @_check_fdtd
     def get_pfield(self, monitor_name: str) -> npt.NDArray:
-        """Returns power as a function of space and wavelength, with xyz components."""
+        """Returns Poynting vector as a function of space and wavelength."""
         return self.getresult(monitor_name, 'P', 'P')
 
     def get_efield_magnitude(self, monitor_name: str) -> npt.NDArray:

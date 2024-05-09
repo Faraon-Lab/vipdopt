@@ -262,6 +262,7 @@ class SuperFoM:
 
     @staticmethod
     def from_dict(data: dict) -> SuperFoM:
+        """Create a SuperFom from a dictionary representation."""
         return SuperFoM(data['foms'], data['weights'])
 
 

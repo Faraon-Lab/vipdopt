@@ -37,6 +37,7 @@ class Monitor(LumericalSimObject):
         self._fshape = None  # field shape
         self._e = None
         self._h = None
+        self._p = None
         self._trans_mag = None
 
     @property
@@ -66,6 +67,13 @@ class Monitor(LumericalSimObject):
         if self._h is None:
             self._h = self.sim.get_hfield(self.monitor_name)
         return self._h
+
+    @property
+    def p(self) -> npt.NDArray:
+        """Return the h field measured by this monitor."""
+        if self._p is None:
+            self._p = self.sim.get_pfield(self.monitor_name)
+        return self._p
 
     @property
     def trans_mag(self) -> npt.NDArray:
