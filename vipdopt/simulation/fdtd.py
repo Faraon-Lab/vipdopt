@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import abc
+import contextlib
 import functools
 import time
 import typing
 from collections.abc import Callable
 from functools import partial
-from typing import Any, Concatenate
+from typing import Any, Concatenate, overload
 
 import numpy as np
 import numpy.typing as npt
 from overrides import override
 
 import vipdopt
-from vipdopt.simulation import LumericalSimulation
+from vipdopt.simulation import LumericalSimObjectType, LumericalSimulation, Simulation
 from vipdopt.utils import (
     P,
     Path,
@@ -57,9 +58,19 @@ class ISolver(abc.ABC):
         """Load data into the solver from a file."""
 
     @abc.abstractmethod
+    @overload
     @ensure_path
-    def save(self, path: Path):
-        """Close the connection with the FDTD solver software."""
+    def save(self, path: Path): ...
+
+    @abc.abstractmethod
+    @overload
+    @ensure_path
+    def save(self, path: Path, sim: Simulation): ...
+
+    @abc.abstractmethod
+    @ensure_path
+    def save(self, path: Path, sim: Simulation | None = None):
+        """Save a simulation using the FDTD solver software."""
 
 
 def _check_lum_fdtd(
@@ -97,6 +108,7 @@ class LumericalFDTD(ISolver):
         self.fdtd: vipdopt.lumapi.FDTD | None = None  # type: ignore
         self._synced: bool = False
         self._env_vars: dict | None = None
+        self.current_sim: LumericalSimulation | None = None
 
     @override
     def connect(self, hide: bool = True) -> None:
@@ -130,12 +142,12 @@ class LumericalFDTD(ISolver):
     @_check_lum_fdtd
     @override
     def addjob(self, fname: str):
-        self.fdtd.addjob(fname, 'FDTD')
+        self.fdtd.addjob(fname, 'FDTD')  # type: ignore
 
     @_check_lum_fdtd
     @override
     def clearjobs(self):
-        self.fdtd.clearjobs('FDTD')
+        self.fdtd.clearjobs('FDTD')  # type: ignore
 
     @_sync_lum_fdtd_solver
     @override
@@ -148,7 +160,7 @@ class LumericalFDTD(ISolver):
                 1: Run jobs using the resources and parallel settings specified in
                     the resource manager. (default)
         """
-        self.fdtd.runjobs('FDTD', option)
+        self.fdtd.runjobs('FDTD', option)  # type: ignore
 
     @_sync_lum_fdtd_solver
     @override
@@ -166,16 +178,30 @@ class LumericalFDTD(ISolver):
 
     @_check_lum_fdtd
     @override
+    @ensure_path
     def load(self, path: Path):
         """Load a simulation from a Lumerical .fsp file."""
         fname = str(path)
         self.fdtd.load(fname)  # type: ignore
         vipdopt.logger.debug(f'Succesfully loaded simulation from {fname}.\n')
 
+    @overload
+    @ensure_path
+    def save(self, path: Path): ...
+
+    @overload
+    @ensure_path
+    def save(self, path: Path, sim: Simulation): ...
+
     @_check_lum_fdtd
-    @override
-    def save(self, path: Path):
-        self.fdtd.save(str(path))
+    @ensure_path
+    def save(self, path: Path, sim: Simulation | None = None):
+        """Save a LumericalSimulation using the FDTD solver software."""
+        if sim is not None:
+            self.load_simulation(sim)
+        if self.current_sim is not None:
+            self.current_sim.info['path'] = path
+        self.fdtd.save(str(path))  # type: ignore
         vipdopt.logger.debug(f'Succesfully saved simulation to {path}.\n')
 
     @_check_lum_fdtd
@@ -254,11 +280,11 @@ class LumericalFDTD(ISolver):
     ) -> Any:
         """Get a result from the FDTD solver, accesing a specific value if desired."""
         if property_name is None:
-            res = self.getresult(object_name)  # Gets all named results
+            res = self.fdtd.getresult(object_name)  # Gets all named results
             vipdopt.logger.debug(f'Available results from {object_name}:\n{res}')
             return res
 
-        res = self.getresult(object_name, property_name)
+        res = self.fdtd.getresult(object_name, property_name)
         if dataset_value is not None:
             res = res[dataset_value]
         vipdopt.logger.debug(f'Got "{property_name}" from "{object_name}": {res}')
@@ -301,9 +327,9 @@ class LumericalFDTD(ISolver):
     @typing.no_type_check
     def get_field(self, monitor_name: str, field_indicator: str) -> npt.NDArray:
         """Return the E or H field from a monitor."""
-        if field_indicator not in 'EH':
+        if field_indicator not in 'EHP':
             raise ValueError(
-                f'Expected field_indicator to be "E" or "H"; got {field_indicator}'
+                f'Expected field_indicator to be "E", "H" or "P"; got {field_indicator}'
             )
         polarizations = [field_indicator + c for c in 'xyz']
 
@@ -330,35 +356,80 @@ class LumericalFDTD(ISolver):
         return self.get_field(monitor_name, 'E')
 
     @_check_lum_fdtd
-    def get_pfield(self, monitor_name: str) -> npt.NDArray:
-        """Returns Poynting vector as a function of space and wavelength."""
-        return self.getresult(monitor_name, 'P', 'P')
+    def get_poynting(self, monitor_name: str) -> npt.NDArray:
+        """Return the Poynting vector from a monitor."""
+        return self.get_field(monitor_name, 'P')
+
+    @_check_lum_fdtd
+    def get_transmission(self, monitor_name: str) -> npt.NDArray:
+        """Return the transmission as a function of wavelength."""
+        return self.fdtd.transmission(monitor_name)  # type: ignore
 
     def get_efield_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the E field from a monitor."""
-        efield = self.get_efield(monitor_name)
-        enorm_squared = np.sum(np.square(np.abs(efield)), axis=0)
+        enorm_squared = self.fdtd.getelectric(monitor_name)  # type: ignore
         return np.sqrt(enorm_squared)
 
     @_check_lum_fdtd
     @typing.no_type_check
-    def get_source_power(self) -> npt.NDArray:
+    def get_source_power(self, monitor_name: str) -> npt.NDArray:
         """Return the source power of a given monitor."""
-        f = self.getresult('focal_monitor_0', 'f')
+        f = self.getresult(monitor_name, 'f')  # Get frequency vector
         return self.fdtd.sourcepower(f)
 
     def get_overall_power(self, monitor_name) -> npt.NDArray:
         """Return the overall power from a given monitor."""
-        source_power = self.get_source_power()
+        sp = self.get_source_power(monitor_name)
         t = self.get_transmission_magnitude(monitor_name)
-        return source_power * t.T
+        return t.T * sp
 
     @_check_lum_fdtd
-    def load_simulation(self, sim: LumericalSimulation):
-        """Load a simulation into the FDTD hook."""
-        # TODO: Write this lol
-        # Need to add each sim object from the simulation to the fdtd
-        # should be able to reuse code from `LumericalSimulation.add_object`
+    def load_simulation(self, sim: Simulation):
+        """Load a simulation into the FDTD solver."""
+        if not isinstance(sim, LumericalSimulation):
+            raise TypeError(
+                'LumericalFDTD can only load simulations of type "LumericalSimulation"'
+                f'; Received "{type(sim)}"'
+            )
+        self.fdtd.switchtolayout()  # type: ignore
+        self.fdtd.deleteall()  # type: ignore
+        for obj in sim.objects.values():
+            # Create an object for each of those in the simulation
+            with contextlib.suppress(BaseException):
+                LumericalSimObjectType.get_add_function(obj.obj_type)(
+                    self.fdtd,
+                    **obj.properties,
+                )
+        self.current_sim = sim
+
+    @_check_lum_fdtd
+    def reformat_monitor_data(self, sims: list[LumericalSimulation]):
+        """Reformat simulation data so it can be loaded independent of the solver.
+
+        This method does the following for each provided simulation.
+            * Loads the simulation from the path indicated by sim.info['path']
+            * Creates a .npz file for each monitor in the simulation, containing all
+                of the returned values (E, H, P, T, Source Power)
+
+        Arguments:
+            sims (list[LumericalSimulation]): The simulation to load data from. Must
+                have the `info['path']` field populated.
+        """
+        for sim in sims:
+            sim_path: Path = sim.info['path']
+            self.load(sim_path)
+            for monitor in sim.monitors():
+                mname = monitor.name
+                e = self.get_efield(mname)
+                h = self.get_hfield(mname)
+                p = self.get_poynting(mname)
+                t = self.get_transmission(mname)
+                sp = self.get_source_power(mname)
+
+                output_path = sim_path.with_suffix('') / f'_{mname}.npz'
+                monitor.set_src(output_path)
+
+                np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp)
 
 
 ISolver.register(LumericalFDTD)

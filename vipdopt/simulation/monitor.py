@@ -1,9 +1,15 @@
 """Class for general sources in a simulation."""
 
+from pathlib import Path
+
+import numpy as np
 import numpy.typing as npt
 
-from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
-from vipdopt.simulation.simulation import LumericalSimulation
+from vipdopt.simulation.simobject import (
+    MONITOR_TYPES,
+    LumericalSimObject,
+    LumericalSimObjectType,
+)
 
 
 class Monitor(LumericalSimObject):
@@ -12,23 +18,29 @@ class Monitor(LumericalSimObject):
     def __init__(
         self,
         name: str,
-        type: LumericalSimObjectType,
-        sim: LumericalSimulation | None = None,
+        obj_type: LumericalSimObjectType,
+        src: Path | None = None,
     ) -> None:
         """Initialize a Monitor."""
-        super().__init__(name, type)
-        if sim is not None:
-            self.set_sim(sim)
+        if obj_type not in MONITOR_TYPES:
+            raise ValueError(
+                f'Cannot create a Monitor of type {obj_type}; permitted choices are '
+                f'"{MONITOR_TYPES}"'
+            )
+        super().__init__(name, obj_type)
+        self.src = src
+        self.reset()
+        self._sync = src is not None  # Only set to sync if the source file exists
 
-    def set_sim(self, sim: LumericalSimulation):
-        """Set which sim this monitor is connected to."""
-        self.sim = sim
+    def set_src(self, src: Path):
+        """Set the source file this monitor is connected to."""
+        self.src = src
         self.reset()
 
     def __eq__(self, __value: object) -> bool:
         """Test equality."""
         if isinstance(__value, Monitor):
-            return self.sim == __value.sim and self.name == __value.name
+            return self.src == __value.src and self.name == __value.name
         return super().__eq__(__value)
 
     def reset(self):
@@ -38,73 +50,104 @@ class Monitor(LumericalSimObject):
         self._e = None
         self._h = None
         self._p = None
+        self._t = None
+        self._sp = None
         self._trans_mag = None
+        self._sync = True  # Next time data is accessed, it'll reload the data.
+
+    def load_source(self):
+        """Load the monitor's data from it's source file."""
+        assert self.set_src is not None
+        data: npt.NDArray = np.load(self.src)
+        self._e = data['e']
+        self._h = data['h']
+        self._p = data['p']
+        self._t = data['t']
+        self._sp = data['sp']
+        self._tshape = self._t.shape
+        self._fshape = self._e.shape
+
+        self._sync = False  # Don't need to sync anymore
 
     @property
     def tshape(self) -> tuple[int, ...]:
-        """Return the shape of the numpy array for this monitor's fields."""
-        if self._tshape is None and self.sim.fdtd is not None:
-            self._tshape = self.sim.get_transmission_shape(self.monitor_name)
+        """Return the shape of the numpy array for this monitor's transmission."""
+        if self._sync:
+            self.load_source()
         return self._tshape
 
     @property
     def fshape(self) -> tuple[int, ...]:
         """Return the shape of the numpy array for this monitor's fields."""
-        if self._fshape is None and self.sim.fdtd is not None:
-            self._fshape = self.e.shape
+        if self._sync:
+            self.load_source()
         return self._fshape
 
     @property
     def e(self) -> npt.NDArray:
-        """Return the e field measured by this monitor."""
-        if self._e is None:
-            self._e = self.sim.get_efield(self.monitor_name)
+        """Return the E field measured by this monitor."""
+        if self._sync:
+            self.load_source()
         return self._e
 
     @property
     def h(self) -> npt.NDArray:
-        """Return the h field measured by this monitor."""
-        if self._h is None:
-            self._h = self.sim.get_hfield(self.monitor_name)
+        """Return the H field measured by this monitor."""
+        if self._sync:
+            self.load_source()
         return self._h
 
     @property
     def p(self) -> npt.NDArray:
-        """Return the h field measured by this monitor."""
-        if self._p is None:
-            self._p = self.sim.get_pfield(self.monitor_name)
+        """Return the Poynting vector measured by this monitor."""
+        if self._sync:
+            self.load_source()
         return self._p
+
+    @property
+    def sp(self) -> npt.NDArray:
+        """Return the source power measured by this monitor."""
+        if self._sync:
+            self.load_source()
+        return self._sp
+
+    @property
+    def t(self) -> npt.NDArray:
+        """Return the transmission measured by this monitor."""
+        if self._sync:
+            self.load_source()
+        return self._t
 
     @property
     def trans_mag(self) -> npt.NDArray:
         """Return the transmission magnitude measured by this monitor."""
-        if self._trans_mag is None:
-            self._trans_mag = self.sim.get_transmission_magnitude(self.monitor_name)
-        return self._trans_mag
+        if self._sync:
+            self.load_source()
+        return np.abs(self._t)
 
 
 class Proflie(Monitor):
     def __init__(
         self,
         name: str,
-        sim: LumericalSimulation | None = None,
+        src: Path | None = None,
     ) -> None:
-        super().__init__(name, LumericalSimObjectType.PROFILE, sim)
+        super().__init__(name, LumericalSimObjectType.PROFILE, src)
 
 
 class Power(Monitor):
     def __init__(
         self,
         name: str,
-        sim: LumericalSimulation | None = None,
+        src: Path | None = None,
     ) -> None:
-        super().__init__(name, LumericalSimObjectType.POWER, sim)
+        super().__init__(name, LumericalSimObjectType.POWER, src)
 
 
 class Index(Monitor):
     def __init__(
         self,
         name: str,
-        sim: LumericalSimulation | None = None,
+        src: Path | None = None,
     ) -> None:
-        super().__init__(name, LumericalSimObjectType.INDEX, sim)
+        super().__init__(name, LumericalSimObjectType.INDEX, src)

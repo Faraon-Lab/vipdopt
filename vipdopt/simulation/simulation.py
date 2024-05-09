@@ -17,7 +17,7 @@ from collections.abc import Callable, Iterable, Iterator
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Any, Concatenate
+from typing import Any, Concatenate, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -26,11 +26,10 @@ from scipy import interpolate  # type: ignore
 
 import vipdopt
 from vipdopt.optimization import Device
+from vipdopt.simulation.monitor import Monitor
 from vipdopt.simulation.simobject import (
     IMPORT_TYPES,
-    MONITOR_TYPES,
     OBJECT_TYPE_NAME_MAP,
-    SOURCE_TYPES,
     LumericalSimObject,
     LumericalSimObjectType,
 )
@@ -89,6 +88,9 @@ class ISimulation(abc.ABC):
     @abc.abstractmethod
     def run(self):
         """Run the simulation."""
+
+
+Simulation = TypeVar('Simulation', bound=ISimulation)
 
 
 class LumericalEncoder(json.JSONEncoder):
@@ -323,7 +325,7 @@ class LumericalSimulation(ISimulation):
 
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
-        self.objects = OrderedDict()
+        self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
         if self.fdtd is not None:
             self.fdtd.newproject()
             self._synced = True
@@ -389,16 +391,16 @@ class LumericalSimulation(ISimulation):
 
     def sources(self) -> list[LumericalSimObject]:
         """Return a list of all source objects."""
-        return [obj for _, obj in self.objects.items() if obj.obj_type in SOURCE_TYPES]
+        return [obj for _, obj in self.objects.items() if isinstance(obj, Source)]
 
     def source_names(self) -> Iterator[str]:
         """Return a list of all source object names."""
         for obj in self.sources():
             yield obj.name
 
-    def monitors(self) -> list[LumericalSimObject]:
+    def monitors(self) -> list[Monitor]:
         """Return a list of all monitor objects."""
-        return [obj for _, obj in self.objects.items() if obj.obj_type in MONITOR_TYPES]
+        return [obj for _, obj in self.objects.items() if isinstance(obj, Monitor)]
 
     def monitor_names(self) -> Iterator[str]:
         """Return a list of all monitor object names."""

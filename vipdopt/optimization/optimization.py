@@ -466,7 +466,7 @@ class Optimization:
 
                     for f_idx, f in enumerate(self.foms):
                         if (
-                            f.fom_monitors[-1].sim.info['name'] in tempfile_fwd_name
+                            f.fom_monitors[-1].src.info['name'] in tempfile_fwd_name
                         ):  # TODO: might need to account for file extensions
                             # TODO: rewrite this to hook to whichever device the FoM is tied to
                             # print(f'FoM property has length {len(f.fom)}')
@@ -489,7 +489,7 @@ class Optimization:
                             )
                             vipdopt.logger.info(
                                 f'File being accessed: {tempfile_fwd_name} should match'
-                                f' FoM tempfile {f.fom_monitors[-1].sim.info["name"]}'
+                                f' FoM tempfile {f.fom_monitors[-1].src.info["name"]}'
                             )
                             # vipdopt.logger.debug(
                             #     f'TrueFoM before has shape{f.true_fom.shape}')
@@ -518,7 +518,7 @@ class Optimization:
                                 self.true_iteration, f_idx, :
                             ] = np.squeeze(
                                 np.abs(
-                                    f.fom_monitors[0].sim.getresult(
+                                    f.fom_monitors[0].src.getresult(
                                         'transmission_focal_monitor_', 'T', 'T'
                                     )
                                 )
@@ -582,7 +582,7 @@ class Optimization:
 
                     for f_idx, f in enumerate(self.foms):
                         if (
-                            f.grad_monitors[-1].sim.info['name'] in tempfile_adj_name
+                            f.grad_monitors[-1].src.info['name'] in tempfile_adj_name
                         ):  # TODO: might need to account for file extensions
                             # TODO: rewrite this to hook to whichever device the FoM is tied to
                             # print(f'FoM property has length {len(f.fom)}')
@@ -598,7 +598,7 @@ class Optimization:
                             vipdopt.logger.info(f'Accessing FoM {f_idx} in list.')
                             vipdopt.logger.info(
                                 f'File being accessed: {tempfile_adj_name} should match'
-                                f' FoM tempfile {f.grad_monitors[-1].sim.info["name"]}'
+                                f' FoM tempfile {f.grad_monitors[-1].src.info["name"]}'
                             )
                             f.gradient = f.compute_gradient()
                             # vipdopt.logger.info(
