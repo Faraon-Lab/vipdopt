@@ -6,7 +6,6 @@ from vipdopt.simulation.simulation import (
     ISimulation,
     LumericalEncoder,
     LumericalSimulation,
-    Simulation,
 )
 from vipdopt.simulation.source import AdjointSource, ForwardSource, Source
 
@@ -15,7 +14,6 @@ __all__ = [
     'LumericalSimObject',
     'LumericalSimObjectType',
     'LumericalSimulation',
-    'Simulation',
     'LumericalEncoder',
     'Monitor',
     'Source',

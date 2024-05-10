@@ -52,7 +52,7 @@ class Monitor(LumericalSimObject):
         self._p = None
         self._t = None
         self._sp = None
-        self._trans_mag = None
+
         self._sync = True  # Next time data is accessed, it'll reload the data.
 
     def load_source(self):

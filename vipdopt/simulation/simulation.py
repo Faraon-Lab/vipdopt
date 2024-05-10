@@ -3,24 +3,17 @@
 from __future__ import annotations
 
 import abc
-import contextlib
-import functools
 import json
 import logging
-import os
 import sys
-import time
-import typing
 from argparse import ArgumentParser
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Iterable, Iterator
 from copy import copy
-from functools import partial
 from pathlib import Path
-from typing import Any, Concatenate, TypeVar
+from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 from overrides import override
 from scipy import interpolate  # type: ignore
 
@@ -29,41 +22,13 @@ from vipdopt.optimization import Device
 from vipdopt.simulation.monitor import Monitor
 from vipdopt.simulation.simobject import (
     IMPORT_TYPES,
-    OBJECT_TYPE_NAME_MAP,
     LumericalSimObject,
     LumericalSimObjectType,
 )
 from vipdopt.simulation.source import Source
-from vipdopt.utils import P, PathLike, R, convert_path, ensure_path, read_config_file
+from vipdopt.utils import PathLike, ensure_path, read_config_file
 
 # TODO: Create simulation subpackage and add this, monitors, sources, and maybe devices
-
-
-def _check_fdtd(
-    func: Callable[Concatenate[LumericalSimulation, P], R],
-) -> Callable[Concatenate[LumericalSimulation, P], R]:
-    @functools.wraps(func)
-    def wrapped(sim: LumericalSimulation, *args: P.args, **kwargs: P.kwargs):
-        if sim.fdtd is None:
-            raise UnboundLocalError(
-                f'Cannot call {func.__name__} before `fdtd` is instantiated.'
-                ' Has `connect()` been called?'
-            )
-        assert sim.fdtd is not None
-        return func(sim, *args, **kwargs)
-
-    return wrapped
-
-
-def _sync_fdtd_solver(
-    func: Callable[Concatenate[LumericalSimulation, P], R],
-) -> Callable[Concatenate[LumericalSimulation, P], R]:
-    @functools.wraps(func)
-    def wrapped(sim: LumericalSimulation, *args: P.args, **kwargs: P.kwargs):
-        sim._sync_fdtd()  # noqa: SLF001
-        return func(sim, *args, **kwargs)
-
-    return wrapped
 
 
 class ISimulation(abc.ABC):
@@ -74,23 +39,12 @@ class ISimulation(abc.ABC):
         """Create simulation object."""
 
     @abc.abstractmethod
-    def connect(self):
-        """Create hook to simulation software."""
-
-    @abc.abstractmethod
     def load(self, source: PathLike | dict):
         """Load simulation from a file or dictionary."""
 
     @abc.abstractmethod
     def save(self, fname: PathLike):
         """Save simulation data to a file."""
-
-    @abc.abstractmethod
-    def run(self):
-        """Run the simulation."""
-
-
-Simulation = TypeVar('Simulation', bound=ISimulation)
 
 
 class LumericalEncoder(json.JSONEncoder):
@@ -118,9 +72,6 @@ class LumericalSimulation(ISimulation):
             "filename", "path", "simulator", and "coordinates".
         objects (OrderedDict[str, LumericalSimObject]): The objects within
             the simulation
-        _synced (bool): Flag for whether fdtd needs to be synced.
-        _env_vars (dict | None): Environment variables to be passed into `set_env_vars`
-            upon the next sync.
     """
 
     def __init__(self, source: PathLike | dict | None = None) -> None:
@@ -129,11 +80,8 @@ class LumericalSimulation(ISimulation):
         Arguments:
             source (PathLike | dict | None): optional source to load the simulation from
         """
-        self.fdtd: vipdopt.lumapi.FDTD | None = None  # type: ignore
         self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
         self._clear_objects()
-        self._synced: bool = False
-        self._env_vars: dict | None = None
 
         if source:
             self.load(source)
@@ -142,84 +90,12 @@ class LumericalSimulation(ISimulation):
     def __str__(self) -> str:
         return self.as_json()
 
-    def get_env_vars(self) -> dict:
-        """Return the current pending environment variables to be set.
-
-        Returns:
-            dict: The current pending environment variables to be set. If
-                `self._env_vars` is None, returns an empty dictionary.
-        """
-        return {} if self._env_vars is None else self._env_vars
-
-    @override
-    def connect(self, license_checked: bool = True) -> None:
-        if vipdopt.lumapi is None:
-            raise ModuleNotFoundError(
-                'Module "vipdopt.lumapi" has not yet been instatiated.'
-            )
-        vipdopt.logger.debug('Attempting to connect to Lumerical servers...')
-
-        if license_checked:
-            self.fdtd = 1  # Placeholder
-
-        # This loop handles the problem of
-        # "Failed to start messaging, check licenses..." that Lumerical often has.
-        while self.fdtd is None:
-            try:
-                vipdopt.fdtd = vipdopt.lumapi.FDTD(hide=True)
-                vipdopt.logger.info('Verified license with Lumerical servers.\n')
-                self.fdtd = vipdopt.fdtd
-            except (AttributeError, vipdopt.lumapi.LumApiError) as e:  # noqa: PERF203
-                logging.exception(
-                    'Licensing server error - can be ignored.',
-                    exc_info=e,
-                )
-                continue
-
-        vipdopt.logger.info(f'Connecting with {self.info["name"]}.')
-        self.fdtd = vipdopt.fdtd
-        self.fdtd.newproject()
-        self._sync_fdtd()
-
     @override
     def load(self, source: PathLike | dict):
         if isinstance(source, dict):
             self._load_dict(source)
         else:
-            src = convert_path(source)
-            if src.suffix == '.fsp':
-                self._load_fsp(source)
-            else:
-                self._load_file(source)
-
-    @_check_fdtd
-    @ensure_path
-    def _load_fsp(self, fname: Path):
-        """Load a simulation from a Lumerical .fsp file."""
-        vipdopt.logger.debug(f'Loading simulation from {fname}...')
-        self._clear_objects()
-        self.fdtd.load(str(fname))  # type: ignore
-        self.fdtd.selectall()  # type: ignore
-        objects = self.fdtd.getAllSelectedObjects()  # type: ignore
-        # vipdopt.logger.debug(list(vars(objects[0]).keys()))
-        # vipdopt.logger.debug(list(objects[0].__dict__.keys()))
-        # print(objects[0]['type'])
-        for o in objects:
-            otype = o['type']
-            if otype == 'DFTMonitor':
-                if o['spatial interpolation'] == 'specified position':
-                    obj_type = LumericalSimObjectType.PROFILE
-                else:
-                    obj_type = LumericalSimObjectType.POWER
-            else:
-                obj_type = OBJECT_TYPE_NAME_MAP[otype]
-            oname = o._id.name.split('::')[-1]  # noqa: SLF001
-            sim_obj = LumericalSimObject(oname, obj_type)
-            for name in o._nameMap:  # noqa: SLF001
-                sim_obj[name] = o[name]
-
-            self.objects[oname] = sim_obj
-        vipdopt.logger.debug(self.as_json())
+            self._load_file(source)
 
     @ensure_path
     def _load_file(self, fname: Path):
@@ -241,60 +117,13 @@ class LumericalSimulation(ISimulation):
                 **obj['properties'],
             )
 
-    @_check_fdtd
-    def _sync_fdtd(self):
-        """Sync local objects with `vipdopt.lumapi.FDTD` objects."""
-        if self._synced:
-            return
-        self.fdtd.switchtolayout()
-        for obj_name, obj in self.objects.items():
-            # Create object if needed
-            if self.fdtd.getnamednumber(obj_name) == 0:
-                kwargs = {'name': obj_name} if obj_name != 'FDTD' else {}
-                with contextlib.suppress(BaseException):
-                    LumericalSimObjectType.get_add_function(obj.obj_type)(
-                        self.fdtd,
-                        **kwargs,
-                        # ,**obj.properties,
-                        # ! 20240223 Ian: Had to take this out because OrderedDict
-                        # ! properties that were inactive in Lumerical were returning
-                        # ! errors and sometimes that needs to happen, but lumapi.py
-                        # ! offers no pass statement.
-                    )
-            try:
-                for key, val in obj.properties.items():
-                    self.fdtd.setnamed(obj_name, key, val)
-            except (AttributeError, vipdopt.lumapi.LumApiError) as e:
-                template = 'An exception of type {0} occurred. Arguments:\n{1!r}\n'
-                message = template.format(type(e).__name__, e.args)
-                logging.debug(
-                    message + f' Property {key} in FDTD Object {obj_name}'
-                    ' is inactive / cannot be changed.'
-                )
-
-        if self._env_vars is not None:
-            self.setup_env_resources(**self._env_vars)
-            self._env_vars = None
-        self._synced = True
-        vipdopt.logger.debug('Resynced LumericalSimulation with fdtd solver.')
-
     @ensure_path
     @override
     def save(self, fname: Path):
-        if self.fdtd is not None:
-            self.save_lumapi(fname)
         content = self.as_json()
         with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             f.write(content)
         vipdopt.logger.debug(f'Succesfully saved simulation to {fname}.\n')
-
-    @_sync_fdtd_solver
-    @ensure_path
-    def save_lumapi(self, fname: Path, debug_mode=False):
-        """Save using Lumerical's simulation file type (.fsp)."""
-        if not debug_mode:
-            self.fdtd.save(os.path.abspath(str(fname.with_suffix(''))))  # type: ignore
-        self.info['path'] = str(os.path.abspath(str(fname.with_suffix(''))))
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this simulation."""
@@ -309,16 +138,6 @@ class LumericalSimulation(ISimulation):
             cls=LumericalEncoder,
         )
 
-    @_sync_fdtd_solver
-    @override
-    def run(self):
-        self.fdtd.run()
-
-    @_check_fdtd
-    def set_resource(self, resource_num: int, resource: str, value: Any):
-        """Set the specified job manager resource for this simulation."""
-        self.fdtd.setresource('FDTD', resource_num, resource, value)  # type: ignore
-
     def _clear_info(self):
         """Clear all existing simulation info and create a new project."""
         self.info = OrderedDict()
@@ -326,9 +145,6 @@ class LumericalSimulation(ISimulation):
     def _clear_objects(self):
         """Clear all existing objects and create a new project."""
         self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
-        if self.fdtd is not None:
-            self.fdtd.newproject()
-            self._synced = True
 
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
@@ -336,8 +152,6 @@ class LumericalSimulation(ISimulation):
         new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
-
-        new_sim.promise_env_setup(**self.get_env_vars())
 
         return new_sim
 
@@ -439,23 +253,11 @@ class LumericalSimulation(ISimulation):
     def add_object(self, obj: LumericalSimObject) -> None:
         """Add an existing object to the simulation."""
         # Add copy to the vipdopt.lumapi.FDTD
-        if self.fdtd is not None:
-            LumericalSimObjectType.get_add_function(obj.obj_type)(
-                self.fdtd,
-                **obj.properties,
-            )
-        else:
-            self._synced = False
         self.objects[obj.name] = obj
 
     def update_object(self, name: str, **properties):
-        """Update lumerical object with new property values."""
+        """Update object with new property values."""
         obj = self.objects[name]
-        if self.fdtd is not None:
-            for key, val in properties.items():
-                self.fdtd.setnamed(obj.name, key, val)
-        else:
-            self._synced = False
         obj.update(**properties)
 
     def import_nk_material(
@@ -647,218 +449,14 @@ class LumericalSimulation(ISimulation):
             # Disable device index monitor to save memory
             self.disable(['design_index_monitor'])
 
-            self._sync_fdtd()
             return cur_density, cur_permittivity
         return None
-
-    def close(self):
-        """Close fdtd conenction."""
-        if self.fdtd is not None:
-            vipdopt.logger.debug('Closing connection with Lumerical...')
-            self.fdtd.close()
-            vipdopt.logger.debug('Succesfully closed connection with Lumerical.')
-            # ! 20240224 - We could comment out the next two lines
-            self.fdtd = None
-            self._synced = False
 
     def __eq__(self, __value: object) -> bool:
         """Test equality of simulations."""
         if isinstance(__value, LumericalSimulation):
             return self.objects == __value.objects
         return super().__eq__(__value)
-
-    def __enter__(self):
-        """Startup for context manager usage."""
-        self.connect()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Cleanup after exiting a context."""
-        self.close()
-
-    @_check_fdtd
-    @typing.no_type_check
-    def get_env_resources(self) -> dict:
-        """Return a dictionary containing all job manager resources."""
-        resources = {}
-        for resource in self.fdtd.setresource('FDTD', 1).splitlines():
-            resources[resource] = self.fdtd.getresource('FDTD', 1, resource)
-        return resources
-
-    def promise_env_setup(self, **kwargs):
-        """Setup the environment settings as soon as the fdtd is instantiated."""
-        if self.fdtd is None:
-            self._env_vars = kwargs if len(kwargs) > 0 else None
-        else:
-            self.setup_env_resources(**kwargs)
-
-    def setup_env_resources(self, **kwargs):
-        """Configure the environment resources for running this simulation.
-
-        **kwargs:
-            mpi_exe (Path): Path to the mpi executable to use
-            nprocs (int): The number of processes to run the simulation with
-            hostfile (Path | None): Path to a hostfile for running distributed jobs
-            solver_exe (Path): Path to the fdtd-solver to run
-            nsims (int): The number of simulations being run
-        """
-        self.set_resource(1, 'mpi no default options', '1')
-
-        nsims = kwargs.pop('nsims', 1)
-        self.set_resource(1, 'capacity', nsims)
-
-        mpi_exe = kwargs.pop(
-            'mpi_exe',
-            Path('/central/software/mpich/4.0.0/bin/mpirun'),
-        )
-        self.set_resource(1, 'mpi executable', str(mpi_exe))
-
-        nprocs = kwargs.pop('nprocs', 8)
-        hostfile = kwargs.pop('hostfile', None)
-        mpi_opt = f'-n {nprocs}'
-        if hostfile is not None:
-            mpi_opt += f' --hostfile {hostfile}'
-        self.set_resource(1, 'mpi extra command line options', mpi_opt)
-
-        solver_exe = kwargs.pop(
-            'solver_exe',
-            Path('/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem'),
-        )
-        self.set_resource(1, 'solver executable', str(solver_exe))
-
-        self.set_resource(
-            1,
-            'submission script',
-            '#!/bin/sh\n'
-            f'{mpi_exe} {mpi_opt} {solver_exe} {{PROJECT_FILE_PATH}}\n'
-            'exit 0',
-        )
-        vipdopt.logger.debug('Updated simulation resources:')
-        for resource, value in self.get_env_resources().items():
-            vipdopt.logger.debug(f'\t"{resource}" = {value}')
-
-    @_check_fdtd
-    @typing.no_type_check
-    def getresult(
-        self,
-        object_name: str,
-        property_name: str | None = None,
-        dataset_value: str | None = None,
-    ) -> Any:
-        """Get a result from the FDTD solver, accesing a specific value if desired."""
-        if property_name is None:
-            res = self.getresult(object_name)  # Gets all named results
-            vipdopt.logger.debug(f'Available results from {object_name}:\n{res}')
-            return res
-
-        res = self.getresult(object_name, property_name)
-        if dataset_value is not None:
-            res = res[dataset_value]
-        vipdopt.logger.debug(f'Got "{property_name}" from "{object_name}": {res}')
-        return res
-
-    @_check_fdtd
-    @typing.no_type_check
-    def get_shape(
-        self,
-        monitor_name: str,
-        value: str,
-        dataset_value: str | None = None,
-    ) -> tuple[int, ...]:
-        """Return the shape of a property returned from this simulation's monitors."""
-        vipdopt.logger.info(f'Loading {self.info["path"]}')
-        path: Path = self.info['path']
-        try:
-            self.fdtd.load(str(path.absolute()))
-        except vipdopt.lumapi.LumApiError:
-            self.fdtd.load(str(path))
-        prop = self.getresult(monitor_name, value, dataset_value)
-        if isinstance(prop, dict):
-            vipdopt.logger.debug(
-                'Need to access one level deeper.'
-                f' Args passed: {monitor_name}, {value}, {dataset_value}.'
-            )
-            return None
-        return np.squeeze(prop).shape
-
-    @_check_fdtd
-    @typing.no_type_check
-    def get_field_shape(self) -> tuple[int, ...]:
-        """Return the shape of the fields returned from design index monitors."""
-        index_prev = self.getresult('design_index_monitor', 'index preview')
-        return np.squeeze(index_prev['index_x']).shape
-
-    @_check_fdtd
-    @typing.no_type_check
-    def get_transmission_magnitude(self, monitor_name: str) -> npt.NDArray:
-        """Return the magnitude of the transmission for a given monitor."""
-        # Ensure this is a transmission monitor
-        monitor_name = monitor_name.replace('focal', 'transmission')
-        transmission = self.getresult(monitor_name, 'T', 'T')
-        return np.abs(transmission)
-
-    @_check_fdtd
-    @typing.no_type_check
-    def get_transmission_shape(self, monitor_name: str) -> npt.NDArray:
-        """Get the shape of the transmission field from the given monitor."""
-        monitor_name = monitor_name.replace('focal', 'transmission')
-        return self.get_shape(monitor_name, 'T', 'T')
-
-    @_check_fdtd
-    @typing.no_type_check
-    def get_field(self, monitor_name: str, field_indicator: str) -> npt.NDArray:
-        """Return the E or H field from a monitor."""
-        if field_indicator not in 'EH':
-            raise ValueError(
-                f'Expected field_indicator to be "E" or "H"; got {field_indicator}'
-            )
-        polarizations = [field_indicator + c for c in 'xyz']
-
-        start = time.time()
-        vipdopt.logger.debug(f'Getting {polarizations} from monitor "{monitor_name}"')
-        fields = np.array(
-            list(map(partial(self.fdtd.getdata, monitor_name), polarizations)),
-            dtype=np.complex128,
-        )
-        data_xfer_size_mb = fields.nbytes / (1024**2)
-        elapsed = time.time() - start + 1e-8  # avoid zero error
-
-        vipdopt.logger.debug(f'Transferred {data_xfer_size_mb} MB')
-        vipdopt.logger.debug(f'Data rate = {data_xfer_size_mb / elapsed} MB/sec')
-
-        return fields
-
-    def get_hfield(self, monitor_name: str) -> npt.NDArray:
-        """Return the H field from a monitor."""
-        return self.get_field(monitor_name, 'H')
-
-    def get_efield(self, monitor_name: str) -> npt.NDArray:
-        """Return the E field from a monitor."""
-        return self.get_field(monitor_name, 'E')
-
-    @_check_fdtd
-    def get_pfield(self, monitor_name: str) -> npt.NDArray:
-        """Returns Poynting vector as a function of space and wavelength."""
-        return self.getresult(monitor_name, 'P', 'P')
-
-    def get_efield_magnitude(self, monitor_name: str) -> npt.NDArray:
-        """Return the magnitude of the E field from a monitor."""
-        efield = self.get_efield(monitor_name)
-        enorm_squared = np.sum(np.square(np.abs(efield)), axis=0)
-        return np.sqrt(enorm_squared)
-
-    @_check_fdtd
-    @typing.no_type_check
-    def get_source_power(self) -> npt.NDArray:
-        """Return the source power of a given monitor."""
-        f = self.getresult('focal_monitor_0', 'f')
-        return self.fdtd.sourcepower(f)
-
-    def get_overall_power(self, monitor_name) -> npt.NDArray:
-        """Return the overall power from a given monitor."""
-        source_power = self.get_source_power()
-        t = self.get_transmission_magnitude(monitor_name)
-        return source_power * t.T
 
 
 ISimulation.register(LumericalSimulation)
@@ -886,12 +484,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
 
     # with LumericalSimulation(Path(args.simulation_json)) as sim:
-    with LumericalSimulation() as sim:
-        # sim.promise_env_setup()
-        sim.load('test_project/.tmp/sim_0.fsp')
-        sys.exit()
+    # with LumericalSimulation() as sim:
+    #     # sim.promise_env_setup()
+    #     sim.load('test_project/.tmp/sim_0.fsp')
+    #     sys.exit()
 
-        vipdopt.logger.info('Saving Simulation')
-        sim.save(Path('test_sim'))
-        vipdopt.logger.info('Running simulation')
-        sim.run()
+    #     vipdopt.logger.info('Saving Simulation')
+    #     sim.save(Path('test_sim'))
+    #     vipdopt.logger.info('Running simulation')
+    #     sim.run()

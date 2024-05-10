@@ -16,7 +16,7 @@ import numpy.typing as npt
 from overrides import override
 
 import vipdopt
-from vipdopt.simulation import LumericalSimObjectType, LumericalSimulation, Simulation
+from vipdopt.simulation import ISimulation, LumericalSimObjectType, LumericalSimulation
 from vipdopt.utils import (
     P,
     Path,
@@ -65,11 +65,11 @@ class ISolver(abc.ABC):
     @abc.abstractmethod
     @overload
     @ensure_path
-    def save(self, path: Path, sim: Simulation): ...
+    def save(self, path: Path, sim: ISimulation): ...
 
     @abc.abstractmethod
     @ensure_path
-    def save(self, path: Path, sim: Simulation | None = None):
+    def save(self, path: Path, sim: ISimulation | None = None):
         """Save a simulation using the FDTD solver software."""
 
 
@@ -191,11 +191,11 @@ class LumericalFDTD(ISolver):
 
     @overload
     @ensure_path
-    def save(self, path: Path, sim: Simulation): ...
+    def save(self, path: Path, sim: ISimulation): ...
 
     @_check_lum_fdtd
     @ensure_path
-    def save(self, path: Path, sim: Simulation | None = None):
+    def save(self, path: Path, sim: ISimulation | None = None):
         """Save a LumericalSimulation using the FDTD solver software."""
         if sim is not None:
             self.load_simulation(sim)
@@ -266,7 +266,7 @@ class LumericalFDTD(ISolver):
             f'{mpi_exe} {mpi_opt} {solver_exe} {{PROJECT_FILE_PATH}}\n'
             'exit 0',
         )
-        vipdopt.logger.debug('Updated simulation resources:')
+        vipdopt.logger.debug('Updated lumerical job manager resources:')
         for resource, value in self.get_env_resources().items():
             vipdopt.logger.debug(f'\t"{resource}" = {value}')
 
@@ -292,41 +292,8 @@ class LumericalFDTD(ISolver):
 
     @_check_lum_fdtd
     @typing.no_type_check
-    def get_shape(
-        self,
-        monitor_name: str,
-        value: str,
-        dataset_value: str | None = None,
-    ) -> tuple[int, ...]:
-        """Return the shape of a property returned from this simulation's monitors."""
-        prop = self.getresult(monitor_name, value, dataset_value)
-        if isinstance(prop, dict):
-            raise ValueError(  # noqa: TRY004
-                'Requested property is a dataset, and does not have a '
-                '`shape` attribute.'
-                f' Args passed: {monitor_name}, {value}, {dataset_value}.'
-            )
-        return np.squeeze(prop).shape
-
-    @_check_lum_fdtd
-    @typing.no_type_check
-    def get_transmission_magnitude(self, monitor_name: str) -> npt.NDArray:
-        """Return the magnitude of the transmission for a given monitor."""
-        # Ensure this is a transmission monitor
-        monitor_name = monitor_name.replace('focal', 'transmission')
-        transmission = self.getresult(monitor_name, 'T', 'T')
-        return np.abs(transmission)
-
-    @_check_lum_fdtd
-    @typing.no_type_check
-    def get_transmission_shape(self, monitor_name: str) -> npt.NDArray:
-        """Get the shape of the transmission field from the given monitor."""
-        return self.get_shape(monitor_name, 'T', 'T')
-
-    @_check_lum_fdtd
-    @typing.no_type_check
     def get_field(self, monitor_name: str, field_indicator: str) -> npt.NDArray:
-        """Return the E or H field from a monitor."""
+        """Return the E or H field or Poynting vector (P) from a monitor."""
         if field_indicator not in 'EHP':
             raise ValueError(
                 f'Expected field_indicator to be "E", "H" or "P"; got {field_indicator}'
@@ -380,11 +347,11 @@ class LumericalFDTD(ISolver):
     def get_overall_power(self, monitor_name) -> npt.NDArray:
         """Return the overall power from a given monitor."""
         sp = self.get_source_power(monitor_name)
-        t = self.get_transmission_magnitude(monitor_name)
+        t = np.abs(self.get_transmission(monitor_name))
         return t.T * sp
 
     @_check_lum_fdtd
-    def load_simulation(self, sim: Simulation):
+    def load_simulation(self, sim: ISimulation):
         """Load a simulation into the FDTD solver."""
         if not isinstance(sim, LumericalSimulation):
             raise TypeError(
