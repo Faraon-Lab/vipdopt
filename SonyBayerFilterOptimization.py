@@ -22,7 +22,7 @@ import numpy as np
 from vipdopt.optimization.filter import Sigmoid
 from vipdopt.simulation.monitor import Monitor
 from vipdopt.configuration import SonyBayerConfig
-from vipdopt.optimization import Optimization, BayerFilterFoM, AdamOptimizer
+from vipdopt.optimization import LumericalOptimization, BayerFilterFoM, AdamOptimizer
 from vipdopt.optimization.device import Device
 
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     #
     # Step 0
     #
-    logger.info('Beginnning Step 0: Lumerical Setup')
+    logger.info('Beginnning Step 0: Lumerical SetuOptiLumericalOptimizationp')
 
     # Load configuration file
     cfg = SonyBayerConfig()
@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
     all_sims = fwd_sims + adj_sims
 
-    logger.info('Completed Step 0: Lumerical Setup')
+    logger.info('Completed Step 0: Lumerical SetuOptiLumericalOptimizationp')
 
     #
     # Step 1
@@ -144,7 +144,7 @@ if __name__ == '__main__':
     max_epochs = 1
     max_iter = 2
 
-    optimization = Optimization(
+    optimization = LumericalOptimization(
         all_sims,
         bayer_filter,
         full_fom,

@@ -16,7 +16,8 @@ import numpy.typing as npt
 from overrides import override
 
 import vipdopt
-from vipdopt.simulation import ISimulation, LumericalSimObjectType, LumericalSimulation
+from vipdopt.simulation.simulation import ISimulation, LumericalSimulation
+from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
 from vipdopt.utils import (
     P,
     Path,
@@ -53,9 +54,27 @@ class ISolver(abc.ABC):
         """Close the connection with the FDTD solver software."""
 
     @abc.abstractmethod
+    @overload
     @ensure_path
     def load(self, path: Path):
-        """Load data into the solver from a file."""
+        ...
+
+    @abc.abstractmethod
+    @ensure_path
+    def load(self, sim: ISimulation):
+        ...
+
+    @abc.abstractmethod
+    @overload
+    @ensure_path
+    def load(self, path: Path, sim: ISimulation):
+        ...
+
+    @abc.abstractmethod
+    @overload
+    @ensure_path
+    def load(self, path: Path | None, sim: ISimulation | None):
+        """Load data into the solver from a file into a simulation object.."""
 
     @abc.abstractmethod
     @overload
@@ -175,6 +194,71 @@ class LumericalFDTD(ISolver):
             vipdopt.logger.debug('Succesfully closed connection with Lumerical.')
             self.fdtd = None
             # self._synced = False
+
+
+    @abc.abstractmethod
+    @overload
+    @ensure_path
+    def load(self, path: Path):
+        ...
+
+    @abc.abstractmethod
+    @overload
+    def load(self, sim: ISimulation):
+        ...
+
+    @abc.abstractmethod
+    @overload
+    @ensure_path
+    def load(self, path: Path, sim: ISimulation):
+        ...
+
+    @abc.abstractmethod
+    @overload
+    @ensure_path
+    def load(self, path: Path | None, sim: ISimulation | None):
+        """Load data into the solver from a file or a simulation object.."""
+        if sim is not None:
+            self.load_simulation(sim)
+            if path is not None:  # Load file into sim object
+                self.fdtd.load(str(path))
+                self.current_sim.info['path'] = path
+            else:  # Load data from sim's path
+                self.fdtd.load(str(self.current_sim.info['path']))
+        elif path is not None:  # Just load data from file
+            self.fdtd.load(str(path))
+        else:
+            raise ValueError('Both arguments `path` and `sim` cannot be `None`.')
+    
+    @_check_lum_fdtd
+    def sync_sim(self, sim: LumericalSimulation):
+        """Update the simulation to match the data stored in `self.fdtd`."""
+        self.fdtd.selectall()
+        objects = self.fdtd.getAllSelectedObjects()
+        sim.clear_objects()
+        for o in objects:
+            otype = o['type']
+
+
+    @_check_lum_fdtd
+    def load_simulation(self, sim: ISimulation):
+        """Load a simulation into the FDTD solver."""
+        if not isinstance(sim, LumericalSimulation):
+            raise TypeError(
+                'LumericalFDTD can only load simulations of type "LumericalSimulation"'
+                f'; Received "{type(sim)}"'
+            )
+        self.fdtd.switchtolayout()  # type: ignore
+        self.fdtd.deleteall()  # type: ignore
+        for obj in sim.objects.values():
+            # Create an object for each of those in the simulation
+            with contextlib.suppress(BaseException):
+                LumericalSimObjectType.get_add_function(obj.obj_type)(
+                    self.fdtd,
+                    **obj.properties,
+                )
+        self.current_sim = sim
+
 
     @_check_lum_fdtd
     @override
@@ -349,25 +433,6 @@ class LumericalFDTD(ISolver):
         sp = self.get_source_power(monitor_name)
         t = np.abs(self.get_transmission(monitor_name))
         return t.T * sp
-
-    @_check_lum_fdtd
-    def load_simulation(self, sim: ISimulation):
-        """Load a simulation into the FDTD solver."""
-        if not isinstance(sim, LumericalSimulation):
-            raise TypeError(
-                'LumericalFDTD can only load simulations of type "LumericalSimulation"'
-                f'; Received "{type(sim)}"'
-            )
-        self.fdtd.switchtolayout()  # type: ignore
-        self.fdtd.deleteall()  # type: ignore
-        for obj in sim.objects.values():
-            # Create an object for each of those in the simulation
-            with contextlib.suppress(BaseException):
-                LumericalSimObjectType.get_add_function(obj.obj_type)(
-                    self.fdtd,
-                    **obj.properties,
-                )
-        self.current_sim = sim
 
     @_check_lum_fdtd
     def reformat_monitor_data(self, sims: list[LumericalSimulation]):

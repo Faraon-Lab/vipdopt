@@ -8,6 +8,7 @@ from vipdopt.simulation.simulation import (
     LumericalSimulation,
 )
 from vipdopt.simulation.source import AdjointSource, ForwardSource, Source
+from vipdopt.simulation.fdtd import ISolver, LumericalFDTD
 
 __all__ = [
     'ISimulation',
@@ -19,4 +20,6 @@ __all__ = [
     'Source',
     'ForwardSource',
     'AdjointSource',
+    'ISolver',
+    'LumericalFDTD',
 ]

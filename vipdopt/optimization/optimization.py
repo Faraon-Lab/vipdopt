@@ -17,16 +17,16 @@ from vipdopt import GDS, STL
 from vipdopt.configuration import Config
 from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.fom import FoM
+from vipdopt.optimization.fom import FoM, SuperFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
-from vipdopt.simulation import LumericalSimulation
+from vipdopt.simulation import LumericalSimulation, LumericalFDTD
 
 DEFAULT_OPT_FOLDERS = {'temp': Path('.'), 'opt_info': Path('.'), 'opt_plots': Path('.')}
 
 TI02_THRESHOLD = 0.5
 
 
-class Optimization:
+class LumericalOptimization:
     """Class for orchestrating all the pieces of an optimization."""
 
     def __init__(
@@ -34,7 +34,7 @@ class Optimization:
         sims: Iterable[LumericalSimulation],
         device: Device,
         optimizer: GradientOptimizer,
-        fom: FoM | None,
+        fom: SuperFoM | None,
         cfg: Config,
         start_epoch: int = 0,
         start_iter: int = 0,
@@ -68,7 +68,7 @@ class Optimization:
 
         self.fom_hist: list[npt.NDArray] = []
         self.param_hist: list[npt.NDArray] = []
-        self._callbacks: list[Callable[[Optimization], None]] = []
+        self._callbacks: list[Callable[[LumericalOptimization], None]] = []
 
         self.epoch = start_epoch
         self.iteration = start_iter
@@ -79,6 +79,8 @@ class Optimization:
         )
 
         # self.stats = {}
+
+        self.fdtd = LumericalFDTD()
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
@@ -334,6 +336,7 @@ class Optimization:
         vipdopt.logger.info('Beginning Step 3: Setting up Forward and Adjoint Jobs')
 
         for sim_idx, sim in enumerate(self.sims):
+            self.fdtd.load(sim)
             self.runner_sim.fdtd.load(sim.info['name'])
             # self.runner_sim.fdtd.load(self.sim_files[sim_idx].name)
             # Switch to Layout

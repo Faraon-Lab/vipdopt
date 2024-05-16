@@ -67,7 +67,6 @@ class LumericalSimulation(ISimulation):
     """Lumerical FDTD Simulation Code.
 
     Attributes:
-        fdtd (vipdopt.lumapi.FDTD | None): Lumerical session
         info (OrderedDict[str]): Info about this simulation. Contains the keys
             "filename", "path", "simulator", and "coordinates".
         objects (OrderedDict[str, LumericalSimObject]): The objects within
@@ -81,7 +80,7 @@ class LumericalSimulation(ISimulation):
             source (PathLike | dict | None): optional source to load the simulation from
         """
         self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
-        self._clear_objects()
+        self.clear_objects()
 
         if source:
             self.load(source)
@@ -106,10 +105,11 @@ class LumericalSimulation(ISimulation):
         vipdopt.logger.info(f'Succesfully loaded {fname}\n')
 
     def _load_dict(self, d: dict):
+        """Load a simulation from a dictionary."""
         self._clear_info()
         self.info.update(d.get('info', {}))
 
-        self._clear_objects()
+        self.clear_objects()
         for obj in d['objects'].values():
             self.new_object(
                 obj['name'],
@@ -142,7 +142,7 @@ class LumericalSimulation(ISimulation):
         """Clear all existing simulation info and create a new project."""
         self.info = OrderedDict()
 
-    def _clear_objects(self):
+    def clear_objects(self):
         """Clear all existing objects and create a new project."""
         self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
 

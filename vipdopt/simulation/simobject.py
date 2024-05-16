@@ -1,5 +1,6 @@
 """Abstractions of Lumerical simulation objects."""
 
+from __future__ import annotations
 import json
 from collections import OrderedDict
 from collections.abc import Callable
@@ -106,3 +107,22 @@ class LumericalSimObject:
     def as_dict(self) -> dict:
         """Return a dictionary representation of this object."""
         return vars(self)
+
+    @classmethod
+    def from_fdtd(cls, obj: dict) -> LumericalSimObject:
+        """Return a LumericalSimObject from the fdtd equivalent."""
+        otype = obj['type']
+        if otype == 'DFTMonitor':
+            if obj['spatiazl interpolation'] == 'specified position':
+                obj_type = LumericalSimObjectType.PROFILE
+            else:
+                obj_type = LumericalSimObjectType.POWER
+        else:
+            obj_type = OBJECT_TYPE_NAME_MAP[otype]
+        oname = obj._id.name.split('::')[-1]
+        sim_obj = LumericalSimObject(oname, obj_type)
+        sim_obj.update(**obj._nameMap)
+
+        return sim_obj
+
+

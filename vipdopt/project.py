@@ -15,7 +15,7 @@ import numpy.typing as npt
 
 import vipdopt
 from vipdopt.configuration import Config, SonyBayerConfig
-from vipdopt.optimization import Device, FoM, GradientOptimizer, Optimization
+from vipdopt.optimization import Device, FoM, GradientOptimizer, LumericalOptimization
 from vipdopt.optimization.filter import Scale, Sigmoid
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import Coordinates, PathLike, ensure_path, glob_first
@@ -106,7 +106,7 @@ class Project:
         self.config = config_type()
         self.config_type = config_type
 
-        self.optimization: Optimization | None = None
+        self.optimization: LumericalOptimization | None = None
         self.optimizer: GradientOptimizer | None = None
         self.device: Device | None = None
         self.base_sim: LumericalSimulation | None = None
@@ -356,7 +356,7 @@ class Project:
         assert self.device is not None
         assert self.optimizer is not None
         assert self.base_sim is not None
-        self.optimization = Optimization(
+        self.optimization = LumericalOptimization(
             sims,
             self.device,
             self.optimizer,
