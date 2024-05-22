@@ -18,10 +18,11 @@ from overrides import override
 from scipy import interpolate  # type: ignore
 
 import vipdopt
-from vipdopt.optimization import Device
+# from vipdopt.optimization import Device
 from vipdopt.simulation.monitor import Monitor
 from vipdopt.simulation.simobject import (
     IMPORT_TYPES,
+    MONITOR_TYPES,
     LumericalSimObject,
     LumericalSimObjectType,
 )
@@ -214,7 +215,8 @@ class LumericalSimulation(ISimulation):
 
     def monitors(self) -> list[Monitor]:
         """Return a list of all monitor objects."""
-        return [obj for _, obj in self.objects.items() if isinstance(obj, Monitor)]
+        # return [obj for _, obj in self.objects.items() if isinstance(obj, Monitor)]
+        return [obj for _, obj in self.objects.items() if obj.obj_type in MONITOR_TYPES]
 
     def monitor_names(self) -> Iterator[str]:
         """Return a list of all monitor object names."""
@@ -279,7 +281,7 @@ class LumericalSimulation(ISimulation):
 
     def import_cur_index(
         self,
-        design: Device,
+        design: Any,
         reinterpolate_permittivity_factor=1,
         reinterpolate_permittivity=False,
         binary_design=False,

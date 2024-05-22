@@ -23,6 +23,8 @@ from vipdopt.utils import (
     Path,
     R,
     ensure_path,
+    import_lumapi,
+    setup_logger
 )
 
 
@@ -129,7 +131,7 @@ class LumericalFDTD(ISolver):
         self._env_vars: dict | None = None
         self.current_sim: LumericalSimulation | None = None
 
-    @override
+    # @override
     def connect(self, hide: bool = True) -> None:
         if vipdopt.lumapi is None:
             raise ModuleNotFoundError(
@@ -159,17 +161,17 @@ class LumericalFDTD(ISolver):
         vipdopt.logger.debug('Resynced LumericalFDTD.')
 
     @_check_lum_fdtd
-    @override
+    # @override
     def addjob(self, fname: str):
         self.fdtd.addjob(fname, 'FDTD')  # type: ignore
 
     @_check_lum_fdtd
-    @override
+    # @override
     def clearjobs(self):
         self.fdtd.clearjobs('FDTD')  # type: ignore
 
     @_sync_lum_fdtd_solver
-    @override
+    # @override
     def runjobs(self, option: int = 1):
         """Run all simulations in the job queue.
 
@@ -182,11 +184,11 @@ class LumericalFDTD(ISolver):
         self.fdtd.runjobs('FDTD', option)  # type: ignore
 
     @_sync_lum_fdtd_solver
-    @override
+    # @override
     def run(self):
         self.fdtd.run()
 
-    @override
+    # @override
     def close(self):
         if self.fdtd is not None:
             vipdopt.logger.debug('Closing connection with Lumerical...')
@@ -261,7 +263,7 @@ class LumericalFDTD(ISolver):
 
 
     @_check_lum_fdtd
-    @override
+    # @override
     @ensure_path
     def load(self, path: Path):
         """Load a simulation from a Lumerical .fsp file."""
@@ -452,16 +454,33 @@ class LumericalFDTD(ISolver):
             self.load(sim_path)
             for monitor in sim.monitors():
                 mname = monitor.name
-                e = self.get_efield(mname)
-                h = self.get_hfield(mname)
-                p = self.get_poynting(mname)
-                t = self.get_transmission(mname)
-                sp = self.get_source_power(mname)
+                vipdopt.logger.debug(mname)
+                vipdopt.logger.debug(self.fdtd.getdata(mname))
+                # e = self.get_efield(mname)
+                # h = self.get_hfield(mname)
+                # p = self.get_poynting(mname)
+                # t = self.get_transmission(mname)
+                # sp = self.get_source_power(mname)
 
-                output_path = sim_path.with_suffix('') / f'_{mname}.npz'
-                monitor.set_src(output_path)
+                # output_path = sim_path.with_suffix(f'_{mname}.npz')
+                # monitor.set_src(output_path)
 
-                np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp)
+                # np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp)
+                # np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp)
 
 
 ISolver.register(LumericalFDTD)
+
+if __name__ == '__main__':
+    vipdopt.logger = setup_logger('logger', 0)
+    vipdopt.lumapi = import_lumapi('C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py')
+    fdtd = LumericalFDTD()
+    sim = LumericalSimulation('runs\\test_run\\sim.json')
+    sim.info['path'] = Path('sim.fsp')
+    fdtd.connect()
+    # fdtd.load_simulation(sim)
+    # fdtd.save('sim.fsp')
+    # fdtd.run()
+    # print(sim.info)
+    fdtd.reformat_monitor_data([sim])
+    fdtd.close()
