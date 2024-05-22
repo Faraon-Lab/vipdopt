@@ -5,6 +5,8 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+import vipdopt
+
 from vipdopt.simulation.simobject import (
     MONITOR_TYPES,
     LumericalSimObject,
@@ -52,18 +54,21 @@ class Monitor(LumericalSimObject):
         self._p = None
         self._t = None
         self._sp = None
+        self._power = None
 
         self._sync = True  # Next time data is accessed, it'll reload the data.
 
     def load_source(self):
         """Load the monitor's data from it's source file."""
-        assert self.set_src is not None
-        data: npt.NDArray = np.load(self.src)
+        assert self.src is not None
+        vipdopt.logger.debug(f'Loading monitor data from {self.src} into memory...')
+        data: npt.NDArray = np.load(self.src, allow_pickle=True)
         self._e = data['e']
         self._h = data['h']
         self._p = data['p']
         self._t = data['t']
         self._sp = data['sp']
+        self._power = data['power']
         self._tshape = self._t.shape
         self._fshape = self._e.shape
 
@@ -117,6 +122,13 @@ class Monitor(LumericalSimObject):
         if self._sync:
             self.load_source()
         return self._t
+
+    @property
+    def power(self) -> npt.NDArray:
+        """Return the transmission measured by this monitor."""
+        if self._sync:
+            self.load_source()
+        return self._power
 
     @property
     def trans_mag(self) -> npt.NDArray:

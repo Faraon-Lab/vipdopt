@@ -23,6 +23,7 @@ from vipdopt.simulation.monitor import Monitor
 from vipdopt.simulation.simobject import (
     IMPORT_TYPES,
     MONITOR_TYPES,
+    SOURCE_TYPES,
     LumericalSimObject,
     LumericalSimObjectType,
 )
@@ -247,7 +248,12 @@ class LumericalSimulation(ISimulation):
                 the new object with
         """
         vipdopt.logger.debug(f"Creating new object: '{obj_name}'...")
-        obj = LumericalSimObject(obj_name, obj_type)
+        if obj_type in MONITOR_TYPES:
+            obj = Monitor(obj_name, obj_type)
+        elif obj_type in SOURCE_TYPES:
+            obj = Source(obj_name, obj_type)
+        else:
+            obj = LumericalSimObject(obj_name, obj_type)
         obj.update(**properties)
         self.add_object(obj)
         return obj

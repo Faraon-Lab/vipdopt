@@ -456,17 +456,30 @@ class LumericalFDTD(ISolver):
                 mname = monitor.name
                 vipdopt.logger.debug(mname)
                 vipdopt.logger.debug(self.fdtd.getdata(mname))
-                # e = self.get_efield(mname)
-                # h = self.get_hfield(mname)
-                # p = self.get_poynting(mname)
-                # t = self.get_transmission(mname)
-                # sp = self.get_source_power(mname)
+                data = self.fdtd.getdata(mname).split()
+                vipdopt.logger.debug(data)
+                e = self.get_efield(mname)
+                h = self.get_hfield(mname)
+                p = self.get_poynting(mname) if 'Px' in data else None
+                t = self.get_transmission(mname) if monitor['monitor type'] != 'point'\
+                      else None
+                sp = self.get_source_power(mname)
+                power = self.fdtd.getdata(mname, 'power') if 'power' in data else None
 
-                # output_path = sim_path.with_suffix(f'_{mname}.npz')
-                # monitor.set_src(output_path)
+                output_path = sim_path.parent / (sim_path.stem + f'_{mname}.npz')
 
-                # np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp)
-                # np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp)
+
+                np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp, power=power)
+                monitor.set_src(output_path)
+
+                vipdopt.logger.debug(f'E field: {monitor.e}')
+                monitor.reset()
+                vipdopt.logger.debug(f'E field after (should be None): {monitor._e}')
+                vipdopt.logger.debug('Should print loading again')
+                monitor.e
+                vipdopt.logger.debug('Should NOT print loading again')
+                monitor.h
+                return
 
 
 ISolver.register(LumericalFDTD)
@@ -477,10 +490,11 @@ if __name__ == '__main__':
     fdtd = LumericalFDTD()
     sim = LumericalSimulation('runs\\test_run\\sim.json')
     sim.info['path'] = Path('sim.fsp')
-    fdtd.connect()
+    fdtd.connect(hide=True)
     # fdtd.load_simulation(sim)
     # fdtd.save('sim.fsp')
     # fdtd.run()
+    # vipdopt.logger.debug(sim.info)
     # print(sim.info)
     fdtd.reformat_monitor_data([sim])
     fdtd.close()
