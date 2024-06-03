@@ -7,6 +7,8 @@ import numpy.typing as npt
 
 import vipdopt
 
+from vipdopt.utils import ensure_path
+
 from vipdopt.simulation.simobject import (
     MONITOR_TYPES,
     LumericalSimObject,
@@ -32,8 +34,8 @@ class Monitor(LumericalSimObject):
         super().__init__(name, obj_type)
         self.src = src
         self.reset()
-        self._sync = src is not None  # Only set to sync if the source file exists
 
+    @ensure_path
     def set_src(self, src: Path):
         """Set the source file this monitor is connected to."""
         self.src = src
@@ -49,18 +51,20 @@ class Monitor(LumericalSimObject):
         """Reset all cached values from the simulation."""
         self._tshape = None  # transmission shape
         self._fshape = None  # field shape
-        self._e = None
-        self._h = None
-        self._p = None
-        self._t = None
-        self._sp = None
-        self._power = None
+        self._e = None  # E field
+        self._h = None  # H field
+        self._p = None  # Poynting vector
+        self._t = None  # Transmission
+        self._sp = None  # Source Power
+        self._power = None  # Power
 
-        self._sync = True  # Next time data is accessed, it'll reload the data.
+
+        self._sync = self.src is not None  # Only set to sync if the source file exists
 
     def load_source(self):
         """Load the monitor's data from it's source file."""
-        assert self.src is not None
+        if self.src is None:
+            raise RuntimeError(f'Monitor {self} has no source to load data from.')
         vipdopt.logger.debug(f'Loading monitor data from {self.src} into memory...')
         data: npt.NDArray = np.load(self.src, allow_pickle=True)
         self._e = data['e']
@@ -138,7 +142,7 @@ class Monitor(LumericalSimObject):
         return np.abs(self._t)
 
 
-class Proflie(Monitor):
+class Profile(Monitor):
     def __init__(
         self,
         name: str,

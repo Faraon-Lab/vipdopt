@@ -17,7 +17,7 @@ import numpy.typing as npt
 import vipdopt
 from vipdopt.simulation import LumericalSimulation, Monitor, Source, LumericalFDTD
 from vipdopt.simulation.source import DipoleSource, GaussianSource
-from vipdopt.simulation.monitor import Power, Proflie
+from vipdopt.simulation.monitor import Power, Profile
 from vipdopt.utils import Number, flatten, starmap_with_kwargs, import_lumapi ,setup_logger, P
 
 POLARIZATIONS = ['TE', 'TM', 'TE+TM']
@@ -52,6 +52,10 @@ class SuperFoM:
         if isinstance(other, SuperFoM):
             return self.foms == other.foms and self.weights == other.weights
         return super().__eq__(other)
+
+    def reset_monitors(self):
+        """Reset all of the monitors used to calculate the FoM."""
+        map(FoM.reset_monitors, flatten(self.foms))
 
     def compute_fom(self, *args, **kwargs) -> npt.NDArray:
         """Compute the weighted sum of the FoMs."""
@@ -357,14 +361,23 @@ class FoM(SuperFoM):
             self.neg_min_freqs,
         )
 
+    def reset_monitors(self):
+        """Reset all of the monitors used to calculate the FoM."""
+        for mon in self.fwd_monitors:
+            mon.reset()
+        for mon in self.adj_monitors:
+            mon.reset()
+
     def compute_fom(self, *args, **kwargs) -> npt.NDArray:
         """Compute the figure of merit."""
         total_fom = self.fom_func(*args, **kwargs)
+        self.reset_monitors()
         return self._subtract_neg(total_fom)
 
     def compute_grad(self, *args, **kwargs) -> npt.NDArray:
         """Compute the gradient of the figure of merit."""
         total_grad = self.grad_func(*args, **kwargs)
+        self.reset_monitors()
         return self._subtract_neg(total_grad)
 
     def _subtract_neg(self, array: npt.NDArray) -> npt.NDArray:
@@ -407,8 +420,8 @@ class FoM(SuperFoM):
         data['polarization'] = self.polarization
         data['fwd_srcs'] = self.fwd_srcs
         data['adj_srcs'] = self.adj_srcs
-        data['fom_monitors'] = self.fwd_monitors
-        data['grad_monitors'] = self.adj_monitors
+        data['fwd_monitors'] = self.fwd_monitors
+        data['adj_monitors'] = self.adj_monitors
         if data['type'] == 'FoM':  # Generic FoM needs to copy functions
             data['fom_func'] = self.fom_func
             data['grad_func'] = self.grad_func
@@ -444,7 +457,13 @@ def unique_adj_sim_map(foms: Iterable[FoM]) -> dict[frozenset[Source], list[FoM]
 
 
 class BayerFilterFoM(FoM):
-    """FoM implementing the particular figure of merit for the SonyBayerFilter."""
+    """FoM implementing the particular figure of merit for the SonyBayerFilter.
+    
+    Must have the following monitor configuration:
+        fwd_monitors: [focal_monitor, transmission_monitor, design_efield]
+        adj_monitors: [design_efield]
+    
+    """
 
     def __init__(
         self,
@@ -533,9 +552,8 @@ class BayerFilterFoM(FoM):
         # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
 
-        for mon in self.fwd_monitors:
-            mon.reset()
-        return total_tfom, total_ffom
+        # return total_tfom, total_ffom
+        return total_ffom
 
     def _bayer_gradient(self):
         """Compute the gradient of the bayer filter figure of merit."""
@@ -585,7 +603,13 @@ class BayerFilterFoM(FoM):
 
 
 class UniformFoM(FoM):
-    """A figure of merit for a device with uniform density."""
+    """A figure of merit for a device with uniform density.
+    
+    Must have the following monitor configuration:
+        fwd_monitors: [design_efield]
+        adj_monitors: []
+
+    """
 
     def __init__(
         self,
@@ -612,11 +636,11 @@ class UniformFoM(FoM):
         )
         self.constant = constant
 
-    def _uniform_fom(self, variables: npt.NDArray):
-        return 1 - np.abs(variables - self.constant)
+    def _uniform_fom(self):
+        return 1 - np.abs(self.fwd_monitors[0].e - self.constant)
 
-    def _uniform_gradient(self, variables: npt.NDArray):
-        return np.sign(variables - self.constant)
+    def _uniform_gradient(self):
+        return np.sign(self.fwd_monitors[0].e - self.constant)
 
 if __name__ == '__main__':
     vipdopt.logger = setup_logger('logger', 0)
@@ -628,18 +652,18 @@ if __name__ == '__main__':
         'TE',
         [GaussianSource('forward_src_x')], 
         [GaussianSource('forward_src_x'), DipoleSource('adj_src_0x')],
-        [Power('focal_monitor_0'), Power('transmission_monitor_0'), Proflie('design_efield_monitor')],
-        [Proflie('design_efield_monitor')],
+        [Power('focal_monitor_0'), Power('transmission_monitor_0'), Profile('design_efield_monitor')],
+        [Profile('design_efield_monitor')],
         list(range(60)),
         [],
     )
     fwd_sim = fom.create_forward_sim(base_sim)[0]
-    fwd_sim.info['path'] = Path('test_data\\fwd_sim.fsp').absolute()
+    fwd_sim.set_path('test_data\\fwd_sim.fsp')
     adj_sim = fom.create_adjoint_sim(base_sim)[0]
-    adj_sim.info['path'] = Path('test_data\\adj_sim.fsp').absolute()
+    adj_sim.set_path('test_data\\adj_sim.fsp')
 
-    fdtd = LumericalFDTD()
-    fdtd.connect(hide=True)
+    # fdtd = LumericalFDTD()
+    # fdtd.connect(hide=True)
 
     # fdtd.save('test_data\\fwd_sim.fsp', fwd_sim)
     # fdtd.save('test_data\\adj_sim.fsp', adj_sim)
@@ -647,9 +671,11 @@ if __name__ == '__main__':
     # fdtd.addjob('test_data\\adj_sim.fsp')
     # fdtd.runjobs(0)
 
-    fdtd.reformat_monitor_data([fwd_sim, adj_sim])
+    # fdtd.reformat_monitor_data([fwd_sim, adj_sim])
+    fwd_sim.link_monitors()
+    adj_sim.link_monitors()
 
     fom_val = fom.compute_fom()
-    vipdopt.logger.debug(f'FoM: {fom_val}')
+    vipdopt.logger.debug(f'FoM: {fom_val.shape}')
     grad_val = fom.compute_grad()
-    vipdopt.logger.debug(f'Gradient: {grad_val}')
+    vipdopt.logger.debug(f'Gradient: {grad_val.shape}')

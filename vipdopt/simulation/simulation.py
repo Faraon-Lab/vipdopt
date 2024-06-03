@@ -11,7 +11,7 @@ from collections import OrderedDict
 from collections.abc import Iterable, Iterator
 from copy import copy
 from pathlib import Path
-from typing import Any
+from typing import Any, overload
 
 import numpy as np
 from overrides import override
@@ -148,6 +148,11 @@ class LumericalSimulation(ISimulation):
         """Clear all existing objects and create a new project."""
         self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
 
+    @ensure_path
+    def set_path(self, path: Path):
+        """Set the save path of the simulation."""
+        self.info['path'] = path.absolute()
+
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
         new_sim = LumericalSimulation()
@@ -235,6 +240,27 @@ class LumericalSimulation(ISimulation):
         """Return a list of all monitor object names."""
         for obj in self.monitors():
             yield obj.name
+        
+    @overload
+    def link_monitors(self):
+        ...
+
+    @overload
+    def link_monitors(self, monitors: list[Monitor]):
+        ...
+    
+    def link_monitors(self, monitors: list[Monitor] | None=None):
+
+        """Link all of the given monitors to this simulation.
+        
+        Requires self.info['path'] to have been set already!!
+        """
+        sim_path: Path = self.info['path']
+        if monitors is None:
+            monitors = self.monitors()
+        for mon in monitors:
+            output_path = sim_path.parent / (sim_path.stem + f'_{mon.name}.npz')
+            mon.set_src(output_path)
 
     def imports(self) -> list[LumericalSimObject]:
         """Return a list of all import objects."""

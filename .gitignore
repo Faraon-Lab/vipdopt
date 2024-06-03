@@ -28,6 +28,7 @@ __pycache__/
 *.pkl
 *.npy
 *.npz
+!testing/monitor_data/*.npz
 
 # Distribution / packaging
 .Python
