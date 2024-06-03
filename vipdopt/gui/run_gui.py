@@ -266,9 +266,9 @@ class SettingsWindow(QMainWindow, Ui_SettingsWindow):
         fom = self.project.foms[idx]
         match mode.lower():
             case 'fom':
-                monitors = fom.fom_monitors
+                monitors = fom.fwd_monitors
             case 'grad':
-                monitors = fom.grad_monitors
+                monitors = fom.adj_monitors
             case _:
                 raise ValueError(
                     'fom_dialog can only be called with mode "fom" or "grad"'

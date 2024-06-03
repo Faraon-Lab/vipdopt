@@ -156,6 +156,18 @@ class LumericalSimulation(ISimulation):
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
 
         return new_sim
+    
+    def with_monitors(self, objs: Iterable[str] | Iterable[Monitor], name: str | None=None):
+        """Return a copy of this simulation with only the specified monitors."""
+        new_sim = self.copy()  # Unlinked
+        if name is not None:
+            # Create the simulation with the provided name
+            new_sim.info['name'] = name
+        names = [m.name if isinstance(m, Monitor) else m for m in objs]
+        for name in new_sim.monitor_names:
+            if name not in names:
+                del self.objects[name]
+        return new_sim
 
     def enable(self, names: Iterable[str]):
         """Enable all objects in provided list."""
@@ -216,8 +228,8 @@ class LumericalSimulation(ISimulation):
 
     def monitors(self) -> list[Monitor]:
         """Return a list of all monitor objects."""
-        # return [obj for _, obj in self.objects.items() if isinstance(obj, Monitor)]
-        return [obj for _, obj in self.objects.items() if obj.obj_type in MONITOR_TYPES]
+        return [obj for _, obj in self.objects.items() if isinstance(obj, Monitor)]
+        # return [obj for _, obj in self.objects.items() if obj.obj_type in MONITOR_TYPES]
 
     def monitor_names(self) -> Iterator[str]:
         """Return a list of all monitor object names."""

@@ -156,10 +156,10 @@ class Power(Monitor):
         super().__init__(name, LumericalSimObjectType.POWER, src)
 
 
-class Index(Monitor):
-    def __init__(
-        self,
-        name: str,
-        src: Path | None = None,
-    ) -> None:
-        super().__init__(name, LumericalSimObjectType.INDEX, src)
+# class Index(Monitor):
+#     def __init__(
+#         self,
+#         name: str,
+#         src: Path | None = None,
+#     ) -> None:
+#         super().__init__(name, LumericalSimObjectType.INDEX, src)

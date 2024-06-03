@@ -41,7 +41,6 @@ SOURCE_TYPES = [
 MONITOR_TYPES = [
     LumericalSimObjectType.POWER,
     LumericalSimObjectType.PROFILE,
-    LumericalSimObjectType.INDEX,
 ]
 IMPORT_TYPES = [LumericalSimObjectType.IMPORT]
 

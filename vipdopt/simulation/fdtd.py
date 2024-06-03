@@ -161,9 +161,10 @@ class LumericalFDTD(ISolver):
         vipdopt.logger.debug('Resynced LumericalFDTD.')
 
     @_check_lum_fdtd
+    @ensure_path
     # @override
-    def addjob(self, fname: str):
-        self.fdtd.addjob(fname, 'FDTD')  # type: ignore
+    def addjob(self, fname: Path):
+        self.fdtd.addjob(str(fname.absolute()), 'FDTD')  # type: ignore
 
     @_check_lum_fdtd
     # @override
@@ -181,7 +182,10 @@ class LumericalFDTD(ISolver):
                 1: Run jobs using the resources and parallel settings specified in
                     the resource manager. (default)
         """
+        vipdopt.logger.info(f'Running simulations: {self.fdtd.listjobs("FDTD")}')
         self.fdtd.runjobs('FDTD', option)  # type: ignore
+        self.current_sim = None
+        vipdopt.logger.info('Finished running job queue')
 
     @_sync_lum_fdtd_solver
     # @override
@@ -221,13 +225,19 @@ class LumericalFDTD(ISolver):
     def load(self, path: Path | None, sim: ISimulation | None):
         """Load data into the solver from a file or a simulation object.."""
         if sim is not None:
+            self.fdtd.switchtolayout()  # type: ignore
+            self.fdtd.deleteall()  # type: ignore
             self.load_simulation(sim)
             if path is not None:  # Load file into sim object
+                path = path.absolute()
                 self.fdtd.load(str(path))
                 self.current_sim.info['path'] = path
             else:  # Load data from sim's path
                 self.fdtd.load(str(self.current_sim.info['path']))
         elif path is not None:  # Just load data from file
+            self.fdtd.switchtolayout()  # type: ignore
+            self.fdtd.deleteall()  # type: ignore
+            path = path.absolute()
             self.fdtd.load(str(path))
         else:
             raise ValueError('Both arguments `path` and `sim` cannot be `None`.')
@@ -250,6 +260,7 @@ class LumericalFDTD(ISolver):
                 'LumericalFDTD can only load simulations of type "LumericalSimulation"'
                 f'; Received "{type(sim)}"'
             )
+        vipdopt.logger.debug('Loading simulation...')
         self.fdtd.switchtolayout()  # type: ignore
         self.fdtd.deleteall()  # type: ignore
         for obj in sim.objects.values():
@@ -283,6 +294,7 @@ class LumericalFDTD(ISolver):
     @ensure_path
     def save(self, path: Path, sim: ISimulation | None = None):
         """Save a LumericalSimulation using the FDTD solver software."""
+        path = path.absolute()
         if sim is not None:
             self.load_simulation(sim)
         if self.current_sim is not None:
@@ -373,7 +385,7 @@ class LumericalFDTD(ISolver):
         res = self.fdtd.getresult(object_name, property_name)
         if dataset_value is not None:
             res = res[dataset_value]
-        vipdopt.logger.debug(f'Got "{property_name}" from "{object_name}": {res}')
+        vipdopt.logger.debug(f'Got "{property_name}" from "{object_name}"')
         return res
 
     @_check_lum_fdtd
@@ -414,9 +426,9 @@ class LumericalFDTD(ISolver):
         return self.get_field(monitor_name, 'P')
 
     @_check_lum_fdtd
-    def get_transmission(self, monitor_name: str) -> npt.NDArray:
+    def transmission(self, monitor_name: str) -> npt.NDArray:
         """Return the transmission as a function of wavelength."""
-        return self.fdtd.transmission(monitor_name)  # type: ignore
+        return np.squeeze(self.fdtd.transmission(monitor_name))  # type: ignore
 
     def get_efield_magnitude(self, monitor_name: str) -> npt.NDArray:
         """Return the magnitude of the E field from a monitor."""
@@ -433,7 +445,7 @@ class LumericalFDTD(ISolver):
     def get_overall_power(self, monitor_name) -> npt.NDArray:
         """Return the overall power from a given monitor."""
         sp = self.get_source_power(monitor_name)
-        t = np.abs(self.get_transmission(monitor_name))
+        t = np.abs(self.transmission(monitor_name))
         return t.T * sp
 
     @_check_lum_fdtd
@@ -446,23 +458,32 @@ class LumericalFDTD(ISolver):
                 of the returned values (E, H, P, T, Source Power)
 
         Arguments:
-            sims (list[LumericalSimulation]): The simulation to load data from. Must
+            sims (list[LumericalSimulation]): The simulations to load data from. Must
                 have the `info['path']` field populated.
         """
+        vipdopt.logger.info('Reformatting monitor data...')
         for sim in sims:
+            self.fdtd.switchtolayout()
             sim_path: Path = sim.info['path']
             self.load(sim_path)
+            vipdopt.logger.debug(f'\tReformatting monitor data from {sim_path}...')
             for monitor in sim.monitors():
                 mname = monitor.name
-                vipdopt.logger.debug(mname)
-                vipdopt.logger.debug(self.fdtd.getdata(mname))
+                # vipdopt.logger.debug(mname)
+                # vipdopt.logger.debug(self.fdtd.getdata(mname))
                 data = self.fdtd.getdata(mname).split()
-                vipdopt.logger.debug(data)
-                e = self.get_efield(mname)
-                h = self.get_hfield(mname)
+                # vipdopt.logger.debug(data)
+                e = self.get_efield(mname) if 'Ex' in data else None
+                h = self.get_hfield(mname) if 'Hx' in data else None
                 p = self.get_poynting(mname) if 'Px' in data else None
-                t = self.get_transmission(mname) if monitor['monitor type'] != 'point'\
-                      else None
+                # if monitor['monitor type'] == '2D Z-normal':
+                #     t = self.get_transmission(mname)
+                # else:
+                #     t = None
+                try:
+                    t = self.transmission(mname)
+                except vipdopt.lumapi.LumApiError:
+                    t = None
                 sp = self.get_source_power(mname)
                 power = self.fdtd.getdata(mname, 'power') if 'power' in data else None
 
@@ -471,15 +492,16 @@ class LumericalFDTD(ISolver):
 
                 np.savez(output_path, e=e, h=h, p=p, t=t, sp=sp, power=power)
                 monitor.set_src(output_path)
-
-                vipdopt.logger.debug(f'E field: {monitor.e}')
                 monitor.reset()
-                vipdopt.logger.debug(f'E field after (should be None): {monitor._e}')
-                vipdopt.logger.debug('Should print loading again')
-                monitor.e
-                vipdopt.logger.debug('Should NOT print loading again')
-                monitor.h
-                return
+
+                # vipdopt.logger.debug(f'E field: {monitor.e}')
+                # monitor.reset()
+                # vipdopt.logger.debug(f'E field after (should be None): {monitor._e}')
+                # vipdopt.logger.debug('Should print loading again')
+                # monitor.e
+                # vipdopt.logger.debug('Should NOT print loading again')
+                # monitor.h
+                # return
 
 
 ISolver.register(LumericalFDTD)
@@ -488,11 +510,13 @@ if __name__ == '__main__':
     vipdopt.logger = setup_logger('logger', 0)
     vipdopt.lumapi = import_lumapi('C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py')
     fdtd = LumericalFDTD()
-    sim = LumericalSimulation('runs\\test_run\\sim.json')
-    sim.info['path'] = Path('sim.fsp')
-    fdtd.connect(hide=True)
+    sim = LumericalSimulation('test_data\\sim.json')
+    sim.info['path'] = Path('test_data\\sim.fsp')
+    fdtd.connect(hide=False)
     # fdtd.load_simulation(sim)
-    # fdtd.save('sim.fsp')
+    # fdtd.save('test_data\\sim.fsp', sim)
+    # fdtd.addjob('test_data\\sim.fsp')
+    # fdtd.runjobs(0)
     # fdtd.run()
     # vipdopt.logger.debug(sim.info)
     # print(sim.info)

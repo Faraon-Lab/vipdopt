@@ -8,14 +8,17 @@ from collections.abc import Callable, Iterable, Sequence
 from copy import copy
 from functools import reduce
 from itertools import product
-from typing import Any
+from typing import Any, Concatenate
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.simulation import LumericalSimulation, Monitor, Source
-from vipdopt.utils import Number, flatten, starmap_with_kwargs
+from vipdopt.simulation import LumericalSimulation, Monitor, Source, LumericalFDTD
+from vipdopt.simulation.source import DipoleSource, GaussianSource
+from vipdopt.simulation.monitor import Power, Proflie
+from vipdopt.utils import Number, flatten, starmap_with_kwargs, import_lumapi ,setup_logger, P
 
 POLARIZATIONS = ['TE', 'TM', 'TE+TM']
 
@@ -130,14 +133,22 @@ class SuperFoM:
     ) -> list[LumericalSimulation]:
         """Create all unique forward simulations needed to compute this FoM."""
         fwd_sim_map = unique_fwd_sim_map(flatten(self.foms))
-        return [base_sim.with_enabled(srcs) for srcs in fwd_sim_map]
+        sims = [base_sim.with_enabled(srcs) for srcs in fwd_sim_map]
+        for i, foms in enumerate(fwd_sim_map.values()):
+            for fom in foms:
+                fom.link_forward_sim(sims[i])
+        return sims
 
     def create_adjoint_sim(
         self, base_sim: LumericalSimulation
     ) -> list[LumericalSimulation]:
         """Create all unique adjoint simulations needed to compute this FoM."""
         adj_sim_map = unique_adj_sim_map(flatten(self.foms))
-        return [base_sim.with_enabled(srcs) for srcs in adj_sim_map]
+        sims = [base_sim.with_enabled(srcs) for srcs in adj_sim_map]
+        for i, foms in enumerate(adj_sim_map.values()):
+            for fom in foms:
+                fom.link_adjoint_sim(sims[i])
+        return sims
 
     @staticmethod
     def _math_helper(
@@ -278,8 +289,8 @@ class FoM(SuperFoM):
             create the forward simulation.
         adj_srcs (list[Source]): The sources needed for computing the adjoint; used to
             create the adjoint simulation
-        fom_monitors (list[Monitor]): The monitors needed for computing the FoM
-        grad_monitors (list[Monitor]): The monitors needed for computing the gradient
+        fom_monitors (list[Monitor]): The monitors to track in the forward simulation.
+        adj_monitors (list[Monitor]): The monitors to track in the adjoint simulation.
         fom_func (Callable[..., npt.ArrayLike]): The function to compute the FoM.
         grad_func (Callable[..., npt.ArrayLike]): The function to compute the gradient.
         pos_max_freqs (list[int]): List of indices specifying which frequency bands are
@@ -293,19 +304,19 @@ class FoM(SuperFoM):
         polarization: str,
         fwd_srcs: list[Source],
         adj_srcs: list[Source],
-        fom_monitors: list[Monitor],
-        grad_monitors: list[Monitor],
-        fom_func: Callable[..., npt.NDArray],
-        grad_func: Callable[..., npt.NDArray],
+        fwd_monitors: list[Monitor],
+        adj_monitors: list[Monitor],
+        fom_func: Callable[Concatenate[FoM, P], npt.NDArray],
+        grad_func: Callable[Concatenate[FoM, P], npt.NDArray],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
     ) -> None:
-        """Initialize a FoM2 object."""
+        """Initialize a FoM object."""
         super().__init__([(self,)], [1.0])
         self.fwd_srcs = fwd_srcs
         self.adj_srcs = adj_srcs
-        self.fom_monitors = fom_monitors
-        self.grad_monitors = grad_monitors
+        self.fwd_monitors = fwd_monitors
+        self.adj_monitors = adj_monitors
         self.fom_func = fom_func
         self.grad_func = grad_func
         if polarization not in POLARIZATIONS:
@@ -323,8 +334,8 @@ class FoM(SuperFoM):
                 self.polarization == other.polarization
                 and self.fwd_srcs == other.fwd_srcs
                 and self.adj_srcs == other.adj_srcs
-                and self.fom_monitors == other.fom_monitors
-                and self.grad_monitors == other.grad_monitors
+                and self.fwd_monitors == other.fwd_monitors
+                and self.adj_monitors == other.adj_monitors
                 and self.fom_func == other.fom_func
                 and self.grad_func == other.grad_func
                 and self.pos_max_freqs == other.pos_max_freqs
@@ -338,8 +349,8 @@ class FoM(SuperFoM):
             self.polarization,
             self.fwd_srcs,
             self.adj_srcs,
-            self.fom_monitors,
-            self.grad_monitors,
+            self.fwd_monitors,
+            self.adj_monitors,
             self.fom_func,
             self.grad_func,
             self.pos_max_freqs,
@@ -364,17 +375,30 @@ class FoM(SuperFoM):
             return array
         return array[..., self.pos_max_freqs] - array[..., self.neg_min_freqs]
 
+    def link_forward_sim(self, sim: LumericalSimulation):
+        """Link this FoM's fwd_monitors to a provided simulation."""
+        self.fwd_monitors = [sim.objects[m.name] for m in self.fwd_monitors]
+
     def create_forward_sim(
         self, base_sim: LumericalSimulation
     ) -> list[LumericalSimulation]:
         """Create a simulation with only the forward sources enabled."""
-        return [base_sim.with_enabled(self.fwd_srcs)]
+        fwd_sim = base_sim.with_enabled(self.fwd_srcs)
+        self.link_forward_sim(fwd_sim)
+        return [fwd_sim]
+
+    def link_adjoint_sim(self, sim: LumericalSimulation):
+        """Link this FoM's adj_monitors to a provided simulation."""
+        self.adj_monitors = [sim.objects[m.name] for m in self.adj_monitors]
 
     def create_adjoint_sim(
         self, base_sim: LumericalSimulation
     ) -> list[LumericalSimulation]:
         """Create a simulation with only the adjoint sources enabled."""
-        return [base_sim.with_enabled(self.adj_srcs)]
+        adj_sim = base_sim.with_enabled(self.adj_srcs)
+        self.link_adjoint_sim(adj_sim)
+        return [adj_sim]
+
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this FoM."""
@@ -383,8 +407,8 @@ class FoM(SuperFoM):
         data['polarization'] = self.polarization
         data['fwd_srcs'] = self.fwd_srcs
         data['adj_srcs'] = self.adj_srcs
-        data['fom_monitors'] = self.fom_monitors
-        data['grad_monitors'] = self.grad_monitors
+        data['fom_monitors'] = self.fwd_monitors
+        data['grad_monitors'] = self.adj_monitors
         if data['type'] == 'FoM':  # Generic FoM needs to copy functions
             data['fom_func'] = self.fom_func
             data['grad_func'] = self.grad_func
@@ -448,29 +472,33 @@ class BayerFilterFoM(FoM):
     def _bayer_fom(self):
         """Compute bayer filter figure of merit."""
         # Here we need to figure out which FoM belongs to which file
+
+        # for mon in self.fwd_monitors:
+        #     vipdopt.logger.debug(vars(mon))
+
         # FoM for transmission monitor
-        total_tfom = np.zeros(self.fom_monitors[0].tshape)[..., self.opt_ids]
+        total_tfom = np.zeros(self.fwd_monitors[1].tshape)[..., self.pos_max_freqs]
         # FoM for focal monitor - take [1:] because intensity sums over first axis
-        total_ffom = np.zeros(self.fom_monitors[0].fshape[1:])[..., self.opt_ids]
+        total_ffom = np.zeros(self.fwd_monitors[0].fshape[1:])[..., self.pos_max_freqs]
 
         # Source weight calculation.
-        source_weight = np.zeros(self.fom_monitors[0].fshape, dtype=np.complex128)
-        for monitor in self.fom_monitors:
-            transmission = monitor.trans_mag
-            vipdopt.logger.info(f'Accessing monitor {monitor.monitor_name}')
-            # print(transmission.shape)
-            # print(self.opt_ids)
-            # print(total_tfom.shape)
-            # print(transmission[..., self.opt_ids].shape)
-            # print(transmission[..., self.opt_ids])
-            total_tfom += transmission[..., self.opt_ids]
+        source_weight = np.zeros(self.fwd_monitors[0].fshape, dtype=np.complex128)
+        # for monitor in self.fwd_monitors:
+        transmission = self.fwd_monitors[1].trans_mag
+        # vipdopt.logger.info(f'Accessing monitor {monitor.monitor_name}')
+        # print(transmission.shape)
+        # print(self.opt_ids)
+        # print(total_tfom.shape)
+        # print(transmission[..., self.opt_ids].shape)
+        # print(transmission[..., self.opt_ids])
+        total_tfom += transmission[..., self.pos_max_freqs]
 
-            efield = monitor.e
-            total_ffom += np.sum(np.square(np.abs(efield[..., self.opt_ids])), axis=0)
+        efield = self.fwd_monitors[0].e
+        total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
 
-            source_weight += np.expand_dims(
-                np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3)
-            )
+        source_weight += np.expand_dims(
+            np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3)
+        )
             # We'll apply opt_ids slice when gradient is fully calculated.
             # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])
 
@@ -505,12 +533,15 @@ class BayerFilterFoM(FoM):
         # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
 
+        for mon in self.fwd_monitors:
+            mon.reset()
         return total_tfom, total_ffom
 
     def _bayer_gradient(self):
         """Compute the gradient of the bayer filter figure of merit."""
-        e_fwd = self.design_fwd_fields
-        e_adj = self.grad_monitors[1].e
+        # e_fwd = self.design_fwd_fields
+        e_fwd = self.fwd_monitors[2].e
+        e_adj = self.adj_monitors[0].e
 
         # #! DEBUG: Check orthogonality and direction of E-fields in the design monitor
         vipdopt.logger.info(
@@ -540,7 +571,7 @@ class BayerFilterFoM(FoM):
         self.gradient = np.zeros(df_dev.shape, dtype=np.complex128)
         # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
 
-        self.gradient[..., self.opt_ids] = df_dev[..., self.opt_ids]  # * self.enabled
+        self.gradient[..., self.pos_max_freqs] = df_dev[..., self.pos_max_freqs]  # * self.enabled
         # self.restricted_gradient[..., self.freq_index_restricted_opt] = \
         #     df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
 
@@ -550,7 +581,7 @@ class BayerFilterFoM(FoM):
 
         # return df_dev
 
-        return df_dev[..., self.opt_ids]
+        return df_dev
 
 
 class UniformFoM(FoM):
@@ -586,3 +617,39 @@ class UniformFoM(FoM):
 
     def _uniform_gradient(self, variables: npt.NDArray):
         return np.sign(variables - self.constant)
+
+if __name__ == '__main__':
+    vipdopt.logger = setup_logger('logger', 0)
+    vipdopt.lumapi = import_lumapi('C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py')
+    base_sim = LumericalSimulation('test_data\\sim.json')
+    srcs = base_sim.sources()
+    vipdopt.logger.debug([src.name for src in srcs])
+    fom = BayerFilterFoM(
+        'TE',
+        [GaussianSource('forward_src_x')], 
+        [GaussianSource('forward_src_x'), DipoleSource('adj_src_0x')],
+        [Power('focal_monitor_0'), Power('transmission_monitor_0'), Proflie('design_efield_monitor')],
+        [Proflie('design_efield_monitor')],
+        list(range(60)),
+        [],
+    )
+    fwd_sim = fom.create_forward_sim(base_sim)[0]
+    fwd_sim.info['path'] = Path('test_data\\fwd_sim.fsp').absolute()
+    adj_sim = fom.create_adjoint_sim(base_sim)[0]
+    adj_sim.info['path'] = Path('test_data\\adj_sim.fsp').absolute()
+
+    fdtd = LumericalFDTD()
+    fdtd.connect(hide=True)
+
+    # fdtd.save('test_data\\fwd_sim.fsp', fwd_sim)
+    # fdtd.save('test_data\\adj_sim.fsp', adj_sim)
+    # fdtd.addjob('test_data\\fwd_sim.fsp')
+    # fdtd.addjob('test_data\\adj_sim.fsp')
+    # fdtd.runjobs(0)
+
+    fdtd.reformat_monitor_data([fwd_sim, adj_sim])
+
+    fom_val = fom.compute_fom()
+    vipdopt.logger.debug(f'FoM: {fom_val}')
+    grad_val = fom.compute_grad()
+    vipdopt.logger.debug(f'Gradient: {grad_val}')

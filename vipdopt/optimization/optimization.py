@@ -426,9 +426,9 @@ class LumericalOptimization:
                 # ESSENTIAL STEP - MUST CLEAR THE E-FIELDS OTHERWISE THEY WON'T UPDATE
                 # TODO: Handle this within the monitor itself, or simulation
                 for f in self.foms:
-                    for m in f.fom_monitors:
+                    for m in f.fwd_monitors:
                         m.reset()
-                    for m in f.grad_monitors:
+                    for m in f.adj_monitors:
                         m.reset()
 
                 # Debug using test_dev folder
@@ -469,15 +469,15 @@ class LumericalOptimization:
 
                     for f_idx, f in enumerate(self.foms):
                         if (
-                            f.fom_monitors[-1].src.info['name'] in tempfile_fwd_name
+                            f.fwd_monitors[-1].src.info['name'] in tempfile_fwd_name
                         ):  # TODO: might need to account for file extensions
                             # TODO: rewrite this to hook to whichever device the FoM is tied to
                             # print(f'FoM property has length {len(f.fom)}')
 
-                            f.design_fwd_fields = f.grad_monitors[0].e
+                            f.design_fwd_fields = f.adj_monitors[0].e
                             vipdopt.logger.info(
                                 f'Accessed design E-field monitor. NOTE: Field shape'
-                                f' obtained is: {f.grad_monitors[0].fshape}'
+                                f' obtained is: {f.adj_monitors[0].fshape}'
                             )
                             # vipdopt.logger.debug(
                             #     f'Test value of design_efield_monitor in file '
@@ -492,7 +492,7 @@ class LumericalOptimization:
                             )
                             vipdopt.logger.info(
                                 f'File being accessed: {tempfile_fwd_name} should match'
-                                f' FoM tempfile {f.fom_monitors[-1].src.info["name"]}'
+                                f' FoM tempfile {f.fwd_monitors[-1].src.info["name"]}'
                             )
                             # vipdopt.logger.debug(
                             #     f'TrueFoM before has shape{f.true_fom.shape}')
@@ -521,7 +521,7 @@ class LumericalOptimization:
                                 self.true_iteration, f_idx, :
                             ] = np.squeeze(
                                 np.abs(
-                                    f.fom_monitors[0].src.getresult(
+                                    f.fwd_monitors[0].src.getresult(
                                         'transmission_focal_monitor_', 'T', 'T'
                                     )
                                 )
@@ -585,12 +585,12 @@ class LumericalOptimization:
 
                     for f_idx, f in enumerate(self.foms):
                         if (
-                            f.grad_monitors[-1].src.info['name'] in tempfile_adj_name
+                            f.adj_monitors[-1].src.info['name'] in tempfile_adj_name
                         ):  # TODO: might need to account for file extensions
                             # TODO: rewrite this to hook to whichever device the FoM is tied to
                             # print(f'FoM property has length {len(f.fom)}')
 
-                            f.design_adj_fields = f.grad_monitors[-1].e
+                            f.design_adj_fields = f.adj_monitors[-1].e
                             vipdopt.logger.info('Accessed design E-field monitor.')
                             vipdopt.logger.debug(
                                 'Test value of design_efield_monitor in file '
@@ -601,7 +601,7 @@ class LumericalOptimization:
                             vipdopt.logger.info(f'Accessing FoM {f_idx} in list.')
                             vipdopt.logger.info(
                                 f'File being accessed: {tempfile_adj_name} should match'
-                                f' FoM tempfile {f.grad_monitors[-1].src.info["name"]}'
+                                f' FoM tempfile {f.adj_monitors[-1].src.info["name"]}'
                             )
                             f.gradient = f.compute_gradient()
                             # vipdopt.logger.info(
