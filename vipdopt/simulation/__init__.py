@@ -1,5 +1,6 @@
 """Package for abstracting interactions with the Lumerical Python API."""
 
+from vipdopt.simulation.fdtd import ISolver, LumericalFDTD
 from vipdopt.simulation.monitor import Monitor, Power, Profile
 from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
 from vipdopt.simulation.simulation import (
@@ -8,7 +9,6 @@ from vipdopt.simulation.simulation import (
     LumericalSimulation,
 )
 from vipdopt.simulation.source import AdjointSource, ForwardSource, Source
-from vipdopt.simulation.fdtd import ISolver, LumericalFDTD
 
 __all__ = [
     'ISimulation',

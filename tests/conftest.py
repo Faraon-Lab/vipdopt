@@ -229,6 +229,7 @@ def _mock_focal_monitor(mocker):
     )
     mocker.patch('builtins.open', mocked_template)
 
+
 @pytest.fixture(scope='session')
 def focal_monitor_efield():
     data = np.load(MONITOR_DATA_DIR / 'sim_focal_monitor_0.npz', allow_pickle=True)
@@ -237,7 +238,9 @@ def focal_monitor_efield():
 
 @pytest.fixture(scope='session')
 def transmission_monitor_t():
-    data = np.load(MONITOR_DATA_DIR / 'sim_transmission_monitor_0.npz', allow_pickle=True)
+    data = np.load(
+        MONITOR_DATA_DIR / 'sim_transmission_monitor_0.npz', allow_pickle=True
+    )
     return data['t']
 
 

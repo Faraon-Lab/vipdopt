@@ -6,6 +6,9 @@ import pytest
 
 from testing.utils import assert_close, assert_equal
 from vipdopt.optimization import FoM, SuperFoM
+from vipdopt.optimization.fom import unique_fwd_sim_map
+from vipdopt.simulation import Source
+from vipdopt.utils import flatten
 
 
 def fom_func(n) -> npt.ArrayLike:
@@ -186,6 +189,7 @@ def test_bad_op():
         BASE_FOM + 1
 
 
+@pytest.mark.smoke()
 def test_dict():
     fom = copy(BASE_FOM)
     fdict = fom.as_dict()
@@ -193,3 +197,31 @@ def test_dict():
     fom2 = FoM.from_dict(fdict)
 
     assert_equal(fom2, fom)
+
+
+@pytest.mark.smoke()
+def test_unique_source_map():
+    srcs = [Source(f'src{i}', 'gaussian') for i in range(10)]
+    # 0:1, 1:3, 2:5, 3:7, 4:9
+    combos = [srcs[i:j] for (i, j) in zip(range(5), range(1, 10, 2), strict=False)]
+    foms = [
+        (FoM('TE', src_combo, [], [], [], fom_func, gradient_func, [0, 1, 2], []),)
+        for src_combo in combos
+    ]
+    fom = SuperFoM(foms, np.ones(10))
+    sim_map = unique_fwd_sim_map(flatten(fom.foms))
+    assert_equal(len(sim_map), 5)
+
+    src_map_names = [{src.name for src in srcs} for srcs in sim_map]
+    expected_names = [
+        {'src0'},
+        {'src1', 'src2'},
+        {'src2', 'src3', 'src4'},
+        {'src3', 'src4', 'src5', 'src6'},
+        {'src4', 'src5', 'src6', 'src7', 'src8'},
+    ]
+    for name_set in expected_names:
+        assert name_set in src_map_names
+
+    for i, combo in enumerate(combos):
+        assert_equal(sim_map[frozenset(combo)], [foms[i][0]])

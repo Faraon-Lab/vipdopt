@@ -9,16 +9,22 @@ from copy import copy
 from functools import reduce
 from itertools import product
 from typing import Any, Concatenate
-from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.simulation import LumericalSimulation, Monitor, Source, LumericalFDTD
-from vipdopt.simulation.source import DipoleSource, GaussianSource
+from vipdopt.simulation import LumericalSimulation, Monitor, Source
 from vipdopt.simulation.monitor import Power, Profile
-from vipdopt.utils import Number, flatten, starmap_with_kwargs, import_lumapi ,setup_logger, P
+from vipdopt.simulation.source import DipoleSource, GaussianSource
+from vipdopt.utils import (
+    Number,
+    P,
+    flatten,
+    import_lumapi,
+    setup_logger,
+    starmap_with_kwargs,
+)
 
 POLARIZATIONS = ['TE', 'TM', 'TE+TM']
 
@@ -412,7 +418,6 @@ class FoM(SuperFoM):
         self.link_adjoint_sim(adj_sim)
         return [adj_sim]
 
-
     def as_dict(self) -> dict:
         """Return a dictionary representation of this FoM."""
         data: dict = {}
@@ -458,11 +463,11 @@ def unique_adj_sim_map(foms: Iterable[FoM]) -> dict[frozenset[Source], list[FoM]
 
 class BayerFilterFoM(FoM):
     """FoM implementing the particular figure of merit for the SonyBayerFilter.
-    
+
     Must have the following monitor configuration:
         fwd_monitors: [focal_monitor, transmission_monitor, design_efield]
         adj_monitors: [design_efield]
-    
+
     """
 
     def __init__(
@@ -515,11 +520,9 @@ class BayerFilterFoM(FoM):
         efield = self.fwd_monitors[0].e
         total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
 
-        source_weight += np.expand_dims(
-            np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3)
-        )
-            # We'll apply opt_ids slice when gradient is fully calculated.
-            # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])
+        source_weight += np.expand_dims(np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3))
+        # We'll apply opt_ids slice when gradient is fully calculated.
+        # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])
 
         # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
         # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
@@ -589,7 +592,9 @@ class BayerFilterFoM(FoM):
         self.gradient = np.zeros(df_dev.shape, dtype=np.complex128)
         # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
 
-        self.gradient[..., self.pos_max_freqs] = df_dev[..., self.pos_max_freqs]  # * self.enabled
+        self.gradient[..., self.pos_max_freqs] = df_dev[
+            ..., self.pos_max_freqs
+        ]  # * self.enabled
         # self.restricted_gradient[..., self.freq_index_restricted_opt] = \
         #     df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
 
@@ -604,7 +609,7 @@ class BayerFilterFoM(FoM):
 
 class UniformFoM(FoM):
     """A figure of merit for a device with uniform density.
-    
+
     Must have the following monitor configuration:
         fwd_monitors: [design_efield]
         adj_monitors: []
@@ -642,17 +647,24 @@ class UniformFoM(FoM):
     def _uniform_gradient(self):
         return np.sign(self.fwd_monitors[0].e - self.constant)
 
+
 if __name__ == '__main__':
     vipdopt.logger = setup_logger('logger', 0)
-    vipdopt.lumapi = import_lumapi('C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py')
+    vipdopt.lumapi = import_lumapi(
+        'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
+    )
     base_sim = LumericalSimulation('test_data\\sim.json')
     srcs = base_sim.sources()
     vipdopt.logger.debug([src.name for src in srcs])
     fom = BayerFilterFoM(
         'TE',
-        [GaussianSource('forward_src_x')], 
+        [GaussianSource('forward_src_x')],
         [GaussianSource('forward_src_x'), DipoleSource('adj_src_0x')],
-        [Power('focal_monitor_0'), Power('transmission_monitor_0'), Profile('design_efield_monitor')],
+        [
+            Power('focal_monitor_0'),
+            Power('transmission_monitor_0'),
+            Profile('design_efield_monitor'),
+        ],
         [Profile('design_efield_monitor')],
         list(range(60)),
         [],

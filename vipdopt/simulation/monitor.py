@@ -6,14 +6,12 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-
-from vipdopt.utils import ensure_path
-
 from vipdopt.simulation.simobject import (
     MONITOR_TYPES,
     LumericalSimObject,
     LumericalSimObjectType,
 )
+from vipdopt.utils import ensure_path
 
 
 class Monitor(LumericalSimObject):
@@ -57,7 +55,6 @@ class Monitor(LumericalSimObject):
         self._t = None  # Transmission
         self._sp = None  # Source Power
         self._power = None  # Power
-
 
         self._sync = self.src is not None  # Only set to sync if the source file exists
 

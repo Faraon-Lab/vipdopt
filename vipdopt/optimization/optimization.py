@@ -19,7 +19,7 @@ from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import FoM, SuperFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
-from vipdopt.simulation import LumericalSimulation, LumericalFDTD
+from vipdopt.simulation import LumericalFDTD, LumericalSimulation
 
 DEFAULT_OPT_FOLDERS = {'temp': Path('.'), 'opt_info': Path('.'), 'opt_plots': Path('.')}
 

@@ -1,6 +1,7 @@
 """Abstractions of Lumerical simulation objects."""
 
 from __future__ import annotations
+
 import json
 from collections import OrderedDict
 from collections.abc import Callable
@@ -108,7 +109,7 @@ class LumericalSimObject:
         return vars(self)
 
     @classmethod
-    def from_fdtd(cls, obj: dict) -> LumericalSimObject:
+    def from_fdtd(cls, obj) -> LumericalSimObject:
         """Return a LumericalSimObject from the fdtd equivalent."""
         otype = obj['type']
         if otype == 'DFTMonitor':
@@ -123,5 +124,3 @@ class LumericalSimObject:
         sim_obj.update(**obj._nameMap)
 
         return sim_obj
-
-

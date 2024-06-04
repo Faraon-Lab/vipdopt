@@ -13,19 +13,11 @@ from typing import Any, Concatenate, overload
 
 import numpy as np
 import numpy.typing as npt
-from overrides import override
 
 import vipdopt
+from vipdopt.simulation.simobject import LumericalSimObjectType
 from vipdopt.simulation.simulation import ISimulation, LumericalSimulation
-from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
-from vipdopt.utils import (
-    P,
-    Path,
-    R,
-    ensure_path,
-    import_lumapi,
-    setup_logger
-)
+from vipdopt.utils import P, Path, R, ensure_path, import_lumapi, setup_logger
 
 
 class ISolver(abc.ABC):
@@ -58,23 +50,18 @@ class ISolver(abc.ABC):
     @abc.abstractmethod
     @overload
     @ensure_path
-    def load(self, path: Path):
-        ...
+    def load(self, path: Path): ...
 
     @abc.abstractmethod
-    @ensure_path
-    def load(self, sim: ISimulation):
-        ...
+    @overload
+    def load(self, sim: ISimulation): ...
 
     @abc.abstractmethod
     @overload
     @ensure_path
-    def load(self, path: Path, sim: ISimulation):
-        ...
+    def load(self, path: Path, sim: ISimulation): ...
 
     @abc.abstractmethod
-    @overload
-    @ensure_path
     def load(self, path: Path | None, sim: ISimulation | None):
         """Load data into the solver from a file into a simulation object.."""
 
@@ -201,25 +188,22 @@ class LumericalFDTD(ISolver):
             self.fdtd = None
             # self._synced = False
 
+    @abc.abstractmethod
+    @overload
+    @ensure_path
+    def load(self, path: Path): ...
+
+    @abc.abstractmethod
+    @overload
+    def load(self, sim: ISimulation): ...
 
     @abc.abstractmethod
     @overload
     @ensure_path
-    def load(self, path: Path):
-        ...
+    def load(self, path: Path, sim: ISimulation): ...
 
     @abc.abstractmethod
-    @overload
-    def load(self, sim: ISimulation):
-        ...
-
-    @abc.abstractmethod
-    @overload
-    @ensure_path
-    def load(self, path: Path, sim: ISimulation):
-        ...
-
-    @abc.abstractmethod
+    @_check_lum_fdtd
     @overload
     @ensure_path
     def load(self, path: Path | None, sim: ISimulation | None):
@@ -241,16 +225,6 @@ class LumericalFDTD(ISolver):
             self.fdtd.load(str(path))
         else:
             raise ValueError('Both arguments `path` and `sim` cannot be `None`.')
-    
-    @_check_lum_fdtd
-    def sync_sim(self, sim: LumericalSimulation):
-        """Update the simulation to match the data stored in `self.fdtd`."""
-        self.fdtd.selectall()
-        objects = self.fdtd.getAllSelectedObjects()
-        sim.clear_objects()
-        for o in objects:
-            otype = o['type']
-
 
     @_check_lum_fdtd
     def load_simulation(self, sim: ISimulation):
@@ -271,7 +245,6 @@ class LumericalFDTD(ISolver):
                     **obj.properties,
                 )
         self.current_sim = sim
-
 
     @_check_lum_fdtd
     # @override
@@ -507,7 +480,9 @@ ISolver.register(LumericalFDTD)
 
 if __name__ == '__main__':
     vipdopt.logger = setup_logger('logger', 0)
-    vipdopt.lumapi = import_lumapi('C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py')
+    vipdopt.lumapi = import_lumapi(
+        'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
+    )
     fdtd = LumericalFDTD()
     sim = LumericalSimulation('test_data\\sim.json')
     # sim.info['path'] = Path('testing\\monitor_data\\sim.fsp')

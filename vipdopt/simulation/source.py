@@ -17,6 +17,9 @@ class Source(LumericalSimObject):
             return self.name == __value.name and type(self) == type(__value)
         return super().__eq__(__value)
 
+    def __hash__(self) -> int:
+        return hash(self.name)
+
 
 class DipoleSource(Source):
     def __init__(self, name: str):
