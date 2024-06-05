@@ -11,6 +11,7 @@
 !uniform_project/*.json
 temp/
 tmp/
+!testing/*.yml
 
 # Lumerical files
 *.lsf
