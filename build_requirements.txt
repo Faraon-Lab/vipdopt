@@ -11,4 +11,5 @@ Jinja2==3.1.*
 PySide6==6.3.0
 PySide6-stubs==6.4.2
 gdstk==0.9.50
-phinx==7.3.7
+sphinx==7.3.7
+furo==2024.5.6

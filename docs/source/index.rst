@@ -11,6 +11,8 @@ Welcome to Vipdopt's documentation!
 makes use of Lumerical's Python API ``lumapi`` to make the design and optimization of new
 optical devices more straightforward.
 
+Check out the :doc:`usage` section for further information.
+
 
 
 
@@ -27,3 +29,11 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+Contents
+--------
+
+.. toctree::
+   usage
+   config
