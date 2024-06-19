@@ -51,7 +51,14 @@ share/python-wheels/
 *.egg
 MANIFEST
 *.png
-!docs/
+*.bat
+
+# Documentation
+
+docs/source/_autosummary
+
+!docs/*.png
+!docs/*.gif
 
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
