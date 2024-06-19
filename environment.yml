@@ -15,7 +15,8 @@ dependencies:
   - Jinja2=3.1.*
   - PySide6=6.3.0
   - PySide6-stubs=6.4.2
-  - gdstk==0.9.50
+  - gdstk=0.9.50
+  - sphinx=7.3.7
   - pip
   # For Linting
   - ruff=0.3.5

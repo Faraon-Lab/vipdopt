@@ -1,29 +1,39 @@
 """Module for representing sources in Lumerical simulations."""
 
-import pickle
+from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
 
 
-class Source:
-    """Representation of a Lumerical source object.
+# TODO: Create an __eq__ function and also rework what a source stores. Basically
+# just needs to be the name of the source in the base_sim, or some unique identifier.
+# Could also just use the source names instead I suppose...
+class Source(LumericalSimObject):
+    """Representation of a Lumerical source object."""
 
-    Attributes:
-        src_dict (dict): The source data, from the corresponding simulation object or
-            dictionary containing parameters and values.
-        monitor_dict (dict): The monitor at which the source is located. May be a point
-            or a surface. Same type as src_dict.
-        simulation (): The ID of the simulation that this source is from.
-    """
+    def __init__(self, name: str, obj_type: LumericalSimObjectType) -> None:
+        super().__init__(name, obj_type)
 
-    def __init__(self, src_object, monitor_object=None, sim_id=None):
-        """Initialize a Source object."""
-        self.src_dict = src_object
-        self.monitor_dict = monitor_object
-        self.simulation = sim_id
+    def __eq__(self, __value: object) -> bool:
+        if isinstance(__value, Source):
+            return self.name == __value.name and type(self) == type(__value)
+        return super().__eq__(__value)
 
-    def save_to_pickle(self, fname):
-        """Pickles this Source to a file."""
-        with open(fname, 'wb') as f:
-            pickle.dump(self, f)
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+
+class DipoleSource(Source):
+    def __init__(self, name: str):
+        super().__init__(name, LumericalSimObjectType.DIPOLE)
+
+
+class TFSFSource(Source):
+    def __init__(self, name: str):
+        super().__init__(name, LumericalSimObjectType.TFSF)
+
+
+class GaussianSource(Source):
+    def __init__(self, name: str):
+        super().__init__(name, LumericalSimObjectType.GAUSSIAN)
 
 
 class ForwardSource(Source):

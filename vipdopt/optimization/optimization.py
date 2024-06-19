@@ -17,16 +17,16 @@ from vipdopt import GDS, STL
 from vipdopt.configuration import Config
 from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.fom import FoM
+from vipdopt.optimization.fom import FoM, SuperFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
-from vipdopt.simulation import LumericalSimulation
+from vipdopt.simulation import LumericalFDTD, LumericalSimulation
 
 DEFAULT_OPT_FOLDERS = {'temp': Path('.'), 'opt_info': Path('.'), 'opt_plots': Path('.')}
 
 TI02_THRESHOLD = 0.5
 
 
-class Optimization:
+class LumericalOptimization:
     """Class for orchestrating all the pieces of an optimization."""
 
     def __init__(
@@ -34,7 +34,7 @@ class Optimization:
         sims: Iterable[LumericalSimulation],
         device: Device,
         optimizer: GradientOptimizer,
-        fom: FoM | None,
+        fom: SuperFoM | None,
         cfg: Config,
         start_epoch: int = 0,
         start_iter: int = 0,
@@ -68,7 +68,7 @@ class Optimization:
 
         self.fom_hist: list[npt.NDArray] = []
         self.param_hist: list[npt.NDArray] = []
-        self._callbacks: list[Callable[[Optimization], None]] = []
+        self._callbacks: list[Callable[[LumericalOptimization], None]] = []
 
         self.epoch = start_epoch
         self.iteration = start_iter
@@ -79,6 +79,8 @@ class Optimization:
         )
 
         # self.stats = {}
+
+        self.fdtd = LumericalFDTD()
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
@@ -334,6 +336,7 @@ class Optimization:
         vipdopt.logger.info('Beginning Step 3: Setting up Forward and Adjoint Jobs')
 
         for sim_idx, sim in enumerate(self.sims):
+            self.fdtd.load(sim)
             self.runner_sim.fdtd.load(sim.info['name'])
             # self.runner_sim.fdtd.load(self.sim_files[sim_idx].name)
             # Switch to Layout
@@ -423,9 +426,9 @@ class Optimization:
                 # ESSENTIAL STEP - MUST CLEAR THE E-FIELDS OTHERWISE THEY WON'T UPDATE
                 # TODO: Handle this within the monitor itself, or simulation
                 for f in self.foms:
-                    for m in f.fom_monitors:
+                    for m in f.fwd_monitors:
                         m.reset()
-                    for m in f.grad_monitors:
+                    for m in f.adj_monitors:
                         m.reset()
 
                 # Debug using test_dev folder
@@ -466,15 +469,15 @@ class Optimization:
 
                     for f_idx, f in enumerate(self.foms):
                         if (
-                            f.fom_monitors[-1].sim.info['name'] in tempfile_fwd_name
+                            f.fwd_monitors[-1].src.info['name'] in tempfile_fwd_name
                         ):  # TODO: might need to account for file extensions
                             # TODO: rewrite this to hook to whichever device the FoM is tied to
                             # print(f'FoM property has length {len(f.fom)}')
 
-                            f.design_fwd_fields = f.grad_monitors[0].e
+                            f.design_fwd_fields = f.adj_monitors[0].e
                             vipdopt.logger.info(
                                 f'Accessed design E-field monitor. NOTE: Field shape'
-                                f' obtained is: {f.grad_monitors[0].fshape}'
+                                f' obtained is: {f.adj_monitors[0].fshape}'
                             )
                             # vipdopt.logger.debug(
                             #     f'Test value of design_efield_monitor in file '
@@ -489,7 +492,7 @@ class Optimization:
                             )
                             vipdopt.logger.info(
                                 f'File being accessed: {tempfile_fwd_name} should match'
-                                f' FoM tempfile {f.fom_monitors[-1].sim.info["name"]}'
+                                f' FoM tempfile {f.fwd_monitors[-1].src.info["name"]}'
                             )
                             # vipdopt.logger.debug(
                             #     f'TrueFoM before has shape{f.true_fom.shape}')
@@ -518,7 +521,7 @@ class Optimization:
                                 self.true_iteration, f_idx, :
                             ] = np.squeeze(
                                 np.abs(
-                                    f.fom_monitors[0].sim.getresult(
+                                    f.fwd_monitors[0].src.getresult(
                                         'transmission_focal_monitor_', 'T', 'T'
                                     )
                                 )
@@ -582,12 +585,12 @@ class Optimization:
 
                     for f_idx, f in enumerate(self.foms):
                         if (
-                            f.grad_monitors[-1].sim.info['name'] in tempfile_adj_name
+                            f.adj_monitors[-1].src.info['name'] in tempfile_adj_name
                         ):  # TODO: might need to account for file extensions
                             # TODO: rewrite this to hook to whichever device the FoM is tied to
                             # print(f'FoM property has length {len(f.fom)}')
 
-                            f.design_adj_fields = f.grad_monitors[-1].e
+                            f.design_adj_fields = f.adj_monitors[-1].e
                             vipdopt.logger.info('Accessed design E-field monitor.')
                             vipdopt.logger.debug(
                                 'Test value of design_efield_monitor in file '
@@ -598,7 +601,7 @@ class Optimization:
                             vipdopt.logger.info(f'Accessing FoM {f_idx} in list.')
                             vipdopt.logger.info(
                                 f'File being accessed: {tempfile_adj_name} should match'
-                                f' FoM tempfile {f.grad_monitors[-1].sim.info["name"]}'
+                                f' FoM tempfile {f.adj_monitors[-1].src.info["name"]}'
                             )
                             f.gradient = f.compute_gradient()
                             # vipdopt.logger.info(

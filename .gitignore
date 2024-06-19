@@ -11,6 +11,7 @@
 !uniform_project/*.json
 temp/
 tmp/
+!testing/*.yml
 
 # Lumerical files
 *.lsf
@@ -28,6 +29,7 @@ __pycache__/
 *.pkl
 *.npy
 *.npz
+!testing/monitor_data/*.npz
 
 # Distribution / packaging
 .Python

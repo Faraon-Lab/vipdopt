@@ -7,10 +7,11 @@ import pytest
 
 from vipdopt.configuration.template import SonyBayerRenderer
 
-TEST_YAML_PATH = Path('vipdopt/configuration/config_example.yml')
+TEST_YAML_PATH = Path('testing/config_example.yml')
 TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')
 PROJECT_INPUT_DIR = Path('test_project/')
 PROJECT_OUTPUT_DIR = Path('test_output_project/')
+MONITOR_DATA_DIR = Path('testing/monitor_data/')
 
 
 _mock_bad_config_data = {
@@ -217,6 +218,30 @@ def _mock_example_template(mocker):
         read_data=text,
     )
     mocker.patch('builtins.open', mocked_template)
+
+
+@pytest.fixture()
+def _mock_focal_monitor(mocker):
+    with open(MONITOR_DATA_DIR / 'sim_focal_monitor_0.npz', 'rb') as f:
+        text = f.read()
+    mocked_template = mocker.mock_open(
+        read_data=text,
+    )
+    mocker.patch('builtins.open', mocked_template)
+
+
+@pytest.fixture(scope='session')
+def focal_monitor_efield():
+    data = np.load(MONITOR_DATA_DIR / 'sim_focal_monitor_0.npz', allow_pickle=True)
+    return data['e']
+
+
+@pytest.fixture(scope='session')
+def transmission_monitor_t():
+    data = np.load(
+        MONITOR_DATA_DIR / 'sim_transmission_monitor_0.npz', allow_pickle=True
+    )
+    return data['t']
 
 
 @pytest.fixture(scope='session')
