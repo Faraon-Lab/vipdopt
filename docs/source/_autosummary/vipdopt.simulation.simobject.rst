@@ -1,0 +1,32 @@
+vipdopt.simulation.simobject
+============================
+
+.. automodule:: vipdopt.simulation.simobject
+  
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: class-template.rst
+   
+      LumericalSimObject
+      LumericalSimObjectType
+   
+   
+
+   
+   
+   
+
+
+

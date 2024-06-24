@@ -55,7 +55,7 @@ MANIFEST
 
 # Documentation
 
-docs/source/_autosummary
+# docs/source/_autosummary
 
 !docs/*.png
 !docs/*.gif
