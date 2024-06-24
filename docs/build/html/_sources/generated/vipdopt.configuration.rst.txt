@@ -1,0 +1,23 @@
+﻿vipdopt.configuration
+=====================
+
+.. automodule:: vipdopt.configuration
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

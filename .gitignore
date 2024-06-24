@@ -57,6 +57,7 @@ MANIFEST
 
 # docs/source/_autosummary
 
+!docs/build/
 !docs/*.png
 !docs/*.gif
 

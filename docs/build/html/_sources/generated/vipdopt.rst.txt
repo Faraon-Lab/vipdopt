@@ -1,0 +1,6 @@
+﻿vipdopt
+=======
+
+.. currentmodule:: vipdopt
+
+.. automodule:: vipdopt

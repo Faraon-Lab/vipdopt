@@ -1,0 +1,23 @@
+﻿vipdopt.simulation
+==================
+
+.. automodule:: vipdopt.simulation
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
