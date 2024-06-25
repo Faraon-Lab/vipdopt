@@ -645,7 +645,7 @@ class UniformFoM(FoM):
         return 1 - np.abs(self.fwd_monitors[0].e - self.constant)
 
     def _uniform_gradient(self):
-        return np.sign(self.fwd_monitors[0].e - self.constant)
+        return np.sign(self.constant - self.fwd_monitors[0].e)
 
 
 if __name__ == '__main__':
