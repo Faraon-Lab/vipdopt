@@ -318,8 +318,8 @@ class FoM(SuperFoM):
         adj_monitors: list[Monitor],
         fom_func: Callable[Concatenate[FoM, P], npt.NDArray],
         grad_func: Callable[Concatenate[FoM, P], npt.NDArray],
-        pos_max_freqs: list[int],
-        neg_min_freqs: list[int],
+        pos_max_freqs: Sequence[int],
+        neg_min_freqs: Sequence[int],
     ) -> None:
         """Initialize a FoM object."""
         super().__init__([(self,)], [1.0])
@@ -334,8 +334,8 @@ class FoM(SuperFoM):
                 f'Polarization must be one of {POLARIZATIONS}; got {polarization}'
             )
         self.polarization = polarization
-        self.pos_max_freqs = pos_max_freqs
-        self.neg_min_freqs = neg_min_freqs
+        self.pos_max_freqs = list(pos_max_freqs)
+        self.neg_min_freqs = list(neg_min_freqs)
 
     def __eq__(self, other: Any) -> bool:
         """Test equality."""
@@ -621,8 +621,8 @@ class UniformFoM(FoM):
         polarization: str,
         fwd_srcs: list[Source],
         adj_srcs: list[Source],
-        fom_monitors: list[Monitor],
-        grad_monitors: list[Monitor],
+        fwd_monitors: list[Monitor],
+        adj_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         constant: float,
@@ -632,8 +632,8 @@ class UniformFoM(FoM):
             polarization,
             fwd_srcs,
             adj_srcs,
-            fom_monitors,
-            grad_monitors,
+            fwd_monitors,
+            adj_monitors,
             self._uniform_fom,
             self._uniform_gradient,
             pos_max_freqs,
