@@ -20,8 +20,8 @@ class GradientOptimizer(abc.ABC):
         """Step forward one iteration in the optimization process."""
 
 
-class GradientDescentOptimizer(GradientOptimizer):
-    """Optimizer for doing basic gradient descent."""
+class GradientAscentOptimizer(GradientOptimizer):
+    """Optimizer for doing basic gradient ascent."""
 
     step_size: float
 
@@ -37,6 +37,6 @@ class GradientDescentOptimizer(GradientOptimizer):
     ):
         """Step with the gradient."""
         grad = device.backpropagate(gradient)
-        w_hat = device.get_design_variable() - self.step_size * grad
+        w_hat = device.get_design_variable() + self.step_size * grad 
 
         device.set_design_variable(w_hat)

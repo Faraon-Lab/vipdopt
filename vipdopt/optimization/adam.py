@@ -35,7 +35,7 @@ class AdamOptimizer(GradientOptimizer):
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Take gradient step using Adam algorithm."""
         # Commented out as it is already performed outside of this function for now
-        # grad = device.backpropagate(gradient)
+        gradient = device.backpropagate(gradient)
 
         # Changed to gradient descent for now...
         b1, b2 = self.betas

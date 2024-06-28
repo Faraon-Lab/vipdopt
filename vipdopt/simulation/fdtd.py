@@ -290,6 +290,15 @@ class LumericalFDTD(ISolver):
             self._env_vars = kwargs if len(kwargs) > 0 else None
         else:
             self.setup_env_resources(**kwargs)
+    
+    def get_env_vars(self) -> dict:
+        """Return the current pending environment variables to be set.
+
+        Returns:
+            dict: The current pending environment variables to be set. If
+                `self._env_vars` is None, returns an empty dictionary.
+        """
+        return {} if self._env_vars is None else self._env_vars
 
     @_check_lum_fdtd
     def set_resource(self, resource_num: int, resource: str, value: Any):

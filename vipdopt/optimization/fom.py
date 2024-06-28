@@ -194,6 +194,8 @@ class SuperFoM:
                     return NotImplemented
         elif isinstance(first, SuperFoM) and isinstance(second, Number):
             match operator:
+                case '+':
+                    foms = [tuple([second])] + first.foms
                 case '*':
                     foms = first.foms
                     weights = [w * second for w in first.weights]
@@ -204,6 +206,8 @@ class SuperFoM:
                     return NotImplemented
         elif isinstance(first, Number) and isinstance(second, SuperFoM):
             match operator:
+                case '+':
+                    foms = [tuple([first])] + second.foms
                 case '*':
                     foms = second.foms
                     weights = [first * w for w in second.weights]
@@ -318,8 +322,8 @@ class FoM(SuperFoM):
         adj_monitors: list[Monitor],
         fom_func: Callable[Concatenate[FoM, P], npt.NDArray],
         grad_func: Callable[Concatenate[FoM, P], npt.NDArray],
-        pos_max_freqs: list[int],
-        neg_min_freqs: list[int],
+        pos_max_freqs: Sequence[int],
+        neg_min_freqs: Sequence[int],
     ) -> None:
         """Initialize a FoM object."""
         super().__init__([(self,)], [1.0])
@@ -334,8 +338,8 @@ class FoM(SuperFoM):
                 f'Polarization must be one of {POLARIZATIONS}; got {polarization}'
             )
         self.polarization = polarization
-        self.pos_max_freqs = pos_max_freqs
-        self.neg_min_freqs = neg_min_freqs
+        self.pos_max_freqs = list(pos_max_freqs)
+        self.neg_min_freqs = list(neg_min_freqs)
 
     def __eq__(self, other: Any) -> bool:
         """Test equality."""
@@ -607,22 +611,16 @@ class BayerFilterFoM(FoM):
         return df_dev
 
 
-class UniformFoM(FoM):
-    """A figure of merit for a device with uniform density.
-
-    Must have the following monitor configuration:
-        fwd_monitors: [design_efield]
-        adj_monitors: []
-
-    """
+class UniformMAEFoM(FoM):
+    """A figure of merit for a uniform density using mean absolute error."""
 
     def __init__(
         self,
         polarization: str,
         fwd_srcs: list[Source],
         adj_srcs: list[Source],
-        fom_monitors: list[Monitor],
-        grad_monitors: list[Monitor],
+        fwd_monitors: list[Monitor],
+        adj_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         constant: float,
@@ -632,20 +630,98 @@ class UniformFoM(FoM):
             polarization,
             fwd_srcs,
             adj_srcs,
-            fom_monitors,
-            grad_monitors,
-            self._uniform_fom,
-            self._uniform_gradient,
+            fwd_monitors,
+            adj_monitors,
+            self._uniform_mae_fom,
+            self._uniform_mae_gradient,
             pos_max_freqs,
             neg_min_freqs,
         )
         self.constant = constant
 
-    def _uniform_fom(self):
-        return 1 - np.abs(self.fwd_monitors[0].e - self.constant)
+    def _uniform_mae_fom(self, x: npt.NDArray):
+        return 1 - np.abs(x - self.constant)
 
-    def _uniform_gradient(self):
-        return np.sign(self.fwd_monitors[0].e - self.constant)
+    def _uniform_mae_gradient(self, x: npt.NDArray):
+        return np.sign(self.constant - x)
+
+class UniformMSEFoM(FoM):
+    """A figure of merit for a uniform density using mean squared error."""
+    def __init__(
+        self,
+        polarization: str,
+        fwd_srcs: list[Source],
+        adj_srcs: list[Source],
+        fwd_monitors: list[Monitor],
+        adj_monitors: list[Monitor],
+        pos_max_freqs: list[int],
+        neg_min_freqs: list[int],
+        constant: float,
+    ) -> None:
+        """Initialize a UniformFoM."""
+        super().__init__(
+            polarization,
+            fwd_srcs,
+            adj_srcs,
+            fwd_monitors,
+            adj_monitors,
+            self._uniform_mse_fom,
+            self._uniform_mse_gradient,
+            pos_max_freqs,
+            neg_min_freqs,
+        )
+        self.constant = constant
+
+    def _uniform_mse_fom(self, x: npt.NDArray):
+        return 1 - np.square(x - self.constant)
+
+    def _uniform_mse_gradient(self, x: npt.NDArray):
+        return self.constant - x
+
+
+def gaussian_kernel(length=5, sigma=1.0) -> npt.NDArray:
+    """Creates a 2D gaussian kernel.`"""
+    ax = np.linspace(-(length - 1) / 2., (length - 1) / 2., length)
+    gauss = np.exp(-0.5 * np.square(ax) / np.square(sigma))
+    kernel = np.outer(gauss, gauss)
+    return kernel / np.sum(kernel)
+
+
+class GaussianFoM(FoM):
+    """A figure of merit for a device to match a 2d Gaussian."""
+
+    def __init__(
+        self,
+        polarization: str,
+        fwd_srcs: list[Source],
+        adj_srcs: list[Source],
+        fwd_monitors: list[Monitor],
+        adj_monitors: list[Monitor],
+        pos_max_freqs: list[int],
+        neg_min_freqs: list[int],
+        length: float,
+        sigma: float,
+    ) -> None:
+        """Initialize a UniformFoM."""
+        super().__init__(
+            polarization,
+            fwd_srcs,
+            adj_srcs,
+            fwd_monitors,
+            adj_monitors,
+            self._gaussian_fom,
+            self._gaussian_gradient,
+            pos_max_freqs,
+            neg_min_freqs,
+        )
+        self.kernel = gaussian_kernel(length, sigma)
+
+    def _gaussian_fom(self, x: npt.NDArray):
+        return 1 - np.abs(x - self.kernel)
+
+    def _gaussian_gradient(self, x: npt.NDArray):
+        return np.sign(self.kernel - x)
+
 
 
 if __name__ == '__main__':

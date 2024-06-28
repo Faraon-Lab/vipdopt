@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from vipdopt.configuration.template import SonyBayerRenderer
+from vipdopt.optimization import Device
 
 TEST_YAML_PATH = Path('testing/config_example.yml')
 TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')
@@ -285,3 +286,22 @@ def _mock_project_json(mocker):
         read_data=data,
     )
     mocker.patch('builtins.open', mocked_project)
+
+@pytest.fixture()
+def default_device_dict() -> dict:
+    return {
+        'size': (25, 25, 5),
+        'permittivity_constraints': (0.0, 1.0),
+        'coords': {'x': np.array(0), 'y': np.array(0), 'z': np.array(0)},
+        'name': 'device',
+        'init_density': 0.5,
+        'randomize': False,
+        'init_seed': None,
+        'symmetric': False,
+        'filters': None,
+    }
+
+@pytest.fixture(scope='function')
+def device(request, default_device_dict) -> Device:
+    default_device_dict.update(request.param)
+    return Device(**default_device_dict)

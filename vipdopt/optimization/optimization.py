@@ -62,10 +62,6 @@ class LumericalOptimization:
         self.env_vars = env_vars
         self.loop = True
 
-        self.runner_sim = LumericalSimulation()  # Dummy sim for running in parallel
-        self.runner_sim.fdtd = vipdopt.fdtd
-        self.runner_sim.promise_env_setup(**env_vars)
-
         self.fom_hist: list[npt.NDArray] = []
         self.param_hist: list[npt.NDArray] = []
         self._callbacks: list[Callable[[LumericalOptimization], None]] = []
@@ -81,10 +77,16 @@ class LumericalOptimization:
         # self.stats = {}
 
         self.fdtd = LumericalFDTD()
+        self.fdtd.promise_env_setup(**env_vars)
+        self.runner_sim = LumericalSimulation()  # Dummy sim for running in parallel
 
     def add_callback(self, func: Callable):
         """Register a callback function to call after each iteration."""
         self._callbacks.append(func)
+    
+    def set_env_vars(self, env_vars: dict):
+        """Set env vars that are passed to the runner sim of this Optimization."""
+        self.env_vars = env_vars
 
     def create_history(self, fom_types, max_iter, num_design_frequency_points):
         """Set up numpy arrays to track the FoMs and progress of the simulation."""

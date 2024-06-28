@@ -83,6 +83,7 @@ class LumericalSimulation(ISimulation):
         """
         self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
         self.clear_objects()
+        self._env_vars: dict | None = None
 
         if source:
             self.load(source)
@@ -90,6 +91,15 @@ class LumericalSimulation(ISimulation):
     @override
     def __str__(self) -> str:
         return self.as_json()
+    
+    def get_env_vars(self) -> dict:
+        """Return the current pending environment variables to be set.
+
+        Returns:
+            dict: The current pending environment variables to be set. If
+                `self._env_vars` is None, returns an empty dictionary.
+        """
+        return {} if self._env_vars is None else self._env_vars
 
     @override
     def load(self, source: PathLike | dict):
