@@ -381,9 +381,9 @@ class Project:
         else:
             vipdopt.logger.warning(f'Warning! MPI path does not exist.')
         if Path(env_vars['solver_exe']).exists():
-            vipdopt.logger.info(f'Verified: Solver path exists.')    
+            vipdopt.logger.debug(f'Verified: Solver path exists.')    
         else:
-            vipdopt.logger.debug(f'Warning! Solver path does not exist.')
+            vipdopt.logger.warning(f'Warning! Solver path does not exist.')
         
         self.optimization = LumericalOptimization(
             sims,

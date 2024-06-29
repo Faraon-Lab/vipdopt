@@ -389,6 +389,15 @@ class LumericalOptimization:
 
     def run(self):  # noqa: PLR0912, PLR0915
         """Run the optimization."""
+        
+        # I was thinking of this kind of workflow in optimization.py:
+        # 1. load base_sim
+        # 2. create all the different versions using the FoM
+        # 3. run simulations
+        # 4. Using data and gradients etc. calculate updates to the device
+        # 5. import updated device into base_sim
+        # 6. repeat
+        
         self._pre_run()
         vipdopt.logger.info(f'Initial Device: {self.device.get_design_variable()}')
         while self.epoch < self.max_epochs:

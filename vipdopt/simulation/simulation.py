@@ -108,6 +108,35 @@ class LumericalSimulation(ISimulation):
         else:
             self._load_file(source)
 
+    # @_check_fdtd
+    @ensure_path
+    def _load_fsp(self, fname: Path):
+        """Load a simulation from a Lumerical .fsp file."""
+        vipdopt.logger.debug(f'Loading simulation from {fname}...')
+        self._clear_objects()
+        self.fdtd.load(str(fname))  # type: ignore
+        self.fdtd.selectall()  # type: ignore
+        objects = self.fdtd.getAllSelectedObjects()  # type: ignore
+        # vipdopt.logger.debug(list(vars(objects[0]).keys()))
+        # vipdopt.logger.debug(list(objects[0].__dict__.keys()))
+        # print(objects[0]['type'])
+        for o in objects:
+            otype = o['type']
+            if otype == 'DFTMonitor':
+                if o['spatial interpolation'] == 'specified position':
+                    obj_type = LumericalSimObjectType.PROFILE
+                else:
+                    obj_type = LumericalSimObjectType.POWER
+            else:
+                obj_type = OBJECT_TYPE_NAME_MAP[otype]
+            oname = o._id.name.split('::')[-1]  # noqa: SLF001
+            sim_obj = LumericalSimObject(oname, obj_type)
+            for name in o._nameMap:  # noqa: SLF001
+                sim_obj[name] = o[name]
+
+            self.objects[oname] = sim_obj
+        vipdopt.logger.debug(self.as_json())
+
     @ensure_path
     def _load_file(self, fname: Path):
         """Load a simulation from a JSON file."""
@@ -162,6 +191,13 @@ class LumericalSimulation(ISimulation):
     def set_path(self, path: Path):
         """Set the save path of the simulation."""
         self.info['path'] = path.absolute()
+    
+    def get_path(self) -> Path:
+        """Get the save path of the simulation."""
+        p = self.info['path']
+        if not isinstance(p, Path):
+            p = Path(p)
+        return p
 
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""

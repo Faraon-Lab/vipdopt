@@ -114,33 +114,32 @@ if __name__ == '__main__':
             project.config.data['lumapi_filepath_hpc']
         )  # HPC (Linux)
     
+    # base sim is project.base_sim
+    # We can create new simulations from the foMs by using fom.create_forward_sim()
+    # and passing base sim as a template
+    project.base_sim.set_path(project.dir / 'base_sim.fsp')
+    # project.base_sim.set_path('test_data\\base_sim.fsp')
+    fwd_sim = project.foms[0].create_forward_sim(project.base_sim)[0]
     
-    # TODO!!!!
-    # Nia: also all of the simulations can be made from the FoMs using the create_forward_sims
-    # so you just need the base sim, and it’ll make all of the different versions that need to be
-    # run automatically from the FoM
+    fdtd = project.optimization.fdtd
+    fdtd.connect(hide=False) # True)
     
-    # fwd_sim = fom.create_forward_sim(base_sim)[0]
-    # fwd_sim.set_path('test_data\\fwd_sim.fsp')
-    # adj_sim = fom.create_adjoint_sim(base_sim)[0]
-    # adj_sim.set_path('test_data\\adj_sim.fsp')
-
-    # # fdtd = LumericalFDTD()
-    # # fdtd.connect(hide=True)
-
-    # # fdtd.save('test_data\\fwd_sim.fsp', fwd_sim)
-    # # fdtd.save('test_data\\adj_sim.fsp', adj_sim)
-    # # fdtd.addjob('test_data\\fwd_sim.fsp')
-    # # fdtd.addjob('test_data\\adj_sim.fsp')
-    # # fdtd.runjobs(0)
-
-    # # fdtd.reformat_monitor_data([fwd_sim, adj_sim])
-    # fwd_sim.link_monitors()
-    # adj_sim.link_monitors()
-
-    # fom_val = fom.compute_fom()
-    # vipdopt.logger.debug(f'FoM: {fom_val.shape}')
-    # grad_val = fom.compute_grad()
-    # vipdopt.logger.debug(f'Gradient: {grad_val.shape}')
+    debug_post_run=False
+    if not debug_post_run:
+        # fdtd.save(project.base_sim.get_path(), project.base_sim)
+        fdtd.save(project.dir / 'base_sim.fsp', project.base_sim)
+        # fdtd.save('test_data\\adj_sim.fsp', adj_sim)
+        fdtd.addjob(project.dir / 'base_sim.fsp')
+        # fdtd.addjob('test_data\\adj_sim.fsp')
+        fdtd.runjobs(1)
+        fdtd.reformat_monitor_data([project.base_sim])
+    else:
+        fdtd.load(project.dir / 'base_sim.fsp')
+        fdtd.reformat_monitor_data([project.base_sim])
+    
+    fom_val = project.optimization.fom.foms[1][0].compute_fom()
+    vipdopt.logger.debug(f'FoM: {fom_val.shape}')
+    grad_val = project.optimization.fom.foms[1][0].compute_grad()
+    vipdopt.logger.debug(f'Gradient: {grad_val.shape}')
     
     print('Reached end of code.')
