@@ -4,7 +4,7 @@ import numpy.typing as npt
 import pytest
 from jax import grad, jit, vmap
 
-from testing import assert_close, assert_greater_than
+from testing import assert_close, assert_greater_than, assert_less_than
 from vipdopt.optimization import (
     AdamOptimizer,
     Device,
@@ -14,6 +14,11 @@ from vipdopt.optimization import (
     UniformMAEFoM,
     UniformMSEFoM,
 )
+
+
+def avg_abs_dist(x: npt.ArrayLike, y: npt.ArrayLike) -> npt.ArrayLike:
+    """Compute the avergae absolute distance."""
+    return np.abs(x - y).mean()
 
 
 @pytest.mark.smoke()
@@ -45,12 +50,16 @@ from vipdopt.optimization import (
 )
 def test_step(opt, device: Device, fom: FoM):
     """Test a single step with the gradient."""
-    initial_dist = np.abs(device.get_design_variable() - 0.5)
+    initial_w = device.get_design_variable()
+    initial_dist = avg_abs_dist(initial_w, 0.5)
 
     opt.step(device, fom.compute_fom(device.get_design_variable()), 0)
-    new_dist = np.abs(device.get_design_variable() - 0.5)
 
-    assert new_dist.mean() <= initial_dist.mean()  # Should have moved closer to target
+    new_w = device.get_design_variable()
+    new_dist = avg_abs_dist(new_w, 0.5)
+
+    assert_less_than(new_dist, initial_dist)  # Should have moved closer to target
+    assert_close(new_w, initial_w, err=0.0001)  # One step should not perturb too much
 
 
 @pytest.mark.parametrize(
@@ -153,6 +162,7 @@ def test_gaussianfom(opt, device: Device):
     indirect=['device'],
 )
 def test_autograd(opt, device: Device):
+    # Use logistic function for FoM
     def fom(x: npt.NDArray):
         return 1 / (1 + jnp.exp(-x))
 
