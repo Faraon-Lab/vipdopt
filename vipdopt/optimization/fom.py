@@ -12,6 +12,7 @@ from typing import Any, Concatenate
 
 import numpy as np
 import numpy.typing as npt
+import matplotlib.pyplot as plt
 
 import vipdopt
 from vipdopt.simulation import LumericalSimulation, Monitor, Source
@@ -713,10 +714,10 @@ class GaussianFoM(FoM):
         self.kernel = gaussian_kernel(length, sigma)
 
     def _gaussian_fom(self, x: npt.NDArray):
-        return 1 - np.abs(x - self.kernel)
+        return 1 - np.square(x - self.kernel[..., np.newaxis])
 
     def _gaussian_gradient(self, x: npt.NDArray):
-        return np.sign(self.kernel - x)
+        return 2 * (self.kernel[..., np.newaxis] - x)
 
 
 
