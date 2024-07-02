@@ -1,39 +1,47 @@
-import pytest
+import jax.numpy as jnp
 import numpy as np
-import matplotlib.pyplot as plt
+import numpy.typing as npt
+import pytest
+from jax import grad, jit, vmap
 
-from testing import assert_close
-
-from vipdopt.optimization import FoM, UniformMAEFoM, GradientAscentOptimizer, Device, LumericalOptimization, AdamOptimizer, GaussianFoM, UniformMSEFoM
-from vipdopt.simulation import Power
+from testing import assert_close, assert_greater_than
+from vipdopt.optimization import (
+    AdamOptimizer,
+    Device,
+    FoM,
+    GaussianFoM,
+    GradientAscentOptimizer,
+    UniformMAEFoM,
+    UniformMSEFoM,
+)
 
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-        'opt, device, fom',
-        [
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0},
-                UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-            (
-                AdamOptimizer(step_size=1e-4),
-                {'randomize': True, 'init_seed': 0},
-                UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0},
-                UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-            (
-                AdamOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0},
-                UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-        ],
-        indirect=['device']
+    'opt, device, fom',
+    [
+        (
+            GradientAscentOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+        (
+            AdamOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+        (
+            GradientAscentOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+        (
+            AdamOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+    ],
+    indirect=['device'],
 )
 def test_step(opt, device: Device, fom: FoM):
     """Test a single step with the gradient."""
@@ -46,22 +54,13 @@ def test_step(opt, device: Device, fom: FoM):
 
 
 @pytest.mark.parametrize(
-        'opt, device',
-        [
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0}
-            ),
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'init_density': 1.0}
-            ),
-            (
-                AdamOptimizer(step_size=1e-4),
-                {'randomize': True, 'init_seed': 0}
-            ),
-        ],
-        indirect=['device']
+    'opt, device',
+    [
+        (GradientAscentOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+        (GradientAscentOptimizer(step_size=1e-4), {'init_density': 1.0}),
+        (AdamOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+    ],
+    indirect=['device'],
 )
 def test_uniform(opt, device: Device):
     """Test that a device conforms to uniformity in right circumstances."""
@@ -76,11 +75,10 @@ def test_uniform(opt, device: Device):
         [],
         range(n_freq),
         [],
-        0.5  # Tests  absolute value from 0.5
+        0.5,  # Tests  absolute value from 0.5
     )
 
     for i in range(n_iter):
-        
         g = fom.compute_grad(device.get_design_variable())
         opt.step(device, g, i)
 
@@ -88,15 +86,14 @@ def test_uniform(opt, device: Device):
     assert_close(f, 1.0)
 
     assert_close(device.get_design_variable(), 0.5)
-        
 
 
 @pytest.mark.parametrize(
-        'device',
-        [
-            {'randomize': True, 'init_seed': 0},
-        ],
-        indirect=True,
+    'device',
+    [
+        {'randomize': True, 'init_seed': 0},
+    ],
+    indirect=True,
 )
 def test_dual_fom_uniform(device: Device):
     """Using two opposing FoMs should balance out."""
@@ -124,22 +121,13 @@ def test_dual_fom_uniform(device: Device):
 
 
 @pytest.mark.parametrize(
-        'opt, device',
-        [
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0}
-            ),
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'init_density': 1.0}
-            ),
-            (
-                AdamOptimizer(step_size=1e-4),
-                {'randomize': True, 'init_seed': 0}
-            ),
-        ],
-        indirect=['device']
+    'opt, device',
+    [
+        (GradientAscentOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+        (GradientAscentOptimizer(step_size=1e-4), {'init_density': 1.0}),
+        (AdamOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+    ],
+    indirect=['device'],
 )
 def test_gaussianfom(opt, device: Device):
     fom = GaussianFoM('TE+TM', [], [], [], [], range(5), [], 25, 5)
@@ -153,5 +141,31 @@ def test_gaussianfom(opt, device: Device):
 
     w = device.get_design_variable()
     k = fom.kernel[..., np.newaxis]
-    
+
     assert_close(np.square(w - k), np.zeros(w.shape))
+
+
+@pytest.mark.parametrize(
+    'opt, device',
+    [
+        (GradientAscentOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+    ],
+    indirect=['device'],
+)
+def test_autograd(opt, device: Device):
+    def fom(x: npt.NDArray):
+        return 1 / (1 + jnp.exp(-x))
+
+    # Find gradient using autograd
+    grad_func = jit(vmap(vmap(vmap(grad(fom, holomorphic=True)))))
+
+    n_iter = 100000
+    for i in range(n_iter):
+        g = grad_func(device.get_design_variable())
+        opt.step(device, g, i)
+
+    w = device.get_design_variable()
+    f = fom(w)
+
+    assert_greater_than(f, 0.8)
+    assert_greater_than(w, 1.5)

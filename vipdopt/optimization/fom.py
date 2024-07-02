@@ -12,7 +12,6 @@ from typing import Any, Concatenate
 
 import numpy as np
 import numpy.typing as npt
-import matplotlib.pyplot as plt
 
 import vipdopt
 from vipdopt.simulation import LumericalSimulation, Monitor, Source
@@ -642,8 +641,10 @@ class UniformMAEFoM(FoM):
     def _uniform_mae_gradient(self, x: npt.NDArray):
         return np.sign(self.constant - x)
 
+
 class UniformMSEFoM(FoM):
     """A figure of merit for a uniform density using mean squared error."""
+
     def __init__(
         self,
         polarization: str,
@@ -677,8 +678,8 @@ class UniformMSEFoM(FoM):
 
 
 def gaussian_kernel(length=5, sigma=1.0) -> npt.NDArray:
-    """Creates a 2D gaussian kernel.`"""
-    ax = np.linspace(-(length - 1) / 2., (length - 1) / 2., length)
+    """Creates a 2D gaussian kernel."""
+    ax = np.linspace(-(length - 1) / 2.0, (length - 1) / 2.0, length)
     gauss = np.exp(-0.5 * np.square(ax) / np.square(sigma))
     kernel = np.outer(gauss, gauss)
     return kernel / np.sum(kernel)
@@ -718,7 +719,6 @@ class GaussianFoM(FoM):
 
     def _gaussian_gradient(self, x: npt.NDArray):
         return 2 * (self.kernel[..., np.newaxis] - x)
-
 
 
 if __name__ == '__main__':
