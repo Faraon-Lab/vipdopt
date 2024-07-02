@@ -31,4 +31,5 @@ dependencies:
   - pytest-xdist=3.5.*
   - pytest-mock=3.12.*
   - coverage[toml]=7.4.3
-  - jax=0.4.3
+  - jax=0.4.30
+  - jaxlib=0.4.30
