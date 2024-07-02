@@ -44,8 +44,5 @@ jobs:
       - name: Setup Python
         uses: ./.github/actions/python-setup
     
-      - run: |
-            pip install -r test-requirements.txt
-    
       - name: Run Smoke Tests
         run: pytest -m 'smoke and not lumapi'
