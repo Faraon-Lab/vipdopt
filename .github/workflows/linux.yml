@@ -43,6 +43,9 @@ jobs:
 
       - name: Setup Python
         uses: ./.github/actions/python-setup
+        with:
+          cache: 'pip'
+          cache-dependency-path: './*_requirements.txt'
     
       - name: Run Smoke Tests
         run: pytest -m 'smoke and not lumapi'
