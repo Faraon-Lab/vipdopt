@@ -13,6 +13,7 @@ from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
+import shutil
 from types import ModuleType
 from typing import Any, Concatenate, ParamSpec, TypeAlias, TypedDict, TypeVar
 
@@ -287,3 +288,17 @@ def flatten(data: Nested[T]) -> Iterable[T]:
             yield from flatten(x)
     else:
         yield data
+
+
+def rmtree(path: Path, keep_dir: bool=False):
+    """Delete a directory recursively."""
+    if not path.is_dir():
+        raise ValueError('Path must be a directory')
+    for child in path.iterdir():
+        if child.is_file():
+            child.unlink()
+        else:
+            rmtree(child, keep_dir=False)
+    
+    if not keep_dir:
+        path.rmdir()
