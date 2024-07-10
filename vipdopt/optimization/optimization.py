@@ -19,7 +19,7 @@ from vipdopt import GDS, STL
 from vipdopt.configuration import Config
 from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.fom import FoM, SuperFoM
+from vipdopt.optimization.fom import FoM, SuperFoM, BayerFilterFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.simulation import LumericalFDTD, LumericalSimulation
 from vipdopt.utils import rmtree
@@ -253,19 +253,15 @@ class LumericalOptimization:
         """Final pre-processing before running the optimization."""
         # Connect to Lumerical
         self.loop = True
-        return
-        with ThreadPool() as pool:
-            pool.apply(LumericalSimulation.connect, (self.runner_sim,))
-            pool.map(LumericalSimulation.connect, self.sims)
+        self.fdtd.connect(hide=False)
 
     def _post_run(self):
         """Final post-processing after running the optimization."""
         # Disconnect from Lumerical
         self.loop = False
         self.save_histories()
-        self.generate_plots()
-        with ThreadPool() as pool:
-            pool.map(LumericalSimulation.close, self.sims)
+        # self.generate_plots()
+        self.fdtd.close()
 
     def run_simulations(self):
         """Run all of the simulations in parallel."""
@@ -983,7 +979,6 @@ class LumericalOptimization:
     def run2(self):
         """Run the optimization"""
         self._pre_run()
-        self.fdtd.connect(hide=True)
 
         # If an error is encountered while running the optimmization still want to
         # clean up afterwards
@@ -1007,14 +1002,23 @@ class LumericalOptimization:
                 
                 # Save current design before iteration
                 w = self.device.get_design_variable()
-                self.param_hist[self.true_iteration] = w
+                self.param_hist.append(w)
 
                 # Clean scratch directory to save storage space
                 rmtree(self.dirs['temp'], keep_dir=True)
 
-                # TODO: Import device into base simulation
+                # Import device index into base simulation
+                import_primitive = self.base_sim.imports()[0]
+                cur_density, cur_permittivity = self.device.import_cur_index(
+                    import_primitive,
+                    reinterpolation_factor=1,
+                    binarize=False,
+                )
 
-                # Run simulations
+                # # Disable device index monitor to save memory
+                # self.disable([import_monitor_name])
+
+                # Create jobs
                 fwd_sims = self.fom.create_forward_sim(self.base_sim)
                 adj_sims = self.fom.create_adjoint_sim(self.base_sim)
                 for sim in chain(fwd_sims, adj_sims):
@@ -1022,23 +1026,27 @@ class LumericalOptimization:
                     self.fdtd.save(sim_file, sim)
                     self.fdtd.addjob(sim_file)
                 
+                # Run all simulations
                 self.fdtd.runjobs()
                 
                 # Reformat monitor data for easy use
                 self.fdtd.reformat_monitor_data(list(chain(fwd_sims, adj_sims)))
 
                 # Compute FoM
-                f = self.fom.compute_fom(*self.fom_args)
-                self.fom_hist[self.true_iteration] = f
+                f = self.fom.compute_fom(*self.fom_args).sum()
+                self.fom_hist.append(f)
+
+                vipdopt.logger.debug(f'FoM: {f}')
 
                 # Step the device with the gradient
                 g = self.fom.compute_grad(*self.grad_args)
+                vipdopt.logger.debug(f'Gradient: {g}')
                 self.optimizer.step(self.device, g, self.true_iteration)
 
                 # TODO: Re-weight the FoM using performance weighting
 
                 # Generate Plots and call callback functions
-                self.generate_plots()
+                # self.generate_plots()
                 self.call_callbacks()
             
                 self.true_iteration += 1
@@ -1049,3 +1057,55 @@ class LumericalOptimization:
         """Call all of the callback functions."""
         for fun in self._callbacks:
             fun(self)
+
+if __name__ == '__main__':
+    from vipdopt.simulation.source import GaussianSource, DipoleSource
+    from vipdopt.simulation.monitor import Power, Profile
+    from vipdopt.optimization.filter import Sigmoid, Scale
+    from vipdopt.optimization.optimizer import GradientAscentOptimizer
+    from vipdopt.utils import setup_logger, import_lumapi
+    vipdopt.logger = setup_logger('logger', 0)
+    vipdopt.lumapi = import_lumapi(
+        'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
+    )
+    fom = BayerFilterFoM(
+        'TE',
+        [GaussianSource('forward_src_x')],
+        [GaussianSource('forward_src_x'), DipoleSource('adj_src_0x')],
+        [
+            Power('focal_monitor_0'),
+            Power('transmission_monitor_0'),
+            Profile('design_efield_monitor'),
+        ],
+        [Profile('design_efield_monitor')],
+        list(range(60)),
+        [],
+    )
+    sim = LumericalSimulation('runs\\test_run\\sim.json')
+    dev = Device(
+        (25, 25, 5),
+        (0.0, 1.0),
+        {
+            'x': 1e-6 * np.linspace(0, 1, 25),
+            'y': 1e-6 * np.linspace(0, 1, 25),
+            'z': 1e-6 * np.linspace(0, 1, 25),
+        },
+        name='Bayer Filter',
+        randomize=True,
+        init_seed=0,
+        filters=[
+            Sigmoid(0.5, 0.05),
+            Scale((0, 1))
+        ]
+    )
+    opt = LumericalOptimization(
+        sim,
+        dev,
+        GradientAscentOptimizer(step_size=1e-4),
+        fom,
+        tuple(),
+        tuple(),
+        Config(),
+        [1, 2],
+    )
+    opt.run2()

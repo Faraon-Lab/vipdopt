@@ -143,7 +143,12 @@ class SuperFoM:
     ) -> list[LumericalSimulation]:
         """Create all unique forward simulations needed to compute this FoM."""
         fwd_sim_map = unique_fwd_sim_map(flatten(self.foms))
-        sims = [base_sim.with_enabled(srcs) for srcs in fwd_sim_map]
+        sims = [
+            base_sim.with_enabled(
+                srcs,
+                base_sim.info['name'] + '_fwd_' + '_'.join(src.name for src in srcs)
+            ) for srcs in fwd_sim_map
+        ]
         for i, foms in enumerate(fwd_sim_map.values()):
             for fom in foms:
                 fom.link_forward_sim(sims[i])
@@ -154,7 +159,12 @@ class SuperFoM:
     ) -> list[LumericalSimulation]:
         """Create all unique adjoint simulations needed to compute this FoM."""
         adj_sim_map = unique_adj_sim_map(flatten(self.foms))
-        sims = [base_sim.with_enabled(srcs) for srcs in adj_sim_map]
+        sims = [
+            base_sim.with_enabled(
+                srcs,
+                base_sim.info['name'] + '_adj_' + '_'.join(src.name for src in srcs)
+            ) for srcs in adj_sim_map
+        ]
         for i, foms in enumerate(adj_sim_map.values()):
             for fom in foms:
                 fom.link_adjoint_sim(sims[i])
@@ -402,7 +412,9 @@ class FoM(SuperFoM):
         self, base_sim: LumericalSimulation
     ) -> list[LumericalSimulation]:
         """Create a simulation with only the forward sources enabled."""
-        fwd_sim = base_sim.with_enabled(self.fwd_srcs)
+        new_name = base_sim.info['name'] + '_fwd_' + \
+              '_'.join(src.name for src in self.fwd_srcs)
+        fwd_sim = base_sim.with_enabled(self.fwd_srcs, new_name)
         self.link_forward_sim(fwd_sim)
         return [fwd_sim]
 
@@ -414,7 +426,9 @@ class FoM(SuperFoM):
         self, base_sim: LumericalSimulation
     ) -> list[LumericalSimulation]:
         """Create a simulation with only the adjoint sources enabled."""
-        adj_sim = base_sim.with_enabled(self.adj_srcs)
+        new_name = base_sim.info['name'] + '_fwd_' + \
+              '_'.join(src.name for src in self.fwd_srcs)
+        adj_sim = base_sim.with_enabled(self.adj_srcs, new_name)
         self.link_adjoint_sim(adj_sim)
         return [adj_sim]
 
@@ -727,6 +741,7 @@ if __name__ == '__main__':
         'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
     )
     base_sim = LumericalSimulation('test_data\\sim.json')
+    base_sim.set_path('test_data\\')
     srcs = base_sim.sources()
     vipdopt.logger.debug([src.name for src in srcs])
     fom = BayerFilterFoM(

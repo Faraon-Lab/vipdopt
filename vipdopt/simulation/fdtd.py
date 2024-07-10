@@ -15,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.simulation.simobject import LumericalSimObjectType
+from vipdopt.simulation.simobject import LumericalSimObjectType, Import
 from vipdopt.simulation.simulation import ISimulation, LumericalSimulation
 from vipdopt.utils import P, Path, R, ensure_path, import_lumapi, setup_logger
 
@@ -244,6 +244,9 @@ class LumericalFDTD(ISolver):
                     self.fdtd,
                     **obj.properties,
                 )
+                # Import nk2 if possible
+                if isinstance(obj, Import) and obj.n is not None:
+                    self.importnk2(obj.name, *obj.get_nk2())
         self.current_sim = sim
 
     @_check_lum_fdtd
@@ -474,6 +477,31 @@ class LumericalFDTD(ISolver):
                 # monitor.h
                 # return
         vipdopt.logger.info('Finished reformatting monitor data.')
+    
+    @_check_lum_fdtd
+    def importnk2(
+        self,
+        import_name: str,
+        n: npt.NDArray,
+        x: npt.NDArray,
+        y: npt.NDArray,
+        z: npt.NDArray,
+    ):
+        """Import the refractive index (n and k) over an entire volume / surface.
+        
+        Arguments:
+            import_name (str): Name of the import primitive to import to.
+            n (npt.NDArray): Refractive index. Must be of dimension NxMxP or NxMxPx3,
+                depending on whether the material isotropic or not, with N, M, P >= 2.
+            x (npt.NDArray): If n is NxMxP, then x should be Nx1. Values must be
+                uniformly spaced.
+            y (npt.NDArray): If n is NxMxP, then y should be Mx1. Values must be
+                uniformly spaced.
+            z (npt.NDArray): If n is NxMxP, then z should be Px1. Values must be
+                uniformly spaced.
+        """
+        self.fdtd.select(import_name)
+        self.fdtd.importnk2(n, x, y, z)
 
 
 ISolver.register(LumericalFDTD)

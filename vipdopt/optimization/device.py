@@ -11,12 +11,15 @@ from typing import cast
 
 import numpy as np
 import numpy.typing as npt
+from scipy import interpolate
 
 from vipdopt.optimization.filter import Filter, Scale, Sigmoid
-from vipdopt.utils import Coordinates, PathLike, ensure_path
+from vipdopt.utils import Coordinates, PathLike, ensure_path, repeat
+from vipdopt.simulation import LumericalFDTD, LumericalSimulation, Import
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
+REINTERPOLATION_SIZE = (300, 300, 306)
 
 
 # TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
@@ -333,3 +336,120 @@ class Device:
         #     grad = filt.chain_rule(grad, y, x)
 
         return grad
+
+    def import_cur_index(
+        self,
+        import_primitive: Import,
+        reinterpolation_factor: float=1,
+        reinterpolation_size: tuple[int, int, int]=REINTERPOLATION_SIZE,
+        binarize: bool=False,
+    ):
+        """Reinterpolate and import cur_index into design regions.
+        
+        Arguments:
+            import_primitive (Import): The import primitive to import the index to. Will
+                call `import_primitive.set_nk2` with the appropriate values.
+            reinterpolation_factor (float): The scale factor to use when
+                reinterpolating. If 1, this function will not perform reinterpolation.
+                Defaults to 1.
+            reinterpolation_size (tuple[int, int, int]): The number of voxels for the
+                output when reinterpolating. Defaults to (300, 300, 306).
+            binarize (bool): Whether to binarize the index before importing. Defaults to
+                False.
+        """
+        # Here cur_density will have values between 0 and 1
+        cur_density = self.get_density().copy()
+
+        # Reinterpolate
+        if reinterpolation_factor != 1:
+            new_size = np.ceil(reinterpolation_factor)
+            cur_density_import = repeat(cur_density, (new_size, new_size, new_size))
+            # cur_density_import = np.repeat(
+            #     np.repeat(
+            #         np.repeat(
+            #             cur_density,
+            #             np.ceil(reinterpolation_factor),
+            #             axis=0,
+            #         ),
+            #         np.ceil(reinterpolation_factor),
+            #         axis=1,
+            #     ),
+            #     np.ceil(reinterpolation_factor),
+            #     axis=2,
+            # )
+            design_region = [
+                1e-6 * np.linspace(
+                    self.coords[axis][0],
+                    self.coords[axis][-1],
+                    len(self.coords[axis]) * reinterpolation_factor,
+                )
+                for axis in self.coords
+            ]
+            design_region_import = [
+                1e-6 * np.linspace(
+                    self.coords[axis][0],
+                    self.coords[axis][-1],
+                    reinterpolation_size[i],
+                )
+                for i, axis in enumerate(self.coords)
+            ]
+        else:
+            cur_density_import = cur_density.copy()
+            design_region = [
+                1e-6 * np.linspace(
+                    self.coords[axis][0],
+                    self.coords[axis][-1],
+                    cur_density_import.shape[i]
+                )
+                for i, axis in enumerate(self.coords)
+            ]
+            design_region_import = [
+                1e-6 * np.linspace(
+                    self.coords[axis][0],
+                    self.coords[axis][-1],
+                    self.field_shape[i]
+                )
+                for i, axis in enumerate(self.coords)
+            ]
+
+        design_region_import_grid = np.array(
+            np.meshgrid(
+                *design_region_import,
+                indexing='ij'
+            )
+        ).transpose((1, 2, 3, 0))
+
+        # Perform reinterpolation so as to fit into Lumerical mesh.
+        # NOTE: The imported array does not need to have the same size as the
+        # Lumerical mesh. Lumerical will perform its own reinterpolation
+        # (params. of which are unclear).
+        cur_density_import = interpolate.interpn(
+            tuple(design_region),
+            cur_density_import,
+            design_region_import_grid,
+            method='linear'
+        )
+        
+        # Binarize before importing
+        if binarize:
+            cur_density_import = self.binarize(cur_density_import)
+
+        # TODO: Add dispersion. Account for dispersion by using the dispersion_model
+        dispersive_max_permittivity = self.permittivity_constraints[1]
+        self.index_from_permittivity(dispersive_max_permittivity)
+
+        # Convert device to permittivity and then index
+        cur_permittivity = self.density_to_permittivity(
+            cur_density_import,
+            self.permittivity_constraints[0],
+            dispersive_max_permittivity,
+        )
+        # TODO: Another way to do this that can include dispersion is to update the
+        # Scale filter with new permittivity constraint maximum
+        cur_index = self.index_from_permittivity(cur_permittivity)
+
+        # TODO (maybe): cut cur_index by region
+        # Import to simulation
+        import_primitive.set_nk2(cur_index, *design_region_import)
+
+        return cur_density, cur_permittivity

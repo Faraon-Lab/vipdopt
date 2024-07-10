@@ -302,3 +302,12 @@ def rmtree(path: Path, keep_dir: bool=False):
     
     if not keep_dir:
         path.rmdir()
+
+
+
+def repeat(a: npt.NDArray, shape: tuple[int, ...]) -> npt.NDArray:
+    """Apply numpy's `repeat` function along multiple axes.
+    
+    Solution from https://stackoverflow.com/questions/7656665/how-to-repeat-elements-of-an-array-along-two-axes
+    """
+    return np.kron(a, np.ones(shape, dtype=a.dtype))

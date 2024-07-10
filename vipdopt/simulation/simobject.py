@@ -8,6 +8,9 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any
 
+import numpy as np
+import numpy.typing as npt
+
 import vipdopt
 
 
@@ -124,3 +127,27 @@ class LumericalSimObject:
         sim_obj.update(**obj._nameMap)
 
         return sim_obj
+
+
+class Import(LumericalSimObject):
+    """Class representing an import primitive in Lumerical."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name, LumericalSimObjectType.IMPORT)
+        # Create dummy values until otherwise
+        self.n = None
+        self.x = np.ones(1)
+        self.y = np.ones(1)
+        self.z = np.ones(1)
+    
+    def set_nk2(self, n: npt.NDArray, x: npt.NDArray, y: npt.NDArray, z: npt.NDArray):
+        """Set the value of the nk of this import primitive."""
+        self.n = n
+        self.x = x
+        self.y = y
+        self.z = z
+    
+    def get_nk2(self) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+        """Get the relevant data from in order to use `LumericalFDTD.importnk2`."""
+        assert self.n is not None
+        return (self.n, self.x, self.y, self.z)
