@@ -63,7 +63,13 @@ class SuperFoM:
         """Reset all of the monitors used to calculate the FoM."""
         map(FoM.reset_monitors, flatten(self.foms))
 
-    def compute_fom(self, *args, **kwargs) -> npt.NDArray:
+    def compute_fom(
+            self,
+            *args,
+            spectral_weights: npt.NDArray=np.array(1),
+            performance_weights: npt.NDArray=np.array(1),
+            **kwargs
+    ) -> npt.NDArray:
         """Compute the weighted sum of the FoMs."""
         fom_results = np.array([
             SuperFoM._compute_prod(
@@ -74,6 +80,7 @@ class SuperFoM:
             )
             for fom_tup in self.foms
         ])
+        fom_results = np.dot(fom_results, spectral_weights).dot(performance_weights)
         return np.einsum('i,i...->...', self.weights, fom_results)
 
     @staticmethod
@@ -126,7 +133,13 @@ class SuperFoM:
         )
         return np.prod(fom_vals, axis=0) * term2
 
-    def compute_grad(self, *args, **kwargs) -> npt.NDArray:
+    def compute_grad(
+            self,
+            *args,
+            spectral_weights: npt.NDArray=np.array(1),
+            performance_weights: npt.NDArray=np.array(1),
+            **kwargs
+    ) -> npt.NDArray:
         """Compute the weighted sum of the gradients."""
         grad_results = np.array([
             SuperFoM._prod_rule(
@@ -136,6 +149,7 @@ class SuperFoM:
             )
             for fom_tup in self.foms
         ])
+        grad_results = np.dot(grad_results, spectral_weights).dot(performance_weights)
         return np.einsum('i,i...->...', self.weights, grad_results)
 
     def create_forward_sim(
@@ -388,13 +402,15 @@ class FoM(SuperFoM):
         """Compute the figure of merit."""
         total_fom = self.fom_func(*args, **kwargs)
         self.reset_monitors()
-        return self._subtract_neg(total_fom)
+        # return self._subtract_neg(total_fom)
+        return total_fom
 
     def compute_grad(self, *args, **kwargs) -> npt.NDArray:
         """Compute the gradient of the figure of merit."""
         total_grad = self.grad_func(*args, **kwargs)
         self.reset_monitors()
-        return self._subtract_neg(total_grad)
+        # return self._subtract_neg(total_grad)
+        return total_grad
 
     def _subtract_neg(self, array: npt.NDArray) -> npt.NDArray:
         """Subtract the restricted indices from the positive ones."""

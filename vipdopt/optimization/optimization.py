@@ -70,6 +70,9 @@ class LumericalOptimization:
         self.loop = True
         self.true_iteration = 0
 
+        self.spectral_weights = np.array(1)
+        self.performance_weights = np.array(1)
+
         # Setup Lumerical Hook
         self.fdtd = LumericalFDTD()
         self.fdtd.promise_env_setup(**env_vars)
@@ -1058,6 +1061,8 @@ class LumericalOptimization:
         for fun in self._callbacks:
             fun(self)
 
+
+
 if __name__ == '__main__':
     from vipdopt.simulation.source import GaussianSource, DipoleSource
     from vipdopt.simulation.monitor import Power, Profile
@@ -1083,12 +1088,12 @@ if __name__ == '__main__':
     )
     sim = LumericalSimulation('runs\\test_run\\sim.json')
     dev = Device(
-        (25, 25, 5),
+        (41, 41, 42),
         (0.0, 1.0),
         {
-            'x': 1e-6 * np.linspace(0, 1, 25),
-            'y': 1e-6 * np.linspace(0, 1, 25),
-            'z': 1e-6 * np.linspace(0, 1, 25),
+            'x': 1e-6 * np.linspace(0, 1, 41),
+            'y': 1e-6 * np.linspace(0, 1, 41),
+            'z': 1e-6 * np.linspace(0, 1, 42),
         },
         name='Bayer Filter',
         randomize=True,
