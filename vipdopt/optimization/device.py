@@ -14,8 +14,8 @@ import numpy.typing as npt
 from scipy import interpolate
 
 from vipdopt.optimization.filter import Filter, Scale, Sigmoid
+from vipdopt.simulation import Import
 from vipdopt.utils import Coordinates, PathLike, ensure_path, repeat
-from vipdopt.simulation import LumericalFDTD, LumericalSimulation, Import
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
@@ -264,15 +264,8 @@ class Device:
             self.w[..., i + 1] = var_out
 
     def index_from_permittivity(self, permittivity):
-        """Takes square root of permittivty to give the index.
-
-        Raises:
-            (ValueError): If any permittivity values are not real.
-        """
-        if np.any(np.imag(permittivity)):
-            raise ValueError(f'Expected real permittivty values; got {permittivity}.')
-
-        return np.sqrt(permittivity)
+        """Takes square root of permittivty to give the index."""
+        return np.sqrt(np.real(permittivity))
 
     def permittivity_to_density(self, eps, eps_min, eps_max):
         """Convert permittivity to density."""
@@ -340,12 +333,12 @@ class Device:
     def import_cur_index(
         self,
         import_primitive: Import,
-        reinterpolation_factor: float=1,
-        reinterpolation_size: tuple[int, int, int]=REINTERPOLATION_SIZE,
-        binarize: bool=False,
+        reinterpolation_factor: float = 1,
+        reinterpolation_size: tuple[int, int, int] = REINTERPOLATION_SIZE,
+        binarize: bool = False,
     ):
         """Reinterpolate and import cur_index into design regions.
-        
+
         Arguments:
             import_primitive (Import): The import primitive to import the index to. Will
                 call `import_primitive.set_nk2` with the appropriate values.
@@ -378,7 +371,8 @@ class Device:
             #     axis=2,
             # )
             design_region = [
-                1e-6 * np.linspace(
+                1e-6
+                * np.linspace(
                     self.coords[axis][0],
                     self.coords[axis][-1],
                     len(self.coords[axis]) * reinterpolation_factor,
@@ -386,7 +380,8 @@ class Device:
                 for axis in self.coords
             ]
             design_region_import = [
-                1e-6 * np.linspace(
+                1e-6
+                * np.linspace(
                     self.coords[axis][0],
                     self.coords[axis][-1],
                     reinterpolation_size[i],
@@ -396,27 +391,24 @@ class Device:
         else:
             cur_density_import = cur_density.copy()
             design_region = [
-                1e-6 * np.linspace(
+                1e-6
+                * np.linspace(
                     self.coords[axis][0],
                     self.coords[axis][-1],
-                    cur_density_import.shape[i]
+                    cur_density_import.shape[i],
                 )
                 for i, axis in enumerate(self.coords)
             ]
             design_region_import = [
-                1e-6 * np.linspace(
-                    self.coords[axis][0],
-                    self.coords[axis][-1],
-                    self.field_shape[i]
+                1e-6
+                * np.linspace(
+                    self.coords[axis][0], self.coords[axis][-1], self.field_shape[i]
                 )
                 for i, axis in enumerate(self.coords)
             ]
 
         design_region_import_grid = np.array(
-            np.meshgrid(
-                *design_region_import,
-                indexing='ij'
-            )
+            np.meshgrid(*design_region_import, indexing='ij')
         ).transpose((1, 2, 3, 0))
 
         # Perform reinterpolation so as to fit into Lumerical mesh.
@@ -427,9 +419,9 @@ class Device:
             tuple(design_region),
             cur_density_import,
             design_region_import_grid,
-            method='linear'
+            method='linear',
         )
-        
+
         # Binarize before importing
         if binarize:
             cur_density_import = self.binarize(cur_density_import)

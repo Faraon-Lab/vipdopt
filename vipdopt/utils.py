@@ -13,7 +13,6 @@ from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from importlib.abc import Loader
 from numbers import Number
 from pathlib import Path
-import shutil
 from types import ModuleType
 from typing import Any, Concatenate, ParamSpec, TypeAlias, TypedDict, TypeVar
 
@@ -290,7 +289,7 @@ def flatten(data: Nested[T]) -> Iterable[T]:
         yield data
 
 
-def rmtree(path: Path, keep_dir: bool=False):
+def rmtree(path: Path, keep_dir: bool = False):
     """Delete a directory recursively."""
     if not path.is_dir():
         raise ValueError('Path must be a directory')
@@ -299,15 +298,14 @@ def rmtree(path: Path, keep_dir: bool=False):
             child.unlink()
         else:
             rmtree(child, keep_dir=False)
-    
+
     if not keep_dir:
         path.rmdir()
 
 
-
 def repeat(a: npt.NDArray, shape: tuple[int, ...]) -> npt.NDArray:
     """Apply numpy's `repeat` function along multiple axes.
-    
+
     Solution from https://stackoverflow.com/questions/7656665/how-to-repeat-elements-of-an-array-along-two-axes
     """
     return np.kron(a, np.ones(shape, dtype=a.dtype))

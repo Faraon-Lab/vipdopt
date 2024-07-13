@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import os
 import pickle
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
+from itertools import chain
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from typing import Any
-from itertools import chain
 
 import numpy as np
 import numpy.typing as npt
@@ -19,7 +19,7 @@ from vipdopt import GDS, STL
 from vipdopt.configuration import Config
 from vipdopt.eval import plotter
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.fom import FoM, SuperFoM, BayerFilterFoM
+from vipdopt.optimization.fom import BayerFilterFoM, FoM, SuperFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.simulation import LumericalFDTD, LumericalSimulation
 from vipdopt.utils import rmtree
@@ -42,20 +42,27 @@ class LumericalOptimization:
         device: Device,
         optimizer: GradientOptimizer,
         fom: SuperFoM,
-        fom_args: tuple[Any, ...],
-        grad_args: tuple[Any, ...],
-        cfg: Config,
-        epoch_list: list[int]=[100],
+        fom_args: tuple[Any, ...] = tuple(),
+        fom_kwargs: dict = {},
+        grad_args: tuple[Any, ...] = tuple(),
+        grad_kwargs: dict = {},
+        cfg: Config = Config(),
+        epoch_list: list[int] = [100],
         dirs: dict[str, Path] = DEFAULT_OPT_FOLDERS,
-        env_vars: dict={},
+        env_vars: dict = {},
     ):
         """Initialize Optimization object."""
         self.base_sim = base_sim
         self.device = device
         self.optimizer = optimizer
-        self.fom = fom
+        if isinstance(fom, FoM):
+            self.fom = SuperFoM([(fom,)], [1])
+        else:
+            self.fom = fom
         self.fom_args = fom_args
+        self.fom_kwargs = fom_kwargs
         self.grad_args = grad_args
+        self.grad_kwargs = grad_kwargs
         self.dirs = dirs
         # Ensure directories exist
         for directory in dirs.values():
@@ -256,7 +263,7 @@ class LumericalOptimization:
         """Final pre-processing before running the optimization."""
         # Connect to Lumerical
         self.loop = True
-        self.fdtd.connect(hide=False)
+        self.fdtd.connect(hide=True)
 
     def _post_run(self):
         """Final post-processing after running the optimization."""
@@ -994,15 +1001,22 @@ class LumericalOptimization:
             )
         finally:
             self._post_run()
-    
+
     def _inner_optimization_loop(self):
         """The core optimization loop."""
         self.true_iteration = 0
         for epoch, max_iter in enumerate(self.epoch_list):
-            for i in range(max_iter):
+            vipdopt.logger.info(
+                f'=============== Starting Epoch {epoch} ===============\n'
+            )
+            iters_in_epoch = max_iter - self.true_iteration
+            for i in range(iters_in_epoch):
+                vipdopt.logger.info(
+                    f'===== Epoch {epoch}, Iteration {i} / {iters_in_epoch}, Total Iteration {self.true_iteration} =====\n'
+                )
                 if not self.loop:
                     break
-                
+
                 # Save current design before iteration
                 w = self.device.get_design_variable()
                 self.param_hist.append(w)
@@ -1026,32 +1040,39 @@ class LumericalOptimization:
                 adj_sims = self.fom.create_adjoint_sim(self.base_sim)
                 for sim in chain(fwd_sims, adj_sims):
                     sim_file = self.dirs['temp'] / f'{sim.info["name"]}.fsp'
+                    # print(str(sim_file))
+                    # sim.set_path(sim_file)
+                    # sim.link_monitors()
+
                     self.fdtd.save(sim_file, sim)
                     self.fdtd.addjob(sim_file)
-                
+
                 # Run all simulations
                 self.fdtd.runjobs()
-                
+
                 # Reformat monitor data for easy use
                 self.fdtd.reformat_monitor_data(list(chain(fwd_sims, adj_sims)))
 
                 # Compute FoM
-                f = self.fom.compute_fom(*self.fom_args).sum()
+                f = self.fom.compute_fom(*self.fom_args, **self.fom_kwargs)
                 self.fom_hist.append(f)
 
                 vipdopt.logger.debug(f'FoM: {f}')
 
                 # Step the device with the gradient
-                g = self.fom.compute_grad(*self.grad_args)
-                vipdopt.logger.debug(f'Gradient: {g}')
+                g = self.fom.compute_grad(
+                    *self.grad_args,
+                    apply_performance_weights=True,
+                    **self.grad_kwargs,
+                )
+                # vipdopt.logger.debug(f'Gradient: {g}')
+                vipdopt.logger.debug('Stepping device along gradient.')
                 self.optimizer.step(self.device, g, self.true_iteration)
-
-                # TODO: Re-weight the FoM using performance weighting
 
                 # Generate Plots and call callback functions
                 # self.generate_plots()
                 self.call_callbacks()
-            
+
                 self.true_iteration += 1
             if not self.loop:
                 break
@@ -1062,13 +1083,13 @@ class LumericalOptimization:
             fun(self)
 
 
-
 if __name__ == '__main__':
-    from vipdopt.simulation.source import GaussianSource, DipoleSource
-    from vipdopt.simulation.monitor import Power, Profile
-    from vipdopt.optimization.filter import Sigmoid, Scale
+    from vipdopt.optimization.filter import Scale, Sigmoid
     from vipdopt.optimization.optimizer import GradientAscentOptimizer
-    from vipdopt.utils import setup_logger, import_lumapi
+    from vipdopt.simulation.monitor import Power, Profile
+    from vipdopt.simulation.source import DipoleSource, GaussianSource
+    from vipdopt.utils import import_lumapi, setup_logger
+
     vipdopt.logger = setup_logger('logger', 0)
     vipdopt.lumapi = import_lumapi(
         'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
@@ -1085,6 +1106,7 @@ if __name__ == '__main__':
         [Profile('design_efield_monitor')],
         list(range(60)),
         [],
+        spectral_weights=np.ones(60),
     )
     sim = LumericalSimulation('runs\\test_run\\sim.json')
     dev = Device(
@@ -1098,19 +1120,13 @@ if __name__ == '__main__':
         name='Bayer Filter',
         randomize=True,
         init_seed=0,
-        filters=[
-            Sigmoid(0.5, 0.05),
-            Scale((0, 1))
-        ]
+        filters=[Sigmoid(0.5, 0.05), Scale((0, 1))],
     )
     opt = LumericalOptimization(
         sim,
         dev,
         GradientAscentOptimizer(step_size=1e-4),
         fom,
-        tuple(),
-        tuple(),
-        Config(),
-        [1, 2],
+        epoch_list=[1, 2],
     )
     opt.run2()

@@ -15,6 +15,8 @@ from vipdopt.optimization import (
     UniformMSEFoM,
 )
 
+DEVICE_SIZE = 25 * 25 * 5
+
 
 def avg_abs_dist(x: npt.ArrayLike, y: npt.ArrayLike) -> npt.ArrayLike:
     """Compute the avergae absolute distance."""
@@ -53,7 +55,7 @@ def test_step(opt, device: Device, fom: FoM):
     initial_w = device.get_design_variable()
     initial_dist = avg_abs_dist(initial_w, 0.5)
 
-    opt.step(device, fom.compute_fom(device.get_design_variable()), 0)
+    opt.step(device, fom.compute_grad(device.get_design_variable()), 0)
 
     new_w = device.get_design_variable()
     new_dist = avg_abs_dist(new_w, 0.5)
@@ -92,7 +94,7 @@ def test_uniform(opt, device: Device):
         opt.step(device, g, i)
 
     f = fom.compute_fom(device.get_design_variable())
-    assert_close(f, 1.0)
+    assert_close(f, 1.0 * DEVICE_SIZE, 1)
 
     assert_close(device.get_design_variable(), 0.5)
 
@@ -125,7 +127,7 @@ def test_dual_fom_uniform(device: Device):
 
     # Check that FoM is maximized at x = 0.5
     f = fom.compute_fom(device.get_design_variable())
-    assert_close(f, 1.5)
+    assert_close(f, 1.5 * DEVICE_SIZE)
     assert_close(device.get_design_variable(), 0.5)
 
 
@@ -146,7 +148,7 @@ def test_gaussianfom(opt, device: Device):
         opt.step(device, g, i)
 
     f = fom.compute_fom(device.get_design_variable())
-    assert_close(f, 1.0)
+    assert_close(f, 1.0 * DEVICE_SIZE)
 
     w = device.get_design_variable()
     k = fom.kernel[..., np.newaxis]
@@ -175,7 +177,7 @@ def test_autograd(opt, device: Device):
         opt.step(device, g, i)
 
     w = device.get_design_variable()
-    f = fom(w)
+    f = fom(w).sum()
 
-    assert_greater_than(f, 0.8)
+    assert_greater_than(f, 0.8 * DEVICE_SIZE)
     assert_greater_than(w, 1.5)

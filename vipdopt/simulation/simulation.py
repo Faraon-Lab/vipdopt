@@ -14,7 +14,6 @@ from typing import Any, overload
 
 import numpy as np
 from overrides import override
-from scipy import interpolate  # type: ignore
 
 import vipdopt
 
@@ -24,9 +23,9 @@ from vipdopt.simulation.simobject import (
     IMPORT_TYPES,
     MONITOR_TYPES,
     SOURCE_TYPES,
+    Import,
     LumericalSimObject,
     LumericalSimObjectType,
-    Import,
 )
 from vipdopt.simulation.source import Source
 from vipdopt.utils import PathLike, ensure_path, read_config_file

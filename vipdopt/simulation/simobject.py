@@ -107,6 +107,22 @@ class LumericalSimObject:
             )
         return super().__eq__(__value)
 
+    def __lt__(self, obj2: LumericalSimObject) -> bool:
+        """Test if this object comes before another alphabetically."""
+        return self.name < obj2.name
+
+    def __gt__(self, obj2: LumericalSimObject) -> bool:
+        """Test if this object comes after another alphabetically."""
+        return self.name > obj2.name
+
+    def __le__(self, obj2: LumericalSimObject) -> bool:
+        """Test if this object is less than or equal to another alphabetically."""
+        return self.name <= obj2.name
+
+    def __ge__(self, obj2: LumericalSimObject) -> bool:
+        """Test if this object is greater than or equal to another alphabetically."""
+        return self.name >= obj2.name
+
     def as_dict(self) -> dict:
         """Return a dictionary representation of this object."""
         return vars(self)
@@ -139,14 +155,14 @@ class Import(LumericalSimObject):
         self.x = np.ones(1)
         self.y = np.ones(1)
         self.z = np.ones(1)
-    
+
     def set_nk2(self, n: npt.NDArray, x: npt.NDArray, y: npt.NDArray, z: npt.NDArray):
         """Set the value of the nk of this import primitive."""
         self.n = n
         self.x = x
         self.y = y
         self.z = z
-    
+
     def get_nk2(self) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
         """Get the relevant data from in order to use `LumericalFDTD.importnk2`."""
         assert self.n is not None

@@ -2,7 +2,11 @@
 
 from vipdopt.simulation.fdtd import ISolver, LumericalFDTD
 from vipdopt.simulation.monitor import Monitor, Power, Profile
-from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType, Import
+from vipdopt.simulation.simobject import (
+    Import,
+    LumericalSimObject,
+    LumericalSimObjectType,
+)
 from vipdopt.simulation.simulation import (
     ISimulation,
     LumericalEncoder,
