@@ -73,18 +73,21 @@ class LumericalSimObject:
         """Create a LumericalSimObject."""
         self.name = name
         self.obj_type = obj_type
-        self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
         self.properties: OrderedDict[str, Any] = OrderedDict()
         if obj_type != LumericalSimObjectType.FDTD:
             self.properties['name'] = name
 
-    def __str__(self) -> str:
-        """Return string representation of object."""
+    def __repr__(self) -> str:
+        """Return string representation of the object."""
         return json.dumps(
             self.as_dict(),
             indent=4,
             ensure_ascii=True,
         )
+    
+    def __str__(self) -> str:
+        """Return a string version of the object."""
+        return f'{self.obj_type} "{self.name}"'
 
     def __setitem__(self, key: str, val: Any) -> None:
         """Set the value of a property of the object."""

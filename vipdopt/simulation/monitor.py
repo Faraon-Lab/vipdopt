@@ -1,6 +1,7 @@
 """Class for general sources in a simulation."""
 
 from pathlib import Path
+import json
 
 import numpy as np
 import numpy.typing as npt
@@ -34,10 +35,24 @@ class Monitor(LumericalSimObject):
         self.reset()
 
     @ensure_path
-    def set_src(self, src: Path):
+    def set_source(self, src: Path):
         """Set the source file this monitor is connected to."""
         self.src = src
         self.reset()
+    
+    def __repr__(self) -> str:
+        """Return a string representation of the monitor."""
+        data = {
+            'name': self.name,
+            'obj_type': self.obj_type,
+            'properties': self.properties
+        }
+        return json.dumps(
+            data,
+            indent=4,
+            ensure_ascii=True,
+        )
+        return str(data)
 
     def __eq__(self, __value: object) -> bool:
         """Test equality."""

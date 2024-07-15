@@ -9,12 +9,12 @@ from vipdopt.simulation import Power
 
 def test_load(focal_monitor_efield, transmission_monitor_t):
     m = Power('focal_monitor_0')
-    m.set_src(MONITOR_DATA_DIR / 'sim_focal_monitor_0.npz')
+    m.set_source(MONITOR_DATA_DIR / 'sim_focal_monitor_0.npz')
 
     assert_close(m.e, focal_monitor_efield)
 
     m = Power('transmission_monitor_0')
-    m.set_src(MONITOR_DATA_DIR / 'sim_transmission_monitor_0.npz')
+    m.set_source(MONITOR_DATA_DIR / 'sim_transmission_monitor_0.npz')
 
     assert_close(m.t, transmission_monitor_t)
 
@@ -24,7 +24,7 @@ def test_reset(mocker, focal_monitor_efield):
     m._sync = True  # noqa: SLF001
     with pytest.raises(RuntimeError, match=r'has no source to load data from'):
         e = m.load_source()
-    m.set_src(MONITOR_DATA_DIR / 'sim_focal_monitor_0.npz')
+    m.set_source(MONITOR_DATA_DIR / 'sim_focal_monitor_0.npz')
 
     spy = mocker.spy(m, 'load_source')
 
