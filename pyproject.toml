@@ -3,7 +3,7 @@
 #
 
 [tool.ruff]
-include = ["vipdopt/*", "tests/*"]
+include = ["vipdopt/*", "tests/*", "testing/*"]
 fix = true
 show-fixes = true
 
@@ -46,7 +46,8 @@ exclude = [
     "*.gds",
     "*.GDS",
     "*.stl",
-    "*.ldev"
+    "*.ldev",
+    "*.npz"
 ]
 
 # Same as Black.

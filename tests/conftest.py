@@ -7,6 +7,7 @@ import pytest
 
 from vipdopt.configuration.template import SonyBayerRenderer
 from vipdopt.optimization import Device
+from vipdopt.optimization import Device
 
 TEST_YAML_PATH = Path('testing/config_example.yml')
 TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')
@@ -303,7 +304,7 @@ def default_device_dict() -> dict:
     }
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture()
 def device(request, default_device_dict) -> Device:
     default_device_dict.update(request.param)
     return Device(**default_device_dict)

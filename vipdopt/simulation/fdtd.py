@@ -15,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.simulation.simobject import LumericalSimObjectType
+from vipdopt.simulation.simobject import Import, LumericalSimObjectType
 from vipdopt.simulation.simulation import ISimulation, LumericalSimulation
 from vipdopt.utils import P, Path, R, ensure_path, import_lumapi, setup_logger
 
@@ -211,18 +211,22 @@ class LumericalFDTD(ISolver):
         if sim is not None:
             self.fdtd.switchtolayout()  # type: ignore
             self.fdtd.deleteall()  # type: ignore
-            self.load_simulation(sim)
             if path is not None:  # Load file into sim object
                 path = path.absolute()
                 self.fdtd.load(str(path))
-                self.current_sim.info['path'] = path
-            else:  # Load data from sim's path
-                self.fdtd.load(str(self.current_sim.info['path']))
+                sim.info['path'] = path
+            elif sim.info['path'] is not None:  # Load data from sim's path
+                self.fdtd.load(sim.info['path'])
+            else:
+                self.load_simulation(sim)
+            self.current_sim = sim
         elif path is not None:  # Just load data from file
             self.fdtd.switchtolayout()  # type: ignore
             self.fdtd.deleteall()  # type: ignore
             path = path.absolute()
             self.fdtd.load(str(path))
+            if self.current_sim is not None:
+                self.current_sim.set_path(path)
         else:
             raise ValueError('Both arguments `path` and `sim` cannot be `None`.')
 
@@ -234,7 +238,9 @@ class LumericalFDTD(ISolver):
                 'LumericalFDTD can only load simulations of type "LumericalSimulation"'
                 f'; Received "{type(sim)}"'
             )
-        vipdopt.logger.debug('Loading simulation...')
+        vipdopt.logger.debug(
+            f'Loading LumericalSimulation "{sim.info["name"]}" into LumericalFDTD...'
+        )
         self.fdtd.switchtolayout()  # type: ignore
         self.fdtd.deleteall()  # type: ignore
         for obj in sim.objects.values():
@@ -244,6 +250,9 @@ class LumericalFDTD(ISolver):
                     self.fdtd,
                     **obj.properties,
                 )
+                # Import nk2 if possible
+                if isinstance(obj, Import) and obj.n is not None:
+                    self.importnk2(obj.name, *obj.get_nk2())
         self.current_sim = sim
 
     @_check_lum_fdtd
@@ -251,6 +260,7 @@ class LumericalFDTD(ISolver):
     @ensure_path
     def load(self, path: Path):
         """Load a simulation from a Lumerical .fsp file."""
+        vipdopt.logger.debug(f'Loading simulation from {path!s} into Lumerical...')
         fname = str(path)
         self.fdtd.load(fname)  # type: ignore
         vipdopt.logger.debug(f'Succesfully loaded simulation from {fname}.\n')
@@ -272,16 +282,8 @@ class LumericalFDTD(ISolver):
             self.load_simulation(sim)
 
         if self.current_sim is not None:
-            try:
-                if not self.current_sim.info['path'].samefile(path):
-                    vipdopt.logger.debug(f'Simulation path has changed to {path}.\n')
-            except Exception:
-                if str(self.current_sim.info['path'].absolute()) != str(
-                    path.absolute()
-                ):
-                    vipdopt.logger.debug(f'Simulation path has changed to {path}.\n')
-            self.current_sim.info['path'] = path
-
+            self.current_sim.set_path(path)
+            # self.current_sim.info['path'] = path
         self.fdtd.save(str(path))  # type: ignore
         vipdopt.logger.debug(f'Successfully saved simulation to {path}.\n')
 
@@ -495,6 +497,31 @@ class LumericalFDTD(ISolver):
                 # monitor.h
                 # return
         vipdopt.logger.info('Finished reformatting monitor data.')
+
+    @_check_lum_fdtd
+    def importnk2(
+        self,
+        import_name: str,
+        n: npt.NDArray,
+        x: npt.NDArray,
+        y: npt.NDArray,
+        z: npt.NDArray,
+    ):
+        """Import the refractive index (n and k) over an entire volume / surface.
+
+        Arguments:
+            import_name (str): Name of the import primitive to import to.
+            n (npt.NDArray): Refractive index. Must be of dimension NxMxP or NxMxPx3,
+                depending on whether the material isotropic or not, with N, M, P >= 2.
+            x (npt.NDArray): If n is NxMxP, then x should be Nx1. Values must be
+                uniformly spaced.
+            y (npt.NDArray): If n is NxMxP, then y should be Mx1. Values must be
+                uniformly spaced.
+            z (npt.NDArray): If n is NxMxP, then z should be Px1. Values must be
+                uniformly spaced.
+        """
+        self.fdtd.select(import_name)
+        self.fdtd.importnk2(n, x, y, z)
 
 
 ISolver.register(LumericalFDTD)

@@ -287,3 +287,25 @@ def flatten(data: Nested[T]) -> Iterable[T]:
             yield from flatten(x)
     else:
         yield data
+
+
+def rmtree(path: Path, keep_dir: bool = False):
+    """Delete a directory recursively."""
+    if not path.is_dir():
+        raise ValueError('Path must be a directory')
+    for child in path.iterdir():
+        if child.is_file():
+            child.unlink()
+        else:
+            rmtree(child, keep_dir=False)
+
+    if not keep_dir:
+        path.rmdir()
+
+
+def repeat(a: npt.NDArray, shape: tuple[int, ...]) -> npt.NDArray:
+    """Apply numpy's `repeat` function along multiple axes.
+
+    Solution from https://stackoverflow.com/questions/7656665/how-to-repeat-elements-of-an-array-along-two-axes
+    """
+    return np.kron(a, np.ones(shape, dtype=a.dtype))

@@ -48,6 +48,7 @@ class SuperFoM:
         """Initialize a SuperFoM."""
         self.foms: list[tuple[FoM, ...]] = [tuple(f) for f in foms]
         self.weights: list[float] = list(weights)
+        self.performance_weights = np.ones(len(self.foms))
 
     def __copy__(self) -> SuperFoM:
         """Create a copy of this FoM."""
@@ -63,6 +64,36 @@ class SuperFoM:
         """Reset all of the monitors used to calculate the FoM."""
         map(FoM.reset_monitors, flatten(self.foms))
 
+    def performance_weighting(self, fom_values: npt.NDArray):
+        """Recompute the weights based on the performance of the optimization.
+
+        All gradients are combined with a weighted average in Eq.(3), with weights
+        chosen according to Eq.(2) such that all figures of merit seek the same
+        efficiency. In these equations, FoM represents the current value of a figure of
+        merit, N is the total number of figures of merit, and wi represents the weight
+        applied to its respective merit function's gradient. The maximum operator is
+        used to ensure the weights are never negative, thus ignoring the gradient of
+        high-performing figures of merit rather than forcing the figure of merit to
+        decrease. The 2/N factor is used to ensure all weights conveniently sum to 1
+        unless some weights were negative before the maximum operation. Although the
+        maximum operator is non-differentiable, this function is used only to apply the
+        gradient rather than to compute it. Therefore, it does not affect the
+        applicability of the adjoint method. Taken from: https://doi.org/10.1038/s41598-021-88785-5
+
+        Arguments:
+            fom_values (npt.NDArray): The values of the computed FoMs to determine the
+                new weights from. Should have shape 1 x N where N is the number of
+                FoMs.
+        """
+        weights = (2.0 / len(fom_values)) - fom_values**2 / np.sum(fom_values**2)
+
+        # Zero-shift and renormalize
+        if np.min(weights) < 0:
+            weights -= np.min(weights)
+            weights /= np.sum(weights)
+
+        self.performance_weights = weights
+
     def compute_fom(self, *args, **kwargs) -> npt.NDArray:
         """Compute the weighted sum of the FoMs."""
         fom_results = np.array([
@@ -74,6 +105,8 @@ class SuperFoM:
             )
             for fom_tup in self.foms
         ])
+        self.performance_weighting(fom_results)
+        # fom_results = np.dot(fom_results, spectral_weights).dot(performance_weights)
         return np.einsum('i,i...->...', self.weights, fom_results)
 
     @staticmethod
@@ -101,7 +134,7 @@ class SuperFoM:
                 starmap_with_kwargs(
                     FoM.compute_fom,
                     ((fom, *args) for fom in foms),
-                    (kwargs for _ in foms),
+                    ({'sum_values': False, **kwargs} for _ in foms),
                 )
             )
         )
@@ -117,7 +150,7 @@ class SuperFoM:
         term2 = np.sum(
             np.divide(
                 grad_vals,
-                fom_vals,
+                fom_vals.reshape(grad_vals.shape),
                 out=np.zeros(grad_vals.shape),
                 where=fom_vals != 0,  # Return zeros where division by zero occur
                 dtype=float,
@@ -126,7 +159,9 @@ class SuperFoM:
         )
         return np.prod(fom_vals, axis=0) * term2
 
-    def compute_grad(self, *args, **kwargs) -> npt.NDArray:
+    def compute_grad(
+        self, *args, apply_performance_weights=False, **kwargs
+    ) -> npt.NDArray:
         """Compute the weighted sum of the gradients."""
         grad_results = np.array([
             SuperFoM._prod_rule(
@@ -136,6 +171,9 @@ class SuperFoM:
             )
             for fom_tup in self.foms
         ])
+        # grad_results = np.dot(grad_results, spectral_weights).dot(performance_weights)
+        if apply_performance_weights:
+            return np.einsum('i,i...->...', self.performance_weights, grad_results)
         return np.einsum('i,i...->...', self.weights, grad_results)
 
     def create_forward_sim(
@@ -143,7 +181,15 @@ class SuperFoM:
     ) -> list[LumericalSimulation]:
         """Create all unique forward simulations needed to compute this FoM."""
         fwd_sim_map = unique_fwd_sim_map(flatten(self.foms))
-        sims = [base_sim.with_enabled(srcs) for srcs in fwd_sim_map]
+        sims = [
+            base_sim.with_enabled(
+                srcs,
+                base_sim.info['name']
+                + '_fwd_'
+                + '_'.join(src.name for src in sorted(srcs)),
+            )
+            for srcs in fwd_sim_map
+        ]
         for i, foms in enumerate(fwd_sim_map.values()):
             for fom in foms:
                 fom.link_forward_sim(sims[i])
@@ -154,7 +200,15 @@ class SuperFoM:
     ) -> list[LumericalSimulation]:
         """Create all unique adjoint simulations needed to compute this FoM."""
         adj_sim_map = unique_adj_sim_map(flatten(self.foms))
-        sims = [base_sim.with_enabled(srcs) for srcs in adj_sim_map]
+        sims = [
+            base_sim.with_enabled(
+                srcs,
+                base_sim.info['name']
+                + '_adj_'
+                + '_'.join(src.name for src in sorted(srcs)),
+            )
+            for srcs in adj_sim_map
+        ]
         for i, foms in enumerate(adj_sim_map.values()):
             for fom in foms:
                 fom.link_adjoint_sim(sims[i])
@@ -325,6 +379,7 @@ class FoM(SuperFoM):
         grad_func: Callable[Concatenate[FoM, P], npt.NDArray],
         pos_max_freqs: Sequence[int],
         neg_min_freqs: Sequence[int],
+        spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
         """Initialize a FoM object."""
         super().__init__([(self,)], [1.0])
@@ -341,6 +396,7 @@ class FoM(SuperFoM):
         self.polarization = polarization
         self.pos_max_freqs = list(pos_max_freqs)
         self.neg_min_freqs = list(neg_min_freqs)
+        self.spectral_weights = spectral_weights
 
     def __eq__(self, other: Any) -> bool:
         """Test equality."""
@@ -355,6 +411,7 @@ class FoM(SuperFoM):
                 and self.grad_func == other.grad_func
                 and self.pos_max_freqs == other.pos_max_freqs
                 and self.neg_min_freqs == other.neg_min_freqs
+                and self.spectral_weights == other.spectral_weights
             )
         return super().__eq__(other)
 
@@ -370,6 +427,7 @@ class FoM(SuperFoM):
             self.grad_func,
             self.pos_max_freqs,
             self.neg_min_freqs,
+            self.spectral_weights,
         )
 
     def reset_monitors(self):
@@ -379,17 +437,22 @@ class FoM(SuperFoM):
         for mon in self.adj_monitors:
             mon.reset()
 
-    def compute_fom(self, *args, **kwargs) -> npt.NDArray:
+    def compute_fom(self, *args, sum_values: bool = True, **kwargs) -> npt.NDArray:
         """Compute the figure of merit."""
         total_fom = self.fom_func(*args, **kwargs)
         self.reset_monitors()
-        return self._subtract_neg(total_fom)
+        # return self._subtract_neg(total_fom)
+        f = np.dot(total_fom, self.spectral_weights)
+        if sum_values:
+            return f.sum()
+        return f
 
     def compute_grad(self, *args, **kwargs) -> npt.NDArray:
         """Compute the gradient of the figure of merit."""
         total_grad = self.grad_func(*args, **kwargs)
         self.reset_monitors()
-        return self._subtract_neg(total_grad)
+        # return self._subtract_neg(total_grad)
+        return np.dot(total_grad, self.spectral_weights)
 
     def _subtract_neg(self, array: npt.NDArray) -> npt.NDArray:
         """Subtract the restricted indices from the positive ones."""
@@ -407,7 +470,12 @@ class FoM(SuperFoM):
         self, base_sim: LumericalSimulation
     ) -> list[LumericalSimulation]:
         """Create a simulation with only the forward sources enabled."""
-        fwd_sim = base_sim.with_enabled(self.fwd_srcs)
+        new_name = (
+            base_sim.info['name']
+            + '_fwd_'
+            + '_'.join(src.name for src in self.fwd_srcs)
+        )
+        fwd_sim = base_sim.with_enabled(self.fwd_srcs, new_name)
         self.link_forward_sim(fwd_sim)
         return [fwd_sim]
 
@@ -419,7 +487,12 @@ class FoM(SuperFoM):
         self, base_sim: LumericalSimulation
     ) -> list[LumericalSimulation]:
         """Create a simulation with only the adjoint sources enabled."""
-        adj_sim = base_sim.with_enabled(self.adj_srcs)
+        new_name = (
+            base_sim.info['name']
+            + '_fwd_'
+            + '_'.join(src.name for src in self.fwd_srcs)
+        )
+        adj_sim = base_sim.with_enabled(self.adj_srcs, new_name)
         self.link_adjoint_sim(adj_sim)
         return [adj_sim]
 
@@ -484,6 +557,7 @@ class BayerFilterFoM(FoM):
         grad_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
+        spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
         """Initialize a BayerFilterFoM."""
         super().__init__(
@@ -496,6 +570,7 @@ class BayerFilterFoM(FoM):
             self._bayer_gradient,
             pos_max_freqs,
             neg_min_freqs,
+            spectral_weights,
         )
 
     def _bayer_fom(self):
@@ -625,6 +700,7 @@ class UniformMAEFoM(FoM):
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         constant: float,
+        spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
         """Initialize a UniformFoM."""
         super().__init__(
@@ -637,6 +713,7 @@ class UniformMAEFoM(FoM):
             self._uniform_mae_gradient,
             pos_max_freqs,
             neg_min_freqs,
+            spectral_weights=spectral_weights,
         )
         self.constant = constant
 
@@ -660,6 +737,7 @@ class UniformMSEFoM(FoM):
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         constant: float,
+        spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
         """Initialize a UniformFoM."""
         super().__init__(
@@ -672,9 +750,12 @@ class UniformMSEFoM(FoM):
             self._uniform_mse_gradient,
             pos_max_freqs,
             neg_min_freqs,
+            spectral_weights=spectral_weights,
         )
         self.constant = constant
 
+    def _uniform_mse_fom(self, x: npt.NDArray):
+        return 1 - np.square(x - self.constant)
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
 
@@ -683,7 +764,7 @@ class UniformMSEFoM(FoM):
 
 
 def gaussian_kernel(length=5, sigma=1.0) -> npt.NDArray:
-    """Creates a 2D gaussian kernel.`"""
+    """Creates a 2D gaussian kernel."""
     ax = np.linspace(-(length - 1) / 2.0, (length - 1) / 2.0, length)
     gauss = np.exp(-0.5 * np.square(ax) / np.square(sigma))
     kernel = np.outer(gauss, gauss)
@@ -704,6 +785,7 @@ class GaussianFoM(FoM):
         neg_min_freqs: list[int],
         length: float,
         sigma: float,
+        spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
         """Initialize a UniformFoM."""
         super().__init__(
@@ -716,14 +798,15 @@ class GaussianFoM(FoM):
             self._gaussian_gradient,
             pos_max_freqs,
             neg_min_freqs,
+            spectral_weights=spectral_weights,
         )
         self.kernel = gaussian_kernel(length, sigma)
 
     def _gaussian_fom(self, x: npt.NDArray):
-        return 1 - np.abs(x - self.kernel)
+        return 1 - np.square(x - self.kernel[..., np.newaxis])
 
     def _gaussian_gradient(self, x: npt.NDArray):
-        return np.sign(self.kernel - x)
+        return 2 * (self.kernel[..., np.newaxis] - x)
 
 
 if __name__ == '__main__':
@@ -732,6 +815,7 @@ if __name__ == '__main__':
         'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
     )
     base_sim = LumericalSimulation('test_data\\sim.json')
+    base_sim.set_path('test_data\\')
     srcs = base_sim.sources()
     vipdopt.logger.debug([src.name for src in srcs])
     fom = BayerFilterFoM(

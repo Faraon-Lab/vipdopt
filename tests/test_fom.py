@@ -19,9 +19,10 @@ def gradient_func(n) -> npt.ArrayLike:
     return 2 * n
 
 
-INPUT_ARRAY = np.reshape(range(9), (3, 3))
-SQUARED_ARRAY = np.array([[0, 1, 4], [9, 16, 25], [36, 49, 64]])
-GRADIENT_ARRAY = np.array([[0, 2, 4], [6, 8, 10], [12, 14, 16]])
+INPUT_ARRAY = np.reshape(range(9), (3, 3))  # X
+SQUARED_ARRAY = np.array([[0, 1, 4], [9, 16, 25], [36, 49, 64]])  # X^2
+SQUARE_SUM = SQUARED_ARRAY.sum()
+GRADIENT_ARRAY = np.array([[0, 2, 4], [6, 8, 10], [12, 14, 16]])  # 2X
 ONES_ARRAY = np.ones((3, 3))
 
 BASE_FOM = FoM(
@@ -40,7 +41,7 @@ BASE_FOM = FoM(
 @pytest.mark.smoke()
 def test_compute_fom():
     output = BASE_FOM.compute_fom(INPUT_ARRAY)
-    assert_equal(output, SQUARED_ARRAY)
+    assert_equal(output, SQUARE_SUM)
 
     output = BASE_FOM.compute_grad(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY)
@@ -50,21 +51,21 @@ def test_compute_fom():
 @pytest.mark.parametrize(
     'fom, exp_fom, exp_grad',
     [
-        (BASE_FOM + BASE_FOM, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
-        (BASE_FOM - BASE_FOM, 0 * SQUARED_ARRAY, 0 * GRADIENT_ARRAY),
-        (2 * BASE_FOM, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
-        (BASE_FOM * 2, 2 * SQUARED_ARRAY, 2 * GRADIENT_ARRAY),
-        (BASE_FOM / 2, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
-        (0.5 * BASE_FOM, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
-        ((1 / 2) * BASE_FOM, SQUARED_ARRAY / 2, GRADIENT_ARRAY / 2),
+        (BASE_FOM + BASE_FOM, 2 * SQUARE_SUM, 2 * GRADIENT_ARRAY),
+        (BASE_FOM - BASE_FOM, 0 * SQUARE_SUM, 0 * GRADIENT_ARRAY),
+        (2 * BASE_FOM, 2 * SQUARE_SUM, 2 * GRADIENT_ARRAY),
+        (BASE_FOM * 2, 2 * SQUARE_SUM, 2 * GRADIENT_ARRAY),
+        (BASE_FOM / 2, SQUARE_SUM / 2, GRADIENT_ARRAY / 2),
+        (0.5 * BASE_FOM, SQUARE_SUM / 2, GRADIENT_ARRAY / 2),
+        ((1 / 2) * BASE_FOM, SQUARE_SUM / 2, GRADIENT_ARRAY / 2),
         # Distributive property / linearity
-        (BASE_FOM * (2 + 3), 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),
-        ((2 + 3) * BASE_FOM, 5 * SQUARED_ARRAY, 5 * GRADIENT_ARRAY),
-        (2 * (BASE_FOM + BASE_FOM), 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
-        ((BASE_FOM + BASE_FOM) * 2, 4 * SQUARED_ARRAY, 4 * GRADIENT_ARRAY),
+        (BASE_FOM * (2 + 3), 5 * SQUARE_SUM, 5 * GRADIENT_ARRAY),
+        ((2 + 3) * BASE_FOM, 5 * SQUARE_SUM, 5 * GRADIENT_ARRAY),
+        (2 * (BASE_FOM + BASE_FOM), 4 * SQUARE_SUM, 4 * GRADIENT_ARRAY),
+        ((BASE_FOM + BASE_FOM) * 2, 4 * SQUARE_SUM, 4 * GRADIENT_ARRAY),
         (
             2 * (BASE_FOM + 2 * BASE_FOM) + 3 * (BASE_FOM * BASE_FOM),
-            6 * SQUARED_ARRAY + 3 * SQUARED_ARRAY**2,
+            6 * SQUARE_SUM + 3 * SQUARE_SUM**2,
             6 * GRADIENT_ARRAY + 6 * SQUARED_ARRAY * GRADIENT_ARRAY,
         ),
         (1 + BASE_FOM, 1 + SQUARED_ARRAY, GRADIENT_ARRAY),
@@ -73,7 +74,7 @@ def test_compute_fom():
 )
 def test_arithmetic(fom: FoM, exp_fom: npt.ArrayLike, exp_grad: npt.ArrayLike):
     act_fom = fom.compute_fom(INPUT_ARRAY)
-    assert_equal(act_fom, exp_fom)
+    assert_equal(act_fom, exp_fom.sum())
 
     act_grad = fom.compute_grad(INPUT_ARRAY)
     assert_equal(act_grad, exp_grad)
@@ -84,7 +85,7 @@ def test_sum():
     n = 10
     combined_fom = sum([BASE_FOM] * (n - 1), BASE_FOM)
     output = combined_fom.compute_fom(INPUT_ARRAY)
-    assert_equal(output, 10 * SQUARED_ARRAY)
+    assert_equal(output, 10 * SQUARE_SUM)
     output = combined_fom.compute_grad(INPUT_ARRAY)
     assert_equal(output, 10 * GRADIENT_ARRAY)
 
@@ -97,7 +98,7 @@ def test_weights():
     combined_fom = SuperFoM(foms, weights)
 
     output = combined_fom.compute_fom(INPUT_ARRAY)
-    assert_close(output, sum(weights) * SQUARED_ARRAY)
+    assert_close(output, sum(weights) * SQUARE_SUM)
     output = combined_fom.compute_grad(INPUT_ARRAY)
     assert_close(output, sum(weights) * GRADIENT_ARRAY)
 
@@ -112,7 +113,7 @@ def test_copy():
     # Modifying the copy should not affect the original
     cpy = cpy + BASE_FOM
     assert_equal(vars(BASE_FOM), org_vars)
-    assert_equal(cpy.compute_fom(INPUT_ARRAY), 2 * SQUARED_ARRAY)
+    assert_equal(cpy.compute_fom(INPUT_ARRAY), 2 * SQUARE_SUM)
 
 
 @pytest.mark.smoke()
@@ -120,7 +121,7 @@ def test_iadd():
     fom = copy(BASE_FOM)
     fom += BASE_FOM
     output = fom.compute_fom(INPUT_ARRAY)
-    assert_equal(output, 2 * SQUARED_ARRAY)
+    assert_equal(output, 2 * SQUARE_SUM)
 
     output = fom.compute_grad(INPUT_ARRAY)
     assert_equal(output, 2 * GRADIENT_ARRAY)
@@ -131,7 +132,7 @@ def test_isub():
     fom = copy(BASE_FOM)
     fom -= BASE_FOM
     output = fom.compute_fom(INPUT_ARRAY)
-    assert_equal(output, 0 * SQUARED_ARRAY)
+    assert_equal(output, 0 * SQUARE_SUM)
 
     output = fom.compute_grad(INPUT_ARRAY)
     assert_equal(output, 0 * GRADIENT_ARRAY)
@@ -142,7 +143,7 @@ def test_imul():
     fom = copy(BASE_FOM)
     fom *= 2
     output = fom.compute_fom(INPUT_ARRAY)
-    assert_equal(output, SQUARED_ARRAY * 2)
+    assert_equal(output, SQUARE_SUM * 2)
 
     output = fom.compute_grad(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY * 2)
@@ -153,7 +154,7 @@ def test_itruediv():
     fom = copy(BASE_FOM)
     fom /= 2
     output = fom.compute_fom(INPUT_ARRAY)
-    assert_equal(output, SQUARED_ARRAY / 2)
+    assert_equal(output, SQUARE_SUM / 2)
 
     output = fom.compute_grad(INPUT_ARRAY)
     assert_equal(output, GRADIENT_ARRAY / 2)
@@ -165,7 +166,7 @@ def test_repeated_mult():
 
     combined_fom = fom1 * BASE_FOM
     output = combined_fom.compute_fom(INPUT_ARRAY)
-    assert_close(output, SQUARED_ARRAY**3)
+    assert_close(output, SQUARE_SUM**3)
     output = combined_fom.compute_grad(INPUT_ARRAY)
     assert_close(output, 3 * (SQUARED_ARRAY**2 * GRADIENT_ARRAY))
 
