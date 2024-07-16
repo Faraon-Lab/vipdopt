@@ -15,10 +15,16 @@ import numpy.typing as npt
 
 import vipdopt
 from vipdopt.configuration import Config, SonyBayerConfig
-from vipdopt.optimization import Device, FoM, GradientOptimizer, LumericalOptimization
+from vipdopt.optimization import (
+    Device,
+    FoM,
+    GradientOptimizer,
+    LumericalOptimization,
+    SuperFoM,
+)
 from vipdopt.optimization.filter import Scale, Sigmoid
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
-from vipdopt.utils import Coordinates, PathLike, ensure_path, glob_first
+from vipdopt.utils import Coordinates, PathLike, ensure_path, flatten, glob_first
 
 sys.path.append(os.getcwd())
 
@@ -169,13 +175,14 @@ class Project:
         except BaseException:  # noqa: BLE001
             base_sim = LumericalSimulation()
 
-        # TODO: Are we running it locally or on SLURM or on AWS or?
-        base_sim.promise_env_setup(
-            mpi_exe=cfg['mpi_exe'],
-            nprocs=cfg['nprocs'],
-            solver_exe=cfg['solver_exe'],
-            nsims=len(base_sim.source_names()),
-        )
+        # # TODO: Are we running it locally or on SLURM or on AWS or?
+        # ! 20240627 Ian: Moved it to __main__.py since this is now a method of class LumericalFDTD
+        # base_sim.promise_env_setup(
+        #     mpi_exe=cfg['mpi_exe'],
+        #     nprocs=cfg['nprocs'],
+        #     solver_exe=cfg['solver_exe'],
+        #     nsims=len(base_sim.source_names()),
+        # )
 
         self.base_sim = base_sim
         self.src_to_sim_map = {
@@ -191,9 +198,33 @@ class Project:
         for name, fom_dict in cfg.pop('figures_of_merit').items():
             # Overwrite 'opt_ids' key for now with the entire wavelength vector, by
             # commenting out in config. Spectral sorting comes from spectral weighting
-            fom_dict['freq'] = cfg['lambda_values_um']
-            weights.append(fom_dict['weight'])
-            self.foms.append(FoM.from_dict(name, fom_dict, self.src_to_sim_map))
+
+            # Config contains source/monitor names; replace these with the actual Source and Monitor objects contained in self.base_sim
+            # doesn't need to be the same source / monitor object - just needs to have the same name.
+            def match_cfg_objnames_to_objects(list_names, list_objs):
+                return list(
+                    flatten([[x for x in list_objs if x.name == y] for y in list_names])
+                )
+
+            fom_dict['fwd_srcs'] = match_cfg_objnames_to_objects(
+                fom_dict['fwd_srcs'], self.base_sim.sources()
+            )
+            fom_dict['adj_srcs'] = match_cfg_objnames_to_objects(
+                fom_dict['adj_srcs'], self.base_sim.sources()
+            )
+            fom_dict['fom_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['fom_monitors'], self.base_sim.monitors()
+            )
+            fom_dict['grad_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['grad_monitors'], self.base_sim.monitors()
+            )
+
+            # if pos_max_freqs is blank, make it the whole wavelength vector; if neg_min_freqs is blank, keep blank.
+            if fom_dict['pos_max_freqs'] == []:
+                fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
+
+            weights.append(fom_dict.pop('weight'))
+            self.foms.append(FoM.from_dict(fom_dict))
         self.weights = np.array(weights)
 
     def _setup_weights(self, cfg: Config):
@@ -333,13 +364,12 @@ class Project:
         epoch = cfg.get('current_epoch', 0)
 
         self._load_foms(cfg)
-        full_fom: FoM = sum(np.multiply(self.weights, self.foms))  # type: ignore
+        full_fom = SuperFoM([(f,) for f in self.foms], self.weights)
         self._setup_weights(cfg)
 
         self._load_device(cfg)
 
         # Setup Folder Structure
-
         running_on_local_machine = False
         slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
         if slurm_job_env_variable is None:
@@ -356,12 +386,29 @@ class Project:
         assert self.device is not None
         assert self.optimizer is not None
         assert self.base_sim is not None
+
+        # TODO: Are we running it locally or on SLURM or on AWS or?
+        env_vars = {
+            'mpi_exe': cfg.get('mpi_exe', ''),
+            'nprocs': cfg.get('nprocs', 0),
+            'solver_exe': cfg.get('solver_exe', ''),
+            'nsims': len(list(self.base_sim.source_names())),
+        }
+        # Check if mpi_exe or solver_exe exist.
+        if Path(env_vars['mpi_exe']).exists():
+            vipdopt.logger.debug('Verified: MPI path exists.')
+        else:
+            vipdopt.logger.warning('Warning! MPI path does not exist.')
+        if Path(env_vars['solver_exe']).exists():
+            vipdopt.logger.debug('Verified: Solver path exists.')
+        else:
+            vipdopt.logger.warning('Warning! Solver path does not exist.')
+
         self.optimization = LumericalOptimization(
             sims,
             self.device,
             self.optimizer,
-            full_fom,  # full_fom
-            # will be filled in once full_fom is calculated
+            full_fom,  # full_fom will be filled in once full_fom is calculated
             # might need to load the array of foms[] as well...
             # and the weights AS WELL AS the full_fom()
             # and the gradient function
@@ -370,7 +417,7 @@ class Project:
             start_iter=iteration,
             max_epochs=cfg.get('max_epochs', 1),
             iter_per_epoch=cfg.get('iter_per_epoch', 100),
-            env_vars=self.base_sim.get_env_vars(),
+            env_vars=env_vars,
             dirs=self.subdirectories,
         )
         vipdopt.logger.info('Optimization initialized.')

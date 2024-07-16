@@ -248,6 +248,8 @@ class SuperFoM:
                     return NotImplemented
         elif isinstance(first, SuperFoM) and isinstance(second, Number):
             match operator:
+                case '+':
+                    foms = [tuple([second])] + first.foms
                 case '*':
                     foms = first.foms
                     weights = [w * second for w in first.weights]
@@ -258,6 +260,9 @@ class SuperFoM:
                     return NotImplemented
         elif isinstance(first, Number) and isinstance(second, SuperFoM):
             match operator:
+                case '+':
+                    foms = [tuple([first])] + second.foms
+                    weights = [1.0] + second.weights
                 case '*':
                     foms = second.foms
                     weights = [first * w for w in second.weights]
@@ -749,6 +754,8 @@ class UniformMSEFoM(FoM):
         )
         self.constant = constant
 
+    def _uniform_mse_fom(self, x: npt.NDArray):
+        return 1 - np.square(x - self.constant)
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
 
