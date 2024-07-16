@@ -12,7 +12,7 @@ from vipdopt.simulation.simulation import (
     LumericalEncoder,
     LumericalSimulation,
 )
-from vipdopt.simulation.source import AdjointSource, ForwardSource, Source
+from vipdopt.simulation.source import Source, DipoleSource, GaussianSource, TFSFSource
 
 __all__ = [
     'ISimulation',
@@ -24,9 +24,10 @@ __all__ = [
     'Power',
     'Profile',
     'Source',
+    'DipoleSource',
+    'GaussianSource',
+    'TFSFSource',
     'Import',
-    'ForwardSource',
-    'AdjointSource',
     'ISolver',
     'LumericalFDTD',
 ]
