@@ -16,7 +16,7 @@ blur_half_width_voxels: {{ ((min_feature_size_voxels - 1) / 2) | round(method='c
 #* Optical Properties
 min_device_permittivity: {{ data.min_device_index ** 2 }}
 max_device_permittivity: {{ data.max_device_index ** 2 }}
-{% set focal_length_um = 0.6 -%} {#data.device_scale_um * 30#}
+{% set focal_length_um = data.device_scale_um * 30 -%}
 focal_length_um: {{ focal_length_um }}
 focal_plane_center_vertical_um: {{ -1 * focal_length_um }}
 
