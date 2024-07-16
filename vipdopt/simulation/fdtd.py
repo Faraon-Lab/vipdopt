@@ -270,16 +270,18 @@ class LumericalFDTD(ISolver):
         path = path.absolute()
         if sim is not None:
             self.load_simulation(sim)
-            
+
         if self.current_sim is not None:
             try:
                 if not self.current_sim.info['path'].samefile(path):
                     vipdopt.logger.debug(f'Simulation path has changed to {path}.\n')
-            except Exception as ex:
-                if str(self.current_sim.info['path'].absolute()) != str(path.absolute()): 
+            except Exception:
+                if str(self.current_sim.info['path'].absolute()) != str(
+                    path.absolute()
+                ):
                     vipdopt.logger.debug(f'Simulation path has changed to {path}.\n')
             self.current_sim.info['path'] = path
-            
+
         self.fdtd.save(str(path))  # type: ignore
         vipdopt.logger.debug(f'Successfully saved simulation to {path}.\n')
 
@@ -300,7 +302,7 @@ class LumericalFDTD(ISolver):
             if self._env_vars is None:
                 self._env_vars = kwargs
             self.setup_env_resources(**kwargs)
-    
+
     def get_env_vars(self) -> dict:
         """Return the current pending environment variables to be set.
 

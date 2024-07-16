@@ -287,6 +287,7 @@ def _mock_project_json(mocker):
     )
     mocker.patch('builtins.open', mocked_project)
 
+
 @pytest.fixture()
 def default_device_dict() -> dict:
     return {
@@ -300,6 +301,7 @@ def default_device_dict() -> dict:
         'symmetric': False,
         'filters': None,
     }
+
 
 @pytest.fixture(scope='function')
 def device(request, default_device_dict) -> Device:

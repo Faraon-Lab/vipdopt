@@ -16,10 +16,6 @@
                 "z max": {{ data.fdtd_region_maximum_vertical_um * 1e-6 }},
                 "z min": {{ data.fdtd_region_minimum_vertical_um * 1e-6 }},
                 "simulation time": {{ data.fdtd_simulation_time_fs * 1e-15 }},
-                {% if data.boundary_conditions == 'periodic' -%}
-                "x min bc": "Periodic",
-                "y min bc": "Periodic",
-                {%- endif %}
                 "index": {{ data.background_index }}
             }
         },
@@ -56,6 +52,8 @@
                 "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
                 "z max": {{ data.src_maximum_vertical_um * 1e-6 }},
                 "z min": {{ data.src_minimum_vertical_um * 1e-6 }},
+                "wavelength start": {{ data.lambda_min_um * 1e-6 }},
+                "wavelength stop": {{ data.lambda_max_um * 1e-6 }}
                 "wavelength start": {{ data.lambda_min_um * 1e-6 }},
                 "wavelength stop": {{ data.lambda_max_um * 1e-6 }}
             }
@@ -142,17 +140,11 @@
             "obj_type": "rect",
             "properties": {
                 "x": 0,
-                "y": 0,
-                {%- if data.boundary_conditions == 'periodic' %}
-                "x span": {{data.fdtd_region_size_lateral_um * 1e-6}},
-                "y span": {{data.fdtd_region_size_lateral_um * 1e-6}},
-                {%- else -%}
                 "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
+                "y": 0,
                 "y span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
-                {% endif -%}
-                
-                "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
-                "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
+                "z min": {{ (data.device_vertical_maximum_um + 3 * data.mesh_spacing_um) * 1e-6 }},
+                "z max": {{ (data.device_vertical_maximum_um + 3 * data.mesh_spacing_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 "material": "PEC (Perfect Electrical Conductor)"
             }
         },
@@ -164,33 +156,12 @@
                 "x span": {{ data.device_size_lateral_um * 1e-6 }},
                 "y": 0,
                 "y span": {{ data.device_size_lateral_um * 1e-6 }},
-                "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
-                "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
+                "z min": {{ (data.device_vertical_maximum_um + 3 * data.mesh_spacing_um) * 1e-6 }},
+                "z max": {{ (data.device_vertical_maximum_um + 3 * data.mesh_spacing_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 "index": {{ data.background_index }}
             }
         },
         {% endif -%}
-
-        {# todo: Set up substrates to use data.substrates_above_device#}
-        "substrate": {
-            "name": "substrate",
-            "obj_type": "rect",
-            "properties": {
-                "x": 0,
-                "y": 0,
-                {%- if data.boundary_conditions == 'periodic' %}
-                "x span": {{data.fdtd_region_size_lateral_um * 1e-6}},
-                "y span": {{data.fdtd_region_size_lateral_um * 1e-6}},
-                {%- else -%}
-                "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
-                "y span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
-                {% endif -%}
-                "z min": {{ (data.device_vertical_maximum_um) * 1e-6 }},
-                "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
-                "material": "SiO2 (Glass) - Palik"
-            }
-        },
-
         {#- Set up sidewalls on the side to try and attenuate crosstalk -#}
         {% for idx in range(0, data.num_sidewalls) -%}
         {%- set name = "sidewall_%d" | format(idx) -%}

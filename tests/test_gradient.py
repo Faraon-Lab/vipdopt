@@ -1,39 +1,42 @@
-import pytest
 import numpy as np
-import matplotlib.pyplot as plt
+import pytest
 
 from testing import assert_close
-
-from vipdopt.optimization import FoM, UniformMAEFoM, GradientAscentOptimizer, Device, LumericalOptimization, AdamOptimizer, GaussianFoM, UniformMSEFoM
-from vipdopt.simulation import Power
+from vipdopt.optimization import (
+    AdamOptimizer,
+    FoM,
+    GradientAscentOptimizer,
+    UniformMAEFoM,
+    UniformMSEFoM,
+)
 
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-        'opt, device, fom',
-        [
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0},
-                UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-            (
-                AdamOptimizer(step_size=1e-4),
-                {'randomize': True, 'init_seed': 0},
-                UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0},
-                UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-            (
-                AdamOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0},
-                UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
-            ),
-        ],
-        indirect=['device']
+    'opt, device, fom',
+    [
+        (
+            GradientAscentOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+        (
+            AdamOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+        (
+            GradientAscentOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+        (
+            AdamOptimizer(step_size=1e-4),
+            {'randomize': True, 'init_seed': 0},
+            UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+        ),
+    ],
+    indirect=['device'],
 )
 def test_step(opt, device, fom: FoM):
     """Test a single step with the gradient."""
@@ -57,22 +60,13 @@ def test_step(opt, device, fom: FoM):
 
 
 @pytest.mark.parametrize(
-        'opt, device',
-        [
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'randomize': True, 'init_seed': 0}
-            ),
-            (
-                GradientAscentOptimizer(step_size=1e-4), 
-                {'init_density': 1.0}
-            ),
-            (
-                AdamOptimizer(step_size=1e-4),
-                {'randomize': True, 'init_seed': 0}
-            ),
-        ],
-        indirect=['device']
+    'opt, device',
+    [
+        (GradientAscentOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+        (GradientAscentOptimizer(step_size=1e-4), {'init_density': 1.0}),
+        (AdamOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+    ],
+    indirect=['device'],
 )
 def test_uniform(opt, device):
     """Test that a device conforms to uniformity in right circumstances."""
@@ -87,11 +81,10 @@ def test_uniform(opt, device):
         [],
         range(n_freq),
         [],
-        0.5  # Tests  absolute value from 0.5
+        0.5,  # Tests  absolute value from 0.5
     )
 
     for i in range(n_iter):
-        
         g = fom.compute_grad(device.get_design_variable())
         opt.step(device, g, i)
 
@@ -99,15 +92,14 @@ def test_uniform(opt, device):
     assert_close(f, 1.0)
 
     assert_close(device.get_design_variable(), 0.5)
-        
 
 
 @pytest.mark.parametrize(
-        'device',
-        [
-            {'randomize': True, 'init_seed': 0},
-        ],
-        indirect=True,
+    'device',
+    [
+        {'randomize': True, 'init_seed': 0},
+    ],
+    indirect=True,
 )
 def test_dual_fom_uniform(device):
     """Using two opposing FoMs should balance out."""
@@ -132,5 +124,3 @@ def test_dual_fom_uniform(device):
     # Check that FoM is maximized at x = 0.5
     assert_close(f, 1.5)
     assert_close(device.get_design_variable(), 0.5)
-
-    

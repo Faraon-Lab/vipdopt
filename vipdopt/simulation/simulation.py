@@ -91,7 +91,7 @@ class LumericalSimulation(ISimulation):
     @override
     def __str__(self) -> str:
         return self.as_json()
-    
+
     def get_env_vars(self) -> dict:
         """Return the current pending environment variables to be set.
 
@@ -191,7 +191,7 @@ class LumericalSimulation(ISimulation):
     def set_path(self, path: Path):
         """Set the save path of the simulation."""
         self.info['path'] = path.absolute()
-    
+
     def get_path(self) -> Path:
         """Get the save path of the simulation."""
         p = self.info['path']
@@ -353,6 +353,7 @@ class LumericalSimulation(ISimulation):
         obj.update(**properties)
 
     def import_nk_material(
+        #! TODO: 20240702 - MOVE TO FDTD. Add the input argument of the device name as string.
         self,
         cur_index,
         device_region_import_x,
@@ -360,7 +361,11 @@ class LumericalSimulation(ISimulation):
         device_region_import_z,
     ):
         """Import the nk2 material."""
-        device_name = self.import_names()[0]
+        device_name = list(self.import_names())[0]
+
+        #! TODO: eRASE THIS
+        self.fdtd = vipdopt.fdtd.fdtd
+
         self.fdtd.select(device_name)
         self.fdtd.importnk2(
             cur_index,

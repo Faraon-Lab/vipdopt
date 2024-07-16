@@ -15,10 +15,16 @@ import numpy.typing as npt
 
 import vipdopt
 from vipdopt.configuration import Config, SonyBayerConfig
-from vipdopt.optimization import Device, FoM, GradientOptimizer, LumericalOptimization
+from vipdopt.optimization import (
+    Device,
+    FoM,
+    GradientOptimizer,
+    LumericalOptimization,
+    SuperFoM,
+)
 from vipdopt.optimization.filter import Scale, Sigmoid
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
-from vipdopt.utils import Coordinates, PathLike, ensure_path, glob_first, flatten
+from vipdopt.utils import Coordinates, PathLike, ensure_path, flatten, glob_first
 
 sys.path.append(os.getcwd())
 
@@ -192,19 +198,31 @@ class Project:
         for name, fom_dict in cfg.pop('figures_of_merit').items():
             # Overwrite 'opt_ids' key for now with the entire wavelength vector, by
             # commenting out in config. Spectral sorting comes from spectral weighting
-            
+
             # Config contains source/monitor names; replace these with the actual Source and Monitor objects contained in self.base_sim
+            # doesn't need to be the same source / monitor object - just needs to have the same name.
             def match_cfg_objnames_to_objects(list_names, list_objs):
-                return list(flatten([[x for x in list_objs if x.name==y] for y in list_names]))
-            fom_dict['fwd_srcs'] = match_cfg_objnames_to_objects(fom_dict['fwd_srcs'], self.base_sim.sources())
-            fom_dict['adj_srcs'] = match_cfg_objnames_to_objects(fom_dict['adj_srcs'], self.base_sim.sources())
-            fom_dict['fom_monitors'] = match_cfg_objnames_to_objects(fom_dict['fom_monitors'], self.base_sim.monitors())
-            fom_dict['grad_monitors'] = match_cfg_objnames_to_objects(fom_dict['grad_monitors'], self.base_sim.monitors())
-                
+                return list(
+                    flatten([[x for x in list_objs if x.name == y] for y in list_names])
+                )
+
+            fom_dict['fwd_srcs'] = match_cfg_objnames_to_objects(
+                fom_dict['fwd_srcs'], self.base_sim.sources()
+            )
+            fom_dict['adj_srcs'] = match_cfg_objnames_to_objects(
+                fom_dict['adj_srcs'], self.base_sim.sources()
+            )
+            fom_dict['fom_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['fom_monitors'], self.base_sim.monitors()
+            )
+            fom_dict['grad_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['grad_monitors'], self.base_sim.monitors()
+            )
+
             # if pos_max_freqs is blank, make it the whole wavelength vector; if neg_min_freqs is blank, keep blank.
             if fom_dict['pos_max_freqs'] == []:
                 fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
-            
+
             weights.append(fom_dict.pop('weight'))
             self.foms.append(FoM.from_dict(fom_dict))
         self.weights = np.array(weights)
@@ -346,7 +364,7 @@ class Project:
         epoch = cfg.get('current_epoch', 0)
 
         self._load_foms(cfg)
-        full_fom: FoM = sum(np.multiply(self.weights, self.foms))  # type: ignore
+        full_fom = SuperFoM([(f,) for f in self.foms], self.weights)
         self._setup_weights(cfg)
 
         self._load_device(cfg)
@@ -368,23 +386,24 @@ class Project:
         assert self.device is not None
         assert self.optimizer is not None
         assert self.base_sim is not None
-        
+
         # TODO: Are we running it locally or on SLURM or on AWS or?
-        env_vars = {'mpi_exe': cfg.get('mpi_exe', ''),
-                'nprocs': cfg.get('nprocs', 0),
-                'solver_exe': cfg.get('solver_exe', ''),
-                'nsims': len(list(self.base_sim.source_names()))
-            }
+        env_vars = {
+            'mpi_exe': cfg.get('mpi_exe', ''),
+            'nprocs': cfg.get('nprocs', 0),
+            'solver_exe': cfg.get('solver_exe', ''),
+            'nsims': len(list(self.base_sim.source_names())),
+        }
         # Check if mpi_exe or solver_exe exist.
         if Path(env_vars['mpi_exe']).exists():
-            vipdopt.logger.debug(f'Verified: MPI path exists.')
+            vipdopt.logger.debug('Verified: MPI path exists.')
         else:
-            vipdopt.logger.warning(f'Warning! MPI path does not exist.')
+            vipdopt.logger.warning('Warning! MPI path does not exist.')
         if Path(env_vars['solver_exe']).exists():
-            vipdopt.logger.debug(f'Verified: Solver path exists.')    
+            vipdopt.logger.debug('Verified: Solver path exists.')
         else:
-            vipdopt.logger.warning(f'Warning! Solver path does not exist.')
-        
+            vipdopt.logger.warning('Warning! Solver path does not exist.')
+
         self.optimization = LumericalOptimization(
             sims,
             self.device,
