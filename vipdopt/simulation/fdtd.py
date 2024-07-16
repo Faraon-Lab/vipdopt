@@ -164,7 +164,7 @@ class LumericalFDTD(ISolver):
         """Run all simulations in the job queue.
 
         Arguments:
-            option (int): Indicates the resources to use when runnin simulations.
+            option (int): Indicates the resources to use when running simulations.
                 0: Run jobs in single process mode using only the local machine.
                 1: Run jobs using the resources and parallel settings specified in
                     the resource manager. (default)
@@ -270,18 +270,28 @@ class LumericalFDTD(ISolver):
         path = path.absolute()
         if sim is not None:
             self.load_simulation(sim)
+
         if self.current_sim is not None:
+            try:
+                if not self.current_sim.info['path'].samefile(path):
+                    vipdopt.logger.debug(f'Simulation path has changed to {path}.\n')
+            except Exception:
+                if str(self.current_sim.info['path'].absolute()) != str(
+                    path.absolute()
+                ):
+                    vipdopt.logger.debug(f'Simulation path has changed to {path}.\n')
             self.current_sim.info['path'] = path
+
         self.fdtd.save(str(path))  # type: ignore
-        vipdopt.logger.debug(f'Succesfully saved simulation to {path}.\n')
+        vipdopt.logger.debug(f'Successfully saved simulation to {path}.\n')
 
     @_check_lum_fdtd
     @typing.no_type_check
-    def get_env_resources(self) -> dict:
+    def get_env_resources(self, resource_num: int = 1) -> dict:
         """Return a dictionary containing all job manager resources."""
         resources = {}
-        for resource in self.fdtd.setresource('FDTD', 1).splitlines():
-            resources[resource] = self.fdtd.getresource('FDTD', 1, resource)
+        for resource in self.fdtd.getresource('FDTD', resource_num).splitlines():
+            resources[resource] = self.fdtd.getresource('FDTD', resource_num, resource)
         return resources
 
     def promise_env_setup(self, **kwargs):
@@ -289,7 +299,18 @@ class LumericalFDTD(ISolver):
         if self.fdtd is None:
             self._env_vars = kwargs if len(kwargs) > 0 else None
         else:
+            if self._env_vars is None:
+                self._env_vars = kwargs
             self.setup_env_resources(**kwargs)
+
+    def get_env_vars(self) -> dict:
+        """Return the current pending environment variables to be set.
+
+        Returns:
+            dict: The current pending environment variables to be set. If
+                `self._env_vars` is None, returns an empty dictionary.
+        """
+        return {} if self._env_vars is None else self._env_vars
 
     @_check_lum_fdtd
     def set_resource(self, resource_num: int, resource: str, value: Any):

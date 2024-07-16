@@ -279,6 +279,7 @@ class Device:
         """Convert density to permittivity."""
         return density * (eps_max - eps_min) + eps_min
 
+    @classmethod
     def binarize(self, variable_in):
         """Assumes density - if not, convert explicitly."""
         return 1.0 * np.greater_equal(variable_in, 0.5)
