@@ -68,13 +68,13 @@ def test_compute_fom():
             6 * SQUARE_SUM + 3 * SQUARE_SUM**2,
             6 * GRADIENT_ARRAY + 6 * SQUARED_ARRAY * GRADIENT_ARRAY,
         ),
-        (1 + BASE_FOM, 1 + SQUARED_ARRAY, GRADIENT_ARRAY),
-        (BASE_FOM + 1, SQUARED_ARRAY + 1, GRADIENT_ARRAY)
+        (1 + BASE_FOM, 9 + SQUARE_SUM, GRADIENT_ARRAY),
+        (BASE_FOM + 1, SQUARE_SUM + 9, GRADIENT_ARRAY)
     ],
 )
 def test_arithmetic(fom: FoM, exp_fom: npt.ArrayLike, exp_grad: npt.ArrayLike):
     act_fom = fom.compute_fom(INPUT_ARRAY)
-    assert_equal(act_fom, exp_fom.sum())
+    assert_equal(act_fom, exp_fom)
 
     act_grad = fom.compute_grad(INPUT_ARRAY)
     assert_equal(act_grad, exp_grad)
@@ -182,14 +182,8 @@ def test_bad_op():
     with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for %'):
         BASE_FOM % 2
 
-    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for +'):
-        BASE_FOM + 1
-
     with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for /'):
         BASE_FOM / BASE_FOM
-
-    with pytest.raises(TypeError, match=r'unsupported operand type\(s\) for +'):
-        BASE_FOM + 1
 
 
 @pytest.mark.smoke()

@@ -249,7 +249,13 @@ class SuperFoM:
         elif isinstance(first, SuperFoM) and isinstance(second, Number):
             match operator:
                 case '+':
-                    foms = [tuple([second])] + first.foms
+                    fom_num = ConstantFoM(second)
+                    foms = first.foms + fom_num.foms
+                    weights = first.weights + fom_num.weights
+                case '-':
+                    fom_num = ConstantFoM(second)
+                    foms = first.foms + fom_num.foms
+                    weights = first.weights + [-w for w in fom_num.weights]
                 case '*':
                     foms = first.foms
                     weights = [w * second for w in first.weights]
@@ -261,8 +267,13 @@ class SuperFoM:
         elif isinstance(first, Number) and isinstance(second, SuperFoM):
             match operator:
                 case '+':
-                    foms = [tuple([first])] + second.foms
-                    weights = [1.0] + second.weights
+                    fom_num = ConstantFoM(first)
+                    foms = fom_num.foms + second.foms
+                    weights = fom_num.weights + second.weights
+                case '-':
+                    fom_num = ConstantFoM(first)
+                    foms = fom_num.foms + second.foms
+                    weights = fom_num.weights + [-w for w in second.weights]
                 case '*':
                     foms = second.foms
                     weights = [first * w for w in second.weights]
@@ -537,6 +548,29 @@ def unique_adj_sim_map(foms: Iterable[FoM]) -> dict[frozenset[Source], list[FoM]
         adj_srcs = frozenset(fom.adj_srcs)
         sim_map[adj_srcs].append(fom)
     return sim_map
+
+
+class ConstantFoM(FoM):
+    """Class for representing constant values in a FoM."""
+    def __init__(self, value: Number):
+        super().__init__(
+            'TE+TM',
+            [],
+            [],
+            [],
+            [],
+            self._constant_fom,
+            self._constant_grad,
+            [0],
+            []
+        )
+        self.value = value
+    
+    def _constant_fom(self, x: npt.NDArray):
+        return np.ones(x.shape) * self.value
+
+    def _constant_grad(self, x: npt.NDArray):
+        return np.zeros(x.shape)
 
 
 class BayerFilterFoM(FoM):
