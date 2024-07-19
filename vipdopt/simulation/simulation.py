@@ -199,12 +199,12 @@ class LumericalSimulation(ISimulation):
         """Get the save path of the simulation."""
         return self.info.get('path', None)
 
-    def get_path(self) -> Path:
-        """Get the save path of the simulation."""
-        p = self.info['path']
-        if not isinstance(p, Path):
-            p = Path(p)
-        return p
+    # def get_path(self) -> Path:
+    #     """Get the save path of the simulation."""
+    #     p = self.info['path']
+    #     if not isinstance(p, Path):
+    #         p = Path(p)
+    #     return p
 
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
