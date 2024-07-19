@@ -48,6 +48,7 @@ class LumericalOptimization:
         grad_kwargs: dict = {},
         cfg: Config = Config(),
         epoch_list: list[int] = [100],
+        true_iteration: int = 0,
         dirs: dict[str, Path] = DEFAULT_OPT_FOLDERS,
         env_vars: dict = {},
     ):
@@ -75,7 +76,7 @@ class LumericalOptimization:
 
         self.epoch_list = epoch_list
         self.loop = True
-        self.true_iteration = 0
+        self.true_iteration = true_iteration
 
         self.spectral_weights = np.array(1)
         self.performance_weights = np.array(1)

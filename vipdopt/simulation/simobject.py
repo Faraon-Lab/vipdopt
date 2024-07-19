@@ -32,7 +32,7 @@ class LumericalSimObjectType(str, Enum):
         """Get the correct lumapi function to add an object."""
         if vipdopt.lumapi is None:
             raise ModuleNotFoundError(
-                'Module "vipdopt.lumapi" has not yet been instatiated.'
+                'Module "vipdopt.lumapi" has not yet been instantiated.'
             )
         return getattr(vipdopt.lumapi.FDTD, f'add{self.value}')
 

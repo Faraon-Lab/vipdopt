@@ -413,10 +413,10 @@ class Project:
             # and the weights AS WELL AS the full_fom()
             # and the gradient function
             cfg,
-            start_epoch=epoch,
-            start_iter=iteration,
-            max_epochs=cfg.get('max_epochs', 1),
-            iter_per_epoch=cfg.get('iter_per_epoch', 100),
+            epoch_list = cfg.get('epoch_list'),
+            true_iteration = iteration,
+            # max_epochs=cfg.get('max_epochs', 1),
+            # iter_per_epoch=cfg.get('iter_per_epoch', 100),
             env_vars=env_vars,
             dirs=self.subdirectories,
         )
