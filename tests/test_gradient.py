@@ -30,22 +30,22 @@ def avg_abs_dist(x: npt.ArrayLike, y: npt.ArrayLike) -> npt.ArrayLike:
         (
             GradientAscentOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+            UniformMAEFoM(range(5), [], 0.5),
         ),
         (
             AdamOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMAEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+            UniformMAEFoM(range(5), [], 0.5),
         ),
         (
             GradientAscentOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+            UniformMSEFoM(range(5), [], 0.5),
         ),
         (
             AdamOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.5),
+            UniformMSEFoM(range(5), [], 0.5),
         ),
     ],
     indirect=['device'],
@@ -79,11 +79,6 @@ def test_uniform(opt, device: Device):
     n_iter = 10000
 
     fom = UniformMAEFoM(
-        'TE+TM',
-        [],
-        [],
-        [],
-        [],
         range(n_freq),
         [],
         0.5,  # Tests  absolute value from 0.5
@@ -94,7 +89,7 @@ def test_uniform(opt, device: Device):
         opt.step(device, g, i)
 
     f = fom.compute_fom(device.get_design_variable())
-    assert_close(f, 1.0 * DEVICE_SIZE, 1)
+    assert_close(f, 1.0, 0.01)
 
     assert_close(device.get_design_variable(), 0.5)
 
@@ -111,9 +106,9 @@ def test_dual_fom_uniform(device: Device):
     n_iter = 10000
 
     # Tests squared error with 0.0
-    fom1 = UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 0.0)
+    fom1 = UniformMSEFoM(range(5), [], 0.0)
     # Tests squared error with 1.0
-    fom2 = UniformMSEFoM('TE+TM', [], [], [], [], range(5), [], 1.0)
+    fom2 = UniformMSEFoM(range(5), [], 1.0)
 
     # Since both are equally weighted, should balance out to 0.5 in theory
     fom = fom1 + fom2
@@ -127,7 +122,7 @@ def test_dual_fom_uniform(device: Device):
 
     # Check that FoM is maximized at x = 0.5
     f = fom.compute_fom(device.get_design_variable())
-    assert_close(f, 1.5 * DEVICE_SIZE)
+    assert_close(f, 1.5)
     assert_close(device.get_design_variable(), 0.5)
 
 
@@ -141,7 +136,7 @@ def test_dual_fom_uniform(device: Device):
     indirect=['device'],
 )
 def test_gaussianfom(opt, device: Device):
-    fom = GaussianFoM('TE+TM', [], [], [], [], range(5), [], 25, 5)
+    fom = GaussianFoM(range(5), [], 25, 5)
 
     for i in range(50000):
         g = fom.compute_grad(device.get_design_variable())
