@@ -306,7 +306,7 @@ class LumericalSimulation(ISimulation):
         for mon in monitors:
             output_path = sim_path.parent / (sim_path.stem + f'_{mon.name}.npz')
             mon.set_src(output_path)
-
+            
     def imports(self) -> list[Import]:
         """Return a list of all import objects."""
         return [obj for _, obj in self.objects.items() if isinstance(obj, Import)]

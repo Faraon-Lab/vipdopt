@@ -39,6 +39,7 @@ class LumericalOptimization:
     def __init__(
         self,
         base_sim: LumericalSimulation,
+        sims: LumericalSimulation,
         device: Device,
         optimizer: GradientOptimizer,
         fom: SuperFoM,
@@ -54,6 +55,7 @@ class LumericalOptimization:
     ):
         """Initialize Optimization object."""
         self.base_sim = base_sim
+        self.sims = sims
         self.device = device
         self.optimizer = optimizer
         if isinstance(fom, FoM):
@@ -266,7 +268,7 @@ class LumericalOptimization:
 
     def _pre_run(self):
         """Final pre-processing before running the optimization."""
-        # Connect to Lumerical
+        # Connect to Lumerical. #! Warning - starts a new project if already connected
         self.loop = True
         self.fdtd.connect(hide=True)
 
@@ -1001,9 +1003,9 @@ class LumericalOptimization:
 
     def run2(self):
         """Run the optimization"""
-        self._pre_run()
-
-        # If an error is encountered while running the optimmization still want to
+        self._pre_run() # Connects to Lumerical if it's not already connected. #! Warning - starts a new project if already connected!
+        
+        # If an error is encountered while running the optimization still want to
         # clean up afterwards
         try:
             self._inner_optimization_loop()
@@ -1047,17 +1049,18 @@ class LumericalOptimization:
 
                 # # Disable device index monitor to save memory
                 # self.disable([import_monitor_name])
+                
+                # Save base sim for ease
+                self.fdtd.save(self.base_sim.get_path(), self.base_sim)
 
                 # Create jobs
                 fwd_sims = self.fom.create_forward_sim(self.base_sim)
                 adj_sims = self.fom.create_adjoint_sim(self.base_sim)
                 for sim in chain(fwd_sims, adj_sims):
                     sim_file = self.dirs['temp'] / f'{sim.info["name"]}.fsp'
-                    # print(str(sim_file))
-                    # sim.set_path(sim_file)
+                    print(sim_file)
                     # sim.link_monitors()
-
-                    self.fdtd.save(sim_file, sim)
+                    self.fdtd.save(sim_file, sim)       # Saving also sets the path
                     self.fdtd.addjob(sim_file)
 
                 # Run all simulations

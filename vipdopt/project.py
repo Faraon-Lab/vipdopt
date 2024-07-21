@@ -185,10 +185,13 @@ class Project:
         # )
 
         self.base_sim = base_sim
+        # We can create new simulations from the foMs by using fom.create_forward_sim()
+        # and passing base sim as a template
         self.src_to_sim_map = {
             src: base_sim.with_enabled([src], name=src)
             for src in base_sim.source_names()
         }
+        self.base_sim.set_path(self.dir / 'base_sim.fsp')
 
     def _load_foms(self, cfg: Config):
         """Load figures of merit from a config."""
@@ -405,6 +408,7 @@ class Project:
             vipdopt.logger.warning('Warning! Solver path does not exist.')
 
         self.optimization = LumericalOptimization(
+            self.base_sim,
             sims,
             self.device,
             self.optimizer,
@@ -501,7 +505,8 @@ class Project:
         """Start this project's optimization."""
         try:
             self.optimization.loop = True
-            self.optimization.run()
+            # self.optimization.run()
+            self.optimization.run2()
         finally:
             vipdopt.logger.info('Saving optimization after early stop...')
             self.save()
