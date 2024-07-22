@@ -315,6 +315,20 @@ class LumericalSimulation(ISimulation):
         """Return a list of all import object names."""
         for obj in self.imports():
             yield obj.name
+    
+    def indexmonitors(self) -> list[LumericalSimObject]:
+        '''Return a list of all indexmonitor objects.'''
+        return [obj for _, obj in self.objects.items() if obj.obj_type == LumericalSimObjectType.INDEX]
+    
+    def indexmonitor_names(self) -> Iterator[str]:
+        '''Return a list of all indexmonitor object names.'''
+        for obj in self.indexmonitors():
+            yield obj.name
+    
+    def import_field_shape(self) -> tuple[int, ...]:
+        """Return the shape of the fields returned from this simulation's design index monitors."""
+        index_prev = vipdopt.fdtd.getresult(list(self.indexmonitor_names())[0], 'index preview')
+        return np.squeeze(index_prev['index_x']).shape
 
     def new_object(
         self,

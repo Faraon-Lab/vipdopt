@@ -573,7 +573,7 @@ class BayerFilterFoM(FoM):
             spectral_weights,
         )
 
-    def _bayer_fom(self):
+    def _bayer_fom(self, *args, **kwargs):
         """Compute bayer filter figure of merit."""
         # Here we need to figure out which FoM belongs to which file
 
@@ -635,6 +635,7 @@ class BayerFilterFoM(FoM):
         # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
 
+        #! 20240721 Ian - Is the tfom not stored AT ALL????
         # return total_tfom, total_ffom
         return total_ffom
 

@@ -3,6 +3,7 @@
 import numpy as np
 import numpy.typing as npt
 
+import vipdopt
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.optimizer import GradientOptimizer
 
@@ -51,6 +52,9 @@ class AdamOptimizer(GradientOptimizer):
         w_hat = device.get_design_variable() + self.step_size * m_hat / np.sqrt(
             v_hat + self.eps
         )
+        
+        device_diff = np.abs(np.maximum(np.minimum(w_hat, 1), 0) - device.get_design_variable())
+        vipdopt.logger.info(f'Average change is {np.sum(device_diff)}')
 
         # Apply changes
         device.set_design_variable(np.maximum(np.minimum(w_hat, 1), 0))

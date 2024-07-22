@@ -59,7 +59,7 @@ class Monitor(LumericalSimObject):
         self._sync = self.src is not None  # Only set to sync if the source file exists
 
     def load_source(self):
-        """Load the monitor's data from it's source file."""
+        """Load the monitor's data from its source file."""
         if self.src is None:
             raise RuntimeError(f'Monitor {self} has no source to load data from.')
         vipdopt.logger.debug(f'Loading monitor data from {self.src} into memory...')

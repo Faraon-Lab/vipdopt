@@ -187,7 +187,7 @@ class LumericalOptimization:
         with (folder / 'fom_history.npy').open('wb') as f:
             np.save(f, foms)
         params = np.array(self.param_hist)
-        with (folder / 'paramater_history.npy').open('wb') as f:
+        with (folder / 'parameter_history.npy').open('wb') as f:
             np.save(f, params)
 
     def generate_plots(self):
@@ -1004,18 +1004,23 @@ class LumericalOptimization:
     def run2(self):
         """Run the optimization"""
         self._pre_run() # Connects to Lumerical if it's not already connected. #! Warning - starts a new project if already connected!
-        
+
         # If an error is encountered while running the optimization still want to
         # clean up afterwards
-        try:
-            self._inner_optimization_loop()
-        except RuntimeError as e:
-            vipdopt.logger.exception(
-                f'Encountered exception while running optimization: {e}'
-                '\nStopping Optimization...'
-            )
-        finally:
-            self._post_run()
+        
+        self._inner_optimization_loop()
+        
+        #! 20240721 ian - DEBUG COMMENT THIS BLOCK - UNCOMMENT FOR GIT PUSH
+        # try:
+        #     self._inner_optimization_loop()
+        # except RuntimeError as e:
+        #     vipdopt.logger.exception(
+        #         f'Encountered exception while running optimization: {e}'
+        #         '\nStopping Optimization...'
+        #     )
+        # finally:
+        #     self._post_run()
+        self._post_run()
 
     def _inner_optimization_loop(self):
         """The core optimization loop."""
@@ -1049,22 +1054,32 @@ class LumericalOptimization:
 
                 # # Disable device index monitor to save memory
                 # self.disable([import_monitor_name])
-                
+
                 # Save base sim for ease
                 self.fdtd.save(self.base_sim.get_path(), self.base_sim)
+                
+                # Reassign field shape now that the device has been properly imported into Lumerical.
+                self.device.field_shape = self.base_sim.import_field_shape()
 
                 # Create jobs
                 fwd_sims = self.fom.create_forward_sim(self.base_sim)
                 adj_sims = self.fom.create_adjoint_sim(self.base_sim)
                 for sim in chain(fwd_sims, adj_sims):
                     sim_file = self.dirs['temp'] / f'{sim.info["name"]}.fsp'
-                    print(sim_file)
                     # sim.link_monitors()
                     self.fdtd.save(sim_file, sim)       # Saving also sets the path
                     self.fdtd.addjob(sim_file)
 
-                # Run all simulations
-                self.fdtd.runjobs()
+                pull_files_from_debug_folder = False
+                # If true, we're in debugging mode and it means no simulations are run.
+                # Data is instead pulled from finished simulation files in the debug folder.
+                if not pull_files_from_debug_folder:
+                    # Run all simulations
+                    self.fdtd.runjobs()
+                else:
+                    for sim in chain(fwd_sims, adj_sims):
+                        sim_file = self.dirs['debug_completed_jobs'] / f'{sim.info["name"]}.fsp'
+                        sim.set_path(sim_file)
 
                 # Reformat monitor data for easy use
                 self.fdtd.reformat_monitor_data(list(chain(fwd_sims, adj_sims)))
@@ -1075,17 +1090,75 @@ class LumericalOptimization:
 
                 vipdopt.logger.debug(f'FoM: {f}')
 
-                # Step the device with the gradient
+                # Compute gradient
                 g = self.fom.compute_grad(
                     *self.grad_args,
                     apply_performance_weights=True,
                     **self.grad_kwargs,
                 )
                 # vipdopt.logger.debug(f'Gradient: {g}')
+                
+                # Process gradient accordingly. #! TODO: WE SHOULD WRAP THIS INTO A FUNCTION.
+                g = np.sum(g, -1)   # Sum over wavelength
+                vipdopt.logger.info(f'Design_gradient has average {np.mean(g)}, max {np.max(g)}')
+                # Permittivity factor in amplitude of electric dipole at x_0:
+                # Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)
+                # todo: if dispersion is considered, this needs to be assembled spectrally --------------------------------------------------
+                # We need to properly account here for the current real and imaginary index
+                # because they both contribute in the end to the real part of the gradient ΔFoM/Δε_r
+                # in Eq. 5 of Lalau-Keraly paper https://doi.org/10.1364/OE.21.021693
+                #
+                # dispersive_max_permittivity = dispersion_model.average_permittivity( dispersive_ranges_um[ lookup_dispersive_range_idx ] )
+                dispersive_max_permittivity = self.cfg['max_device_permittivity']
+                delta_real_permittivity = np.real( dispersive_max_permittivity - self.cfg['min_device_permittivity'] )
+                delta_imag_permittivity = np.imag( dispersive_max_permittivity - self.cfg['min_device_permittivity'] )
+                # todo: -----------------------------------------------------------------------------------------------------
+                get_grad_density = delta_real_permittivity * np.real(g) + delta_imag_permittivity * (-1*np.imag(g))
+                #! This is where the gradient picks up a permittivity factor i.e. becomes larger than 1!
+                #! Mitigated by backpropagating through the Scale filter.
+                get_grad_density = 2 * get_grad_density		# Factor of 2 after taking the real part
+                
+                 # Get the full design gradient by summing the x,y polarization components # todo: Do we need to consider polarization??
+                # todo: design_gradient = 2 * ( xy_polarized_gradients[0] + xy_polarized_gradients[1] )
+                # Project / interpolate the design_gradient, the values of which we have at each (mesh) voxel point, and obtain it at each (geometry) voxel point
+                gradient_region_x = 1e-6 * np.linspace(self.device.coords['x'][0], self.device.coords['x'][-1], g.shape[0]) #cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
+                gradient_region_y = 1e-6 * np.linspace(self.device.coords['y'][0], self.device.coords['y'][-1], g.shape[1])
+                try:
+                    gradient_region_z = 1e-6 * np.linspace(self.device.coords['z'][0], self.device.coords['z'][-1], g.shape[2])
+                except IndexError as err:	# 2D case
+                    gradient_region_z = 1e-6 * np.linspace(self.device.coords['z'][0], self.device.coords['z'][-1], 3)
+                design_region_geometry = np.array(np.meshgrid(1e-6*self.device.coords['x'], 1e-6*self.device.coords['y'], 1e-6*self.device.coords['z'], indexing='ij')
+                                    ).transpose((1,2,3,0))
+
+                if self.cfg['simulator_dimension'] in '2D':
+                    design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                        np.repeat(get_grad_density[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
+                                                        design_region_geometry, method='linear' )
+                elif self.cfg['simulator_dimension'] in '3D':
+                    design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                        get_grad_density,
+                                                        design_region_geometry, method='linear' )
+                # design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ), device_gradient, bayer_filter_region, method='linear' )
+                
+                # Each device needs to remember its gradient!
+                # todo: refine this
+                if self.cfg['enforce_xy_gradient_symmetry']:
+                    if self.cfg['simulator_dimension'] in '2D':
+                        transpose_design_gradient_interpolated = np.flip(design_gradient_interpolated, 1)
+                    if self.cfg['simulator_dimension'] in '3D':
+                        transpose_design_gradient_interpolated = np.swapaxes( design_gradient_interpolated, 0, 1 )
+                    design_gradient_interpolated = 0.5 * ( design_gradient_interpolated + transpose_design_gradient_interpolated )
+                # self.device.gradient = design_gradient_interpolated.copy()	# This is BEFORE backpropagation
+                
+                # Step the device with the gradient
                 vipdopt.logger.debug('Stepping device along gradient.')
-                self.optimizer.step(self.device, g, self.true_iteration)
+                self.optimizer.step(self.device, design_gradient_interpolated.copy(), self.true_iteration)
+                #! TODO: NOT STEPPING CORRECTLY! IT JUST KEEPS LOADING THE SAME DEVICE.
+                # Need to check whether it's respecting the epochs and everything. At the moment this is implemented 
+                # in a way where it doesn't respect the epoch maximums and minimums.
 
                 # Generate Plots and call callback functions
+                self.save_histories()
                 # self.generate_plots()
                 self.call_callbacks()
 

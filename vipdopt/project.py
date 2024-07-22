@@ -40,8 +40,8 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     saved_scripts_folder = data_folder / 'saved_scripts'
     optimization_info_folder = data_folder / 'opt_info'
     optimization_plots_folder = optimization_info_folder / 'plots'
-    debug_completed_jobs_folder = temp_folder / 'ares_test_dev'
-    pull_completed_jobs_folder = data_folder
+    debug_completed_jobs_folder = root_dir / 'ares_test_dev'
+    pull_completed_jobs_folder = temp_folder
     if debug_mode:
         pull_completed_jobs_folder = debug_completed_jobs_folder
 
@@ -224,7 +224,9 @@ class Project:
 
             # if pos_max_freqs is blank, make it the whole wavelength vector; if neg_min_freqs is blank, keep blank.
             if fom_dict['pos_max_freqs'] == []:
-                fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
+                #! WAVELENGTH VALUES - INDICES OR ACTUAL VALUES?
+                # fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
+                fom_dict['pos_max_freqs'] = np.array(range(len(cfg['lambda_values_um'])))
 
             weights.append(fom_dict.pop('weight'))
             self.foms.append(FoM.from_dict(fom_dict))
@@ -379,7 +381,9 @@ class Project:
             running_on_local_machine = True
 
         self.subdirectories = create_internal_folder_structure(
-            self.dir, running_on_local_machine
+            self.dir, 
+            debug_mode = True
+            #debug_mode = running_on_local_machine
         )
         vipdopt.logger.info('Internal folder substructure created.')
 
@@ -416,7 +420,8 @@ class Project:
             # might need to load the array of foms[] as well...
             # and the weights AS WELL AS the full_fom()
             # and the gradient function
-            cfg,
+            fom_kwargs = cfg,
+            cfg = cfg,
             epoch_list = cfg.get('epoch_list'),
             true_iteration = iteration,
             # max_epochs=cfg.get('max_epochs', 1),
@@ -503,13 +508,19 @@ class Project:
 
     def start_optimization(self):
         """Start this project's optimization."""
-        try:
-            self.optimization.loop = True
-            # self.optimization.run()
-            self.optimization.run2()
-        finally:
-            vipdopt.logger.info('Saving optimization after early stop...')
-            self.save()
+        
+        self.optimization.loop = True
+        # self.optimization.run()
+        self.optimization.run2()
+        
+        #! DEBUG 20240721 ian - uncomment this block for the git push
+        # try:
+        #     self.optimization.loop = True
+        #     # self.optimization.run()
+        #     self.optimization.run2()
+        # finally:
+        #     vipdopt.logger.info('Saving optimization after early stop...')
+        #     self.save()
 
     def stop_optimization(self):
         """Stop this project's optimization."""

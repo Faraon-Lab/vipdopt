@@ -167,3 +167,9 @@ class Import(LumericalSimObject):
         """Get the relevant data from in order to use `LumericalFDTD.importnk2`."""
         assert self.n is not None
         return (self.n, self.x, self.y, self.z)
+
+class IndexMonitor(LumericalSimObject):
+    """Class representing an index monitor in Lumerical."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name, LumericalSimObjectType.INDEX)
