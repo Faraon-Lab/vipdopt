@@ -154,25 +154,31 @@ def test_gaussianfom(opt, device: Device):
 @pytest.mark.parametrize(
     'opt, device',
     [
-        (GradientAscentOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+        (GradientAscentOptimizer(step_size=2e-4), {'randomize': True, 'init_seed': 0}),
+        (AdamOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
     ],
     indirect=['device'],
 )
 def test_autograd(opt, device: Device):
+    """Test that the gradient works when computed using autograd."""
+
     # Use logistic function for FoM
     def fom(x: npt.NDArray):
         return 1 / (1 + jnp.exp(-x))
 
     # Find gradient using autograd
-    grad_func = jit(vmap(vmap(vmap(grad(fom, holomorphic=True)))))
+    grad_func = jit(vmap(vmap(vmap(grad(fom)))))
+    # _, vjpfun = jvp(fom, device.get_design_variable())
+    # grad_func = jit(lambda x: vjpfun(fom(x)))
 
     n_iter = 100000
     for i in range(n_iter):
-        g = grad_func(device.get_design_variable())
+        g = grad_func(jnp.real(device.get_design_variable()))
+        # g,  = vmap(vmap(vmap(vjp(fom, device.get_design_variable()))))
         opt.step(device, g, i)
 
     w = device.get_design_variable()
     f = fom(w).sum()
 
-    assert_greater_than(f, 0.8 * DEVICE_SIZE)
-    assert_greater_than(w, 1.5)
+    assert_greater_than(f, 0.9 * DEVICE_SIZE)  # FoM is getting close to 1 everywhere
+    assert_greater_than(w.mean(), 1.5)

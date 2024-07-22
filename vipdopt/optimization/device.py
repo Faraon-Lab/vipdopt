@@ -133,7 +133,8 @@ class Device:
                 w[..., 0, 0] = np.tril(w[..., 0, 0]) + np.triu(w[..., 0, 0].T, 1)
                 w[..., 0, 0] = np.flip(w[..., 0, 0], axis=1)
 
-            w[..., 0] = np.maximum(np.minimum(w[..., 0], 1), 0)
+            w_min, w_max = self.permittivity_constraints
+            w[..., 0] = np.maximum(np.minimum(w[..., 0], w_max), w_min)
         else:
             w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w

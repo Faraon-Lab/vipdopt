@@ -194,7 +194,7 @@ class LumericalSimulation(ISimulation):
     def set_path(self, path: Path):
         """Set the save path of the simulation."""
         self.info['path'] = path.absolute()
-    
+
     def get_path(self) -> Path | None:
         """Get the save path of the simulation."""
         return self.info.get('path', None)

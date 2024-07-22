@@ -17,7 +17,16 @@ import numpy.typing as npt
 import vipdopt
 from vipdopt.simulation.simobject import Import, LumericalSimObjectType
 from vipdopt.simulation.simulation import ISimulation, LumericalSimulation
-from vipdopt.utils import P, Path, R, ensure_path, import_lumapi, setup_logger, convert_path, PathLike
+from vipdopt.utils import (
+    P,
+    Path,
+    PathLike,
+    R,
+    convert_path,
+    ensure_path,
+    import_lumapi,
+    setup_logger,
+)
 
 
 class ISolver(abc.ABC):

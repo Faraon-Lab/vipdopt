@@ -69,7 +69,7 @@ def test_compute_fom():
             6 * GRADIENT_ARRAY + 6 * SQUARED_ARRAY * GRADIENT_ARRAY,
         ),
         (1 + BASE_FOM, 9 + SQUARE_SUM, GRADIENT_ARRAY),
-        (BASE_FOM + 1, SQUARE_SUM + 9, GRADIENT_ARRAY)
+        (BASE_FOM + 1, SQUARE_SUM + 9, GRADIENT_ARRAY),
     ],
 )
 def test_arithmetic(fom: FoM, exp_fom: npt.ArrayLike, exp_grad: npt.ArrayLike):

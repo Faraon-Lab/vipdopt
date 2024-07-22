@@ -84,7 +84,7 @@ class LumericalSimObject:
             indent=4,
             ensure_ascii=True,
         )
-    
+
     def __str__(self) -> str:
         """Return a string version of the object."""
         return f'{self.obj_type} "{self.name}"'

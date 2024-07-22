@@ -12,7 +12,7 @@ from vipdopt.simulation.simulation import (
     LumericalEncoder,
     LumericalSimulation,
 )
-from vipdopt.simulation.source import Source, DipoleSource, GaussianSource, TFSFSource
+from vipdopt.simulation.source import DipoleSource, GaussianSource, Source, TFSFSource
 
 __all__ = [
     'ISimulation',

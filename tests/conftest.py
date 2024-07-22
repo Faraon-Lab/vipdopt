@@ -7,7 +7,6 @@ import pytest
 
 from vipdopt.configuration.template import SonyBayerRenderer
 from vipdopt.optimization import Device
-from vipdopt.optimization import Device
 
 TEST_YAML_PATH = Path('testing/config_example.yml')
 TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')

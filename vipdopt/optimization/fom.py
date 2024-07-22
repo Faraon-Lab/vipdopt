@@ -392,7 +392,7 @@ class FoM(SuperFoM):
         pos_max_freqs: Sequence[int],
         neg_min_freqs: Sequence[int],
         spectral_weights: npt.NDArray = np.array(1),
-        reduce: Callable[[npt.NDArray], Number]=np.sum,
+        reduce: Callable[[npt.NDArray], Number] = np.sum,
     ) -> None:
         """Initialize a FoM object."""
         super().__init__([(self,)], [1.0])
@@ -443,7 +443,7 @@ class FoM(SuperFoM):
             self.pos_max_freqs,
             self.neg_min_freqs,
             self.spectral_weights,
-            self.reduce
+            self.reduce,
         )
 
     def reset_monitors(self):
@@ -453,7 +453,7 @@ class FoM(SuperFoM):
         for mon in self.adj_monitors:
             mon.reset()
 
-    def compute_fom(self, *args, reduce: bool=True, **kwargs) -> npt.NDArray:
+    def compute_fom(self, *args, reduce: bool = True, **kwargs) -> npt.NDArray:
         """Compute the figure of merit."""
         total_fom = self.fom_func(*args, **kwargs)
         self.reset_monitors()
@@ -557,20 +557,13 @@ def unique_adj_sim_map(foms: Iterable[FoM]) -> dict[frozenset[Source], list[FoM]
 
 class ConstantFoM(FoM):
     """Class for representing constant values in a FoM."""
+
     def __init__(self, value: Number):
         super().__init__(
-            'TE+TM',
-            [],
-            [],
-            [],
-            [],
-            self._constant_fom,
-            self._constant_grad,
-            [0],
-            []
+            'TE+TM', [], [], [], [], self._constant_fom, self._constant_grad, [0], []
         )
         self.value = value
-    
+
     def _constant_fom(self, x: npt.NDArray):
         return np.ones(x.shape) * self.value
 
@@ -748,7 +741,7 @@ class UniformMAEFoM(FoM):
             pos_max_freqs,
             neg_min_freqs,
             spectral_weights=spectral_weights,
-            reduce=np.mean
+            reduce=np.mean,
         )
         self.constant = constant
 
@@ -781,12 +774,13 @@ class UniformMSEFoM(FoM):
             pos_max_freqs,
             neg_min_freqs,
             spectral_weights=spectral_weights,
-            reduce=np.mean
+            reduce=np.mean,
         )
         self.constant = constant
 
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
+
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
 

@@ -1,7 +1,7 @@
 """Class for general sources in a simulation."""
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
@@ -39,13 +39,13 @@ class Monitor(LumericalSimObject):
         """Set the source file this monitor is connected to."""
         self.src = src
         self.reset()
-    
+
     def __repr__(self) -> str:
         """Return a string representation of the monitor."""
         data = {
             'name': self.name,
             'obj_type': self.obj_type,
-            'properties': self.properties
+            'properties': self.properties,
         }
         return json.dumps(
             data,
