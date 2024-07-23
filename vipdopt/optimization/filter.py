@@ -181,6 +181,12 @@ class Scale(Filter):
 
         self.range = self._bounds[1] - self._bounds[0]
 
+    def __eq__(self, __value: object) -> bool:
+        """Test equality."""
+        if isinstance(__value, Scale):
+            return self.variable_bounds == __value.variable_bounds
+        return super().__eq__(__value)
+
     def __repr__(self):
         """Return a string representation of the filter."""
         return 'Scale filter with range: [{:0.3f}, {:0.3f}]'.format(*self._bounds)

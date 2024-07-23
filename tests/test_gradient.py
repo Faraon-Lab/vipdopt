@@ -67,9 +67,9 @@ def test_step(opt, device: Device, fom: FoM):
 @pytest.mark.parametrize(
     'opt, device',
     [
-        (GradientAscentOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+        (GradientAscentOptimizer(step_size=1e-3), {'randomize': True, 'init_seed': 0}),
         (GradientAscentOptimizer(step_size=1e-4), {'init_density': 1.0}),
-        (AdamOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+        (AdamOptimizer(step_size=1e-3), {'randomize': True, 'init_seed': 0}),
     ],
     indirect=['device'],
 )
