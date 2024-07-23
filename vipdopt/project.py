@@ -227,6 +227,8 @@ class Project:
                 #! WAVELENGTH VALUES - INDICES OR ACTUAL VALUES?
                 # fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
                 fom_dict['pos_max_freqs'] = np.array(range(len(cfg['lambda_values_um'])))
+            
+            fom_dict['all_freqs'] = 3e8/cfg['lambda_values_um']
 
             weights.append(fom_dict.pop('weight'))
             self.foms.append(FoM.from_dict(fom_dict))
