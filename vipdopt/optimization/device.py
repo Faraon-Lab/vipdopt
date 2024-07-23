@@ -56,10 +56,9 @@ class Device:
         **kwargs,
     ):
         """Initialize Device object."""
-        if filters is None:
-            filters = []
         if len(size) != 3:  # noqa: PLR2004
             raise ValueError(f'Device size must be 3 dimensional; got {len(size)}')
+
         if any(d < 1 for d in size) or any(not isinstance(d, int) for d in size):
             raise ValueError(
                 'Expected positive, integer dimensions;' f' received {size}'
@@ -70,13 +69,21 @@ class Device:
             raise ValueError(
                 'Expected 2 permittivity constraints;' f'got {permittivity_constraints}'
             )
+
         if any(not isinstance(pc, Real) for pc in permittivity_constraints):
             raise ValueError(
                 'Expected real permittivity;' f' got {permittivity_constraints}'
             )
+
         if permittivity_constraints[0] >= permittivity_constraints[1]:
             raise ValueError('Maximum permittivity must be greater than minimum')
         self.permittivity_constraints = permittivity_constraints
+
+        # Make sure there is always a Scale filter at the end
+        if filters is None:
+            filters = [Scale(permittivity_constraints)]
+        elif not isinstance(filters[-1], Scale):
+            filters.append(Scale(permittivity_constraints))
 
         if (
             not isinstance(coords, dict)
@@ -92,6 +99,7 @@ class Device:
                 'Expected device coordinates to be ndarrays;' f' got {coords}'
             )
         self.coords = coords
+
 
         # Optional arguments
         self.name = name
@@ -132,8 +140,6 @@ class Device:
             if self.symmetric:
                 w[..., 0, 0] = np.tril(w[..., 0, 0]) + np.triu(w[..., 0, 0].T, 1)
                 w[..., 0, 0] = np.flip(w[..., 0, 0], axis=1)
-
-            w[..., 0] = np.maximum(np.minimum(w[..., 0], 1), 0)
         else:
             w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w

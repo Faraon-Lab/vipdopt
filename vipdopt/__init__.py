@@ -13,7 +13,8 @@ logger: logging.Logger = logging.getLogger()
 
 try:
     lumapi: ModuleType | None = import_lumapi(
-        f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
+        # f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
+        'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
     )
 except FileNotFoundError:
     # logger.exception('lumapi not found. Using dummy values\n')

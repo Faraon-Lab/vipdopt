@@ -81,7 +81,10 @@ class LumericalSimulation(ISimulation):
         Arguments:
             source (PathLike | dict | None): optional source to load the simulation from
         """
-        self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
+        self.info: OrderedDict[str, Any] = OrderedDict([
+            ('name', ''),
+            ('path', None),
+        ])
         self.clear_objects()
         self._env_vars: dict | None = None
 
@@ -192,12 +195,16 @@ class LumericalSimulation(ISimulation):
         """Set the save path of the simulation."""
         self.info['path'] = path.absolute()
 
-    def get_path(self) -> Path:
+    def get_path(self) -> Path | None:
         """Get the save path of the simulation."""
-        p = self.info['path']
-        if not isinstance(p, Path):
-            p = Path(p)
-        return p
+        return self.info.get('path', None)
+
+    # def get_path(self) -> Path:
+    #     """Get the save path of the simulation."""
+    #     p = self.info['path']
+    #     if not isinstance(p, Path):
+    #         p = Path(p)
+    #     return p
 
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
@@ -311,8 +318,8 @@ class LumericalSimulation(ISimulation):
             monitors = self.monitors()
         for mon in monitors:
             output_path = sim_path.parent / (sim_path.stem + f'_{mon.name}.npz')
-            mon.set_src(output_path)
-            
+            mon.set_source(output_path)
+
     def imports(self) -> list[Import]:
         """Return a list of all import objects."""
         return [obj for _, obj in self.objects.items() if isinstance(obj, Import)]

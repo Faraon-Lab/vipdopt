@@ -17,8 +17,16 @@ import numpy.typing as npt
 import vipdopt
 from vipdopt.simulation.simobject import Import, LumericalSimObjectType
 from vipdopt.simulation.simulation import ISimulation, LumericalSimulation
-from vipdopt.utils import P, Path, R, ensure_path, import_lumapi, setup_logger
-from time import sleep
+from vipdopt.utils import (
+    P,
+    Path,
+    PathLike,
+    R,
+    convert_path,
+    ensure_path,
+    import_lumapi,
+    setup_logger,
+)
 
 class ISolver(abc.ABC):
     """Class representing FDTD solver software."""
@@ -188,35 +196,31 @@ class LumericalFDTD(ISolver):
             self.fdtd = None
             # self._synced = False
 
-    @abc.abstractmethod
     @overload
     @ensure_path
     def load(self, path: Path): ...
 
-    @abc.abstractmethod
     @overload
     def load(self, sim: ISimulation): ...
 
-    @abc.abstractmethod
     @overload
     @ensure_path
     def load(self, path: Path, sim: ISimulation): ...
 
-    @abc.abstractmethod
     @_check_lum_fdtd
-    @overload
-    @ensure_path
-    def load(self, path: Path | None, sim: ISimulation | None):
+    def load(self, path: PathLike | None, sim: ISimulation | None):
         """Load data into the solver from a file or a simulation object.."""
+        if path is not None:
+            path = convert_path(path)
         if sim is not None:
             self.fdtd.switchtolayout()  # type: ignore
             self.fdtd.deleteall()  # type: ignore
             if path is not None:  # Load file into sim object
                 path = path.absolute()
                 self.fdtd.load(str(path))
-                sim.info['path'] = path
-            elif sim.info['path'] is not None:  # Load data from sim's path
-                self.fdtd.load(sim.info['path'])
+                sim.set_path(path)
+            elif sim.get_path() is not None:  # Load data from sim's path
+                self.fdtd.load(str(sim.get_path()))
             else:
                 self.load_simulation(sim)
             self.current_sim = sim
@@ -255,15 +259,15 @@ class LumericalFDTD(ISolver):
                     self.importnk2(obj.name, *obj.get_nk2())
         self.current_sim = sim
 
-    @_check_lum_fdtd
-    # @override
-    @ensure_path
-    def load(self, path: Path):
-        """Load a simulation from a Lumerical .fsp file."""
-        vipdopt.logger.debug(f'Loading simulation from {path!s} into Lumerical...')
-        fname = str(path)
-        self.fdtd.load(fname)  # type: ignore
-        vipdopt.logger.debug(f'Succesfully loaded simulation from {fname}.\n')
+    # @_check_lum_fdtd
+    # # @override
+    # @ensure_path
+    # def load(self, path: Path):
+    #     """Load a simulation from a Lumerical .fsp file."""
+    #     vipdopt.logger.debug(f'Loading simulation from {path!s} into Lumerical...')
+    #     fname = str(path)
+    #     self.fdtd.load(fname)  # type: ignore
+    #     vipdopt.logger.debug(f'Succesfully loaded simulation from {fname}.\n')
 
     @overload
     @ensure_path
@@ -473,8 +477,10 @@ class LumericalFDTD(ISolver):
         vipdopt.logger.info('Reformatting monitor data...')
         for sim in sims:
             self.fdtd.switchtolayout()
-            sim_path: Path = sim.info['path']
-            self.load(sim_path)
+            sim_path: Path | None = sim.get_path()
+            if sim_path is None:
+                continue
+            self.load(sim_path, None)
             vipdopt.logger.debug(f'Reformatting monitor data from {sim_path}...')
             sim.link_monitors()
             for monitor in sim.monitors():
@@ -544,16 +550,36 @@ if __name__ == '__main__':
     vipdopt.lumapi = import_lumapi(
         'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
     )
+    # fdtd = LumericalFDTD()
+    # sim = LumericalSimulation('test_data\\sim.json')
+    # # sim.info['path'] = Path('testing\\monitor_data\\sim.fsp')
+    # fdtd.connect(hide=True)
+    # # fdtd.load_simulation(sim)
+    # fdtd.save('testing\\monitor_data\\sim.fsp', sim)
+    # fdtd.addjob('testing\\monitor_data\\sim.fsp')
+    # fdtd.runjobs(0)
+    # # fdtd.run()
+    # # vipdopt.logger.debug(sim.info)
+    # # print(sim.info)
+    # fdtd.reformat_monitor_data([sim])
+    # fdtd.close()
+
+    # Creating the FDTD hook
+
     fdtd = LumericalFDTD()
-    sim = LumericalSimulation('test_data\\sim.json')
-    # sim.info['path'] = Path('testing\\monitor_data\\sim.fsp')
-    fdtd.connect(hide=True)
-    # fdtd.load_simulation(sim)
-    fdtd.save('testing\\monitor_data\\sim.fsp', sim)
-    fdtd.addjob('testing\\monitor_data\\sim.fsp')
-    fdtd.runjobs(0)
-    # fdtd.run()
-    # vipdopt.logger.debug(sim.info)
-    # print(sim.info)
+    sim = LumericalSimulation('docs\\notebooks\\simulation_example.json')
+    sim_file = 'sim.fsp'  # Where Lumerical will save simulation data
+
+    fdtd.connect(hide=False)  # This starts a Lumerical session
+
+    fdtd.load(path=None, sim=sim)  # Load simulation into Lumerical
+    fdtd.save(sim_file)  # Lumerical must save to a file before running
+
+    fdtd.addjob(sim_file)  # Add the simulation file to the job queue
+
+    fdtd.runjobs()
+
+    # Create individual data files for each Monitor
     fdtd.reformat_monitor_data([sim])
-    fdtd.close()
+
+    fdtd.close()  # End Lumerical session

@@ -64,6 +64,7 @@ class SuperFoM:
         """Reset all of the monitors used to calculate the FoM."""
         map(FoM.reset_monitors, flatten(self.foms))
 
+    # TODO: Account for ConstantFoM's, since that will affect the weights
     def performance_weighting(self, fom_values: npt.NDArray):
         """Recompute the weights based on the performance of the optimization.
 
@@ -134,7 +135,7 @@ class SuperFoM:
                 starmap_with_kwargs(
                     FoM.compute_fom,
                     ((fom, *args) for fom in foms),
-                    ({'sum_values': False, **kwargs} for _ in foms),
+                    ({'reduce': False, **kwargs} for _ in foms),
                 )
             )
         )
@@ -249,7 +250,13 @@ class SuperFoM:
         elif isinstance(first, SuperFoM) and isinstance(second, Number):
             match operator:
                 case '+':
-                    foms = [tuple([second])] + first.foms
+                    fom_num = ConstantFoM(second)
+                    foms = first.foms + fom_num.foms
+                    weights = first.weights + fom_num.weights
+                case '-':
+                    fom_num = ConstantFoM(second)
+                    foms = first.foms + fom_num.foms
+                    weights = first.weights + [-w for w in fom_num.weights]
                 case '*':
                     foms = first.foms
                     weights = [w * second for w in first.weights]
@@ -261,8 +268,13 @@ class SuperFoM:
         elif isinstance(first, Number) and isinstance(second, SuperFoM):
             match operator:
                 case '+':
-                    foms = [tuple([first])] + second.foms
-                    weights = [1.0] + second.weights
+                    fom_num = ConstantFoM(first)
+                    foms = fom_num.foms + second.foms
+                    weights = fom_num.weights + second.weights
+                case '-':
+                    fom_num = ConstantFoM(first)
+                    foms = fom_num.foms + second.foms
+                    weights = fom_num.weights + [-w for w in second.weights]
                 case '*':
                     foms = second.foms
                     weights = [first * w for w in second.weights]
@@ -380,6 +392,7 @@ class FoM(SuperFoM):
         pos_max_freqs: Sequence[int],
         neg_min_freqs: Sequence[int],
         spectral_weights: npt.NDArray = np.array(1),
+        reduce: Callable[[npt.NDArray], Number] = np.sum,
     ) -> None:
         """Initialize a FoM object."""
         super().__init__([(self,)], [1.0])
@@ -397,6 +410,7 @@ class FoM(SuperFoM):
         self.pos_max_freqs = list(pos_max_freqs)
         self.neg_min_freqs = list(neg_min_freqs)
         self.spectral_weights = spectral_weights
+        self.reduce = reduce
 
     def __eq__(self, other: Any) -> bool:
         """Test equality."""
@@ -412,6 +426,7 @@ class FoM(SuperFoM):
                 and self.pos_max_freqs == other.pos_max_freqs
                 and self.neg_min_freqs == other.neg_min_freqs
                 and self.spectral_weights == other.spectral_weights
+                and self.reduce == other.reduce
             )
         return super().__eq__(other)
 
@@ -428,6 +443,7 @@ class FoM(SuperFoM):
             self.pos_max_freqs,
             self.neg_min_freqs,
             self.spectral_weights,
+            self.reduce,
         )
 
     def reset_monitors(self):
@@ -437,14 +453,14 @@ class FoM(SuperFoM):
         for mon in self.adj_monitors:
             mon.reset()
 
-    def compute_fom(self, *args, sum_values: bool = True, **kwargs) -> npt.NDArray:
+    def compute_fom(self, *args, reduce: bool = True, **kwargs) -> npt.NDArray:
         """Compute the figure of merit."""
         total_fom = self.fom_func(*args, **kwargs)
         self.reset_monitors()
         # return self._subtract_neg(total_fom)
         f = np.dot(total_fom, self.spectral_weights)
-        if sum_values:
-            return f.sum()
+        if reduce:
+            return self.reduce(f)
         return f
 
     def compute_grad(self, *args, **kwargs) -> npt.NDArray:
@@ -539,6 +555,22 @@ def unique_adj_sim_map(foms: Iterable[FoM]) -> dict[frozenset[Source], list[FoM]
     return sim_map
 
 
+class ConstantFoM(FoM):
+    """Class for representing constant values in a FoM."""
+
+    def __init__(self, value: Number):
+        super().__init__(
+            'TE+TM', [], [], [], [], self._constant_fom, self._constant_grad, [0], []
+        )
+        self.value = value
+
+    def _constant_fom(self, x: npt.NDArray):
+        return np.ones(x.shape) * self.value
+
+    def _constant_grad(self, x: npt.NDArray):
+        return np.zeros(x.shape)
+
+
 class BayerFilterFoM(FoM):
     """FoM implementing the particular figure of merit for the SonyBayerFilter.
 
@@ -553,8 +585,8 @@ class BayerFilterFoM(FoM):
         polarization: str,
         fwd_srcs: list[Source],
         adj_srcs: list[Source],
-        fom_monitors: list[Monitor],
-        grad_monitors: list[Monitor],
+        fwd_monitors: list[Monitor],
+        adj_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         spectral_weights: npt.NDArray = np.array(1),
@@ -564,8 +596,8 @@ class BayerFilterFoM(FoM):
             polarization,
             fwd_srcs,
             adj_srcs,
-            fom_monitors,
-            grad_monitors,
+            fwd_monitors,
+            adj_monitors,
             self._bayer_fom,
             self._bayer_gradient,
             pos_max_freqs,
@@ -693,11 +725,6 @@ class UniformMAEFoM(FoM):
 
     def __init__(
         self,
-        polarization: str,
-        fwd_srcs: list[Source],
-        adj_srcs: list[Source],
-        fwd_monitors: list[Monitor],
-        adj_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         constant: float,
@@ -705,16 +732,17 @@ class UniformMAEFoM(FoM):
     ) -> None:
         """Initialize a UniformFoM."""
         super().__init__(
-            polarization,
-            fwd_srcs,
-            adj_srcs,
-            fwd_monitors,
-            adj_monitors,
+            'TE+TM',
+            [],
+            [],
+            [],
+            [],
             self._uniform_mae_fom,
             self._uniform_mae_gradient,
             pos_max_freqs,
             neg_min_freqs,
             spectral_weights=spectral_weights,
+            reduce=np.mean,
         )
         self.constant = constant
 
@@ -730,11 +758,6 @@ class UniformMSEFoM(FoM):
 
     def __init__(
         self,
-        polarization: str,
-        fwd_srcs: list[Source],
-        adj_srcs: list[Source],
-        fwd_monitors: list[Monitor],
-        adj_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         constant: float,
@@ -742,21 +765,23 @@ class UniformMSEFoM(FoM):
     ) -> None:
         """Initialize a UniformFoM."""
         super().__init__(
-            polarization,
-            fwd_srcs,
-            adj_srcs,
-            fwd_monitors,
-            adj_monitors,
+            'TE+TM',
+            [],
+            [],
+            [],
+            [],
             self._uniform_mse_fom,
             self._uniform_mse_gradient,
             pos_max_freqs,
             neg_min_freqs,
             spectral_weights=spectral_weights,
+            reduce=np.mean,
         )
         self.constant = constant
 
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
+
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
 
@@ -777,11 +802,6 @@ class GaussianFoM(FoM):
 
     def __init__(
         self,
-        polarization: str,
-        fwd_srcs: list[Source],
-        adj_srcs: list[Source],
-        fwd_monitors: list[Monitor],
-        adj_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
         length: float,
@@ -790,11 +810,11 @@ class GaussianFoM(FoM):
     ) -> None:
         """Initialize a UniformFoM."""
         super().__init__(
-            polarization,
-            fwd_srcs,
-            adj_srcs,
-            fwd_monitors,
-            adj_monitors,
+            'TE+TM',
+            [],
+            [],
+            [],
+            [],
             self._gaussian_fom,
             self._gaussian_gradient,
             pos_max_freqs,

@@ -7,7 +7,6 @@ import pytest
 
 from vipdopt.configuration.template import SonyBayerRenderer
 from vipdopt.optimization import Device
-from vipdopt.optimization import Device
 
 TEST_YAML_PATH = Path('testing/config_example.yml')
 TEST_TEMPLATE_PATH = Path('jinja_templates/derived_simulation_properties.j2')
@@ -108,12 +107,12 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
     'border_size_voxels': int(round((5 * 0.051) / 0.085)),
     'device_voxels_lateral_bordered': int(round(2.04 / 0.085)),
     # FDTD Properties
-    'vertical_gap_size_um': 0.085 * 15,
+    'vertical_gap_size_um': 0.085 * 25,
     'lateral_gap_size_um': 0.051 * 10,
-    'fdtd_region_size_vertical_um': 2 * (0.085 * 15) + (0.408 * 5) + (0.051 * 30),
+    'fdtd_region_size_vertical_um': 2 * (0.085 * 25) + (0.408 * 5) + (0.051 * 30),
     'fdtd_region_size_lateral_um': 2 * (0.051 * 10) + 2.04,
-    'fdtd_region_maximum_vertical_um': 2.04 + (0.085 * 15),
-    'fdtd_region_minimum_vertical_um': -1 * 0.051 * 30 - (0.085 * 15),
+    'fdtd_region_maximum_vertical_um': 2.04 + (0.085 * 25),
+    'fdtd_region_minimum_vertical_um': -1 * 0.051 * 30 - (0.085 * 25),
     # Surrounding Properties
     'pec_aperture_thickness_um': 3 * 0.017,
     'sidewall_x_positions_um': [(2.04 + 0.085) / 2, 0, -(2.04 + 0.085) / 2, 0],
@@ -142,8 +141,8 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
     ),
     # Forward Properties
     'lateral_aperture_um': 1.1 * 2.04,
-    'src_maximum_vertical_um': 0.408 * 5 + (0.085 * 15 * 2 / 3),
-    'src_minimum_vertical_um': -(0.051 * 30) - 0.5 * (0.085 * 15),
+    'src_maximum_vertical_um': 0.408 * 5 + (0.085 * 25 * 5 / 6),
+    'src_minimum_vertical_um': -(0.051 * 30) - 0.5 * (0.085 * 25),
     'mid_lambda_um': (0.375 + 0.725) / 2,
     'source_angle_theta_rad': np.arcsin(np.sin(0) * 1.0 / 1.5),
     'source_angle_theta_deg': np.arcsin(np.sin(0) * 1.0 / 1.5) * 180 / np.pi,

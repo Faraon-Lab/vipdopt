@@ -12,6 +12,7 @@
 temp/
 tmp/
 !testing/*.yml
+!docs/notebooks/*.json
 
 # Lumerical files
 *.lsf
@@ -30,6 +31,7 @@ __pycache__/
 *.npy
 *.npz
 !testing/monitor_data/*.npz
+!docs/notebooks/*.npz
 
 # Distribution / packaging
 .Python
@@ -54,6 +56,7 @@ MANIFEST
 *.bat
 
 # Documentation
+**/.ipynb_checkpoints/
 
 # docs/source/_autosummary
 
