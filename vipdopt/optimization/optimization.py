@@ -1067,6 +1067,7 @@ class LumericalOptimization:
                 for sim in chain(fwd_sims, adj_sims):
                     sim_file = self.dirs['temp'] / f'{sim.info["name"]}.fsp'
                     # sim.link_monitors()
+                    
                     self.fdtd.save(sim_file, sim)       # Saving also sets the path
                     self.fdtd.addjob(sim_file)
 

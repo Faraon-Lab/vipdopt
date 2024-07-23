@@ -18,7 +18,7 @@ import vipdopt
 from vipdopt.simulation.simobject import Import, LumericalSimObjectType
 from vipdopt.simulation.simulation import ISimulation, LumericalSimulation
 from vipdopt.utils import P, Path, R, ensure_path, import_lumapi, setup_logger
-
+from time import sleep
 
 class ISolver(abc.ABC):
     """Class representing FDTD solver software."""
@@ -284,7 +284,20 @@ class LumericalFDTD(ISolver):
         if self.current_sim is not None:
             self.current_sim.set_path(path)
             # self.current_sim.info['path'] = path
-        self.fdtd.save(str(path))  # type: ignore
+        
+        # Sometimes saving fails due to some sort of perms issue depending on machine and OS.
+        # Attempt saving with 2s between attempts, and hard fails after 4 attempts.
+        for x in range(0, 4):  # try 4 times
+            str_error = None
+            try:
+                self.fdtd.save(str(path))  # type: ignore
+                str_error = None
+            except Exception as str_error:
+                pass
+            if str_error:
+                sleep(2)  # wait for 2 seconds before trying to fetch the data again
+            else:
+                break
         vipdopt.logger.debug(f'Successfully saved simulation to {path}.\n')
 
     @_check_lum_fdtd

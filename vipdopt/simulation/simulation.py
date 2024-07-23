@@ -205,6 +205,12 @@ class LumericalSimulation(ISimulation):
         new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
+        
+        try:    # Copy-paste the device imports from the previous simulation into the new simulation.
+            for i, imp in enumerate(new_sim.imports()):
+                imp.set_nk2(*self.imports()[i].get_nk2())
+        except Exception as e:
+            pass
 
         return new_sim
 
