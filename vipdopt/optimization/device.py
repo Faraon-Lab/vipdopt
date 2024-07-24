@@ -362,8 +362,8 @@ class Device:
 
         # Reinterpolate
         if reinterpolation_factor != 1:
-            new_size = np.ceil(reinterpolation_factor)
-            cur_density_import = repeat(cur_density, (new_size, new_size, new_size))
+            new_size = tuple(int(x) for x in np.ceil(np.multiply(reinterpolation_factor, self.size)))
+            cur_density_import = repeat(cur_density, new_size)
             # cur_density_import = np.repeat(
             #     np.repeat(
             #         np.repeat(

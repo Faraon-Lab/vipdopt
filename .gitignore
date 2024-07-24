@@ -13,6 +13,8 @@ temp/
 tmp/
 !testing/*.yml
 !docs/notebooks/*.json
+!docs/notebooks/example_render.yml
+!docs/notebooks/config_example_3d.yml
 
 # Lumerical files
 *.lsf
@@ -185,3 +187,4 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+docs/notebooks/pixel_example/template.j2
