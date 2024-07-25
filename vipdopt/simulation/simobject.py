@@ -73,6 +73,7 @@ class LumericalSimObject:
         """Create a LumericalSimObject."""
         self.name = name
         self.obj_type = obj_type
+        self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
         self.properties: OrderedDict[str, Any] = OrderedDict()
         if obj_type != LumericalSimObjectType.FDTD:
             self.properties['name'] = name

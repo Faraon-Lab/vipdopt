@@ -412,13 +412,13 @@ if __name__ == '__main__':
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level)
 
-    # with LumericalSimulation(Path(args.simulation_json)) as sim:
-    # with LumericalSimulation() as sim:
-    #     # sim.promise_env_setup()
-    #     sim.load('test_project/.tmp/sim_0.fsp')
-    #     sys.exit()
+    with LumericalSimulation(Path(args.simulation_json)) as sim:
+    #with LumericalSimulation() as sim:
+        sim.fdtd.promise_env_setup()
+        sim.load('test_project/.tmp/sim_0.fsp')
+        sys.exit()
 
-    #     vipdopt.logger.info('Saving Simulation')
-    #     sim.save(Path('test_sim'))
-    #     vipdopt.logger.info('Running simulation')
-    #     sim.run()
+        vipdopt.logger.info('Saving Simulation')
+        sim.save(Path('test_sim'))
+        vipdopt.logger.info('Running simulation')
+        sim.run()

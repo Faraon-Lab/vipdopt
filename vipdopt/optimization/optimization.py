@@ -78,18 +78,25 @@ class LumericalOptimization:
 
         self.epoch_list = epoch_list
         self.loop = True
-        self.true_iteration = true_iteration
+        self.iteration = true_iteration
 
         self.spectral_weights = np.array(1)
         self.performance_weights = np.array(1)
 
         # Setup Lumerical Hook
         self.fdtd = LumericalFDTD()
+        # # TODO: Are we running it locally or on SLURM or on AWS or?
         self.fdtd.promise_env_setup(**env_vars)
 
         # Setup histories
-        self.fom_hist: list[npt.NDArray] = []
-        self.param_hist: list[npt.NDArray] = []
+        self.fom_hist: dict[str, list[npt.NDArray]] = {}           # History of FoM-related parameters with each iteration
+        self.param_hist: dict[str, list[npt.NDArray]] = {}         # History of all other parameters with each iteration
+        #! These will be fed directly into plotter.py so this is the place to be changing labels / variable names and somesuch.
+        for metric in ['transmission', 'intensity']:
+            self.fom_hist.update( {f'{metric}_overall': []} )
+            for i, f in enumerate(self.fom.foms):
+                self.fom_hist.update( {f'{metric}_{i}': []} )
+        self.param_hist.update({'design': []})
 
         # Setup callback functions
         self._callbacks: list[Callable[[LumericalOptimization], None]] = []
@@ -222,7 +229,7 @@ class LumericalOptimization:
                 e_focal['x'],
                 e_focal['lambda'],
                 folder,
-                self.true_iteration,
+                self.iteration,
                 wl_idxs=[7, 22],
             )
         elif self.cfg['simulator_dimension'] == '3D':
@@ -232,7 +239,7 @@ class LumericalOptimization:
                 e_focal['y'],
                 e_focal['lambda'],
                 folder,
-                self.true_iteration,
+                self.iteration,
                 wl_idxs=[9, 29, 49],
             )
 
@@ -240,12 +247,12 @@ class LumericalOptimization:
                 self.fom_evolution['transmission'],
                 self.cfg['lambda_values_um'],
                 folder,
-                self.true_iteration,
+                self.iteration,
             )  # continuously produces only one plot per epoch to save space
 
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
         final_device_layer_fig, _ = plotter.visualize_device(
-            cur_index, folder, iteration=self.true_iteration
+            cur_index, folder, iteration=self.iteration
         )
 
         # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
@@ -326,11 +333,11 @@ class LumericalOptimization:
             os.path.abspath(self.dirs['opt_info'] / 'cur_design.npy'),
             self.device.get_design_variable(),
         )
-        if self.true_iteration in self.epoch_list:  # i.e. new epoch
+        if self.iteration in self.epoch_list:  # i.e. new epoch
             np.save(
                 os.path.abspath(
                     self.dirs['opt_info']
-                    / f'cur_design_e{self.epoch_list.index(self.true_iteration)}.npy'
+                    / f'cur_design_e{self.epoch_list.index(self.iteration)}.npy'
                 ),
                 self.device.get_design_variable(),
             )
@@ -423,7 +430,7 @@ class LumericalOptimization:
                     f'=========\nEpoch {self.epoch}, iter {self.iteration}:'
                     ' Running simulations...'
                 )
-                # self.true_iteration = self.epoch * self.iter_per_epoch + self.iteration
+                # self.iteration = self.epoch * self.iter_per_epoch + self.iteration
 
                 vipdopt.logger.debug(
                     f'\tDesign Variable: {self.device.get_design_variable()}'
@@ -538,10 +545,10 @@ class LumericalOptimization:
 
                             # Store fom, restricted fom, true fom
                             self.fom_evolution['transmission'][
-                                self.true_iteration, f_idx, :
+                                self.iteration, f_idx, :
                             ] = np.squeeze(f.fom)
                             self.fom_evolution['overall_transmission'][
-                                self.true_iteration, f_idx, :
+                                self.iteration, f_idx, :
                             ] = np.squeeze(
                                 np.abs(
                                     f.fwd_monitors[0].src.getresult(
@@ -551,7 +558,7 @@ class LumericalOptimization:
                             )
                             # TODO: add line for restricted fom
                             self.fom_evolution[self.cfg['optimization_fom']][
-                                self.true_iteration, f_idx, :
+                                self.iteration, f_idx, :
                             ] = np.squeeze(f.true_fom)
 
                             # Compute adjoint amplitude or source weight
@@ -649,12 +656,12 @@ class LumericalOptimization:
                 # (epochs, iterations, focal_areas, polarizations, wavelengths)
                 list_overall_figure_of_merit = self.fom_func(self.foms, self.weights)
                 # TODO: plots and histories
-                self.figure_of_merit_evolution[self.true_iteration] = np.sum(
+                self.figure_of_merit_evolution[self.iteration] = np.sum(
                     list_overall_figure_of_merit, -1
                 )  # Sum over wavelength
                 vipdopt.logger.info(
                     'Figure of merit is now: '
-                    f'{self.figure_of_merit_evolution[self.true_iteration]}'
+                    f'{self.figure_of_merit_evolution[self.iteration]}'
                 )
 
                 # # Compute FoM and Gradient
@@ -692,7 +699,7 @@ class LumericalOptimization:
                     self.binarization_evolution,
                 )
 
-                self.param_hist.append(self.device.get_design_variable())
+                self.param_hist.get('design').append( self.device.get_design_variable() )
 
                 # TODO: Here is where we would start plotting the loss landscape. Probably should be accessed by a separate class...
                 # Or we could move it to the device step part
@@ -898,7 +905,7 @@ class LumericalOptimization:
                 # self.device.set_design_variable(np.maximum(np.minimum(w_hat, 1), 0))
 
                 self.optimizer.step(
-                    self.device, design_gradient_unfiltered, self.true_iteration
+                    self.device, design_gradient_unfiltered, self.iteration
                 )
 
                 # Save out overall savefile and all save information as separate files
@@ -1007,9 +1014,9 @@ class LumericalOptimization:
 
         # If an error is encountered while running the optimization still want to
         # clean up afterwards
-        
+
         self._inner_optimization_loop()
-        
+
         #! 20240721 ian - DEBUG COMMENT THIS BLOCK - UNCOMMENT FOR GIT PUSH
         # try:
         #     self._inner_optimization_loop()
@@ -1024,42 +1031,80 @@ class LumericalOptimization:
 
     def _inner_optimization_loop(self):
         """The core optimization loop."""
-        self.true_iteration = 0
+        # self.iteration = 0
         for epoch, max_iter in enumerate(self.epoch_list):
+            
+            if max_iter < self.iteration:
+                continue
+            
             vipdopt.logger.info(
                 f'=============== Starting Epoch {epoch} ===============\n'
             )
-            iters_in_epoch = max_iter - self.true_iteration
+            iters_in_epoch = max_iter - self.iteration
+            
             for i in range(iters_in_epoch):
                 vipdopt.logger.info(
-                    f'===== Epoch {epoch}, Iteration {i} / {iters_in_epoch}, Total Iteration {self.true_iteration} =====\n'
+                    f'===== Epoch {epoch}, Iteration {i} / {iters_in_epoch}, Total Iteration {self.iteration} =====\n'
                 )
                 if not self.loop:
                     break
 
-                # Save current design before iteration
-                w = self.device.get_design_variable()
-                self.param_hist.append(w)
-
                 # Clean scratch directory to save storage space
                 rmtree(self.dirs['temp'], keep_dir=True)
 
-                # Import device index into base simulation
+                # # Disable device index monitor(s) to save memory
+                self.base_sim.disable(self.base_sim.indexmonitor_names())
+
+                #! THE ORDER of the following matters because device.field_shape must be set properly
+                #! before calling device.import_cur_index()
+                if i == 0:                                              # Just do it once per epoch
+                    # Sync up base sim LumericalSimObject with FDTD in order to get device index monitor shape.
+                    self.fdtd.save(self.base_sim.get_path(), self.base_sim)
+                    # Reassign field shape now that the device has been properly imported into Lumerical.
+                    self.device.field_shape = self.base_sim.import_field_shape()
+
+                # Each epoch the filters get stronger and so the permittivity must be passed through the new filters
+                self.device.update_filters(
+                    epoch = np.max( np.where( np.array(self.epoch_list)<=self.iteration ) )
+                    )
+                self.device.update_density()
+                # Import device index now into base simulation
                 import_primitive = self.base_sim.imports()[0]
                 cur_density, cur_permittivity = self.device.import_cur_index(
                     import_primitive,
                     reinterpolation_factor=1,
                     binarize=False,
                 )
-
-                # # Disable device index monitor to save memory
-                # self.disable([import_monitor_name])
-
-                # Save base sim for ease
+                # Sync up with FDTD to properly import device.
                 self.fdtd.save(self.base_sim.get_path(), self.base_sim)
                 
-                # Reassign field shape now that the device has been properly imported into Lumerical.
-                self.device.field_shape = self.base_sim.import_field_shape()
+                # # Save statistics to do with design variable away before running simulations.
+                # Save current design before iteration
+                self.param_hist.get('design').append( self.device.get_design_variable() )
+                # # Calculate material % and binarization level, store away
+                # # todo: redo this section once you get sigmoid filters up and can start counting materials
+                # cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
+                # tio2_pct = 100 * np.count_nonzero(self.device.get_design_variable() < 0.5) / cur_index.size
+                # # todo: should wrap these as functions of Device object
+                # vipdopt.logger.info(f'TiO2% is {tio2_pct}%.')		# todo: seems to be wrong?		
+                # self.param_hist.get('tio2_pct').append( tio2_pct )
+                # # logging.info(f'Binarization is {100 * np.sum(np.abs(cur_density-0.5))/(cur_density.size*0.5)}%.')
+                # binarization_fraction = self.device.compute_binarization(self.device.get_design_variable())
+                # vipdopt.logger.info(f'Binarization is {100 * binarization_fraction}%.')
+                # self.param_hist.get('binarization').append( binarization_fraction )
+                # # todo: re-code binarization for multiple materials.
+                
+                
+
+                vipdopt.logger.info('Beginning Step 1: All Simulations Setup')
+                #
+                # Step 1: After importing the current epoch's permittivity value to the device;
+                # We create a different optimization job for:
+                # - each of the polarizations for the forward source waves
+                # - each of the polarizations for each of the adjoint sources
+                # Since here, each adjoint source is corresponding to a focal location for a target color band, we have
+                # <num_wavelength_bands> x <num_polarizations> adjoint sources.
+                # We then enqueue each job and run them all in parallel.
 
                 # Create jobs
                 fwd_sims = self.fom.create_forward_sim(self.base_sim)
@@ -1067,29 +1112,48 @@ class LumericalOptimization:
                 for sim in chain(fwd_sims, adj_sims):
                     sim_file = self.dirs['temp'] / f'{sim.info["name"]}.fsp'
                     # sim.link_monitors()
-                    
+
                     self.fdtd.save(sim_file, sim)       # Saving also sets the path
                     self.fdtd.addjob(sim_file)
+                vipdopt.logger.info('In-Progress Step 1: All Simulations Setup and Jobs Added')
 
-                pull_files_from_debug_folder = False
+
                 # If true, we're in debugging mode and it means no simulations are run.
                 # Data is instead pulled from finished simulation files in the debug folder.
-                if not pull_files_from_debug_folder:
-                    # Run all simulations
-                    self.fdtd.runjobs()
-                else:
+                # If false, run jobs and check that they all ran to completion.
+                if self.cfg['pull_sim_files_from_debug_folder']:
                     for sim in chain(fwd_sims, adj_sims):
                         sim_file = self.dirs['debug_completed_jobs'] / f'{sim.info["name"]}.fsp'
                         sim.set_path(sim_file)
+                else:
+                    while self.fdtd.fdtd.listjobs("FDTD"):              # Existing job list still occupied
+                        # Run simulations from existing job list
+                        self.fdtd.runjobs()
+                        
+                        # Check if there are any jobs that didn't run
+                        for sim in chain(fwd_sims, adj_sims):
+                            sim_file = sim.get_path()
+                            # self.fdtd.load(sim_file)
+                            # if self.fdtd.layoutmode():
+                            if sim_file.stat().st_size <= 2e7:  # Arbitrary 20MB filesize for simulations that didn't run completely
+                                self.fdtd.addjob(sim_file)
+                                vipdopt.logger.info(f'Failed to run: {sim_file.name}. Re-adding ...')
+                vipdopt.logger.info('Completed Step 1: All Simulations Run.')
+
 
                 # Reformat monitor data for easy use
                 self.fdtd.reformat_monitor_data(list(chain(fwd_sims, adj_sims)))
 
-                # Compute FoM
+                # Compute intensity FoM
                 f = self.fom.compute_fom(*self.fom_args, **self.fom_kwargs)
-                self.fom_hist.append(f)
-
+                self.fom_hist.get('intensity_overall').append(f)
                 vipdopt.logger.debug(f'FoM: {f}')
+                # Compute transmission FoM
+                t = np.array([fom[0].fom_func(*self.fom_args, *self.fom_kwargs) for fom in self.fom.foms])
+                # todo: WHY IS THE TRANSMISSION ABOVE 100% WTF
+                [self.fom_hist.get(f'transmission_{idx}').append(t_i) for idx,t_i in enumerate(t)]
+                self.fom_hist.get('transmission_overall').append(np.squeeze(np.sum(t, 0)))
+                # [plt.plot(np.squeeze(t_i)) for t_i in t]
 
                 # Compute gradient
                 g = self.fom.compute_grad(
@@ -1098,7 +1162,7 @@ class LumericalOptimization:
                     **self.grad_kwargs,
                 )
                 # vipdopt.logger.debug(f'Gradient: {g}')
-                
+
                 # Process gradient accordingly. #! TODO: WE SHOULD WRAP THIS INTO A FUNCTION.
                 g = np.sum(g, -1)   # Sum over wavelength
                 vipdopt.logger.info(f'Design_gradient has average {np.mean(g)}, max {np.max(g)}')
@@ -1110,15 +1174,15 @@ class LumericalOptimization:
                 # in Eq. 5 of Lalau-Keraly paper https://doi.org/10.1364/OE.21.021693
                 #
                 # dispersive_max_permittivity = dispersion_model.average_permittivity( dispersive_ranges_um[ lookup_dispersive_range_idx ] )
-                dispersive_max_permittivity = self.cfg['max_device_permittivity']
-                delta_real_permittivity = np.real( dispersive_max_permittivity - self.cfg['min_device_permittivity'] )
-                delta_imag_permittivity = np.imag( dispersive_max_permittivity - self.cfg['min_device_permittivity'] )
+                dispersive_max_permittivity = self.device.permittivity_constraints[1]
+                delta_real_permittivity = np.real( dispersive_max_permittivity - self.device.permittivity_constraints[0] )
+                delta_imag_permittivity = np.imag( dispersive_max_permittivity - self.device.permittivity_constraints[0] )
                 # todo: -----------------------------------------------------------------------------------------------------
                 get_grad_density = delta_real_permittivity * np.real(g) + delta_imag_permittivity * (-1*np.imag(g))
                 #! This is where the gradient picks up a permittivity factor i.e. becomes larger than 1!
                 #! Mitigated by backpropagating through the Scale filter.
                 get_grad_density = 2 * get_grad_density		# Factor of 2 after taking the real part
-                
+
                  # Get the full design gradient by summing the x,y polarization components # todo: Do we need to consider polarization??
                 # todo: design_gradient = 2 * ( xy_polarized_gradients[0] + xy_polarized_gradients[1] )
                 # Project / interpolate the design_gradient, the values of which we have at each (mesh) voxel point, and obtain it at each (geometry) voxel point
@@ -1140,7 +1204,7 @@ class LumericalOptimization:
                                                         get_grad_density,
                                                         design_region_geometry, method='linear' )
                 # design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ), device_gradient, bayer_filter_region, method='linear' )
-                
+
                 # Each device needs to remember its gradient!
                 # todo: refine this
                 if self.cfg['enforce_xy_gradient_symmetry']:
@@ -1150,20 +1214,19 @@ class LumericalOptimization:
                         transpose_design_gradient_interpolated = np.swapaxes( design_gradient_interpolated, 0, 1 )
                     design_gradient_interpolated = 0.5 * ( design_gradient_interpolated + transpose_design_gradient_interpolated )
                 # self.device.gradient = design_gradient_interpolated.copy()	# This is BEFORE backpropagation
-                
+
                 # Step the device with the gradient
                 vipdopt.logger.debug('Stepping device along gradient.')
-                self.optimizer.step(self.device, design_gradient_interpolated.copy(), self.true_iteration)
-                #! TODO: NOT STEPPING CORRECTLY! IT JUST KEEPS LOADING THE SAME DEVICE.
-                # Need to check whether it's respecting the epochs and everything. At the moment this is implemented 
-                # in a way where it doesn't respect the epoch maximums and minimums.
+                self.optimizer.step(self.device, design_gradient_interpolated.copy(), self.iteration)
 
+                # Need to check whether it's respecting the epochs and everything. At the moment this is implemented
+                # in a way where it doesn't respect the epoch maximums and minimums.
                 # Generate Plots and call callback functions
                 self.save_histories()
                 # self.generate_plots()
                 self.call_callbacks()
 
-                self.true_iteration += 1
+                self.iteration += 1
             if not self.loop:
                 break
 

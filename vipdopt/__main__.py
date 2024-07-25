@@ -103,6 +103,7 @@ if __name__ == '__main__':
     # 'optimizer': Adam/GDOptimizer object; 'device': Device object;
     # 'base_sim': Simulation object; 'src_to_sim_map': dict with source names as keys, Simulation objects as values
     # 'foms': list of FoM objects, 'weights': array of shape (#FoMs, nλ)
+    vipdopt.logger.info('Completed Step 0: Project Setup')
 
     # Now that config is loaded, set up lumapi
     if os.getenv('SLURM_JOB_NODELIST') is None:
@@ -113,13 +114,10 @@ if __name__ == '__main__':
         vipdopt.lumapi = import_lumapi(
             project.config.data['lumapi_filepath_hpc']
         )  # HPC (Linux)
-    
-    fdtd = project.optimization.fdtd
+
+    fdtd = project.optimization.fdtd    # NOTE: - the instantiation is called in optimization.py
     vipdopt.fdtd = fdtd      # Makes it available to global
-    
-    # fwd_sim = project.foms[0].create_forward_sim(project.base_sim)[0]
-    # fwd_sim.set_path(project.dir / 'fwd_sim.fsp')
-    
+
     fdtd.connect(hide=False) # True)
     project.start_optimization()
     

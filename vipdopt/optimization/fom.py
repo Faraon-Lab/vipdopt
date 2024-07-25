@@ -583,52 +583,45 @@ class BayerFilterFoM(FoM):
         )
 
     def _bayer_fom(self, *args, **kwargs):
-        """Compute bayer filter figure of merit."""
-        # Here we need to figure out which FoM belongs to which file
-
+        """Compute bayer filter figure of merit.
+        More specifically, this function is customized for the Bayer Filter FoM, which requires both the transmission and intensity."""
         # for mon in self.fwd_monitors:
         #     vipdopt.logger.debug(vars(mon))
+        # TODO: Add functionality for neg_min_freqs
 
         # FoM for transmission monitor
         total_tfom = np.zeros(self.fwd_monitors[1].tshape)[..., self.pos_max_freqs]
         # FoM for focal monitor - take [1:] because intensity sums over first axis
         total_ffom = np.zeros(self.fwd_monitors[0].fshape[1:])[..., self.pos_max_freqs]
-
         # Source weight calculation.
         source_weight = np.zeros(self.fwd_monitors[0].fshape, dtype=np.complex128)
-        # for monitor in self.fwd_monitors:
+        
         transmission = self.fwd_monitors[1].trans_mag
-        # vipdopt.logger.info(f'Accessing monitor {monitor.monitor_name}')
-        # print(transmission.shape)
-        # print(self.opt_ids)
-        # print(total_tfom.shape)
-        # print(transmission[..., self.opt_ids].shape)
-        # print(transmission[..., self.opt_ids])
         total_tfom += transmission[..., self.pos_max_freqs]
 
         efield = self.fwd_monitors[0].e
         total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
 
-        source_weight += np.expand_dims(np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3))
-        # We'll apply opt_ids slice when gradient is fully calculated.
-        # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])
-
+        
         # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
         # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
         # to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj) https://stackoverflow.com/a/30032182
-        self.source_weight = (
-            source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
-        )
-        # TODO: Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
+        source_weight += np.expand_dims(np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3))
+        # We'll apply opt_ids slice when gradient is fully calculated.
 
-        # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
-        # direction along the polarization. This is going to be the amplitude of the
-        # dipole-adjoint source driven at the focal plane. Reminder that this is only
-        # applicable for dipole-based adjoint sources
+        # NOTE: 20240305 Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
+        self.source_weight = source_weight
+        # self.source_weight = (
+        #     source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
+        # )
+        
+        #! TODO: REDO - direction of source_weight vector potential error.
+        # # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
+        # # direction along the polarization. This is going to be the amplitude of the
+        # # dipole-adjoint source driven at the focal plane. Reminder that this is only
+        # # applicable for dipole-based adjoint sources
 
-        # x-polarized if phi = 0, y-polarized if phi = 90.
-        # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1
-        # TODO: REDO - direction of source_weight vector potential error.
+        # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1     # x-polarized if phi = 0, y-polarized if phi = 90.
 
         # self.source_weight = np.squeeze(
         #     np.conj(
@@ -643,10 +636,15 @@ class BayerFilterFoM(FoM):
         #     )
         # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
-
-        #! 20240721 Ian - Is the tfom not stored AT ALL????
-        # return total_tfom, total_ffom
-        return total_ffom
+        
+        # NOTE: Ultimately because of the way SuperFoM is set up, there can only be one return value.
+        match kwargs.get('type', None):
+            case 'transmission':
+                return total_tfom
+            case 'intensity':
+                return total_ffom
+            case _:
+                return total_ffom
 
     def _bayer_gradient(self):
         """Compute the gradient of the bayer filter figure of merit."""

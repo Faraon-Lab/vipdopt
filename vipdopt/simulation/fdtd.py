@@ -296,10 +296,11 @@ class LumericalFDTD(ISolver):
             try:
                 self.fdtd.save(str(path))  # type: ignore
                 str_error = None
-            except Exception as str_error:
-                pass
+            except Exception as e:
+                str_error = True
+                
             if str_error:
-                sleep(2)  # wait for 2 seconds before trying to fetch the data again
+                time.sleep(2)  # wait for 2 seconds before trying to fetch the data again
             else:
                 break
         vipdopt.logger.debug(f'Successfully saved simulation to {path}.\n')
