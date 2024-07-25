@@ -378,6 +378,8 @@ class FoM(SuperFoM):
             being maximized in the optimization.
         neg_min_freqs (list[int]): List of indices specifying which frequency bands are
             being minimized in the optimization.
+        all_freqs (list[float]): List of frequencies (absolute values) across the entire
+            simulation.
     """
 
     def __init__(
@@ -391,6 +393,7 @@ class FoM(SuperFoM):
         grad_func: Callable[Concatenate[FoM, P], npt.NDArray],
         pos_max_freqs: Sequence[int],
         neg_min_freqs: Sequence[int],
+        all_freqs: Sequence[float],
         spectral_weights: npt.NDArray = np.array(1),
         reduce: Callable[[npt.NDArray], Number] = np.sum,
     ) -> None:
@@ -409,6 +412,7 @@ class FoM(SuperFoM):
         self.polarization = polarization
         self.pos_max_freqs = list(pos_max_freqs)
         self.neg_min_freqs = list(neg_min_freqs)
+        self.all_freqs = list(all_freqs)
         self.spectral_weights = spectral_weights
         self.reduce = reduce
 
@@ -425,6 +429,7 @@ class FoM(SuperFoM):
                 and self.grad_func == other.grad_func
                 and self.pos_max_freqs == other.pos_max_freqs
                 and self.neg_min_freqs == other.neg_min_freqs
+                and self.all_freqs == other.all_freqs
                 and self.spectral_weights == other.spectral_weights
                 and self.reduce == other.reduce
             )
@@ -442,6 +447,7 @@ class FoM(SuperFoM):
             self.grad_func,
             self.pos_max_freqs,
             self.neg_min_freqs,
+            self.all_freqs,
             self.spectral_weights,
             self.reduce,
         )
@@ -469,14 +475,6 @@ class FoM(SuperFoM):
         self.reset_monitors()
         # return self._subtract_neg(total_grad)
         return np.dot(total_grad, self.spectral_weights)
-
-    def _subtract_neg(self, array: npt.NDArray) -> npt.NDArray:
-        """Subtract the restricted indices from the positive ones."""
-        if len(self.pos_max_freqs) == 0:
-            return 0 - array
-        if len(self.neg_min_freqs) == 0:
-            return array
-        return array[..., self.pos_max_freqs] - array[..., self.neg_min_freqs]
 
     def link_forward_sim(self, sim: LumericalSimulation):
         """Link this FoM's fwd_monitors to a provided simulation."""
@@ -526,6 +524,7 @@ class FoM(SuperFoM):
             data['grad_func'] = self.grad_func
         data['pos_max_freqs'] = self.pos_max_freqs
         data['neg_min_freqs'] = self.neg_min_freqs
+        data['all_freqs'] = self.all_freqs
 
         return data
 
@@ -589,6 +588,7 @@ class BayerFilterFoM(FoM):
         adj_monitors: list[Monitor],
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
+        all_freqs: list[float],
         spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
         """Initialize a BayerFilterFoM."""
@@ -602,56 +602,50 @@ class BayerFilterFoM(FoM):
             self._bayer_gradient,
             pos_max_freqs,
             neg_min_freqs,
+            all_freqs,
             spectral_weights,
         )
 
-    def _bayer_fom(self):
-        """Compute bayer filter figure of merit."""
-        # Here we need to figure out which FoM belongs to which file
-
+    def _bayer_fom(self, type='transmission'):
+        """Compute bayer filter figure of merit.
+        More specifically, this function is customized for the Bayer Filter FoM, which requires both the transmission and intensity."""
         # for mon in self.fwd_monitors:
         #     vipdopt.logger.debug(vars(mon))
+        # TODO: Add functionality for neg_min_freqs
 
         # FoM for transmission monitor
         total_tfom = np.zeros(self.fwd_monitors[1].tshape)[..., self.pos_max_freqs]
         # FoM for focal monitor - take [1:] because intensity sums over first axis
         total_ffom = np.zeros(self.fwd_monitors[0].fshape[1:])[..., self.pos_max_freqs]
-
         # Source weight calculation.
         source_weight = np.zeros(self.fwd_monitors[0].fshape, dtype=np.complex128)
-        # for monitor in self.fwd_monitors:
+        
         transmission = self.fwd_monitors[1].trans_mag
-        # vipdopt.logger.info(f'Accessing monitor {monitor.monitor_name}')
-        # print(transmission.shape)
-        # print(self.opt_ids)
-        # print(total_tfom.shape)
-        # print(transmission[..., self.opt_ids].shape)
-        # print(transmission[..., self.opt_ids])
         total_tfom += transmission[..., self.pos_max_freqs]
 
         efield = self.fwd_monitors[0].e
         total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
 
-        source_weight += np.expand_dims(np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3))
-        # We'll apply opt_ids slice when gradient is fully calculated.
-        # source_weight += np.conj(efield[:,0,0,0, self.opt_ids])
-
+        
         # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
         # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
         # to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj) https://stackoverflow.com/a/30032182
-        self.source_weight = (
-            source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
-        )
-        # TODO: Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
+        source_weight += np.expand_dims(np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3))
+        # We'll apply opt_ids slice when gradient is fully calculated.
 
-        # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
-        # direction along the polarization. This is going to be the amplitude of the
-        # dipole-adjoint source driven at the focal plane. Reminder that this is only
-        # applicable for dipole-based adjoint sources
+        # NOTE: 20240305 Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
+        self.source_weight = source_weight
+        # self.source_weight = (
+        #     source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
+        # )
+        
+        #! TODO: REDO - direction of source_weight vector potential error.
+        # # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
+        # # direction along the polarization. This is going to be the amplitude of the
+        # # dipole-adjoint source driven at the focal plane. Reminder that this is only
+        # # applicable for dipole-based adjoint sources
 
-        # x-polarized if phi = 0, y-polarized if phi = 90.
-        # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1
-        # TODO: REDO - direction of source_weight vector potential error.
+        # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1     # x-polarized if phi = 0, y-polarized if phi = 90.
 
         # self.source_weight = np.squeeze(
         #     np.conj(
@@ -666,9 +660,15 @@ class BayerFilterFoM(FoM):
         #     )
         # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
-
-        # return total_tfom, total_ffom
-        return total_ffom
+        
+        # NOTE: Ultimately because of the way SuperFoM is set up, there can only be one return value.
+        match type:
+            case 'transmission':
+                return total_tfom
+            case 'intensity':
+                return total_ffom
+            case _:
+                return total_ffom
 
     def _bayer_gradient(self):
         """Compute the gradient of the bayer filter figure of merit."""
@@ -726,6 +726,7 @@ class UniformMAEFoM(FoM):
         self,
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
+        all_freqs: list[float],
         constant: float,
         spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
@@ -740,6 +741,7 @@ class UniformMAEFoM(FoM):
             self._uniform_mae_gradient,
             pos_max_freqs,
             neg_min_freqs,
+            all_freqs,
             spectral_weights=spectral_weights,
             reduce=np.mean,
         )
@@ -759,6 +761,7 @@ class UniformMSEFoM(FoM):
         self,
         pos_max_freqs: list[int],
         neg_min_freqs: list[int],
+        all_freqs: list[float],
         constant: float,
         spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
@@ -773,13 +776,11 @@ class UniformMSEFoM(FoM):
             self._uniform_mse_gradient,
             pos_max_freqs,
             neg_min_freqs,
+            all_freqs,
             spectral_weights=spectral_weights,
             reduce=np.mean,
         )
         self.constant = constant
-
-    def _uniform_mse_fom(self, x: npt.NDArray):
-        return 1 - np.square(x - self.constant)
 
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)

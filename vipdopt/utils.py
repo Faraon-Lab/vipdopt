@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import operator
 import importlib.util as imp
 import itertools
 import json
@@ -309,3 +310,18 @@ def repeat(a: npt.NDArray, shape: tuple[int, ...]) -> npt.NDArray:
     Solution from https://stackoverflow.com/questions/7656665/how-to-repeat-elements-of-an-array-along-two-axes
     """
     return np.kron(a, np.ones(shape, dtype=a.dtype))
+
+# Nested dictionary handling - https://stackoverflow.com/a/14692747
+def get_by_path(root, items):
+    """Access a nested object in root by item sequence."""
+    return functools.reduce(operator.getitem, items, root)
+
+
+def set_by_path(root, items, value):
+    """Set a value in a nested object in root by item sequence."""
+    get_by_path(root, items[:-1])[items[-1]] = value
+
+
+def del_by_path(root, items):
+    """Delete a key-value in a nested object in root by item sequence."""
+    del get_by_path(root, items[:-1])[items[-1]]

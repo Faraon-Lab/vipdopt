@@ -170,21 +170,20 @@ if __name__ == '__main__':
     vipdopt.fdtd = fdtd      # Makes it available to global
     fdtd.connect(hide=False) # True)
     
-    debug_post_run=False
+    debug_post_run=True
     if not debug_post_run:
+        
+        plt.imshow(np.abs(project.device.get_design_variable()[...,0]), cmap=plt.get_cmap('gray'))
+        cur_density, cur_permittivity = project.device.import_cur_index(
+                    fwd_sim.objects['design_import'],
+                    reinterpolation_factor = 1, # project.config.get('reinterpolate_permittivity_factor'),
+                    binarize=False
+                )
+        
         # fdtd.save(project.base_sim.get_path(), project.base_sim)
         # fdtd.save(project.dir / 'base_sim.fsp', project.base_sim)
         fdtd.save(fwd_sim.get_path(), fwd_sim)
         # fdtd.save('test_data\\adj_sim.fsp', adj_sim)
-        
-        # plt.imshow(np.abs(project.device.get_design_variable()[...,0]), cmap=plt.get_cmap('gray'))
-        cur_density, cur_permittivity = fwd_sim.import_cur_index(
-                    project.device,
-                    # cfg.cv.reinterpolate_permittivity,
-                    reinterpolate_permittivity=False,
-                    # cfg.cv.reinterpolate_permittivity_factor
-                    reinterpolate_permittivity_factor=1,
-                )
         
         fdtd.addjob(fwd_sim.get_path())
         # fdtd.addjob('test_data\\adj_sim.fsp')

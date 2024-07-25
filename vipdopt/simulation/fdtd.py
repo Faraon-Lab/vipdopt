@@ -288,7 +288,22 @@ class LumericalFDTD(ISolver):
 
         if self.current_sim is not None:
             self.current_sim.set_path(path)
-        self.fdtd.save(str(path))  # type: ignore
+            # self.current_sim.info['path'] = path
+        
+        # Sometimes saving fails due to some sort of perms issue depending on machine and OS.
+        # Attempt saving with 2s between attempts, and hard fails after 4 attempts.
+        for x in range(0, 4):  # try 4 times
+            str_error = None
+            try:
+                self.fdtd.save(str(path))  # type: ignore
+                str_error = None
+            except Exception as e:
+                str_error = True
+                
+            if str_error:
+                time.sleep(2)  # wait for 2 seconds before trying to fetch the data again
+            else:
+                break
         vipdopt.logger.debug(f'Successfully saved simulation to {path}.\n')
 
     @_check_lum_fdtd

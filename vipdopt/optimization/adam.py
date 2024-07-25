@@ -3,6 +3,7 @@
 import numpy as np
 import numpy.typing as npt
 
+import vipdopt
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.optimizer import GradientOptimizer
 
@@ -34,7 +35,6 @@ class AdamOptimizer(GradientOptimizer):
 
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Take gradient step using Adam algorithm."""
-        # Commented out as it is already performed outside of this function for now
         gradient = -device.backpropagate(gradient)
 
         # Changed to gradient descent for now...

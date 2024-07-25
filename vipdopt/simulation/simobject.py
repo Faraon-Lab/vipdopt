@@ -33,7 +33,7 @@ class LumericalSimObjectType(str, Enum):
         """Get the correct lumapi function to add an object."""
         if vipdopt.lumapi is None:
             raise ModuleNotFoundError(
-                'Module "vipdopt.lumapi" has not yet been instatiated.'
+                'Module "vipdopt.lumapi" has not yet been instantiated.'
             )
         return getattr(vipdopt.lumapi.FDTD, f'add{self.value}')
 
@@ -74,6 +74,7 @@ class LumericalSimObject:
         """Create a LumericalSimObject."""
         self.name = name
         self.obj_type = obj_type
+        self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
         self.properties: OrderedDict[str, Any] = OrderedDict()
         if obj_type != LumericalSimObjectType.FDTD:
             self.properties['name'] = name
@@ -176,3 +177,9 @@ class Import(LumericalSimObject):
         """Get the relevant data from in order to use `LumericalFDTD.importnk2`."""
         assert self.n is not None
         return (self.n, self.x, self.y, self.z)
+
+class IndexMonitor(LumericalSimObject):
+    """Class representing an index monitor in Lumerical."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name, LumericalSimObjectType.INDEX)

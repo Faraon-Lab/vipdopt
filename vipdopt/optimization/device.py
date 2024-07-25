@@ -58,7 +58,6 @@ class Device:
         """Initialize Device object."""
         if len(size) != 3:  # noqa: PLR2004
             raise ValueError(f'Device size must be 3 dimensional; got {len(size)}')
-
         if any(d < 1 for d in size) or any(not isinstance(d, int) for d in size):
             raise ValueError(
                 'Expected positive, integer dimensions;' f' received {size}'
@@ -69,12 +68,10 @@ class Device:
             raise ValueError(
                 'Expected 2 permittivity constraints;' f'got {permittivity_constraints}'
             )
-
         if any(not isinstance(pc, Real) for pc in permittivity_constraints):
             raise ValueError(
                 'Expected real permittivity;' f' got {permittivity_constraints}'
             )
-
         if permittivity_constraints[0] >= permittivity_constraints[1]:
             raise ValueError('Maximum permittivity must be greater than minimum')
         self.permittivity_constraints = permittivity_constraints
@@ -99,7 +96,6 @@ class Device:
                 'Expected device coordinates to be ndarrays;' f' got {coords}'
             )
         self.coords = coords
-
 
         # Optional arguments
         self.name = name
@@ -243,6 +239,7 @@ class Device:
 
     def update_filters(self, epoch=0):
         """Update the filters of the device."""
+        # TODO: Make this more general.
         sigmoid_beta = 0.0625 * (2**epoch)
         sigmoid_eta = 0.5
         self.filters = [
@@ -256,10 +253,6 @@ class Device:
 
     def get_permittivity(self) -> npt.NDArray[np.complex128]:
         """Return the permittivity of the design variable."""
-        # # Now that there is a Scale filter, this is unnecessary.
-        # eps_min, eps_max = self.permittivity_constraints
-        # return self.get_density() * (eps_max - eps_min) + eps_min
-
         return self.w[..., -1]
 
     def update_density(self):
@@ -360,7 +353,7 @@ class Device:
         # Here cur_density will have values between 0 and 1
         cur_density = self.get_density().copy()
 
-        # Reinterpolate
+        # Perform repetition of density values across each axis for shrinking during reinterpolation process
         if reinterpolation_factor != 1:
             new_size = tuple(int(x) for x in np.ceil(np.multiply(reinterpolation_factor, self.size)))
             cur_density_import = repeat(cur_density, new_size)
@@ -398,17 +391,13 @@ class Device:
         else:
             cur_density_import = cur_density.copy()
             design_region = [
-                1e-6
-                * np.linspace(
-                    self.coords[axis][0],
-                    self.coords[axis][-1],
-                    cur_density_import.shape[i],
+                1e-6 * np.linspace(
+                    self.coords[axis][0], self.coords[axis][-1], cur_density_import.shape[i],
                 )
                 for i, axis in enumerate(self.coords)
             ]
             design_region_import = [
-                1e-6
-                * np.linspace(
+                1e-6 * np.linspace(
                     self.coords[axis][0], self.coords[axis][-1], self.field_shape[i]
                 )
                 for i, axis in enumerate(self.coords)
