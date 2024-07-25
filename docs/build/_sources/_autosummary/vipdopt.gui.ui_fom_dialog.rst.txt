@@ -1,0 +1,31 @@
+vipdopt.gui.ui\_fom\_dialog
+===========================
+
+.. automodule:: vipdopt.gui.ui_fom_dialog
+  
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: class-template.rst
+   
+      Ui_Dialog
+   
+   
+
+   
+   
+   
+
+
+

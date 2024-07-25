@@ -12,9 +12,9 @@
 temp/
 tmp/
 !testing/*.yml
-!docs/notebooks/*.json
-!docs/notebooks/example_render.yml
-!docs/notebooks/config_example_3d.yml
+!docs/source/notebooks/*.json
+!docs/source/notebooks/example_render.yml
+!docs/source/notebooks/config_example_3d.yml
 
 # Lumerical files
 *.lsf
@@ -33,7 +33,7 @@ __pycache__/
 *.npy
 *.npz
 !testing/monitor_data/*.npz
-!docs/notebooks/*.npz
+!docs/source/notebooks/*.npz
 
 # Distribution / packaging
 .Python
@@ -60,12 +60,11 @@ MANIFEST
 # Documentation
 **/.ipynb_checkpoints/
 
-# docs/source/_autosummary
-
 !docs/build/
 !docs/*.png
 !docs/*.gif
 
+docs/source/_autosummary/
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/

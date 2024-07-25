@@ -1,0 +1,45 @@
+vipdopt.optimization.device.Device
+==================================
+
+.. currentmodule:: vipdopt.optimization.device
+
+.. autoclass:: Device
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Device.__init__
+      ~Device.as_dict
+      ~Device.backpropagate
+      ~Device.binarize
+      ~Device.compute_binarization
+      ~Device.density_to_permittivity
+      ~Device.from_source
+      ~Device.get_density
+      ~Device.get_design_variable
+      ~Device.get_permittivity
+      ~Device.import_cur_index
+      ~Device.index_from_permittivity
+      ~Device.load_dict
+      ~Device.load_file
+      ~Device.num_filters
+      ~Device.pass_through_filters
+      ~Device.permittivity_to_density
+      ~Device.save
+      ~Device.set_design_variable
+      ~Device.update_density
+      ~Device.update_filters
+   
+   
+
+   
+   
+   

@@ -1,0 +1,158 @@
+vipdopt.gui.config\_editor.ConfigModel
+======================================
+
+.. currentmodule:: vipdopt.gui.config_editor
+
+.. autoclass:: ConfigModel
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~ConfigModel.__init__
+      ~ConfigModel.beginInsertColumns
+      ~ConfigModel.beginInsertRows
+      ~ConfigModel.beginMoveColumns
+      ~ConfigModel.beginMoveRows
+      ~ConfigModel.beginRemoveColumns
+      ~ConfigModel.beginRemoveRows
+      ~ConfigModel.beginResetModel
+      ~ConfigModel.blockSignals
+      ~ConfigModel.buddy
+      ~ConfigModel.canDropMimeData
+      ~ConfigModel.canFetchMore
+      ~ConfigModel.changePersistentIndex
+      ~ConfigModel.changePersistentIndexList
+      ~ConfigModel.checkIndex
+      ~ConfigModel.childEvent
+      ~ConfigModel.children
+      ~ConfigModel.clear
+      ~ConfigModel.clearItemData
+      ~ConfigModel.columnCount
+      ~ConfigModel.connect
+      ~ConfigModel.connectNotify
+      ~ConfigModel.createIndex
+      ~ConfigModel.customEvent
+      ~ConfigModel.data
+      ~ConfigModel.decodeData
+      ~ConfigModel.deleteLater
+      ~ConfigModel.disconnect
+      ~ConfigModel.disconnectNotify
+      ~ConfigModel.dropMimeData
+      ~ConfigModel.dumpObjectInfo
+      ~ConfigModel.dumpObjectTree
+      ~ConfigModel.dynamicPropertyNames
+      ~ConfigModel.emit
+      ~ConfigModel.encodeData
+      ~ConfigModel.endInsertColumns
+      ~ConfigModel.endInsertRows
+      ~ConfigModel.endMoveColumns
+      ~ConfigModel.endMoveRows
+      ~ConfigModel.endRemoveColumns
+      ~ConfigModel.endRemoveRows
+      ~ConfigModel.endResetModel
+      ~ConfigModel.event
+      ~ConfigModel.eventFilter
+      ~ConfigModel.fetchMore
+      ~ConfigModel.findChild
+      ~ConfigModel.findChildren
+      ~ConfigModel.flags
+      ~ConfigModel.hasChildren
+      ~ConfigModel.hasIndex
+      ~ConfigModel.headerData
+      ~ConfigModel.index
+      ~ConfigModel.inherits
+      ~ConfigModel.insertColumn
+      ~ConfigModel.insertColumns
+      ~ConfigModel.insertRow
+      ~ConfigModel.insertRows
+      ~ConfigModel.installEventFilter
+      ~ConfigModel.isQuickItemType
+      ~ConfigModel.isSignalConnected
+      ~ConfigModel.isWidgetType
+      ~ConfigModel.isWindowType
+      ~ConfigModel.itemData
+      ~ConfigModel.killTimer
+      ~ConfigModel.load
+      ~ConfigModel.match
+      ~ConfigModel.metaObject
+      ~ConfigModel.mimeData
+      ~ConfigModel.mimeTypes
+      ~ConfigModel.moveColumn
+      ~ConfigModel.moveColumns
+      ~ConfigModel.moveRow
+      ~ConfigModel.moveRows
+      ~ConfigModel.moveToThread
+      ~ConfigModel.objectName
+      ~ConfigModel.parent
+      ~ConfigModel.persistentIndexList
+      ~ConfigModel.property
+      ~ConfigModel.receivers
+      ~ConfigModel.removeColumn
+      ~ConfigModel.removeColumns
+      ~ConfigModel.removeEventFilter
+      ~ConfigModel.removeRow
+      ~ConfigModel.removeRows
+      ~ConfigModel.resetInternalData
+      ~ConfigModel.revert
+      ~ConfigModel.roleNames
+      ~ConfigModel.rowCount
+      ~ConfigModel.sender
+      ~ConfigModel.senderSignalIndex
+      ~ConfigModel.setData
+      ~ConfigModel.setHeaderData
+      ~ConfigModel.setItemData
+      ~ConfigModel.setObjectName
+      ~ConfigModel.setParent
+      ~ConfigModel.setProperty
+      ~ConfigModel.sibling
+      ~ConfigModel.signalsBlocked
+      ~ConfigModel.sort
+      ~ConfigModel.span
+      ~ConfigModel.startTimer
+      ~ConfigModel.submit
+      ~ConfigModel.supportedDragActions
+      ~ConfigModel.supportedDropActions
+      ~ConfigModel.thread
+      ~ConfigModel.timerEvent
+      ~ConfigModel.to_json
+      ~ConfigModel.tr
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~ConfigModel.columnsAboutToBeInserted
+      ~ConfigModel.columnsAboutToBeMoved
+      ~ConfigModel.columnsAboutToBeRemoved
+      ~ConfigModel.columnsInserted
+      ~ConfigModel.columnsMoved
+      ~ConfigModel.columnsRemoved
+      ~ConfigModel.dataChanged
+      ~ConfigModel.destroyed
+      ~ConfigModel.headerDataChanged
+      ~ConfigModel.layoutAboutToBeChanged
+      ~ConfigModel.layoutChanged
+      ~ConfigModel.modelAboutToBeReset
+      ~ConfigModel.modelReset
+      ~ConfigModel.objectNameChanged
+      ~ConfigModel.rowsAboutToBeInserted
+      ~ConfigModel.rowsAboutToBeMoved
+      ~ConfigModel.rowsAboutToBeRemoved
+      ~ConfigModel.rowsInserted
+      ~ConfigModel.rowsMoved
+      ~ConfigModel.rowsRemoved
+      ~ConfigModel.staticMetaObject
+   
+   
