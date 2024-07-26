@@ -1,0 +1,145 @@
+#* Original Properties
+
+{% for name, value in data.items() -%}
+{{ name }}: {{ value }}
+{% endfor %}
+
+#
+# Derived Properties
+#
+
+#* Mesh Properties
+{% set min_feature_size_voxels = data.min_feature_size_um / data.geometry_spacing_lateral_um  %}
+min_feature_size_voxels: {{ min_feature_size_voxels }}
+blur_half_width_voxels: {{ ((min_feature_size_voxels - 1) / 2) | round(method='ceil') | int }}
+
+#* Optical Properties
+min_device_permittivity: {{ data.min_device_index ** 2 }}
+max_device_permittivity: {{ data.max_device_index ** 2 }}
+{% set focal_length_um = data.device_scale_um * 30 -%}
+focal_length_um: {{ focal_length_um }}
+focal_plane_center_vertical_um: {{ -1 * focal_length_um }}
+
+#* Device Properties
+vertical_layer_height_voxels: {{ (data.vertical_layer_height_um / data.device_scale_um ) | int }}
+{% set device_size_vertical_um = data.vertical_layer_height_um * data.num_vertical_layers -%}
+device_size_vertical_um: {{ device_size_vertical_um }}
+device_voxels_lateral: {{ (data.device_size_lateral_um / data.geometry_spacing_lateral_um) | round | int }}
+device_voxels_vertical: {{ (device_size_vertical_um / data.device_scale_um) | round | int }}
+{% set device_voxels_simulation_mesh_lateral =  1 + (data.device_size_lateral_um / data.mesh_spacing_um) | int -%}
+device_voxels_simulation_mesh_lateral: {{ device_voxels_simulation_mesh_lateral }}
+{% set LOOKUP_MESH_CELLS = {1:3, 2:3, 3:2, 4:3, 5:2, 6:2, 8:3, 9:2, 10:2, 12:0,
+                                    15:2, 20:2, 30:2, 40:2} -%}
+{# TODO: Handle lookup mesh cells - they shouldn't be needed.#}                            
+device_voxels_simulation_mesh_vertical: {{ LOOKUP_MESH_CELLS[data.num_vertical_layers] + (device_size_vertical_um / data.mesh_spacing_um) | int }}
+device_vertical_maximum_um: {{ device_size_vertical_um }}
+{% set device_size_lateral_bordered_um = data.device_size_lateral_um -%}
+device_size_lateral_bordered_um: {{ device_size_lateral_bordered_um }}
+device_voxels_simulation_mesh_lateral_bordered: {{ device_voxels_simulation_mesh_lateral }}
+{% set border_size_um = 5 * data.device_scale_um -%}
+border_size_um: {{ border_size_um }}
+border_size_voxels: {{ (border_size_um / data.geometry_spacing_lateral_um) | round | int }}
+device_voxels_lateral_bordered: {{ (device_size_lateral_bordered_um / data.geometry_spacing_lateral_um) | round | int }}
+
+#* FDTD Properties
+{% set vertical_gap_size_um = data.geometry_spacing_lateral_um * 25 %}
+vertical_gap_size_um: {{ vertical_gap_size_um }}
+{% set lateral_gap_size_um = data.device_scale_um * 10 -%}
+lateral_gap_size_um: {{ lateral_gap_size_um }}
+fdtd_region_size_vertical_um: {{ 2 * vertical_gap_size_um + data.device_size_lateral_um + focal_length_um }}
+{% if data.boundary_conditions == 'periodic' -%}
+fdtd_region_size_lateral_um: {{ data.device_size_lateral_um }}
+{%- else -%}
+fdtd_region_size_lateral_um: {{ data.device_size_lateral_um + 2 * lateral_gap_size_um}}
+{%- endif %}
+fdtd_region_maximum_vertical_um: {{ device_size_vertical_um + vertical_gap_size_um }}
+fdtd_region_minimum_vertical_um: {{ -1 * focal_length_um - vertical_gap_size_um }}
+
+#* Surrounding Properties
+pec_aperture_thickness_um: {{ 3 * data.mesh_spacing_um }}
+substrate_thickness_um: {{ data.substrate_thickness_um }}
+sidewall_x_positions_um: {{ [
+    data.device_size_lateral_um / 2 + data.sidewall_thickness_um / 2,
+    0,
+    -data.device_size_lateral_um / 2 - data.sidewall_thickness_um / 2,
+    0,
+] }}
+sidewall_y_positions_um: {{ [
+    0,
+    data.device_size_lateral_um / 2 + data.sidewall_thickness_um / 2,
+    0,
+    -data.device_size_lateral_um / 2 - data.sidewall_thickness_um / 2,
+] }}
+sidewall_xspan_positions_um: {{ [
+    data.sidewall_thickness_um,
+    data.device_size_lateral_um + data.sidewall_thickness_um * 2,
+    data.sidewall_thickness_um,
+    data.device_size_lateral_um + data.sidewall_thickness_um * 2,
+]}}
+sidewall_yspan_positions_um: {{ [
+    data.device_size_lateral_um + data.sidewall_thickness_um * 2,
+    data.sidewall_thickness_um,
+    data.device_size_lateral_um + data.sidewall_thickness_um * 2,
+    data.sidewall_thickness_um,
+]}}
+
+#* Spectral Properties
+{% set bandwidth_um = data.lambda_max_um - data.lambda_min_um -%}
+bandwidth_um: {{ bandwidth_um }}
+{% set num_design_frequency_points = data.num_bands * data.num_points_per_band -%}
+num_design_frequency_points: {{ num_design_frequency_points }}
+num_eval_frequency_points: {{ 6 * num_design_frequency_points }}
+{% set lambda_values_um = data.lambda_min_um | linspace(data.lambda_max_um, num_design_frequency_points) -%}
+lambda_values_um: {{ lambda_values_um | list }}
+max_intensity_by_wavelength: {{ ( (data.device_size_lateral_um ** 4) / ((focal_length_um ** 2) * (lambda_values_um ** 2)) ) | list }}
+dispersive_range_size_um: {{ bandwidth_um / data.num_dispersive_ranges }}
+dispersive_ranges_um: {{ [[data.lambda_min_um, data.lambda_max_um]] }}
+
+#* PDAF Functionality Properties
+pdaf_focal_spot_x_um: {{ 0.25 * data.device_size_lateral_um }}
+pdaf_focal_spot_y_um: {{ 0.25 * data.device_size_lateral_um }}
+{% set pdaf_lambda_min_um = data.lambda_min_um -%}
+pdaf_lambda_min_um: {{ pdaf_lambda_min_um }}
+{% set pdaf_lambda_max_um = data.lambda_min_um + bandwidth_um / 3 -%}
+pdaf_lambda_max_um: {{ pdaf_lambda_max_um }}
+{% set pdaf_lambda_values_um = pdaf_lambda_min_um | linspace(pdaf_lambda_max_um, num_design_frequency_points) -%}
+pdaf_lambda_values_um: {{ pdaf_lambda_values_um | list}}
+pdaf_max_intensity_by_wavelength: {{ ( (data.device_size_lateral_um ** 4) / ((focal_length_um ** 2) * (pdaf_lambda_values_um ** 2)) ) | list}}
+
+#* Forward (Input) Source Properties
+lateral_aperture_um: {{ 1.1 * data.device_size_lateral_um }}
+src_maximum_vertical_um: {{ device_size_vertical_um + vertical_gap_size_um * 5 / 6 }}
+src_minimum_vertical_um: {{ -focal_length_um - 0.5 * vertical_gap_size_um }}
+mid_lambda_um: {{ (data.lambda_min_um + data.lambda_max_um) / 2 }}
+gaussian_waist_radius_um: {{ data.beam_size_multiplier }}
+{% set source_angle_theta_rad = (((data.source_angle_theta_vacuum_deg * pi / 180) | sin ) * 1 / data.background_index) | arcsin -%}
+source_angle_theta_rad: {{ source_angle_theta_rad }}
+source_angle_theta_deg: {{ source_angle_theta_rad * 180 / pi}}
+
+#* Adjoint Source Properties
+adjoint_vertical_um: {{ -focal_length_um }}
+num_adjoint_sources: {{ data.num_focal_spots }}
+adjoint_x_positions_um: {{ [
+    data.device_size_lateral_um / 4,
+    -data.device_size_lateral_um / 4,
+    -data.device_size_lateral_um / 4,
+    data.device_size_lateral_um / 4,
+] | list }}
+adjoint_y_positions_um: {{ [
+    data.device_size_lateral_um / 4,
+    data.device_size_lateral_um / 4,
+    -data.device_size_lateral_um / 4,
+    -data.device_size_lateral_um / 4,
+] | list }}
+
+#* Optimization Properties
+total_iters: {{data.max_epochs * data.iter_per_epoch}}
+epoch_range_design_change_max: {{ data.epoch_start_design_change_max - data.epoch_end_design_change_max }}
+epoch_range_design_change_min: {{ data.epoch_start_design_change_min - data.epoch_end_design_change_min }}
+spectral_focal_plane_map: {{ [
+    [0, data.num_points_per_band],
+    [data.num_points_per_band, 2 * data.num_points_per_band],
+    [2 * data.num_points_per_band, 3 * data.num_points_per_band],
+    [data.num_points_per_band, 2 * data.num_points_per_band],
+] | list}}
+desired_peak_location_per_band: {{ (((lambda_values_um | newaxis) - data.desired_peaks_per_band_um) ** 2) | argmin(axis=0) | list }}

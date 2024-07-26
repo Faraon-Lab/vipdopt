@@ -362,8 +362,8 @@ class Device:
 
         # Perform repetition of density values across each axis for shrinking during reinterpolation process
         if reinterpolation_factor != 1:
-            new_size = np.ceil(reinterpolation_factor).astype(int)
-            cur_density_import = repeat(cur_density, (new_size, new_size, new_size))
+            new_size = tuple(int(x) for x in np.ceil(np.multiply(reinterpolation_factor, self.size)))
+            cur_density_import = repeat(cur_density, new_size)
             # cur_density_import = np.repeat(
             #     np.repeat(
             #         np.repeat(

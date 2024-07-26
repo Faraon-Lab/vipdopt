@@ -19,6 +19,9 @@ dependencies:
   # For autodocs
   - sphinx=7.3.7
   - furo=2024.5.6
+  - nbsphinx=0.9.4
+  - sphinx_gallery=0.17.0
+  - pandoc=1.13
   # For Jupyter
   - notebook==7.2.1
   # Pip

@@ -1,0 +1,23 @@
+vipdopt.optimization.main
+=========================
+
+.. automodule:: vipdopt.optimization.main
+  
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

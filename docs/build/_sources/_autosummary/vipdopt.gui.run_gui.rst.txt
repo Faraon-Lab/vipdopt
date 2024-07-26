@@ -1,0 +1,41 @@
+vipdopt.gui.run\_gui
+====================
+
+.. automodule:: vipdopt.gui.run_gui
+  
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      start_gui
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: class-template.rst
+   
+      FomDialog
+      MplCanvas
+      SettingsWindow
+      StatusDashboard
+   
+   
+
+   
+   
+   
+
+
+

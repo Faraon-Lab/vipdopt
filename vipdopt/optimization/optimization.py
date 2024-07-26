@@ -1014,20 +1014,15 @@ class LumericalOptimization:
 
         # If an error is encountered while running the optimization still want to
         # clean up afterwards
-
-        self._inner_optimization_loop()
-
-        #! 20240721 ian - DEBUG COMMENT THIS BLOCK - UNCOMMENT FOR GIT PUSH
-        # try:
-        #     self._inner_optimization_loop()
-        # except RuntimeError as e:
-        #     vipdopt.logger.exception(
-        #         f'Encountered exception while running optimization: {e}'
-        #         '\nStopping Optimization...'
-        #     )
-        # finally:
-        #     self._post_run()
-        self._post_run()
+        try:
+            self._inner_optimization_loop()
+        except RuntimeError as e:
+            vipdopt.logger.exception(
+                f'Encountered exception while running optimization: {e}'
+                '\nStopping Optimization...'
+            )
+        finally:
+            self._post_run()
 
     def _inner_optimization_loop(self):
         """The core optimization loop."""
@@ -1121,7 +1116,7 @@ class LumericalOptimization:
                 # If true, we're in debugging mode and it means no simulations are run.
                 # Data is instead pulled from finished simulation files in the debug folder.
                 # If false, run jobs and check that they all ran to completion.
-                if True: # self.cfg['pull_sim_files_from_debug_folder']:
+                if self.cfg.get('pull_sim_files_from_debug_folder', False):
                     for sim in chain(fwd_sims, adj_sims):
                         sim_file = self.dirs['debug_completed_jobs'] / f'{sim.info["name"]}.fsp'
                         sim.set_path(sim_file)
@@ -1176,6 +1171,7 @@ class LumericalOptimization:
                 # Process gradient accordingly for application to device through optimizer.
 
                 g = np.sum(g, -1)   # Sum over wavelength
+                # Process gradient accordingly. #! TODO: WE SHOULD WRAP THIS INTO A FUNCTION.
                 vipdopt.logger.info(f'Design_gradient has average {np.mean(g)}, max {np.max(g)}')
 
                 # Permittivity factor in amplitude of electric dipole at x_0:

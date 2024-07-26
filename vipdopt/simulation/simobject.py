@@ -7,6 +7,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from enum import Enum
 from typing import Any
+from copy import copy
 
 import numpy as np
 import numpy.typing as npt
@@ -159,6 +160,11 @@ class Import(LumericalSimObject):
         self.x = np.ones(1)
         self.y = np.ones(1)
         self.z = np.ones(1)
+    
+    def as_dict(self) -> dict:
+        data = copy(vars(self))
+        del data['n'], data['x'], data['y'], data['z']
+        return data
 
     def set_nk2(self, n: npt.NDArray, x: npt.NDArray, y: npt.NDArray, z: npt.NDArray):
         """Set the value of the nk of this import primitive."""

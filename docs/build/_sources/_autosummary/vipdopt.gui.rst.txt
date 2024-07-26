@@ -1,0 +1,37 @@
+vipdopt.gui
+===========
+
+.. automodule:: vipdopt.gui
+  
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :template: module-template.rst
+   :recursive:
+
+   config_editor
+   run_gui
+   ui_dashboard
+   ui_fom_dialog
+   ui_settings
+   ui_status
+

@@ -1,0 +1,31 @@
+vipdopt.gui.ui\_settings
+========================
+
+.. automodule:: vipdopt.gui.ui_settings
+  
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: class-template.rst
+   
+      Ui_MainWindow
+   
+   
+
+   
+   
+   
+
+
+

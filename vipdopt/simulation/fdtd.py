@@ -28,6 +28,7 @@ from vipdopt.utils import (
     setup_logger,
 )
 
+
 class ISolver(abc.ABC):
     """Class representing FDTD solver software."""
 

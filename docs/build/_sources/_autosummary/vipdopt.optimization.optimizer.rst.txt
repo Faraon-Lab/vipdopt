@@ -1,0 +1,32 @@
+vipdopt.optimization.optimizer
+==============================
+
+.. automodule:: vipdopt.optimization.optimizer
+  
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: class-template.rst
+   
+      GradientAscentOptimizer
+      GradientOptimizer
+   
+   
+
+   
+   
+   
+
+
+
