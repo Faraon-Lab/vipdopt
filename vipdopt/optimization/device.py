@@ -13,6 +13,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy import interpolate
 
+from vipdopt import STL, GDS
 from vipdopt.optimization.filter import Filter, Scale, Sigmoid
 from vipdopt.simulation import Import
 from vipdopt.utils import Coordinates, PathLike, ensure_path, repeat
@@ -423,6 +424,7 @@ class Device:
             design_region_import_grid,
             method='linear',
         )
+        #! TODO: CHECK - Don't think this is going to work for 2D.
 
         # Binarize before importing
         if binarize:
@@ -447,3 +449,92 @@ class Device:
         import_primitive.set_nk2(cur_index, *design_region_import)
 
         return cur_density, cur_permittivity
+
+    def interpolate_gradient(
+        self,
+        g: npt.NDArray,
+        dimension: str = '3D'
+        ):
+        """Reinterpolate and import gradient into the shape of the design regions.
+
+        Arguments:
+            g (NDArray): The uninterpolated, but perhaps processed, gradient with shape obtained from
+                        the design efield monitors for adjoint optimization.
+            dimension (str): The dimension of the simulation, either "2D" or "3D". Defaults to "3D".
+        """
+
+        gradient_region_x = 1e-6 * np.linspace(self.coords['x'][0], self.coords['x'][-1], g.shape[0]) #cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
+        gradient_region_y = 1e-6 * np.linspace(self.coords['y'][0], self.coords['y'][-1], g.shape[1])
+        try:
+            gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], g.shape[2])
+        except IndexError as err:	# 2D case
+            gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], 3)
+        design_region_geometry = np.array(np.meshgrid(1e-6*self.coords['x'], 1e-6*self.coords['y'], 1e-6*self.coords['z'], indexing='ij')
+                            ).transpose((1,2,3,0))
+
+        if dimension in '2D':
+            design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                np.repeat(g[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
+                                                design_region_geometry, method='linear' )
+        elif dimension in '3D':
+            design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                g,
+                                                design_region_geometry, method='linear' )
+
+        return design_gradient_interpolated
+
+
+    def export_density_as_stl(self, filename):
+        '''Binarizes device density and exports as STL file for fabrication.'''
+        
+        # STL Export requires density to be fully binarized
+        full_density = self.binarize(self.get_density())
+        stl_generator = STL.STL(full_density)
+        stl_generator.generate_stl()
+        stl_generator.save_stl( filename )
+
+    def export_density_as_gds(self, gds_layer_dir):
+        
+        # STL Export requires density to be fully binarized
+        full_density = self.binarize(self.get_density())
+        
+        # GDS Export must be done in layers. We split the full design into individual layers, (not related to design layers)
+        # Express each layer as polygons in an STL Mesh object and write that layer into its own cell of the GDS file
+        layer_mesh_array = []
+        for z_layer in range(full_density.shape[2]):
+            stl_generator = STL.STL(full_density[..., z_layer][..., np.newaxis])
+            stl_generator.generate_stl()
+            layer_mesh_array.append(stl_generator.stl_mesh)
+        
+        # Create a GDS object that contains a Library with Cells corresponding to each 2D layer in the 3D device.
+        gds_generator = GDS.GDS().set_layers(full_density.shape[2], 
+                unit = 1e-6 * np.abs(self.coords['x'][-1] - self.coords['x'][0])/self.size[0])
+        gds_generator.assemble_device(layer_mesh_array, listed=False)
+
+        # Create directory for export
+        Path(gds_layer_dir).mkdir(parents=True, exist_ok=True)
+        # Export both GDS and SVG for easy visualization.
+        gds_generator.export_device(gds_layer_dir, filetype='gds')
+        gds_generator.export_device(gds_layer_dir, filetype='svg')
+        
+        # for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
+        #     gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
+        #     gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
+        
+        # # Here is a function for GDS device import to Lumerical - be warned this takes maybe 3-5 minutes per layer.
+        # def import_gds(sim, device, gds_layer_dir):
+        #     import time
+            
+        #     sim.fdtd.load(sim.info['name'])
+        #     sim.fdtd.switchtolayout()
+        #     device_name = device.import_names()[0]
+        #     sim.disable([device_name])
+            
+        #     z_vals = device.coords['z']
+        #     for z_idx in range(len(z_vals)):
+        #         t = time.time()
+        #         # fdtd.gdsimport(os.path.join(gds_layer_dir, 'device.gds'), f'L{layer_idx}', 0)
+        #         sim.fdtd.gdsimport(os.path.join(gds_layer_dir, 'device.gds'), f'L{z_idx}', 0, "Si (Silicon) - Palik",
+        #                     z_vals[z_idx], z_vals[z_idx+1])
+        #         sim.fdtd.set({'x': device.coords['x'][0], 'y': device.coords['y'][0]})      # Be careful of units - 1e-6
+        #         vipdopt.logger.info(f'Layer {z_idx} imported in {time.time()-t} seconds.')

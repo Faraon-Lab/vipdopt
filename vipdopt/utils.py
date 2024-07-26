@@ -311,6 +311,10 @@ def repeat(a: npt.NDArray, shape: tuple[int, ...]) -> npt.NDArray:
     """
     return np.kron(a, np.ones(shape, dtype=a.dtype))
 
+def real_part_complex_product(z1, z2):
+    """Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)"""
+    return np.real(z1)*np.real(z2) + np.imag(z1) * (-1*np.imag(z2))
+    
 # Nested dictionary handling - https://stackoverflow.com/a/14692747
 def get_by_path(root, items):
     """Access a nested object in root by item sequence."""

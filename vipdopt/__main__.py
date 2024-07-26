@@ -100,7 +100,7 @@ if __name__ == '__main__':
     project.load_project(args.directory, config_name=args.config)
     # What does the Project class contain?
     # 'dir': directory where it's stored; 'config': SonyBayerConfig object; 'optimization': Optimization object;
-    # 'optimizer': Adam/GDOptimizer object; 'device': Device object;
+    # 'optimizer': [Adam/GradientAscent]Optimizer object; 'device': Device object;
     # 'base_sim': Simulation object; 'src_to_sim_map': dict with source names as keys, Simulation objects as values
     # 'foms': list of FoM objects, 'weights': array of shape (#FoMs, nλ)
     vipdopt.logger.info('Completed Step 0: Project Setup')
@@ -121,4 +121,9 @@ if __name__ == '__main__':
     fdtd.connect(hide=False) # True)
     project.start_optimization()
     
-    print('Reached end of code.')
+    # STL Export final design
+    project.device.export_density_as_stl( project.subdirectories['data'] / 'final_device.stl' )
+    # GDS Export final design
+    project.device.export_density_as_gds( project.subdirectories['data'] / 'gds' )
+    
+    vipdopt.logger.info('Reached end of code.')

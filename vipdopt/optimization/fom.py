@@ -88,6 +88,7 @@ class SuperFoM:
         weights = (2.0 / len(fom_values)) - fom_values**2 / np.sum(fom_values**2)
 
         # Zero-shift and renormalize
+        #! Check: Maybe not zero-shift(x) but instead max(x,0) ? Compare and contrast
         if np.min(weights) < 0:
             weights -= np.min(weights)
             weights /= np.sum(weights)
@@ -677,22 +678,23 @@ class BayerFilterFoM(FoM):
 
         vipdopt.logger.info('Computing Gradient')
 
-        self.gradient = np.zeros(df_dev.shape, dtype=np.complex128)
-        # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+        # NOTE: [DEPRECATED in v4 - no longer assigning gradient variable to FoMs.] ============================================
+        # self.gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+        # # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
 
-        self.gradient[..., self.pos_max_freqs] = df_dev[
-            ..., self.pos_max_freqs
-        ]  # * self.enabled
-        # self.restricted_gradient[..., self.freq_index_restricted_opt] = \
-        #     df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
+        # self.gradient[..., self.pos_max_freqs] = df_dev[
+        #     ..., self.pos_max_freqs
+        # ]  # * self.enabled
+        # # self.restricted_gradient[..., self.freq_index_restricted_opt] = \
+        # #     df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
 
-        # self.gradient = df_dev[..., pos_gradient_indices] * self.enabled
-        # self.restricted_gradient = df_dev[..., neg_gradient_indices] * \
-        #       self.enabled_restricted
+        # # self.gradient = df_dev[..., pos_gradient_indices] * self.enabled
+        # # self.restricted_gradient = df_dev[..., neg_gradient_indices] * \
+        # #       self.enabled_restricted
+        # ======================================================================================================================
 
-        # return df_dev
-
-        return df_dev
+        # return df_dev     
+        return df_dev[..., self.pos_max_freqs]
 
 
 class UniformMAEFoM(FoM):
