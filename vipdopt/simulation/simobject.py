@@ -7,6 +7,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from enum import Enum
 from typing import Any
+from copy import copy
 
 import numpy as np
 import numpy.typing as npt
@@ -32,7 +33,7 @@ class LumericalSimObjectType(str, Enum):
         """Get the correct lumapi function to add an object."""
         if vipdopt.lumapi is None:
             raise ModuleNotFoundError(
-                'Module "vipdopt.lumapi" has not yet been instatiated.'
+                'Module "vipdopt.lumapi" has not yet been instantiated.'
             )
         return getattr(vipdopt.lumapi.FDTD, f'add{self.value}')
 
@@ -78,13 +79,17 @@ class LumericalSimObject:
         if obj_type != LumericalSimObjectType.FDTD:
             self.properties['name'] = name
 
-    def __str__(self) -> str:
-        """Return string representation of object."""
+    def __repr__(self) -> str:
+        """Return string representation of the object."""
         return json.dumps(
             self.as_dict(),
             indent=4,
             ensure_ascii=True,
         )
+
+    def __str__(self) -> str:
+        """Return a string version of the object."""
+        return f'{self.obj_type} "{self.name}"'
 
     def __setitem__(self, key: str, val: Any) -> None:
         """Set the value of a property of the object."""
@@ -155,6 +160,11 @@ class Import(LumericalSimObject):
         self.x = np.ones(1)
         self.y = np.ones(1)
         self.z = np.ones(1)
+    
+    def as_dict(self) -> dict:
+        data = copy(vars(self))
+        del data['n'], data['x'], data['y'], data['z']
+        return data
 
     def set_nk2(self, n: npt.NDArray, x: npt.NDArray, y: npt.NDArray, z: npt.NDArray):
         """Set the value of the nk of this import primitive."""
@@ -167,3 +177,9 @@ class Import(LumericalSimObject):
         """Get the relevant data from in order to use `LumericalFDTD.importnk2`."""
         assert self.n is not None
         return (self.n, self.x, self.y, self.z)
+
+class IndexMonitor(LumericalSimObject):
+    """Class representing an index monitor in Lumerical."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name, LumericalSimObjectType.INDEX)

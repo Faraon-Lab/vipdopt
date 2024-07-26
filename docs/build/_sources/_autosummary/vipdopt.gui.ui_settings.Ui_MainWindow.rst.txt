@@ -1,0 +1,27 @@
+vipdopt.gui.ui\_settings.Ui\_MainWindow
+=======================================
+
+.. currentmodule:: vipdopt.gui.ui_settings
+
+.. autoclass:: Ui_MainWindow
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Ui_MainWindow.__init__
+      ~Ui_MainWindow.retranslateUi
+      ~Ui_MainWindow.setupUi
+   
+   
+
+   
+   
+   

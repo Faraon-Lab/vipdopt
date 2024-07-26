@@ -2,6 +2,6 @@
 
 from vipdopt.configuration.config import Config
 from vipdopt.configuration.sbc import SonyBayerConfig
-from vipdopt.configuration.template import TemplateRenderer
+from vipdopt.configuration.template import TemplateRenderer, SonyBayerRenderer
 
-__all__ = ['Config', 'SonyBayerConfig', 'TemplateRenderer']
+__all__ = ['Config', 'SonyBayerConfig', 'TemplateRenderer', 'SonyBayerRenderer']

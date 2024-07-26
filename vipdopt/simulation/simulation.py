@@ -81,7 +81,10 @@ class LumericalSimulation(ISimulation):
         Arguments:
             source (PathLike | dict | None): optional source to load the simulation from
         """
-        self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
+        self.info: OrderedDict[str, Any] = OrderedDict([
+            ('name', ''),
+            ('path', None),
+        ])
         self.clear_objects()
         self._env_vars: dict | None = None
 
@@ -192,12 +195,16 @@ class LumericalSimulation(ISimulation):
         """Set the save path of the simulation."""
         self.info['path'] = path.absolute()
 
-    def get_path(self) -> Path:
+    def get_path(self) -> Path | None:
         """Get the save path of the simulation."""
-        p = self.info['path']
-        if not isinstance(p, Path):
-            p = Path(p)
-        return p
+        return self.info.get('path', None)
+
+    # def get_path(self) -> Path:
+    #     """Get the save path of the simulation."""
+    #     p = self.info['path']
+    #     if not isinstance(p, Path):
+    #         p = Path(p)
+    #     return p
 
     def copy(self) -> LumericalSimulation:
         """Return a copy of this simulation."""
@@ -205,6 +212,12 @@ class LumericalSimulation(ISimulation):
         new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
+        
+        try:    # Copy-paste the device imports from the previous simulation into the new simulation.
+            for i, imp in enumerate(new_sim.imports()):
+                imp.set_nk2(*self.imports()[i].get_nk2())
+        except Exception as e:
+            pass
 
         return new_sim
 
@@ -305,7 +318,7 @@ class LumericalSimulation(ISimulation):
             monitors = self.monitors()
         for mon in monitors:
             output_path = sim_path.parent / (sim_path.stem + f'_{mon.name}.npz')
-            mon.set_src(output_path)
+            mon.set_source(output_path)
 
     def imports(self) -> list[Import]:
         """Return a list of all import objects."""
@@ -315,6 +328,20 @@ class LumericalSimulation(ISimulation):
         """Return a list of all import object names."""
         for obj in self.imports():
             yield obj.name
+    
+    def indexmonitors(self) -> list[LumericalSimObject]:
+        '''Return a list of all indexmonitor objects.'''
+        return [obj for _, obj in self.objects.items() if obj.obj_type == LumericalSimObjectType.INDEX]
+    
+    def indexmonitor_names(self) -> Iterator[str]:
+        '''Return a list of all indexmonitor object names.'''
+        for obj in self.indexmonitors():
+            yield obj.name
+    
+    def import_field_shape(self) -> tuple[int, ...]:
+        """Return the shape of the fields returned from this simulation's design index monitors."""
+        index_prev = vipdopt.fdtd.getresult(list(self.indexmonitor_names())[0], 'index preview')
+        return np.squeeze(index_prev['index_x']).shape
 
     def new_object(
         self,
@@ -385,13 +412,13 @@ if __name__ == '__main__':
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level)
 
-    # with LumericalSimulation(Path(args.simulation_json)) as sim:
-    # with LumericalSimulation() as sim:
-    #     # sim.promise_env_setup()
-    #     sim.load('test_project/.tmp/sim_0.fsp')
-    #     sys.exit()
+    with LumericalSimulation(Path(args.simulation_json)) as sim:
+    #with LumericalSimulation() as sim:
+        sim.fdtd.promise_env_setup()
+        sim.load('test_project/.tmp/sim_0.fsp')
+        sys.exit()
 
-    #     vipdopt.logger.info('Saving Simulation')
-    #     sim.save(Path('test_sim'))
-    #     vipdopt.logger.info('Running simulation')
-    #     sim.run()
+        vipdopt.logger.info('Saving Simulation')
+        sim.save(Path('test_sim'))
+        vipdopt.logger.info('Running simulation')
+        sim.run()

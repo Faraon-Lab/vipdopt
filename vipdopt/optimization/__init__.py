@@ -2,7 +2,7 @@
 
 from vipdopt.optimization.adam import AdamOptimizer
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.filter import Filter, Sigmoid
+from vipdopt.optimization.filter import Filter, Sigmoid, Scale
 from vipdopt.optimization.fom import (
     BayerFilterFoM,
     FoM,
@@ -29,4 +29,5 @@ __all__ = [
     'GradientOptimizer',
     'LumericalOptimization',
     'Sigmoid',
+    'Scale',
 ]

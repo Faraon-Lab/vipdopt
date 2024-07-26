@@ -29,8 +29,10 @@ from vipdopt.utils import Coordinates, PathLike, ensure_path, flatten, glob_firs
 sys.path.append(os.getcwd())
 
 
-def create_internal_folder_structure(root_dir: Path, debug_mode=False):
-    """Create the subdirectories of the project folder."""
+def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False):
+    """Create the subdirectories of the project folder.
+    pull_files_debug_mode: if True, sets the folder for pulling completed jobs to the debug folder which should contain already-run sims.
+    This is for avoiding simulation runtime during debug testing."""
     directories: dict[str, Path] = {'main': root_dir}
 
     # * Output / Save Paths
@@ -40,9 +42,9 @@ def create_internal_folder_structure(root_dir: Path, debug_mode=False):
     saved_scripts_folder = data_folder / 'saved_scripts'
     optimization_info_folder = data_folder / 'opt_info'
     optimization_plots_folder = optimization_info_folder / 'plots'
-    debug_completed_jobs_folder = temp_folder / 'ares_test_dev'
-    pull_completed_jobs_folder = data_folder
-    if debug_mode:
+    debug_completed_jobs_folder = root_dir / 'ares_test_dev'
+    pull_completed_jobs_folder = temp_folder
+    if pull_files_debug_mode:
         pull_completed_jobs_folder = debug_completed_jobs_folder
 
     evaluation_folder = root_dir / 'eval'
@@ -144,14 +146,17 @@ class Project:
             # Search the directory for a configuration file
             cfg_file = glob_first(project_dir, '**/*config*.{yaml,yml,json}')
         cfg = Config.from_file(cfg_file)
+        # Append simulation data from sim.json to the config from config.json
         cfg_sim = Config.from_file(project_dir / 'sim.json')
         cfg.data['base_simulation'] = cfg_sim.data
+
         self._load_config(cfg)
 
     def _load_optimizer(self, cfg: Config):
         """Load the optimizer from a config."""
         optimizer: str = cfg.pop('optimizer', None)
         if optimizer is None:
+            vipdopt.logging.warning('No optimizer declared in config.')
             return
         optimizer_settings: dict = cfg.pop('optimizer_settings', {})
         try:
@@ -165,38 +170,42 @@ class Project:
     def _load_base_sim(self, cfg: Config):
         """Load the base simulation from a config."""
         try:
-            # Setup base simulation -
+            # Initialize base simulation -
             # Are we running using Lumerical or ceviche or fdtd-z or SPINS or?
             vipdopt.logger.info('Loading base simulation from sim.json...')
             base_sim = LumericalSimulation(cfg.pop('base_simulation'))
-            # TODO: IT'S NOT LOADING
+            # TODO: 20240724 ian - IT'S NOT LOADING
             # cfg.data['base_simulation']['objects']['FDTD']['dimension'] properly!
+            # TODO: Switch that property in the config to 2D and then check the following code:
+            # b = LumericalSimulation(cfg.get('base_simulation'))
+            # b.objects['FDTD'].properties['dimension']
             vipdopt.logger.info('...successfully loaded base simulation!')
         except BaseException:  # noqa: BLE001
             base_sim = LumericalSimulation()
 
-        # # TODO: Are we running it locally or on SLURM or on AWS or?
-        # ! 20240627 Ian: Moved it to __main__.py since this is now a method of class LumericalFDTD
-        # base_sim.promise_env_setup(
-        #     mpi_exe=cfg['mpi_exe'],
-        #     nprocs=cfg['nprocs'],
-        #     solver_exe=cfg['solver_exe'],
-        #     nsims=len(base_sim.source_names()),
-        # )
-
         self.base_sim = base_sim
+        # NOTE: (Not used here):
+        # We can create new simulations from the foMs by using fom.create_forward_sim() and passing base sim as a template
         self.src_to_sim_map = {
             src: base_sim.with_enabled([src], name=src)
             for src in base_sim.source_names()
-        }
+        }                                                   # key, value types here are Dict( str : LumericalSimulation )
+        self.base_sim.set_path(self.dir / 'base_sim.fsp')
+
+        # TODO: Partitioning the base_sim into simulations: i.e. a list of Simulation objects
+        # TODO: And the same with devices
+        # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
 
     def _load_foms(self, cfg: Config):
         """Load figures of merit from a config."""
-        # Setup FoMs
         self.foms = []
         weights = []
+
+        # Setup FoMs. #! A lot of hardcoded processing is done here, prime candidate for errors of some kind.
+        # But essentially this just consists of changing it from a dictionary of strings/lists/floats
+        # to a dictionary of objects
         for name, fom_dict in cfg.pop('figures_of_merit').items():
-            # Overwrite 'opt_ids' key for now with the entire wavelength vector, by
+            # [DEPRECATED, removed from config] Overwrite 'opt_ids' key for now with the entire wavelength vector, by
             # commenting out in config. Spectral sorting comes from spectral weighting
 
             # Config contains source/monitor names; replace these with the actual Source and Monitor objects contained in self.base_sim
@@ -221,22 +230,25 @@ class Project:
 
             # if pos_max_freqs is blank, make it the whole wavelength vector; if neg_min_freqs is blank, keep blank.
             if fom_dict['pos_max_freqs'] == []:
-                fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
+                #! WAVELENGTH VALUES - INDICES OR ACTUAL VALUES?
+                # fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
+                fom_dict['pos_max_freqs'] = np.array(range(len(cfg['lambda_values_um'])))
+
+            fom_dict['all_freqs'] = 3e8/np.array(cfg['lambda_values_um'])
 
             weights.append(fom_dict.pop('weight'))
             self.foms.append(FoM.from_dict(fom_dict))
         self.weights = np.array(weights)
 
     def _setup_weights(self, cfg: Config):
-        """Setup the weights for each FoM."""
+        """Setup the weights for each FoM.
+        At present this processes spectral weights as a factor to the original weights -
+        i.e. the wavelength-dependent behaviour of each FoM"""
         # Overall Weights for each FoM
-        self.weights = np.array(self.weights)
+        self.weights = np.array(self.weights)           # Just ensure that it's a numpy
 
         # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM
         # (e.g. spectral sorting)
-        # spectral_weights_by_fom = np.zeros(
-        #     (len(fom_dict), cfg.pv.num_design_frequency_points)
-        # )
         spectral_weights_by_fom = np.zeros((
             cfg['num_bands'],
             cfg['num_design_frequency_points'],
@@ -281,6 +293,7 @@ class Project:
         if 'device' in cfg:
             device_source = cfg.pop('device')
             self.device = Device.from_source(device_source)
+
         else:
             # * Design Region(s) + Constraints
             # e.g. feature sizes, bridging/voids, permittivity constraints,
@@ -312,6 +325,7 @@ class Project:
                         3,
                     ),
                 })
+
             elif cfg['simulator_dimension'] == '3D':
                 voxel_array_size = (
                     cfg['device_voxels_lateral_bordered'],
@@ -337,6 +351,7 @@ class Project:
                 region_coordinates,
                 randomize=False,
                 init_seed=0,
+                # todo: add filters to config
                 filters=[
                     Sigmoid(0.5, 1.0),
                     Scale((
@@ -349,25 +364,32 @@ class Project:
 
     def _load_config(self, config: Config | dict):
         """Load and setup optimization from an appropriate JSON config file."""
+
         # Load config file
         cfg = copy(config)
         if not isinstance(config, Config):
             cfg = self.config_type(cfg)
         assert isinstance(cfg, Config)
 
+        # Load optimizer
         self._load_optimizer(cfg)
+        # Load base simulation.
         self._load_base_sim(cfg)
-        sims = self.src_to_sim_map.values()
+        sims = list(self.src_to_sim_map.values())
 
-        # General Settings
-        iteration = cfg.get('current_iteration', 0)
-        epoch = cfg.get('current_epoch', 0)
-
+        # Load Figures of Merit (FoMs)
         self._load_foms(cfg)
         full_fom = SuperFoM([(f,) for f in self.foms], self.weights)
         self._setup_weights(cfg)
 
+        # Load Device
         self._load_device(cfg)
+
+        # General (Other) Settings
+        iteration = cfg.get('current_iteration', 0)
+        epoch = cfg.get('current_epoch', 0)
+
+        # ================================================================================================================
 
         # Setup Folder Structure
         running_on_local_machine = False
@@ -376,11 +398,12 @@ class Project:
             running_on_local_machine = True
 
         self.subdirectories = create_internal_folder_structure(
-            self.dir, running_on_local_machine
+            self.dir,
+            pull_files_debug_mode = True
+            #debug_mode = running_on_local_machine
         )
         vipdopt.logger.info('Internal folder substructure created.')
-
-        os.path.dirname(__file__)  # Go up one folder
+        os.path.dirname(__file__)  # Go up one folder - # todo: 20240724 ian - wait is this line even necessary
 
         # Setup Optimization
         assert self.device is not None
@@ -405,23 +428,24 @@ class Project:
             vipdopt.logger.warning('Warning! Solver path does not exist.')
 
         self.optimization = LumericalOptimization(
+            self.base_sim,
             sims,
             self.device,
             self.optimizer,
-            full_fom,  # full_fom will be filled in once full_fom is calculated
-            # might need to load the array of foms[] as well...
-            # and the weights AS WELL AS the full_fom()
-            # and the gradient function
-            cfg,
-            start_epoch=epoch,
-            start_iter=iteration,
-            max_epochs=cfg.get('max_epochs', 1),
-            iter_per_epoch=cfg.get('iter_per_epoch', 100),
+            full_fom,
+            # Explicitly declare the fom kwargs passed to compute_fom() as cfg.
+            fom_kwargs = cfg,
+            # It could be different but for now it's not
+            cfg = cfg,
+            epoch_list = cfg.get('epoch_list'),
+            true_iteration = iteration,
             env_vars=env_vars,
             dirs=self.subdirectories,
         )
         vipdopt.logger.info('Optimization initialized.')
 
+
+        # Finally, set the remaining config file (now that everything is popped) as the config variable of the Project.
         self.config = cfg
 
     def get(self, prop: str, default: Any = None) -> Any | None:
@@ -499,12 +523,19 @@ class Project:
 
     def start_optimization(self):
         """Start this project's optimization."""
-        try:
-            self.optimization.loop = True
-            self.optimization.run()
-        finally:
-            vipdopt.logger.info('Saving optimization after early stop...')
-            self.save()
+
+        self.optimization.loop = True
+        # self.optimization.run()
+        self.optimization.run2()
+
+        #! DEBUG 20240721 ian - uncomment this block for the git push
+        # try:
+        #     self.optimization.loop = True
+        #     # self.optimization.run()
+        #     self.optimization.run2()
+        # finally:
+        #     vipdopt.logger.info('Saving optimization after early stop...')
+        #     self.save()
 
     def stop_optimization(self):
         """Stop this project's optimization."""
@@ -519,12 +550,14 @@ class Project:
 
 # TODO: Better docstring
 def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
-    """Assign bands."""
+    """Assign spectral bands."""
     # Reminder that wl_band_bounds is a dictionary {'left': [], 'peak': [], 'right': []}
 
     # Naive method: Split lambda_values_um into num_bands and return lefts, centers,
     # and rights accordingly. i.e. assume all bands are equally spread across all of
     # lambda_values_um without missing any values.
+
+    # TODO: CODE IN MORE SELECTIONS AND OPTIONS FOR THE ALGORITHM OF SPECTRAL BAND ASSIGNMENT
 
     for key in wl_band_bounds:  # Reassign empty lists to be numpy arrays
         wl_band_bounds[key] = np.zeros(num_bands)

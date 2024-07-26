@@ -79,14 +79,14 @@ def assert_close(result: Any, expected: Any, err: float = 1e-3) -> None:
         assert_equal(result, expected)
 
 
-def assert_less_than(result: Any, expected: Any):
+def assert_less_than(n1: Any, n2: Any):
     """Assert n1 is less than n2 at all points."""
-    np.testing.assert_array_less(result, expected)
+    np.testing.assert_array_less(n1, n2)
 
 
-def assert_greater_than(result: Any, expected: Any):
+def assert_greater_than(n1: Any, n2: Any):
     """Assert n1 is less than n2 at all points."""
-    np.testing.assert_array_less(expected, result)
+    np.testing.assert_array_less(n2, n1)
 
 
 def catch_exits(func: Callable) -> Callable:

@@ -1,5 +1,6 @@
 """Class for general sources in a simulation."""
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -34,10 +35,24 @@ class Monitor(LumericalSimObject):
         self.reset()
 
     @ensure_path
-    def set_src(self, src: Path):
+    def set_source(self, src: Path):
         """Set the source file this monitor is connected to."""
         self.src = src
         self.reset()
+
+    def __repr__(self) -> str:
+        """Return a string representation of the monitor."""
+        data = {
+            'name': self.name,
+            'obj_type': self.obj_type,
+            'properties': self.properties,
+        }
+        return json.dumps(
+            data,
+            indent=4,
+            ensure_ascii=True,
+        )
+        return str(data)
 
     def __eq__(self, __value: object) -> bool:
         """Test equality."""
@@ -59,7 +74,7 @@ class Monitor(LumericalSimObject):
         self._sync = self.src is not None  # Only set to sync if the source file exists
 
     def load_source(self):
-        """Load the monitor's data from it's source file."""
+        """Load the monitor's data from its source file."""
         if self.src is None:
             raise RuntimeError(f'Monitor {self} has no source to load data from.')
         vipdopt.logger.debug(f'Loading monitor data from {self.src} into memory...')

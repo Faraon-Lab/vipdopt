@@ -12,6 +12,9 @@
 temp/
 tmp/
 !testing/*.yml
+!docs/source/notebooks/*.json
+!docs/source/notebooks/example_render.yml
+!docs/source/notebooks/config_example_3d.yml
 
 # Lumerical files
 *.lsf
@@ -30,6 +33,7 @@ __pycache__/
 *.npy
 *.npz
 !testing/monitor_data/*.npz
+!docs/source/notebooks/*.npz
 
 # Distribution / packaging
 .Python
@@ -54,13 +58,13 @@ MANIFEST
 *.bat
 
 # Documentation
-
-# docs/source/_autosummary
+**/.ipynb_checkpoints/
 
 !docs/build/
 !docs/*.png
 !docs/*.gif
 
+docs/source/_autosummary/
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
@@ -182,3 +186,4 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+docs/notebooks/pixel_example/template.j2

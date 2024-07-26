@@ -1,0 +1,28 @@
+vipdopt.simulation.simobject.IndexMonitor
+=========================================
+
+.. currentmodule:: vipdopt.simulation.simobject
+
+.. autoclass:: IndexMonitor
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~IndexMonitor.__init__
+      ~IndexMonitor.as_dict
+      ~IndexMonitor.from_fdtd
+      ~IndexMonitor.update
+   
+   
+
+   
+   
+   
