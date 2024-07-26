@@ -1,4 +1,4 @@
-vipdopt.simulation.simulation.LumericalSimulation
+﻿vipdopt.simulation.simulation.LumericalSimulation
 =================================================
 
 .. currentmodule:: vipdopt.simulation.simulation
@@ -28,8 +28,11 @@ vipdopt.simulation.simulation.LumericalSimulation
       ~LumericalSimulation.enable_all_sources
       ~LumericalSimulation.get_env_vars
       ~LumericalSimulation.get_path
+      ~LumericalSimulation.import_field_shape
       ~LumericalSimulation.import_names
       ~LumericalSimulation.imports
+      ~LumericalSimulation.indexmonitor_names
+      ~LumericalSimulation.indexmonitors
       ~LumericalSimulation.link_monitors
       ~LumericalSimulation.load
       ~LumericalSimulation.monitor_names

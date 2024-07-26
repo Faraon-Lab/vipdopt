@@ -358,6 +358,7 @@
 </li>
 <li class="toctree-l4 has-children"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.html">vipdopt.simulation.simobject</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" role="switch" type="checkbox"/><label for="toctree-checkbox-30"><div class="visually-hidden">Toggle navigation of vipdopt.simulation.simobject</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.Import.html">vipdopt.simulation.simobject.Import</a></li>
+<li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.IndexMonitor.html">vipdopt.simulation.simobject.IndexMonitor</a></li>
 <li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.LumericalSimObject.html">vipdopt.simulation.simobject.LumericalSimObject</a></li>
 <li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.LumericalSimObjectType.html">vipdopt.simulation.simobject.LumericalSimObjectType</a></li>
 </ul>
@@ -386,8 +387,10 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="_autosummary/vipdopt.utils.html">vipdopt.utils</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" role="switch" type="checkbox"/><label for="toctree-checkbox-34"><div class="visually-hidden">Toggle navigation of vipdopt.utils</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.apply_args_and_kwargs.html">vipdopt.utils.apply_args_and_kwargs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.convert_path.html">vipdopt.utils.convert_path</a></li>
+<li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.del_by_path.html">vipdopt.utils.del_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.ensure_path.html">vipdopt.utils.ensure_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.flatten.html">vipdopt.utils.flatten</a></li>
+<li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.get_by_path.html">vipdopt.utils.get_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.glob_first.html">vipdopt.utils.glob_first</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.import_lumapi.html">vipdopt.utils.import_lumapi</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.ladd_to_all.html">vipdopt.utils.ladd_to_all</a></li>
@@ -396,6 +399,7 @@
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.repeat.html">vipdopt.utils.repeat</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.rmtree.html">vipdopt.utils.rmtree</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.sech.html">vipdopt.utils.sech</a></li>
+<li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.set_by_path.html">vipdopt.utils.set_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.setup_logger.html">vipdopt.utils.setup_logger</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.split_glob.html">vipdopt.utils.split_glob</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.starmap_with_kwargs.html">vipdopt.utils.starmap_with_kwargs</a></li>
@@ -455,6 +459,24 @@
 <strong>i</strong>nverse <strong>p</strong>hotonic <strong>d</strong>esign and <strong>opt</strong>imization. It
 makes use of Lumerical’s Python API <code class="docutils literal notranslate"><span class="pre">lumapi</span></code> to make the design and optimization of new
 optical devices more straightforward.</p>
+<p>This code performs an inverse-design optimization based on the adjoint optimization
+technique <a class="footnote-reference brackets" href="#id3" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> that designs a freeform multilayer optical Bayer filter and focusing lens <a class="footnote-reference brackets" href="#id4" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>.
+The Bayer filter is multiwavelength and focuses and sorts
+different spectral bands into different prescribed locations on the focal plane.
+Otherwise known as a color router, this code is set by default to create a 10-layer
+filter for the visible spectral range, with lateral and vertical dimensions of 2.04
+microns. Different options are available in the config to, for example, enable
+polarization sorting or adjust the spectral bands as necessary.</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id3" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p><a class="reference external" href="https://doi.org/10.1364/OPTICA.384228">https://doi.org/10.1364/OPTICA.384228</a></p>
+</aside>
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p><a class="reference external" href="https://doi.org/10.1364/OE.21.021693">https://doi.org/10.1364/OE.21.021693</a></p>
+</aside>
+</aside>
 <p>Check out the <a class="reference internal" href="usage.html"><span class="doc">Usage</span></a> section for further information.</p>
 <div class="toctree-wrapper compound">
 </div>
@@ -472,7 +494,11 @@ optical devices more straightforward.</p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="usage.html#requirements">Requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage.html#using-vipdopt">Using <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#using-vipdopt">Using <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#outputs">Outputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#gui">GUI</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="notebooks.html">Tutorials</a><ul>
@@ -480,6 +506,7 @@ optical devices more straightforward.</p>
 <li class="toctree-l3"><a class="reference internal" href="notebooks/simulation.html#Creating-a-New-Simulation">Creating a New Simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="notebooks/simulation.html#Simulation-Objects">Simulation Objects</a></li>
 <li class="toctree-l3"><a class="reference internal" href="notebooks/simulation.html#Simulation-Object-Subclasses">Simulation Object Subclasses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="notebooks/simulation.html#Simulation-Configuration-Files">Simulation Configuration Files</a></li>
 <li class="toctree-l3"><a class="reference internal" href="notebooks/simulation.html#Connecting-to-Lumerical-FDTD">Connecting to Lumerical FDTD</a></li>
 </ul>
 </li>

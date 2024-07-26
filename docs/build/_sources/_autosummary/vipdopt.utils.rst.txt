@@ -1,4 +1,4 @@
-vipdopt.utils
+﻿vipdopt.utils
 =============
 
 .. automodule:: vipdopt.utils
@@ -16,8 +16,10 @@ vipdopt.utils
    
       apply_args_and_kwargs
       convert_path
+      del_by_path
       ensure_path
       flatten
+      get_by_path
       glob_first
       import_lumapi
       ladd_to_all
@@ -26,6 +28,7 @@ vipdopt.utils
       repeat
       rmtree
       sech
+      set_by_path
       setup_logger
       split_glob
       starmap_with_kwargs

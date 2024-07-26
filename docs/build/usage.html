@@ -204,7 +204,6 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="notebooks.html">Tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/simulation.html">Simulations in <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/config.html"><code class="docutils literal notranslate"><span class="pre">Config</span></code> objects in <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="notebooks/config.html#Generating-Configuration-Files-using-Jinja2">Generating Configuration Files using <code class="docutils literal notranslate"><span class="pre">Jinja2</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/fom.html">Figures of Merit in <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/device.html">Devices in <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a></li>
 </ul>
@@ -359,6 +358,7 @@
 </li>
 <li class="toctree-l4 has-children"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.html">vipdopt.simulation.simobject</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" role="switch" type="checkbox"/><label for="toctree-checkbox-30"><div class="visually-hidden">Toggle navigation of vipdopt.simulation.simobject</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.Import.html">vipdopt.simulation.simobject.Import</a></li>
+<li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.IndexMonitor.html">vipdopt.simulation.simobject.IndexMonitor</a></li>
 <li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.LumericalSimObject.html">vipdopt.simulation.simobject.LumericalSimObject</a></li>
 <li class="toctree-l5"><a class="reference internal" href="_autosummary/vipdopt.simulation.simobject.LumericalSimObjectType.html">vipdopt.simulation.simobject.LumericalSimObjectType</a></li>
 </ul>
@@ -387,8 +387,10 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="_autosummary/vipdopt.utils.html">vipdopt.utils</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" role="switch" type="checkbox"/><label for="toctree-checkbox-34"><div class="visually-hidden">Toggle navigation of vipdopt.utils</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.apply_args_and_kwargs.html">vipdopt.utils.apply_args_and_kwargs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.convert_path.html">vipdopt.utils.convert_path</a></li>
+<li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.del_by_path.html">vipdopt.utils.del_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.ensure_path.html">vipdopt.utils.ensure_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.flatten.html">vipdopt.utils.flatten</a></li>
+<li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.get_by_path.html">vipdopt.utils.get_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.glob_first.html">vipdopt.utils.glob_first</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.import_lumapi.html">vipdopt.utils.import_lumapi</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.ladd_to_all.html">vipdopt.utils.ladd_to_all</a></li>
@@ -397,6 +399,7 @@
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.repeat.html">vipdopt.utils.repeat</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.rmtree.html">vipdopt.utils.rmtree</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.sech.html">vipdopt.utils.sech</a></li>
+<li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.set_by_path.html">vipdopt.utils.set_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.setup_logger.html">vipdopt.utils.setup_logger</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.split_glob.html">vipdopt.utils.split_glob</a></li>
 <li class="toctree-l4"><a class="reference internal" href="_autosummary/vipdopt.utils.starmap_with_kwargs.html">vipdopt.utils.starmap_with_kwargs</a></li>
@@ -459,7 +462,7 @@
 <li><p>Ansys Lumerical FDTD</p></li>
 <li><p>An installation of MPI, for running simulations in parallel</p></li>
 <li><p>Qt6</p></li>
-<li><p>Dependencies listed in <cite>build_requirements.txt</cite></p></li>
+<li><p>Dependencies listed in <code class="docutils literal notranslate"><span class="pre">build_requirements.txt</span></code></p></li>
 </ul>
 <p>If creating a conda environment, there is not official PySide6 package yet. After activating your environment, you will need to install PySide6 with pip.</p>
 </section>
@@ -479,6 +482,49 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>vipdopt<span class="w"> </span>--help
 </pre></div>
 </div>
+<section id="outputs">
+<h3>Outputs<a class="headerlink" href="#outputs" title="Link to this heading">¶</a></h3>
+<p>All created files and logs are packaged and output to the selected project folde by default. The internal folder structure is as follows:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">data</span></code>:  Data generated in the optimization</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">opt_info</span></code>: captures pertinent information about each iteration and epoch of the optimization. Save data is also collected here for the event that an optimization needs to be restarted.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.tmp</span></code>: Lumerical <code class="docutils literal notranslate"><span class="pre">.fsp</span></code> simulation files and log files that are used to calculate the adjoint and forward E-fields for calculation of the optimization gradient.</p></li>
+</ul>
+<p>The folder <code class="docutils literal notranslate"><span class="pre">opt_info</span></code> collects information about optical figures of merit, the latest 3-D permittivity values of the designed device, the adjoint gradient, and contains auto-generated plots of the evolution of these values throughout the optimization.
+(Please note that values such as transmission are not normalized rigorously for these auto-generated plots, as the inclusion of the proper monitors in Lumerical for rigor would slow down each optimization iteration greatly.)</p>
+<p>A log file is also created in the main project folder, named with the specified name using the <code class="docutils literal notranslate"><span class="pre">--log</span></code> option (defaults to <code class="docutils literal notranslate"><span class="pre">dev.log</span></code>).</p>
+</section>
+<section id="gui">
+<h3>GUI<a class="headerlink" href="#gui" title="Link to this heading">¶</a></h3>
+<p>The GUI <a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> can be started by running</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>vipdopt<span class="w"> </span>gui
+</pre></div>
+</div>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>The GUI is deprecated as of <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code> version 2.0. Some functionality may still be possible but it is untested and unstable.</p>
+</aside>
+</aside>
+<p>This will launch a dashboard that can monitor the progress of a optimization.</p>
+<img alt="A Screenshot of an example optimization loaded in the GUI" src="_images/dashboard.png" />
+<p>From the dashboard you can also open a dialog for editing <a class="footnote-reference brackets" href="#id4" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a> the optimization parameters</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">2</a><span class="fn-bracket">]</span></span>
+<p>Editing and saving an optimization though the GUI is not yet fully supported. However you can still use this window to view the various parameters.</p>
+</aside>
+</aside>
+<img alt="A .GIF demo using the GUI" src="_images/gui_demo.gif" />
+<p>While starting and stopping the optimization through the GUI is not completely supported yet, there are some experimental features pertaining to those functions.</p>
+<p>Clicking the “Start Optimization” button will create a slurm script that can be submitted to run the optimization. To alter the output file format, edit the <a class="reference external" href="../../vipdopt/submit.sh.">submission script</a>.
+The parameters of running the job are included in this file according to the <a class="reference external" href="https://slurm.schedmd.com/sbatch.html">SLURM documentation</a>.  More information can be found there.</p>
+</section>
 </section>
 </section>
 
@@ -539,7 +585,11 @@
             <ul>
 <li><a class="reference internal" href="#">Usage</a><ul>
 <li><a class="reference internal" href="#requirements">Requirements</a></li>
-<li><a class="reference internal" href="#using-vipdopt">Using <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a></li>
+<li><a class="reference internal" href="#using-vipdopt">Using <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code></a><ul>
+<li><a class="reference internal" href="#outputs">Outputs</a></li>
+<li><a class="reference internal" href="#gui">GUI</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

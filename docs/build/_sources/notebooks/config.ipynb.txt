@@ -149,6 +149,7 @@
     "### General Workflow using `Jinja2`\n",
     "\n",
     "The convenience of `Jinja2` creates a sort of workflow one should use when using configuration files in `vipdopt`:\n",
+    "\n",
     "1. Create an initial configuration file with general values (e.g. `pixel_width`)\n",
     "2. Create a template file that uses the values from the configuration file to compute other values\n",
     "3. Render the template file into a final \"rendered\" configuration file\n",
@@ -208,7 +209,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 13,
+   "execution_count": 3,
    "metadata": {},
    "outputs": [],
    "source": [
@@ -219,7 +220,7 @@
     "\n",
     "# Step 1 - create initial config file (already done)\n",
     "og_config_file = pixel_source_directory / 'config_example_3d.yml'\n",
-    "data = Config.from_file(og_config_file)\n",
+    "data = SonyBayerConfig.from_file(og_config_file)\n",
     "\n",
     "# Step 2 - create template file (already done)\n",
     "template_filename =  'derived_simulation_properties.j2'\n",

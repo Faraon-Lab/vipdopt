@@ -1,4 +1,4 @@
-vipdopt.simulation.simobject
+﻿vipdopt.simulation.simobject
 ============================
 
 .. automodule:: vipdopt.simulation.simobject
@@ -20,6 +20,7 @@ vipdopt.simulation.simobject
       :template: class-template.rst
    
       Import
+      IndexMonitor
       LumericalSimObject
       LumericalSimObjectType
    

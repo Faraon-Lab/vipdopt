@@ -11,7 +11,21 @@ Welcome to Vipdopt's documentation!
 makes use of Lumerical's Python API ``lumapi`` to make the design and optimization of new
 optical devices more straightforward.
 
+This code performs an inverse-design optimization based on the adjoint optimization
+technique [#]_ that designs a freeform multilayer optical Bayer filter and focusing lens [#]_.
+The Bayer filter is multiwavelength and focuses and sorts 
+different spectral bands into different prescribed locations on the focal plane. 
+Otherwise known as a color router, this code is set by default to create a 10-layer 
+filter for the visible spectral range, with lateral and vertical dimensions of 2.04 
+microns. Different options are available in the config to, for example, enable 
+polarization sorting or adjust the spectral bands as necessary.
+
+
+.. [#] https://doi.org/10.1364/OPTICA.384228
+.. [#] https://doi.org/10.1364/OE.21.021693
+
 Check out the :doc:`usage` section for further information.
+
 
 
 

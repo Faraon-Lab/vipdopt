@@ -358,6 +358,7 @@
 </li>
 <li class="toctree-l4 has-children"><a class="reference internal" href="vipdopt.simulation.simobject.html">vipdopt.simulation.simobject</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" role="switch" type="checkbox"/><label for="toctree-checkbox-30"><div class="visually-hidden">Toggle navigation of vipdopt.simulation.simobject</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.Import.html">vipdopt.simulation.simobject.Import</a></li>
+<li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.IndexMonitor.html">vipdopt.simulation.simobject.IndexMonitor</a></li>
 <li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.LumericalSimObject.html">vipdopt.simulation.simobject.LumericalSimObject</a></li>
 <li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.LumericalSimObjectType.html">vipdopt.simulation.simobject.LumericalSimObjectType</a></li>
 </ul>
@@ -386,8 +387,10 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="vipdopt.utils.html">vipdopt.utils</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" role="switch" type="checkbox"/><label for="toctree-checkbox-34"><div class="visually-hidden">Toggle navigation of vipdopt.utils</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.apply_args_and_kwargs.html">vipdopt.utils.apply_args_and_kwargs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.convert_path.html">vipdopt.utils.convert_path</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.del_by_path.html">vipdopt.utils.del_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.ensure_path.html">vipdopt.utils.ensure_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.flatten.html">vipdopt.utils.flatten</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.get_by_path.html">vipdopt.utils.get_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.glob_first.html">vipdopt.utils.glob_first</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.import_lumapi.html">vipdopt.utils.import_lumapi</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.ladd_to_all.html">vipdopt.utils.ladd_to_all</a></li>
@@ -396,6 +399,7 @@
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.repeat.html">vipdopt.utils.repeat</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.rmtree.html">vipdopt.utils.rmtree</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.sech.html">vipdopt.utils.sech</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.set_by_path.html">vipdopt.utils.set_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.setup_logger.html">vipdopt.utils.setup_logger</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.split_glob.html">vipdopt.utils.split_glob</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.starmap_with_kwargs.html">vipdopt.utils.starmap_with_kwargs</a></li>
@@ -515,49 +519,58 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.get_path" title="vipdopt.simulation.simulation.LumericalSimulation.get_path"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_path</span></code></a>()</p></td>
 <td><p>Get the save path of the simulation.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.import_names" title="vipdopt.simulation.simulation.LumericalSimulation.import_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">import_names</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.import_field_shape" title="vipdopt.simulation.simulation.LumericalSimulation.import_field_shape"><code class="xref py py-obj docutils literal notranslate"><span class="pre">import_field_shape</span></code></a>()</p></td>
+<td><p>Return the shape of the fields returned from this simulation's design index monitors.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.import_names" title="vipdopt.simulation.simulation.LumericalSimulation.import_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">import_names</span></code></a>()</p></td>
 <td><p>Return a list of all import object names.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.imports" title="vipdopt.simulation.simulation.LumericalSimulation.imports"><code class="xref py py-obj docutils literal notranslate"><span class="pre">imports</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.imports" title="vipdopt.simulation.simulation.LumericalSimulation.imports"><code class="xref py py-obj docutils literal notranslate"><span class="pre">imports</span></code></a>()</p></td>
 <td><p>Return a list of all import objects.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.link_monitors" title="vipdopt.simulation.simulation.LumericalSimulation.link_monitors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">link_monitors</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.indexmonitor_names" title="vipdopt.simulation.simulation.LumericalSimulation.indexmonitor_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">indexmonitor_names</span></code></a>()</p></td>
+<td><p>Return a list of all indexmonitor object names.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.indexmonitors" title="vipdopt.simulation.simulation.LumericalSimulation.indexmonitors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">indexmonitors</span></code></a>()</p></td>
+<td><p>Return a list of all indexmonitor objects.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.link_monitors" title="vipdopt.simulation.simulation.LumericalSimulation.link_monitors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">link_monitors</span></code></a>()</p></td>
 <td><p>Link all of the given monitors to this simulation.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.load" title="vipdopt.simulation.simulation.LumericalSimulation.load"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load</span></code></a>(source)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.load" title="vipdopt.simulation.simulation.LumericalSimulation.load"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load</span></code></a>(source)</p></td>
 <td><p>Load simulation from a file or dictionary.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.monitor_names" title="vipdopt.simulation.simulation.LumericalSimulation.monitor_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">monitor_names</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.monitor_names" title="vipdopt.simulation.simulation.LumericalSimulation.monitor_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">monitor_names</span></code></a>()</p></td>
 <td><p>Return a list of all monitor object names.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.monitors" title="vipdopt.simulation.simulation.LumericalSimulation.monitors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">monitors</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.monitors" title="vipdopt.simulation.simulation.LumericalSimulation.monitors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">monitors</span></code></a>()</p></td>
 <td><p>Return a list of all monitor objects.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.new_object" title="vipdopt.simulation.simulation.LumericalSimulation.new_object"><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_object</span></code></a>(obj_name, obj_type, **properties)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.new_object" title="vipdopt.simulation.simulation.LumericalSimulation.new_object"><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_object</span></code></a>(obj_name, obj_type, **properties)</p></td>
 <td><p>Create a new object and add it to the simulation.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.save" title="vipdopt.simulation.simulation.LumericalSimulation.save"><code class="xref py py-obj docutils literal notranslate"><span class="pre">save</span></code></a>(fname)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.save" title="vipdopt.simulation.simulation.LumericalSimulation.save"><code class="xref py py-obj docutils literal notranslate"><span class="pre">save</span></code></a>(fname)</p></td>
 <td><p>Save simulation data to a file.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.set_path" title="vipdopt.simulation.simulation.LumericalSimulation.set_path"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_path</span></code></a>(path)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.set_path" title="vipdopt.simulation.simulation.LumericalSimulation.set_path"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_path</span></code></a>(path)</p></td>
 <td><p>Set the save path of the simulation.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.source_names" title="vipdopt.simulation.simulation.LumericalSimulation.source_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">source_names</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.source_names" title="vipdopt.simulation.simulation.LumericalSimulation.source_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">source_names</span></code></a>()</p></td>
 <td><p>Return a list of all source object names.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.sources" title="vipdopt.simulation.simulation.LumericalSimulation.sources"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sources</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.sources" title="vipdopt.simulation.simulation.LumericalSimulation.sources"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sources</span></code></a>()</p></td>
 <td><p>Return a list of all source objects.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.update_object" title="vipdopt.simulation.simulation.LumericalSimulation.update_object"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_object</span></code></a>(name, **properties)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.update_object" title="vipdopt.simulation.simulation.LumericalSimulation.update_object"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_object</span></code></a>(name, **properties)</p></td>
 <td><p>Update object with new property values.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.with_disabled" title="vipdopt.simulation.simulation.LumericalSimulation.with_disabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_disabled</span></code></a>(objs[, name])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.with_disabled" title="vipdopt.simulation.simulation.LumericalSimulation.with_disabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_disabled</span></code></a>(objs[, name])</p></td>
 <td><p>Return copy of this simulation with only objects in objs disabled.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.with_enabled" title="vipdopt.simulation.simulation.LumericalSimulation.with_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_enabled</span></code></a>(objs[, name])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.with_enabled" title="vipdopt.simulation.simulation.LumericalSimulation.with_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_enabled</span></code></a>(objs[, name])</p></td>
 <td><p>Return copy of this simulation with only objects in objs enabled.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.with_monitors" title="vipdopt.simulation.simulation.LumericalSimulation.with_monitors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_monitors</span></code></a>(objs[, name])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.with_monitors" title="vipdopt.simulation.simulation.LumericalSimulation.with_monitors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_monitors</span></code></a>(objs[, name])</p></td>
 <td><p>Return a copy of this simulation with only the specified monitors.</p></td>
 </tr>
 </tbody>
@@ -637,6 +650,12 @@
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="vipdopt.simulation.simulation.LumericalSimulation.import_field_shape">
+<span class="sig-name descname"><span class="pre">import_field_shape</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#vipdopt.simulation.simulation.LumericalSimulation.import_field_shape" title="Link to this definition">¶</a></dt>
+<dd><p>Return the shape of the fields returned from this simulation’s design index monitors.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="vipdopt.simulation.simulation.LumericalSimulation.import_names">
 <span class="sig-name descname"><span class="pre">import_names</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#vipdopt.simulation.simulation.LumericalSimulation.import_names" title="Link to this definition">¶</a></dt>
 <dd><p>Return a list of all import object names.</p>
@@ -646,6 +665,18 @@
 <dt class="sig sig-object py" id="vipdopt.simulation.simulation.LumericalSimulation.imports">
 <span class="sig-name descname"><span class="pre">imports</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="vipdopt.simulation.simobject.Import.html#vipdopt.simulation.simobject.Import" title="vipdopt.simulation.simobject.Import"><span class="pre">Import</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#vipdopt.simulation.simulation.LumericalSimulation.imports" title="Link to this definition">¶</a></dt>
 <dd><p>Return a list of all import objects.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vipdopt.simulation.simulation.LumericalSimulation.indexmonitor_names">
+<span class="sig-name descname"><span class="pre">indexmonitor_names</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#vipdopt.simulation.simulation.LumericalSimulation.indexmonitor_names" title="Link to this definition">¶</a></dt>
+<dd><p>Return a list of all indexmonitor object names.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vipdopt.simulation.simulation.LumericalSimulation.indexmonitors">
+<span class="sig-name descname"><span class="pre">indexmonitors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="vipdopt.simulation.simobject.LumericalSimObject.html#vipdopt.simulation.simobject.LumericalSimObject" title="vipdopt.simulation.simobject.LumericalSimObject"><span class="pre">LumericalSimObject</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#vipdopt.simulation.simulation.LumericalSimulation.indexmonitors" title="Link to this definition">¶</a></dt>
+<dd><p>Return a list of all indexmonitor objects.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -811,8 +842,11 @@ properties (dict[str, Any]): optional dictionary to populate</p>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.enable_all_sources"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.enable_all_sources()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.get_env_vars"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.get_env_vars()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.get_path"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.get_path()</span></code></a></li>
+<li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.import_field_shape"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.import_field_shape()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.import_names"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.import_names()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.imports"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.imports()</span></code></a></li>
+<li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.indexmonitor_names"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.indexmonitor_names()</span></code></a></li>
+<li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.indexmonitors"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.indexmonitors()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.link_monitors"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.link_monitors()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.load"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.load()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.simulation.simulation.LumericalSimulation.monitor_names"><code class="docutils literal notranslate"><span class="pre">LumericalSimulation.monitor_names()</span></code></a></li>

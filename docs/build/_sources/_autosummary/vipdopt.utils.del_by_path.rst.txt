@@ -1,0 +1,6 @@
+vipdopt.utils.del\_by\_path
+===========================
+
+.. currentmodule:: vipdopt.utils
+
+.. autofunction:: del_by_path
