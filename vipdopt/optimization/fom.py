@@ -602,6 +602,14 @@ class BayerFilterFoM(FoM):
 
         efield = self.fwd_monitors[0].e
         total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
+        # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
+        try:
+            total_ffom /= np.array(
+                kwargs.get('max_intensity_by_wavelength', None)
+                )[..., self.pos_max_freqs]
+        except Exception as e:
+            pass
+        # TODO: CHECK THAT THIS IS THE RIGHT PLACE TO PUT IT. CHECK GREG CODE
 
         
         # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
