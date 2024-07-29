@@ -17,7 +17,7 @@ from scipy import interpolate  # type: ignore
 import vipdopt
 from vipdopt import GDS, STL
 from vipdopt.configuration import Config
-from vipdopt.eval import plotter
+from vipdopt.eval import plotter_v2
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import BayerFilterFoM, FoM, SuperFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
@@ -197,16 +197,19 @@ class LumericalOptimization:
         with (folder / 'parameter_history.npy').open('wb') as f:
             np.save(f, params)
 
-    # def generate_plots(self):
-    #     """Generate the plots and save to file."""
-    #     folder = self.dirs['opt_plots']
+    def generate_plots(self):
+        """Generate the plots and save to file."""
+        folder = self.dirs['opt_plots']
+        
+        # Placeholder
+        getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
 
     #     # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
 
-    #     # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
-    #     fom_fig = plotter.plot_fom_trace(
-    #         self.figure_of_merit_evolution, folder, self.epoch_list
-    #     )
+        # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
+        # fom_fig = plotter_v2.plot_fom_trace(
+        #     self.fom_hist['intensity_overall'], folder, self.epoch_list
+        # )
     #     quad_trans_fig = plotter.plot_quadrant_transmission_trace(
     #         self.fom_evolution['transmission'], folder, self.epoch_list
     #     )
@@ -258,9 +261,9 @@ class LumericalOptimization:
     #     # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
     #     # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
 
-    #     # Create plot pickle files for GUI visualization
-    #     with (folder / 'fom.pkl').open('wb') as f:
-    #         pickle.dump(fom_fig, f)
+        # Create plot pickle files for GUI visualization
+        # with (folder / 'fom.pkl').open('wb') as f:
+        #     pickle.dump(fom_fig, f)
     #     with (folder / 'quad_trans.pkl').open('wb') as f:
     #         pickle.dump(quad_trans_fig, f)
     #     with (folder / 'overall_trans.pkl').open('wb') as f:
@@ -272,9 +275,6 @@ class LumericalOptimization:
     #     with (folder / 'final_device_layer.pkl').open('wb') as f:
     #         pickle.dump(final_device_layer_fig, f)
     #     # TODO: rest of the plots
-
-    def generate_plots(self):
-        getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
         
     def generate_plots_3d_v2(self):
         import matplotlib.pyplot as plt
