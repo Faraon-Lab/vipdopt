@@ -201,24 +201,31 @@ class LumericalOptimization:
         """Generate the plots and save to file."""
         folder = self.dirs['opt_plots']
         
-        # Placeholder
+        # Placeholder indiv_quad_trans
         getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
 
     #     # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
 
-        # TODO: Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
-        # fom_fig = plotter_v2.plot_fom_trace(
-        #     self.fom_hist['intensity_overall'], folder, self.epoch_list
-        # )
-    #     quad_trans_fig = plotter.plot_quadrant_transmission_trace(
-    #         self.fom_evolution['transmission'], folder, self.epoch_list
-    #     )
-    #     overall_trans_fig = plotter.plot_quadrant_transmission_trace(
-    #         self.fom_evolution['overall_transmission'],
-    #         folder,
-    #         self.epoch_list,
-    #         filename='overall_trans_trace',
-    #     )
+        # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
+        fom_fig = plotter_v2.plot_fom_trace(
+            np.array(self.fom_hist['intensity_overall']).reshape(
+                            (self.iteration+1, -1, self.cfg['num_design_frequency_points'])
+                            ),
+            folder, self.epoch_list
+        )
+        quad_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
+            np.array([self.fom_hist[f'transmission_{x}'] for x in ['overall',0,1]]).reshape(
+                            (self.iteration+1, -1, self.cfg['num_design_frequency_points'])
+                            ),
+            folder, self.epoch_list
+        )
+        overall_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
+            np.array(self.fom_hist['transmission_overall']).reshape(
+                            (self.iteration+1, -1, self.cfg['num_design_frequency_points'])
+                            ),
+            folder, self.epoch_list,
+            filename='overall_trans_trace',
+        )
 
     #     # TODO: code this to pull the forward sim for FoM_0 i.e. forward_src_x in this case but not EVERY case.
     #     # self.runner_sim.fdtd.load(
@@ -262,12 +269,12 @@ class LumericalOptimization:
     #     # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
 
         # Create plot pickle files for GUI visualization
-        # with (folder / 'fom.pkl').open('wb') as f:
-        #     pickle.dump(fom_fig, f)
-    #     with (folder / 'quad_trans.pkl').open('wb') as f:
-    #         pickle.dump(quad_trans_fig, f)
-    #     with (folder / 'overall_trans.pkl').open('wb') as f:
-    #         pickle.dump(overall_trans_fig, f)
+        with (folder / 'fom.pkl').open('wb') as f:
+            pickle.dump(fom_fig, f)
+        with (folder / 'quad_trans.pkl').open('wb') as f:
+            pickle.dump(quad_trans_fig, f)
+        with (folder / 'overall_trans.pkl').open('wb') as f:
+            pickle.dump(overall_trans_fig, f)
     #     with (folder / 'enorm.pkl').open('wb') as f:
     #         pickle.dump(intensity_fig, f)
     #     with (folder / 'indiv_trans.pkl').open('wb') as f:
@@ -1184,7 +1191,7 @@ class LumericalOptimization:
                 # If true, we're in debugging mode and it means no simulations are run.
                 # Data is instead pulled from finished simulation files in the debug folder.
                 # If false, run jobs and check that they all ran to completion.
-                if self.cfg['pull_sim_files_from_debug_folder']:
+                if True: # self.cfg['pull_sim_files_from_debug_folder']:
                     for sim in chain(fwd_sims, adj_sims):
                         sim_file = self.dirs['debug_completed_jobs'] / f'{sim.info["name"]}.fsp'
                         sim.set_path(sim_file)

@@ -501,7 +501,7 @@ def plot_fom_trace(f, plot_directory_location, epoch_list=None):
     iterations = copy.deepcopy(TEMPLATE_R_VECTOR)
     iterations.update({
         'var_name': 'Iterations',
-        'var_values': range(f.size),
+        'var_values': range(len(f)),
         'short_form': 'iter',
     })
     fom = copy.deepcopy(TEMPLATE_F_VECTOR)
@@ -525,6 +525,8 @@ def plot_quadrant_transmission_trace(
     f, plot_directory_location, epoch_list=None, filename='quad_trans_trace'
 ):
     """Plot evolution trace of quadrant transmission."""
+    f = np.array(f)
+    
     if epoch_list is None:
         epoch_list = np.linspace(0, len(f), 10)
     upperRange = np.ceil(np.max(f))

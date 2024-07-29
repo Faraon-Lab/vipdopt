@@ -1,12 +1,13 @@
 #!/bin/bash
 #SBATCH -A Faraon_Computing
-#SBATCH --time=2:00:00   # walltime
+#SBATCH --time=4:00:00   # walltime
 
-#SBATCH --nodes=10   # number of nodes
+#SBATCH --nodes=2   # number of nodes
 #SBATCH --ntasks-per-node=8  # number of processor cores (i.e. tasks)
 #SBATCH --mem-per-cpu=8G
+##SBATCH --mem=16G
 
-#SBATCH -J "SONY VIP Optimization Code"   # job name
+#SBATCH -J "v2_nia_v4 test_cluster"   # job name
 
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=BEGIN
@@ -21,6 +22,6 @@
 ## Load relevant modules
 # source /home/${USER}/.bashrc
 # source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
-source activate vipdopt-dev
+source activate vipdopt3.10
 
 xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize "runs/test_run" "processed_config.yml"
