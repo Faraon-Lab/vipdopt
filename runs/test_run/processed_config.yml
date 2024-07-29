@@ -4,27 +4,28 @@ start_from_step: 0
 shelf_fn: save_state
 restart_epoch: 0
 restart_iter: 0
+pull_sim_files_from_debug_folder: False
 lumapi_filepath_local: C:\Program Files\Lumerical\v212\api\python\lumapi.py
 lumapi_filepath_hpc: /central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py
 simulator_name: LumericalFDTD
-simulator_dimension: 3D
+simulator_dimension: 2D
 simulator_max_wait_time: 3600
 use_autograd: False
 convert_existing: False
-mesh_spacing_um: 0.03
-geometry_spacing_lateral_um: 0.06
-device_scale_um: 0.06
+mesh_spacing_um: 0.051
+geometry_spacing_lateral_um: 0.085
+device_scale_um: 0.051
 use_smooth_blur: False
-min_feature_size_um: 0.06
-background_index: 1
-min_device_index: 1
-max_device_index: 2.0
+min_feature_size_um: 0.085
+background_index: 1.5
+min_device_index: 1.5
+max_device_index: 2.4
 init_permittivity_0_1_scale: 0.5
 binarize_3_levels: False
 focal_plane_center_lateral_um: 0
 num_vertical_layers: 20
-vertical_layer_height_um: 0.06
-device_size_lateral_um: 1.2
+vertical_layer_height_um: 0.102
+device_size_lateral_um: 2.04
 device_vertical_minimum_um: 0
 substrates_above_device: [{'name': 'glass_substrate', 'thickness_um': 0.4, 'material': 'SiO2 (Glass) - Palik'}]
 substrate_thickness_um: 0.4
@@ -39,8 +40,8 @@ lambda_min_um: 0.4
 lambda_max_um: 0.7
 lambda_min_eval_um: 0.4
 lambda_max_eval_um: 0.7
-num_bands: 3
-num_points_per_band: 20
+num_bands: 2
+num_points_per_band: 15
 num_dispersive_ranges: 1
 add_pdaf: False
 pdaf_angle_phi_degrees: 45
@@ -48,7 +49,7 @@ pdaf_angle_theta_degrees: -8
 pdaf_adj_src_idx: 0
 fdtd_simulation_time_fs: 600
 weight_by_individual_wavelength: True
-use_gaussian_sources: False
+use_gaussian_sources: True
 use_airy_approximation: True
 f_number: 2.2
 airy_correction_factor: 0.84
@@ -59,13 +60,14 @@ xy_phi_rotations: [0, 90]
 xy_adjtheta_rotations: [90, 0]
 xy_pol_rotations: [0, 90]
 xy_names: ['x', 'y']
-num_focal_spots: 4
+use_source_aperture: True
+num_focal_spots: 2
 dispersive_range_to_adjoint_src_map: [[0, 1, 2, 3]]
 adjoint_src_to_dispersive_range_map: [0, 0, 0, 0]
 enforce_xy_gradient_symmetry: False
 weight_by_quadrant_transmission: True
-total_num_iterations: 80
-epoch_list: [0, 16, 32, 48, 64, 80]
+total_num_iterations: 1
+epoch_list: [0, 1]
 epoch_start_design_change_max: 0.15
 epoch_end_design_change_max: 0.05
 epoch_start_design_change_min: 0.05
@@ -83,14 +85,13 @@ weight_focal_plane_map_performance_weighting: [1.0, 1.0, 1.0, 1.0]
 weight_focal_plane_map: [1.0, 1.0, 1.0, 1.0]
 do_green_balance: False
 polarization_name_to_idx: {'x': 0, 'y': 1, 'z': 2}
-desired_peaks_per_band_um: [0.45, 0.55, 0.65]
+desired_peaks_per_band_um: [0.475, 0.625]
 explicit_band_centering: True
 shuffle_green: False
 infrared_center_um: 0.94
 do_rejection: False
 softplus_kappa: 2
 boundary_conditions: pml
-use_source_aperture: True
 evaluate_bordered_extended: False
 do_normalize: False
 should_fix_layers: False
@@ -102,7 +103,7 @@ nprocs: 8
 optimizer: AdamOptimizer
 optimizer_settings: {'step_size': 0.01, 'betas': [0.9, 0.999], 'eps': '1e-8', 'moments': [0.0, 0.0]}
 fom_dict: [{'fwd': [0], 'adj': [0], 'freq_idx_opt': 'f_bin_all', 'freq_idx_restricted_opt': []}, {'fwd': [0], 'adj': [2], 'freq_idx_opt': 'f_bin_all', 'freq_idx_restricted_opt': []}]
-figures_of_merit: {'fom_0': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_0x'], 'fom_monitors': ['focal_monitor_0', 'transmission_monitor_0', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}, 'fom_1': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_1x'], 'fom_monitors': ['focal_monitor_1', 'transmission_monitor_1', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}, 'fom_2': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_2x'], 'fom_monitors': ['focal_monitor_2', 'transmission_monitor_2', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}, 'fom_3': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_3x'], 'fom_monitors': ['focal_monitor_3', 'transmission_monitor_3', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}}
+figures_of_merit: {'fom_0': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_0x'], 'fom_monitors': ['focal_monitor_0', 'transmission_monitor_0', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}, 'fom_1': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_1x'], 'fom_monitors': ['focal_monitor_1', 'transmission_monitor_1', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}}
 
 
 #
@@ -115,78 +116,78 @@ min_feature_size_voxels: 1.0
 blur_half_width_voxels: 0
 
 #* Optical Properties
-min_device_permittivity: 1
-max_device_permittivity: 4.0
-focal_length_um: 1.7999999999999998
-focal_plane_center_vertical_um: -1.7999999999999998
+min_device_permittivity: 2.25
+max_device_permittivity: 5.76
+focal_length_um: 1.5299999999999998
+focal_plane_center_vertical_um: -1.5299999999999998
 
 #* Device Properties
-vertical_layer_height_voxels: 1
-device_size_vertical_um: 1.2
-device_voxels_lateral: 20
-device_voxels_vertical: 20
+vertical_layer_height_voxels: 2
+device_size_vertical_um: 2.04
+device_voxels_lateral: 24
+device_voxels_vertical: 40
 device_voxels_simulation_mesh_lateral: 41
                             
 device_voxels_simulation_mesh_vertical: 42
-device_vertical_maximum_um: 1.2
-device_size_lateral_bordered_um: 1.2
+device_vertical_maximum_um: 2.04
+device_size_lateral_bordered_um: 2.04
 device_voxels_simulation_mesh_lateral_bordered: 41
-border_size_um: 0.3
-border_size_voxels: 5
-device_voxels_lateral_bordered: 20
+border_size_um: 0.255
+border_size_voxels: 3
+device_voxels_lateral_bordered: 24
 
 #* FDTD Properties
 
-vertical_gap_size_um: 1.5
-lateral_gap_size_um: 0.6
-fdtd_region_size_vertical_um: 6.0
-fdtd_region_size_lateral_um: 2.4
-fdtd_region_maximum_vertical_um: 2.7
-fdtd_region_minimum_vertical_um: -3.3
+vertical_gap_size_um: 2.125
+lateral_gap_size_um: 0.51
+fdtd_region_size_vertical_um: 7.82
+fdtd_region_size_lateral_um: 3.06
+fdtd_region_maximum_vertical_um: 4.165
+fdtd_region_minimum_vertical_um: -3.655
 
 #* Surrounding Properties
-pec_aperture_thickness_um: 0.09
+pec_aperture_thickness_um: 0.153
 substrate_thickness_um: 0.4
-sidewall_x_positions_um: [0.6425, 0, -0.6425, 0]
-sidewall_y_positions_um: [0, 0.6425, 0, -0.6425]
-sidewall_xspan_positions_um: [0.085, 1.3699999999999999, 0.085, 1.3699999999999999]
-sidewall_yspan_positions_um: [1.3699999999999999, 0.085, 1.3699999999999999, 0.085]
+sidewall_x_positions_um: [1.0625, 0, -1.0625, 0]
+sidewall_y_positions_um: [0, 1.0625, 0, -1.0625]
+sidewall_xspan_positions_um: [0.085, 2.21, 0.085, 2.21]
+sidewall_yspan_positions_um: [2.21, 0.085, 2.21, 0.085]
 
 #* Spectral Properties
 bandwidth_um: 0.29999999999999993
-num_design_frequency_points: 60
-num_eval_frequency_points: 360
-lambda_values_um: [0.4, 0.40508474576271186, 0.41016949152542376, 0.4152542372881356, 0.4203389830508475, 0.42542372881355933, 0.43050847457627117, 0.43559322033898307, 0.4406779661016949, 0.4457627118644068, 0.45084745762711864, 0.45593220338983054, 0.4610169491525424, 0.4661016949152542, 0.4711864406779661, 0.47627118644067795, 0.48135593220338985, 0.4864406779661017, 0.4915254237288136, 0.4966101694915254, 0.5016949152542373, 0.5067796610169492, 0.511864406779661, 0.5169491525423728, 0.5220338983050847, 0.5271186440677966, 0.5322033898305085, 0.5372881355932203, 0.5423728813559322, 0.547457627118644, 0.5525423728813559, 0.5576271186440678, 0.5627118644067797, 0.5677966101694916, 0.5728813559322034, 0.5779661016949152, 0.583050847457627, 0.5881355932203389, 0.5932203389830508, 0.5983050847457627, 0.6033898305084746, 0.6084745762711864, 0.6135593220338983, 0.6186440677966101, 0.623728813559322, 0.6288135593220339, 0.6338983050847458, 0.6389830508474577, 0.6440677966101694, 0.6491525423728813, 0.6542372881355931, 0.659322033898305, 0.6644067796610169, 0.6694915254237288, 0.6745762711864407, 0.6796610169491525, 0.6847457627118644, 0.6898305084745762, 0.6949152542372881, 0.7]
-max_intensity_by_wavelength: [4.0, 3.9002118310253677, 3.804111741001298, 3.711520199916702, 3.622268470343392, 3.5361978381295542, 3.4531589063178134, 3.3730109464185687, 3.2956213017751486, 3.2208648382946117, 3.1486234382949863, 3.078785533643814, 3.011245674740485, 2.9459041322314055, 2.8826665286475857, 2.821443497422779, 2.7621503669906766, 2.7047068678750508, 2.649036860879905, 2.595068084660276, 2.5427319211103, 2.49196317714567, 2.442699881584141, 2.394883095941952, 2.3484567380671284, 2.303367417623887, 2.2595642825266746, 2.2169988754988115, 2.175625, 2.135398594829818, 2.096277616771426, 2.0582219306916976, 2.0211932065611844, 1.9851548229004232, 1.9500717761983128, 1.9159105958841085, 1.8826392644672802, 1.8502271424893493, 1.818644897959184, 1.7878644399682209, 1.7578588562050244, 1.7286023541096056, 1.7000702054271852, 1.672238693938826, 1.6450850661625716, 1.6185874848337347, 1.5927249849867027, 1.5674774324733167, 1.5428254847645435, 1.5187505538929302, 1.4952347714032599, 1.4722609551879784, 1.4498125780924618, 1.4278737381829838, 1.406429130577511, 1.3854640207461402, 1.3649642191941969, 1.3449160574467707, 1.325306365258775, 1.3061224489795922]
+num_design_frequency_points: 30
+num_eval_frequency_points: 180
+lambda_values_um: [0.4, 0.41034482758620694, 0.4206896551724138, 0.4310344827586207, 0.4413793103448276, 0.4517241379310345, 0.4620689655172414, 0.4724137931034483, 0.4827586206896552, 0.49310344827586206, 0.503448275862069, 0.5137931034482759, 0.5241379310344827, 0.5344827586206896, 0.5448275862068965, 0.5551724137931034, 0.5655172413793104, 0.5758620689655172, 0.5862068965517241, 0.596551724137931, 0.6068965517241379, 0.6172413793103448, 0.6275862068965516, 0.6379310344827586, 0.6482758620689655, 0.6586206896551724, 0.6689655172413793, 0.6793103448275861, 0.6896551724137931, 0.7]
+max_intensity_by_wavelength: [46.24, 43.93795918367347, 41.8036441816716, 39.82114816, 37.976406250000004, 36.25694539945225, 34.65167297839162, 33.150697426607714, 31.745175510204085, 30.42718176927968, 29.189596547194597, 28.026009639205444, 26.930637119113584, 25.898249323621236, 24.92410831597501, 24.00391342926585, 23.13375371802499, 22.310066334397085, 21.52960000000001, 20.789382872798964, 20.086694214876037, 19.41903935582535, 18.784127520830825, 18.179852154857567, 17.60427342689, 17.05560264247143, 16.532188330322036, 16.0325038006648, 15.555136000000001, 15.098775510204087]
 dispersive_range_size_um: 0.29999999999999993
 dispersive_ranges_um: [[0.4, 0.7]]
 
 #* PDAF Functionality Properties
-pdaf_focal_spot_x_um: 0.3
-pdaf_focal_spot_y_um: 0.3
+pdaf_focal_spot_x_um: 0.51
+pdaf_focal_spot_y_um: 0.51
 pdaf_lambda_min_um: 0.4
 pdaf_lambda_max_um: 0.5
-pdaf_lambda_values_um: [0.4, 0.4016949152542373, 0.4033898305084746, 0.40508474576271186, 0.4067796610169492, 0.40847457627118644, 0.41016949152542376, 0.411864406779661, 0.41355932203389834, 0.4152542372881356, 0.4169491525423729, 0.4186440677966102, 0.4203389830508475, 0.42203389830508475, 0.42372881355932207, 0.42542372881355933, 0.42711864406779665, 0.4288135593220339, 0.43050847457627117, 0.4322033898305085, 0.4338983050847458, 0.43559322033898307, 0.43728813559322033, 0.43898305084745765, 0.4406779661016949, 0.4423728813559322, 0.4440677966101695, 0.4457627118644068, 0.44745762711864406, 0.4491525423728814, 0.45084745762711864, 0.45254237288135596, 0.4542372881355932, 0.45593220338983054, 0.4576271186440678, 0.45932203389830506, 0.4610169491525424, 0.4627118644067797, 0.46440677966101696, 0.4661016949152542, 0.46779661016949153, 0.46949152542372885, 0.4711864406779661, 0.4728813559322034, 0.4745762711864407, 0.47627118644067795, 0.47796610169491527, 0.47966101694915253, 0.48135593220338985, 0.4830508474576271, 0.4847457627118644, 0.4864406779661017, 0.48813559322033895, 0.48983050847457626, 0.4915254237288136, 0.49322033898305084, 0.4949152542372881, 0.4966101694915254, 0.49830508474576274, 0.5]
-pdaf_max_intensity_by_wavelength: [4.0, 3.9663159393971767, 3.9330555751712453, 3.9002118310253677, 3.8677777777777775, 3.8357466297067893, 3.804111741001298, 3.772866602313334, 3.742004837409299, 3.711520199916702, 3.681406570163263, 3.651657952105428, 3.622268470343392, 3.593232367219884, 3.564544, 3.5361978381295542, 3.508188460569413, 3.480510553203456, 3.4531589063178134, 3.4261284121491737, 3.3994140624999996, 3.3730109464185687, 3.3469142479418315, 3.3211192438991666, 3.2956213017751486, 3.2704158776295125, 3.245498514072607, 3.2208648382946117, 3.196510560146924, 3.1724314702741188, 3.1486234382949863, 3.125082411031155, 3.101804410781912, 3.078785533643814, 3.0560219478738007, 3.0335098922944956, 3.011245674740485, 2.989225670544352, 2.967446321061325, 2.9459041322314055, 2.924595673177904, 2.9035175748413247, 2.8826665286475857, 2.862039285209595, 2.8416326530612244, 2.821443497422779, 2.8014687389970327, 2.7817053527950164, 2.7621503669906766, 2.7428008618036324, 2.7236539684092134, 2.7047068678750508, 2.6859567901234573, 2.6674010129189067, 2.649036860879905, 2.6308617045145906, 2.6128729592794153, 2.595068084660276, 2.5774445832754873, 2.5600000000000005]
+pdaf_lambda_values_um: [0.4, 0.403448275862069, 0.40689655172413797, 0.41034482758620694, 0.41379310344827586, 0.41724137931034483, 0.4206896551724138, 0.4241379310344828, 0.42758620689655175, 0.4310344827586207, 0.4344827586206897, 0.4379310344827586, 0.4413793103448276, 0.44482758620689655, 0.4482758620689655, 0.4517241379310345, 0.45517241379310347, 0.45862068965517244, 0.4620689655172414, 0.46551724137931033, 0.4689655172413793, 0.4724137931034483, 0.47586206896551725, 0.4793103448275862, 0.48275862068965514, 0.4862068965517241, 0.4896551724137931, 0.49310344827586206, 0.496551724137931, 0.5]
+pdaf_max_intensity_by_wavelength: [46.24, 45.4529505442326, 44.68582591209423, 43.93795918367347, 43.20871111111112, 42.497468752134424, 41.8036441816716, 41.126673276488866, 40.46601456815818, 39.82114816, 39.19157470395565, 38.576814433628876, 37.976406250000004, 37.38990685655911, 36.81688994082841, 36.25694539945225, 35.70967860422407, 35.17470970659732, 34.65167297839162, 34.140216186556934, 33.64000000000001, 33.150697426607714, 32.67199327872296, 32.203583665441755, 31.745175510204092, 31.296486092248887, 30.857242610593147, 30.42718176927968, 30.006049382716053, 29.593600000000006]
 
 #* Forward (Input) Source Properties
-lateral_aperture_um: 1.32
-src_maximum_vertical_um: 2.45
-src_minimum_vertical_um: -2.55
+lateral_aperture_um: 2.244
+src_maximum_vertical_um: 3.810833333333333
+src_minimum_vertical_um: -2.5925
 mid_lambda_um: 0.55
 gaussian_waist_radius_um: 1
 source_angle_theta_rad: 0.0
 source_angle_theta_deg: 0.0
 
 #* Adjoint Source Properties
-adjoint_vertical_um: -1.7999999999999998
-num_adjoint_sources: 4
-adjoint_x_positions_um: [0.3, -0.3, -0.3, 0.3]
-adjoint_y_positions_um: [0.3, 0.3, -0.3, -0.3]
+adjoint_vertical_um: -1.5299999999999998
+num_adjoint_sources: 2
+adjoint_x_positions_um: [0.51, -0.51, -0.51, 0.51]
+adjoint_y_positions_um: [0.51, 0.51, -0.51, -0.51]
 
 #* Optimization Properties
-total_iters: 80 
+total_iters: 1 
 epoch_range_design_change_max: 0.09999999999999999
 epoch_range_design_change_min: 0.05
-spectral_focal_plane_map: [[0, 20], [20, 40], [40, 60], [20, 40]]
-desired_peak_location_per_band: [10, 30, 49]
+spectral_focal_plane_map: [[0, 15], [15, 30], [30, 45], [15, 30]]
+desired_peak_location_per_band: [7, 22]

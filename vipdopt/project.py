@@ -320,8 +320,8 @@ class Project:
                         cfg['device_voxels_vertical'],
                     ),
                     'z': np.linspace(
-                        -0.5 * cfg['mesh_spacing_um'] * 1e-6,
-                        0.5 * cfg['mesh_spacing_um'] * 1e-6,
+                        -1.5 * cfg['mesh_spacing_um'],
+                        1.5 * cfg['mesh_spacing_um'],
                         3,
                     ),
                 })

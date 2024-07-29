@@ -251,10 +251,22 @@ class LumericalFDTD(ISolver):
         for obj in sim.objects.values():
             # Create an object for each of those in the simulation
             with contextlib.suppress(BaseException):
+                # LumericalSimObjectType.get_add_function(obj.obj_type)(
+                #     self.fdtd,
+                #     **obj.properties,
+                # )     
+                # Some property in the obj.properties dictionary is inactive, which breaks everything after it.
+                # So instead we must add just the object, then set each property individually.
                 LumericalSimObjectType.get_add_function(obj.obj_type)(
-                    self.fdtd,
-                    **obj.properties,
+                    self.fdtd, {'name': obj.name}
                 )
+                for p, r in obj.properties.items():
+                    try:
+                        self.fdtd.setnamed(obj.name, p, r)
+                    except Exception as err:
+                        # vipdopt.logger.debug(err + f": {p}")
+                        pass
+                    
                 # Import nk2 if possible
                 if isinstance(obj, Import) and obj.n is not None:
                     self.importnk2(obj.name, *obj.get_nk2())

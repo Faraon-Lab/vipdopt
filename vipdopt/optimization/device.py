@@ -465,9 +465,9 @@ class Device:
 
         gradient_region_x = 1e-6 * np.linspace(self.coords['x'][0], self.coords['x'][-1], g.shape[0]) #cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
         gradient_region_y = 1e-6 * np.linspace(self.coords['y'][0], self.coords['y'][-1], g.shape[1])
-        try:
+        if dimension in '3D':
             gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], g.shape[2])
-        except IndexError as err:	# 2D case
+        elif dimension in '2D':
             gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], 3)
         design_region_geometry = np.array(np.meshgrid(1e-6*self.coords['x'], 1e-6*self.coords['y'], 1e-6*self.coords['z'], indexing='ij')
                             ).transpose((1,2,3,0))
@@ -480,6 +480,11 @@ class Device:
             design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
                                                 g,
                                                 design_region_geometry, method='linear' )
+
+        try:
+            design_gradient_interpolated = np.squeeze(design_gradient_interpolated, axis=3)
+        except Exception as err:
+            pass
 
         return design_gradient_interpolated
 
