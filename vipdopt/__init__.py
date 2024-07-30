@@ -5,17 +5,17 @@ import logging
 from getpass import getuser
 from types import ModuleType
 from typing import Any
+from configparser import ConfigParser
+from pathlib import Path
 
 from vipdopt.utils import import_lumapi
 
+LUMERICAL_LOCATION_FILE = Path(__file__).parent / 'lumerical.cfg'
 fdtd: Any = None
 logger: logging.Logger = logging.getLogger()
 
-try:
-    lumapi: ModuleType | None = import_lumapi(
-        f'/central/home/{getuser()}/lumerical/v232/api/python/lumapi.py'
-        # 'C:\\Program Files\\Lumerical\\v221\\api\\python\\lumapi.py'
-    )
-except FileNotFoundError:
-    # logger.exception('lumapi not found. Using dummy values\n')
-    lumapi = None
+cfg = ConfigParser()
+cfg.read(LUMERICAL_LOCATION_FILE)
+lumapi_path = cfg['Lumerical']['lumapi_path']
+
+lumapi: ModuleType = import_lumapi(lumapi_path)
