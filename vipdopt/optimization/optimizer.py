@@ -3,6 +3,7 @@
 import abc
 
 import numpy.typing as npt
+import numpy as np
 
 from vipdopt.optimization.device import Device
 
@@ -39,7 +40,7 @@ class GradientAscentOptimizer(GradientOptimizer):
         grad = device.backpropagate(gradient)
         w_hat = device.get_design_variable() + self.step_size * grad
 
-        device.set_design_variable(w_hat)
+        device.set_design_variable(device.clip(w_hat))
     
     # TODO: For Gradient Descent/Ascent only: Need to check whether it's respecting the epochs and everything. 
     # todo: At the moment this is implemented in a way where it doesn't respect the epoch maximums and minimums.
