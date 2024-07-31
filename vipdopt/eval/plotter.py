@@ -1385,6 +1385,8 @@ def plot_sorting_transmission_sweep_1d(
 
     return sp.fig, sp.ax
 
+def close_all():
+    plt.close('all')
 
 if __name__ == '__main__':
     plot_directory_location = 'plots'

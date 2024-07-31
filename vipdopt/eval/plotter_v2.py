@@ -11,12 +11,14 @@ import copy
 import os
 import sys
 
+import matplotlib
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
 from matplotlib.ticker import (  # type: ignore
     AutoMinorLocator,
 )
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # type: ignore 
+matplotlib.use('TkAgg')
 
 # Custom Classes and Imports
 sys.path.append(os.path.dirname(__file__))
@@ -580,10 +582,10 @@ def plot_quadrant_transmission_trace(
 
 def plot_individual_quadrant_transmission(f, r, plot_directory_location, iteration):
     """Plot the most updated quadrant transmission."""
-    f = f[iteration]
-    np.max(f)
+    # f = f[iteration]
+    # np.max(f)
 
-    num_adjoint_src = 4
+    num_adjoint_src = f.shape[0]
     lambda_vector = copy.deepcopy(TEMPLATE_R_VECTOR)
     lambda_vector.update({
         'var_name': 'Wavelength',
@@ -604,10 +606,10 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, iterati
         'title': 'Quadrant Transmissions - Trace',
     }
 
-    # plot_subfolder_name = 'quad_trans'
-    # plot_directory_location = plot_directory_location / plot_subfolder_name
-    # if not os.path.isdir(plot_directory_location):
-    #     os.makedirs(plot_directory_location)
+    plot_subfolder_name = 'quad_trans'
+    plot_directory_location = plot_directory_location / plot_subfolder_name
+    if not os.path.isdir(plot_directory_location):
+        os.makedirs(plot_directory_location)
 
     bp = BasicPlot(plot_data)
     fig, ax = bp.fig, bp.ax
@@ -761,7 +763,7 @@ def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs=No
                 'var_name': f'F{adj_src}',
                 'var_values': f[adj_src, :, wl_idx],
             })
-        plot_data = {'r': [r_vector], 'f': quad_trace, 'title': 'E-field Plot'}
+        plot_data = {'r': [r_vector], 'f': quad_trace, 'title': f'E-field at Focal Plane, {int(1e9 * wl[wl_idx]):.3f}nm'}
 
         bp = BasicPlot(plot_data)
         # bp.plot_config['y_axis']['limits'] = [0.0, 1.0]
@@ -773,7 +775,7 @@ def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs=No
         bp.export_plot_config(
             plot_directory_location,
             'Efield_plots',
-            f'Enorm_wl{int(1e9 * wl[wl_idx])}nm_i{iteration}',
+            f'Enorm_wl{int(1e9 * wl[wl_idx]):.3f}nm_i{iteration}',
         )
 
 
@@ -1386,6 +1388,9 @@ def plot_sorting_transmission_sweep_1d(
     sp.export_plot_config(plot_folder, '', 'sorting_trans_eff_sweep_', slice_coords)
 
     return sp.fig, sp.ax
+
+def close_all():
+    plt.close('all')
 
 
 if __name__ == '__main__':

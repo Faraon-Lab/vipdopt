@@ -23,7 +23,7 @@ sys.path.insert(0, path)
 
 from pathlib import Path
 
-from vipdopt.gui import start_gui
+# from vipdopt.gui import start_gui
 from vipdopt.project import Project
 
 if __name__ == '__main__':
@@ -110,15 +110,19 @@ if __name__ == '__main__':
         vipdopt.lumapi = import_lumapi(
             project.config.data['lumapi_filepath_local']
         )  # Windows (local machine)
+        vipdopt.logger.info(f'Local Lumapi path is: {project.config.data["lumapi_filepath_local"]}')
+        hide_fdtd=False
     else:
         vipdopt.lumapi = import_lumapi(
             project.config.data['lumapi_filepath_hpc']
         )  # HPC (Linux)
+        vipdopt.logger.info(f'HPC Lumapi path is: {project.config.data["lumapi_filepath_hpc"]}')
+        hide_fdtd=True
 
     fdtd = project.optimization.fdtd    # NOTE: - the instantiation is called in optimization.py
     vipdopt.fdtd = fdtd      # Makes it available to global
 
-    fdtd.connect(hide=False) # True)
+    fdtd.connect(hide=hide_fdtd)
     project.start_optimization()
     
     # STL Export final design

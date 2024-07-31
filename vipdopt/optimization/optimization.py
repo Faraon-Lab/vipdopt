@@ -96,6 +96,7 @@ class LumericalOptimization:
             self.fom_hist.update( {f'{metric}_overall': []} )
             for i, f in enumerate(self.fom.foms):
                 self.fom_hist.update( {f'{metric}_{i}': []} )
+        self.fom_hist.update( {'intensity_overall_xyzwl': []} )
         self.param_hist.update({'design': []})
 
         # Setup callback functions
@@ -200,70 +201,69 @@ class LumericalOptimization:
     def generate_plots(self):
         """Generate the plots and save to file."""
         folder = self.dirs['opt_plots']
-        
-        # Placeholder indiv_quad_trans
-        getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
+        iteration = self.iteration if self.iteration==self.epoch_list[-1] else self.iteration+1
 
-    #     # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
+        # Placeholder indiv_quad_trans
+        import matplotlib.pyplot as plt
+        getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
+        # self.generate_plots_efield_focalplane_1d()
+
+        # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
 
         # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
         fom_fig = plotter_v2.plot_fom_trace(
             np.array(self.fom_hist['intensity_overall']).reshape(
-                            (self.iteration+1, -1, self.cfg['num_design_frequency_points'])
+                            (iteration, -1)
                             ),
             folder, self.epoch_list
         )
         quad_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
-            np.array([self.fom_hist[f'transmission_{x}'] for x in ['overall',0,1]]).reshape(
-                            (self.iteration+1, -1, self.cfg['num_design_frequency_points'])
+            np.array([self.fom_hist[f'transmission_{x}'] for x in [0,1]]).reshape(
+                            (iteration, -1, self.cfg['num_design_frequency_points'])
                             ),
             folder, self.epoch_list
         )
         overall_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
             np.array(self.fom_hist['transmission_overall']).reshape(
-                            (self.iteration+1, -1, self.cfg['num_design_frequency_points'])
+                            (iteration, -1, self.cfg['num_design_frequency_points'])
                             ),
             folder, self.epoch_list,
             filename='overall_trans_trace',
         )
 
-    #     # TODO: code this to pull the forward sim for FoM_0 i.e. forward_src_x in this case but not EVERY case.
-    #     # self.runner_sim.fdtd.load(
-    #     #     self.foms[0].fom_monitors[0].sim.info['path']
-    #     # )  # untested
-    #     self.runner_sim.fdtd.load(self.sim_files[0].name)
-    #     e_focal = self.runner_sim.getresult('transmission_focal_monitor_', 'E')
-    #     if self.cfg['simulator_dimension'] == '2D':
-    #         intensity_fig = plotter.plot_Enorm_focal_2d(
-    #             np.sum(np.abs(np.squeeze(e_focal['E'])) ** 2, axis=-1),
-    #             e_focal['x'],
-    #             e_focal['lambda'],
-    #             folder,
-    #             self.iteration,
-    #             wl_idxs=[7, 22],
-    #         )
-    #     elif self.cfg['simulator_dimension'] == '3D':
-    #         intensity_fig = plotter.plot_Enorm_focal_3d(
-    #             np.sum(np.abs(np.squeeze(e_focal['E'])) ** 2, axis=-1),
-    #             e_focal['x'],
-    #             e_focal['y'],
-    #             e_focal['lambda'],
-    #             folder,
-    #             self.iteration,
-    #             wl_idxs=[9, 29, 49],
-    #         )
+        if self.cfg['simulator_dimension'] == '2D':
+            intensity_f = np.squeeze(self.fom_hist.get('intensity_overall_xyzwl')[-1])
+            spatial_x = np.linspace(self.device.coords['x'][0], self.device.coords['x'][-1], intensity_f.shape[0])
+            intensity_fig = plotter_v2.plot_Enorm_focal_2d(
+                intensity_f,
+                spatial_x,
+                self.cfg['lambda_values_um'],
+                folder,
+                iteration,
+                wl_idxs=[7, 22]
+            )
+        # elif self.cfg['simulator_dimension'] == '3D':
+            # intensity_fig = plotter.plot_Enorm_focal_3d(
+            #     np.sum(np.abs(np.squeeze(e_focal['E'])) ** 2, axis=-1),
+            #     e_focal['x'],
+            #     e_focal['y'],
+            #     e_focal['lambda'],
+            #     folder,
+            #     self.iteration,
+            #     wl_idxs=[9, 29, 49],
+            # )
 
-    #         indiv_trans_fig = plotter.plot_individual_quadrant_transmission(
-    #             self.fom_evolution['transmission'],
-    #             self.cfg['lambda_values_um'],
-    #             folder,
-    #             self.iteration,
-    #         )  # continuously produces only one plot per epoch to save space
+        indiv_trans_fig = plotter_v2.plot_individual_quadrant_transmission(
+            np.array([self.fom_hist[f'transmission_{x}'][-1] for x in [0,1]]),
+            self.cfg['lambda_values_um'],
+            folder,
+            self.iteration,
+        )  # continuously produces only one plot per epoch to save space
 
-    #     cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
-    #     final_device_layer_fig, _ = plotter.visualize_device(
-    #         cur_index, folder, iteration=self.iteration
-    #     )
+        cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
+        final_device_layer_fig, _ = plotter_v2.visualize_device(
+            cur_index, folder, iteration=iteration
+        )
 
     #     # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
     #     # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
@@ -275,17 +275,20 @@ class LumericalOptimization:
             pickle.dump(quad_trans_fig, f)
         with (folder / 'overall_trans.pkl').open('wb') as f:
             pickle.dump(overall_trans_fig, f)
-    #     with (folder / 'enorm.pkl').open('wb') as f:
-    #         pickle.dump(intensity_fig, f)
-    #     with (folder / 'indiv_trans.pkl').open('wb') as f:
-    #         pickle.dump(indiv_trans_fig, f)
-    #     with (folder / 'final_device_layer.pkl').open('wb') as f:
-    #         pickle.dump(final_device_layer_fig, f)
+        with (folder / 'enorm.pkl').open('wb') as f:
+            pickle.dump(intensity_fig, f)
+        with (folder / 'indiv_trans.pkl').open('wb') as f:
+            pickle.dump(indiv_trans_fig, f)
+        with (folder / 'final_device_layer.pkl').open('wb') as f:
+            pickle.dump(final_device_layer_fig, f)
     #     # TODO: rest of the plots
-        
+
+        plotter_v2.close_all()
+
     def generate_plots_3d_v2(self):
         import matplotlib.pyplot as plt
-        
+        plt.close('all')
+
         quad_trans = []
         quad_colors = ['blue','xkcd:grass green','red','xkcd:olive green','black','green']
         quad_labels = ['B','G1','R','G2','Total','G1+G2']
@@ -302,7 +305,7 @@ class LumericalOptimization:
             plt.plot(self.cfg['lambda_values_um'], quad_trans[num], linestyle='--', color=quad_colors[num], label=quad_labels[num])
 
         plt.plot(self.cfg['lambda_values_um'], quad_trans[-2], color='black', label=f'Overall')
-        plt.hlines(0.225, self.cfg['lambda_values_um'][0], self.cfg['lambda_values_um'][-1], 
+        plt.hlines(0.225, self.cfg['lambda_values_um'][0], self.cfg['lambda_values_um'][-1],
                     color='black', linestyle='--',label="22.5%")
         # Put a legend to the right of the current axis
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -312,10 +315,11 @@ class LumericalOptimization:
         plt.title('PML BCs')
         plt.tight_layout()
         plt.savefig(self.dirs['opt_plots'] / f'quad_trans_i{self.iteration}.png', bbox_inches='tight')
-    
+
     def generate_plots_2d_v2(self):
         import matplotlib.pyplot as plt
-        
+        plt.close('all')
+
         quad_trans = []
         quad_colors = ['blue','red','black']
         quad_labels = ['B','R','Overall']
@@ -328,8 +332,8 @@ class LumericalOptimization:
         fig, ax = plt.subplots()
         for idx, num in enumerate([0,1,-1]):
             plt.plot(self.cfg['lambda_values_um'], quad_trans[num], color=quad_colors[num], label=quad_labels[num])
-            
-        # plt.hlines(0.225, self.cfg['lambda_values_um'][0], self.cfg['lambda_values_um'][-1], 
+
+        # plt.hlines(0.225, self.cfg['lambda_values_um'][0], self.cfg['lambda_values_um'][-1],
         #             color='black', linestyle='--',label="22.5%")
         # Put a legend to the right of the current axis
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -339,6 +343,25 @@ class LumericalOptimization:
         plt.title('PML BCs')
         plt.tight_layout()
         plt.savefig(self.dirs['opt_plots'] / f'quad_trans_i{self.iteration}.png', bbox_inches='tight')
+
+    def generate_plots_efield_focalplane_1d(self):
+        import matplotlib.pyplot as plt
+        plt.close('all')
+
+        fig, ax = plt.subplots()
+        intensity = np.squeeze(self.fom_hist.get('intensity_overall_xyzwl')[-1])
+        spatial_x = np.linspace(self.device.coords['x'][0], self.device.coords['x'][-1], intensity.shape[0])
+        for peak_ind in self.cfg['desired_peak_location_per_band']:
+            wl = self.cfg['lambda_values_um'][peak_ind]
+            plt.plot(spatial_x, intensity[:, peak_ind], label='spatial')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            # plt.ylim([0,1])
+            plt.xlabel('x (um)')
+            plt.ylabel('Intensity')
+            plt.title(f'E-field at Focal Plane, {wl:.3f}um')
+            plt.tight_layout()
+            plt.savefig(self.dirs['opt_plots'] / f'efield_focal_wl{wl:.3f}um_i{self.iteration}.png', bbox_inches='tight')
+            plt.close()
 
     def _pre_run(self):
         """Final pre-processing before running the optimization."""
@@ -987,7 +1010,7 @@ class LumericalOptimization:
                 # TODO: saving out
                 # self.optimizer.save_opt()
 
-                self.generate_plots_3d_v2()
+                self.generate_plots()
                 self.iteration += 1
 
             if not self.loop:
@@ -1191,7 +1214,7 @@ class LumericalOptimization:
                 # If true, we're in debugging mode and it means no simulations are run.
                 # Data is instead pulled from finished simulation files in the debug folder.
                 # If false, run jobs and check that they all ran to completion.
-                if True: # self.cfg['pull_sim_files_from_debug_folder']:
+                if self.cfg['pull_sim_files_from_debug_folder']:
                     for sim in chain(fwd_sims, adj_sims):
                         sim_file = self.dirs['debug_completed_jobs'] / f'{sim.info["name"]}.fsp'
                         sim.set_path(sim_file)
@@ -1228,6 +1251,8 @@ class LumericalOptimization:
                 [self.fom_hist.get(f'transmission_{idx}').append(t_i) for idx,t_i in enumerate(t)]
                 self.fom_hist.get('transmission_overall').append(np.squeeze(np.sum(t, 0)))
                 # [plt.plot(np.squeeze(t_i)) for t_i in t]
+                intensity = np.sum(np.square(np.abs(fwd_sims[0].monitors()[4].e)), axis=0)
+                self.fom_hist.get('intensity_overall_xyzwl').append(intensity)
 
                 # # Here is where we would start plotting the loss landscape. Probably should be accessed by a separate class...
                 # # Or we could move it to the device step part
@@ -1239,14 +1264,9 @@ class LumericalOptimization:
                     apply_performance_weights=True,
                     **self.grad_kwargs,
                 )
-                 # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
-                g /= np.array(self.cfg['max_intensity_by_wavelength'])
-                # vipdopt.logger.debug(f'Gradient: {g}')
-
-                # Process gradient accordingly for application to device through optimizer.
-
-                g = np.sum(g, -1)   # Sum over wavelength
                 vipdopt.logger.info(f'Design_gradient has average {np.mean(g)}, max {np.max(g)}')
+
+                #* Process gradient accordingly for application to device through optimizer.
 
                 # Permittivity factor in amplitude of electric dipole at x_0:
                 # We need to properly account here for the current real and imaginary index

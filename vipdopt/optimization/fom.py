@@ -87,11 +87,13 @@ class SuperFoM:
         """
         weights = (2.0 / len(fom_values)) - fom_values**2 / np.sum(fom_values**2)
 
-        # Zero-shift and renormalize
-        #! Check: Maybe not zero-shift(x) but instead max(x,0) ? Compare and contrast
-        if np.min(weights) < 0:
-            weights -= np.min(weights)
-            weights /= np.sum(weights)
+        # # Zero-shift and renormalize
+        # if np.min(weights) < 0:
+        #     weights -= np.min(weights)
+        #     weights /= np.sum(weights)
+        
+        # Max(x,0) according to Eq. (2), https://www.nature.com/articles/s41598-021-88785-5
+        weights = np.fmax(weights, 0)
 
         self.performance_weights = weights
 
@@ -174,7 +176,8 @@ class SuperFoM:
         ])
         # grad_results = np.dot(grad_results, spectral_weights).dot(performance_weights)
         if apply_performance_weights:
-            return np.einsum('i,i...->...', self.performance_weights, grad_results)
+            assert len(self.weights)==len(self.performance_weights)
+            return np.einsum('i,i...->...', self.weights*self.performance_weights, grad_results)
         return np.einsum('i,i...->...', self.weights, grad_results)
 
     def create_forward_sim(
@@ -655,7 +658,7 @@ class BayerFilterFoM(FoM):
             case _:
                 return total_ffom
 
-    def _bayer_gradient(self):
+    def _bayer_gradient(self, *args, **kwargs):
         """Compute the gradient of the bayer filter figure of merit."""
         # e_fwd = self.design_fwd_fields
         e_fwd = self.fwd_monitors[2].e
@@ -701,7 +704,14 @@ class BayerFilterFoM(FoM):
         # #       self.enabled_restricted
         # ======================================================================================================================
 
-        # return df_dev     
+        try:
+            df_dev[..., self.pos_max_freqs] /= np.array(
+                kwargs.get('max_intensity_by_wavelength', None)
+                )[..., self.pos_max_freqs]
+        except Exception as e:
+            pass
+        
+        # return df_dev   
         return df_dev[..., self.pos_max_freqs]
 
 

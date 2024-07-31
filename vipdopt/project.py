@@ -240,12 +240,12 @@ class Project:
             self.foms.append(FoM.from_dict(fom_dict))
         self.weights = np.array(weights)
 
-    def _setup_weights(self, cfg: Config):
-        """Setup the weights for each FoM.
+    def _setup_spectral_weights(self, cfg: Config):
+        """Setup the spectral weights for each FoM, and assigns according to config order.
         At present this processes spectral weights as a factor to the original weights -
         i.e. the wavelength-dependent behaviour of each FoM"""
         # Overall Weights for each FoM
-        self.weights = np.array(self.weights)           # Just ensure that it's a numpy
+        # self.weights = np.array(self.weights)           # Just ensure that it's a numpy
 
         # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM
         # (e.g. spectral sorting)
@@ -286,7 +286,12 @@ class Project:
             )
         vipdopt.logger.info('Spectral weights assigned.')
 
-        self.weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
+        # self.spectral_weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
+        self.spectral_weights = spectral_weights_by_fom
+        
+        # Assign each spectral weight vector to each FoM. Order matters!
+        for i,f in enumerate(self.foms):
+            f.spectral_weights = self.spectral_weights[i]
 
     def _load_device(self, cfg: Config):
         """Load device from a config, or create a new one if it doesn't exist yet."""
@@ -379,8 +384,8 @@ class Project:
 
         # Load Figures of Merit (FoMs)
         self._load_foms(cfg)
+        self._setup_spectral_weights(cfg)
         full_fom = SuperFoM([(f,) for f in self.foms], self.weights)
-        self._setup_weights(cfg)
 
         # Load Device
         self._load_device(cfg)
@@ -597,7 +602,9 @@ def determine_spectral_weights(
             ] = 1
 
         elif mode == 'gaussian':  # gaussians centered on peaks
-            scaling_exp = -(4 / 7) / np.log(0.5)
+            # TODO: Add a dial for this to config
+            scaling_exp = -(1.5 / 7) / np.log(0.5)    # 2D Bayer
+            # scaling_exp = -(4 / 7) / np.log(0.5)      # 3D Bayer
             band_peak = wl_band_bound_idxs['peak'][fom_idx]
             band_width = (
                 wl_band_bound_idxs['left'][fom_idx]
@@ -608,15 +615,15 @@ def determine_spectral_weights(
                 -((wl_idxs - band_peak) ** 2) / (scaling_exp * band_width) ** 2
             )
 
-    # # Plotting code to check weighting shapes
-    # import matplotlib.pyplot as plt
-    # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
-    # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
-    # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
-    # for fom in spectral_weights_by_fom:
-    # 	plt.plot(fom)
-    # plt.show()
-    # print(3)
+    # Plotting code to check weighting shapes
+    import matplotlib.pyplot as plt
+    plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
+    plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
+    plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
+    for fom in spectral_weights_by_fom:
+        plt.plot(fom)
+    plt.show()
+    print(3)
 
     return spectral_weights_by_fom
 

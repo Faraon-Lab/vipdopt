@@ -24,4 +24,4 @@
 # source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
 source activate vipdopt3.10
 
-xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize "runs/test_run" "processed_config.yml"
+xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize "runs/test_run" "--config" "processed_config.yml"

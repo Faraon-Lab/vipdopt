@@ -11,7 +11,7 @@
             "obj_type": "fdtd",
             "properties": {
                 "dimension": "2D",
-                "x span": 3.06e-06,
+                "x span": 4.08e-06,
                 "y max": 4.165e-06,
                 "y min": -3.6549999999999997e-06,
                 
@@ -24,7 +24,7 @@
             
             "obj_type": "gaussian",
             "properties": {
-                "x span": 6.12e-06,
+                "x span": 8.16e-06,
                 "injection axis": "y-axis",
                 "y": 3.810833333333333e-06,
                 
@@ -44,7 +44,7 @@
             
             "obj_type": "gaussian",
             "properties": {
-                "x span": 6.12e-06,
+                "x span": 8.16e-06,
                 "injection axis": "y-axis",
                 "y": 3.810833333333333e-06,
                 
@@ -63,7 +63,7 @@
             "name": "adj_src_0x",
             "obj_type": "dipole",
             "properties": {
-                "x": 5.1e-07,
+                "x": 7.65e-07,
                 "y": -1.5299999999999998e-06,
                 "theta": 90,
                 "phi": 0,
@@ -76,7 +76,7 @@
             "name": "adj_src_0y",
             "obj_type": "dipole",
             "properties": {
-                "x": 5.1e-07,
+                "x": 7.65e-07,
                 "y": -1.5299999999999998e-06,
                 "theta": 0,
                 "phi": 0,
@@ -89,7 +89,7 @@
             "name": "adj_src_1x",
             "obj_type": "dipole",
             "properties": {
-                "x": -5.1e-07,
+                "x": -7.65e-07,
                 "y": -1.5299999999999998e-06,
                 "theta": 90,
                 "phi": 0,
@@ -102,7 +102,7 @@
             "name": "adj_src_1y",
             "obj_type": "dipole",
             "properties": {
-                "x": -5.1e-07,
+                "x": -7.65e-07,
                 "y": -1.5299999999999998e-06,
                 "theta": 0,
                 "phi": 0,
@@ -116,7 +116,7 @@
             "obj_type": "power",
             "properties": {
                 "monitor type": "point",
-                "x": 5.1e-07,
+                "x": 7.65e-07,
                 "y": -1.5299999999999998e-06,
                 
                 "override global monitor settings": 1,
@@ -130,7 +130,7 @@
             "obj_type": "power",
             "properties": {
                 "monitor type": "point",
-                "x": -5.1e-07,
+                "x": -7.65e-07,
                 "y": -1.5299999999999998e-06,
                 
                 "override global monitor settings": 1,
@@ -146,8 +146,8 @@
                 "monitor type": "Linear X",
                 "y": -1.5299999999999998e-06,
                 
-                "x": 5.1e-07,
-                "x span": 1.02e-06,
+                "x": 7.65e-07,
+                "x span": 1.53e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -161,8 +161,8 @@
                 "monitor type": "Linear X",
                 "y": -1.5299999999999998e-06,
                 
-                "x": -5.1e-07,
-                "x span": 1.02e-06,
+                "x": -7.65e-07,
+                "x span": 1.53e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -177,7 +177,7 @@
                 "y": -1.5299999999999998e-06,
                 
                 "x": 0,
-                "x span": 2.04e-06,
+                "x span": 3.06e-06,
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -189,7 +189,7 @@
             "obj_type": "rect",
             "properties": {
                 "x": 0,
-                "x span": 3.5904e-06,
+                "x span": 5.3856e-06,
                 "y min": 2.44e-06,
                 "y max": 2.593e-06,
                 
@@ -200,7 +200,7 @@
             "obj_type": "rect",
             "properties": {
                 "x": 0,
-                "x span": 2.04e-06,
+                "x span": 3.06e-06,
                 "y min": 2.44e-06,
                 "y max": 2.593e-06,
                 
@@ -211,7 +211,7 @@
             "name": "substrate",
             "obj_type": "rect",
             "properties": {
-                "x": 0,"x span": 3.5904e-06,
+                "x": 0,"x span": 5.3856e-06,
                 "y min": 2.04e-06,
                 "y max": 2.44e-06,
                 
@@ -222,7 +222,7 @@
             "obj_type": "import",
             "dev_id": 0,                
             "properties": {
-                "x span": 2.04e-06,
+                "x span": 3.06e-06,
                 "y min": 0.0,
                 "y max": 2.04e-06,
                 "z span": 1.5299999999999998e-07
@@ -235,7 +235,7 @@
             "dev_id": 0,
             "properties": {
                 "x": 0,
-                "x span": 3.06e-06,
+                "x span": 4.08e-06,
                 "y min": -5e-07,
                 "y max": 2.54e-06,
                 "z span": 1.5299999999999998e-07,
@@ -250,7 +250,7 @@
             "obj_type": "index",
             "dev_id": 0,
             "properties": {
-                "x span": 2.04e-06,
+                "x span": 3.06e-06,
                 "monitor type": "2D Z-Normal",
                 "y min": 0.0,
                 "y max": 2.04e-06,
@@ -263,7 +263,7 @@
             "obj_type": "profile",
             "dev_id": 0,
             "properties": {
-                "x span": 2.04e-06,
+                "x span": 3.06e-06,
                 "monitor type": "2D Z-Normal",
                 "y min": 0.0,
                 "y max": 2.04e-06,

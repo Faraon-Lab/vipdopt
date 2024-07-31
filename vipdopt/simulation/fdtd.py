@@ -5,6 +5,7 @@ from __future__ import annotations
 import abc
 import contextlib
 import functools
+import os
 import time
 import typing
 from collections.abc import Callable
@@ -369,6 +370,9 @@ class LumericalFDTD(ISolver):
             'mpi_exe',
             Path('/central/software/mpich/4.0.0/bin/mpirun'),
         )
+        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+            # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
+            mpi_exe = "/central/home/ifoo/lumerical/2021a_r22/mpich2/nemesis/bin/mpiexec"
         self.set_resource(1, 'mpi executable', str(mpi_exe))
 
         nprocs = kwargs.pop('nprocs', 8)
@@ -382,6 +386,9 @@ class LumericalFDTD(ISolver):
             'solver_exe',
             Path('/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem'),
         )
+        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+            # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
+            solver_exe = "/central/home/ifoo/lumerical/2021a_r22/bin/fdtd-engine-mpich2nem"
         self.set_resource(1, 'solver executable', str(solver_exe))
 
         self.set_resource(
