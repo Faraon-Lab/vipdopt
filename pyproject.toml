@@ -20,9 +20,10 @@ include-package-data = true
 name = "vipdopt"
 version ="1.1"
 authors = [
-  { name="Nia McNichols", email="niamcnichols@gmail.com" },
+  { name="McNichols, N.; Foo, I.; Roberts, G.", email="ianfoo@caltech.edu" },
+]
+maintainers = [
   { name="Ian Foo", email="ianfoo@caltech.edu" },
-  { name="Gregory Roberts", email="faraon@caltech.edu" }
 ]
 description = "Package for volumetirc inverse photonic design and optimization"
 readme = "README.md"

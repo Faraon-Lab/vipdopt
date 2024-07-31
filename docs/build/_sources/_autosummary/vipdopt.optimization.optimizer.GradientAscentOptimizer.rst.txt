@@ -1,4 +1,4 @@
-vipdopt.optimization.optimizer.GradientAscentOptimizer
+﻿vipdopt.optimization.optimizer.GradientAscentOptimizer
 ======================================================
 
 .. currentmodule:: vipdopt.optimization.optimizer
@@ -17,6 +17,7 @@ vipdopt.optimization.optimizer.GradientAscentOptimizer
    .. autosummary::
    
       ~GradientAscentOptimizer.__init__
+      ~GradientAscentOptimizer.scale_step_size
       ~GradientAscentOptimizer.step
    
    

@@ -25,6 +25,7 @@
       ladd_to_all
       radd_to_all
       read_config_file
+      real_part_complex_product
       repeat
       rmtree
       sech

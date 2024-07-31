@@ -5,10 +5,9 @@ Requirements
 ------------
 
 - Python 3.10
-- Ansys Lumerical FDTD
+- Ansys Lumerical FDTD 2021 edition or later
 - An installation of MPI, for running simulations in parallel
 - Qt6
-- Dependencies listed in ``build_requirements.txt``
 
 If creating a conda environment, there is not official PySide6 package yet. After activating your environment, you will need to install PySide6 with pip.
 
@@ -38,7 +37,7 @@ To see more options, run
 Outputs
 _______
 
-All created files and logs are packaged and output to the selected project folde by default. The internal folder structure is as follows:
+All created files and logs are packaged and output to the selected project folder by default. The internal folder structure is as follows:
 
 - ``data``:  Data generated in the optimization
     - ``opt_info``: captures pertinent information about each iteration and epoch of the optimization. Save data is also collected here for the event that an optimization needs to be restarted.

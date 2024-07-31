@@ -68,7 +68,7 @@ def find_lumapi_path(base_diretory: Path, version=SUPPORTED_LUMERICAL_VERSIONS):
     except FileNotFoundError as e:
         raise SystemError(
             f'Lumerical could not be found in default installation directory: {str(base_diretory)}. '
-            'If Lumerical is installed in another directory please specify the path to lumapi.py inside "install.cfg"'
+            'If Lumerical is installed in another directory please specify the path to lumapi.py inside "setup.cfg"'
         ) from e
     print('Succesfully located Lumerical API file!')
     return latest_version / 'api/python/lumapi.py'
