@@ -526,7 +526,7 @@ class Project:
 
         self.optimization.loop = True
         # self.optimization.run()
-        self.optimization.run2()
+        self.optimization.run()
 
         #! DEBUG 20240721 ian - uncomment this block for the git push
         # try:

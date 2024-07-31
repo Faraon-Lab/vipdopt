@@ -22,7 +22,7 @@ version ="1.1"
 authors = [
   { name="Nia McNichols", email="niamcnichols@gmail.com" },
   { name="Ian Foo", email="ianfoo@caltech.edu" },
-  { name="Gregory Roberts"}
+  { name="Gregory Roberts", email="faraon@caltech.edu" }
 ]
 description = "Package for volumetirc inverse photonic design and optimization"
 readme = "README.md"
@@ -44,11 +44,11 @@ dependencies = [
     "Jinja2==3.1.*",
     "PySide6==6.3.0",
     "PySide6-stubs==6.4.2",
+    "gdstk==0.9.50",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "gdstk==0.9.50",
     "sphinx==7.3.7",
     "nbsphinx==0.9.4",
     "furo==2024.5.6",
