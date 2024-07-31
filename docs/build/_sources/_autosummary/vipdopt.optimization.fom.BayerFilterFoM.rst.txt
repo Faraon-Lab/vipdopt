@@ -1,0 +1,35 @@
+vipdopt.optimization.fom.BayerFilterFoM
+=======================================
+
+.. currentmodule:: vipdopt.optimization.fom
+
+.. autoclass:: BayerFilterFoM
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~BayerFilterFoM.__init__
+      ~BayerFilterFoM.as_dict
+      ~BayerFilterFoM.compute_fom
+      ~BayerFilterFoM.compute_grad
+      ~BayerFilterFoM.create_adjoint_sim
+      ~BayerFilterFoM.create_forward_sim
+      ~BayerFilterFoM.from_dict
+      ~BayerFilterFoM.link_adjoint_sim
+      ~BayerFilterFoM.link_forward_sim
+      ~BayerFilterFoM.performance_weighting
+      ~BayerFilterFoM.reset_monitors
+   
+   
+
+   
+   
+   

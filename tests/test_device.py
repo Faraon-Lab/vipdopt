@@ -116,7 +116,7 @@ def test_init_vars():
     )
     x = INITIAL_DENSITY * np.ones((3, 3, 1), dtype=np.complex128)
     assert_close(device.w[..., 0], x)
-    assert_equal(device.w.shape, (3, 3, 1, 3))
+    assert_equal(device.w.shape, (3, 3, 1, 4))
 
 
 @pytest.mark.smoke()
@@ -171,10 +171,11 @@ def test_update_density():
         init_density=INITIAL_DENSITY,
         filters=FILTER_LIST,
     )
-    x = np.ones((3, 3, 1, 3), dtype=np.complex128)
+    x = np.ones((3, 3, 1, 4), dtype=np.complex128)
     x[..., 0] *= 0.6
     x[..., 1] *= 0.607838
     x[..., 2] *= 0.616228
+    x[..., 3] *= 0.616228
 
     device.update_density()
 

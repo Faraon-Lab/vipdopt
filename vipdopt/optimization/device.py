@@ -11,12 +11,16 @@ from typing import cast
 
 import numpy as np
 import numpy.typing as npt
+from scipy import interpolate
 
+from vipdopt import STL, GDS
 from vipdopt.optimization.filter import Filter, Scale, Sigmoid
-from vipdopt.utils import Coordinates, PathLike, ensure_path
+from vipdopt.simulation import Import
+from vipdopt.utils import Coordinates, PathLike, ensure_path, repeat
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
+REINTERPOLATION_SIZE = (300, 300, 306)
 
 
 # TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
@@ -53,8 +57,6 @@ class Device:
         **kwargs,
     ):
         """Initialize Device object."""
-        if filters is None:
-            filters = []
         if len(size) != 3:  # noqa: PLR2004
             raise ValueError(f'Device size must be 3 dimensional; got {len(size)}')
         if any(d < 1 for d in size) or any(not isinstance(d, int) for d in size):
@@ -74,6 +76,12 @@ class Device:
         if permittivity_constraints[0] >= permittivity_constraints[1]:
             raise ValueError('Maximum permittivity must be greater than minimum')
         self.permittivity_constraints = permittivity_constraints
+
+        # Make sure there is always a Scale filter at the end
+        if filters is None:
+            filters = [Scale(permittivity_constraints)]
+        elif not isinstance(filters[-1], Scale):
+            filters.append(Scale(permittivity_constraints))
 
         if (
             not isinstance(coords, dict)
@@ -218,6 +226,13 @@ class Device:
         d = Device._from_dict(attributes)
         d.set_design_variable(w)
         return d
+    
+    def clip(self, x: npt.NDArray) -> npt.NDArray:
+        """Return x where all values are clipped to the device's constraints."""
+        return np.maximum(
+            np.minimum(x, self.permittivity_constraints[1]),
+            self.permittivity_constraints[0]
+        )
 
     def get_design_variable(self) -> npt.NDArray[np.complex128]:
         """Return the design variable of the device region (i.e. first layer)."""
@@ -234,6 +249,7 @@ class Device:
 
     def update_filters(self, epoch=0):
         """Update the filters of the device."""
+        # TODO: Make this more general.
         sigmoid_beta = 0.0625 * (2**epoch)
         sigmoid_eta = 0.5
         self.filters = [
@@ -247,7 +263,7 @@ class Device:
 
     def get_permittivity(self) -> npt.NDArray[np.complex128]:
         """Return the permittivity of the design variable."""
-        # # Now that there is a Scale filter, this is unnecessary.
+        # # Now that there is a Scale filter, the commented-out line below is unnecessary.
         # eps_min, eps_max = self.permittivity_constraints
         # return self.get_density() * (eps_max - eps_min) + eps_min
 
@@ -261,15 +277,8 @@ class Device:
             self.w[..., i + 1] = var_out
 
     def index_from_permittivity(self, permittivity):
-        """Takes square root of permittivty to give the index.
-
-        Raises:
-            (ValueError): If any permittivity values are not real.
-        """
-        if np.any(np.imag(permittivity)):
-            raise ValueError(f'Expected real permittivty values; got {permittivity}.')
-
-        return np.sqrt(permittivity)
+        """Takes square root of permittivty to give the index."""
+        return np.sqrt(np.real(permittivity))
 
     def permittivity_to_density(self, eps, eps_min, eps_max):
         """Convert permittivity to density."""
@@ -279,6 +288,7 @@ class Device:
         """Convert density to permittivity."""
         return density * (eps_max - eps_min) + eps_min
 
+    @classmethod
     def binarize(self, variable_in):
         """Assumes density - if not, convert explicitly."""
         return 1.0 * np.greater_equal(variable_in, 0.5)
@@ -333,3 +343,205 @@ class Device:
         #     grad = filt.chain_rule(grad, y, x)
 
         return grad
+
+    def import_cur_index(
+        self,
+        import_primitive: Import,
+        reinterpolation_factor: float = 1,
+        reinterpolation_size: tuple[int, int, int] = REINTERPOLATION_SIZE,
+        binarize: bool = False,
+    ):
+        """Reinterpolate and import cur_index into design regions.
+
+        Arguments:
+            import_primitive (Import): The import primitive to import the index to. Will
+                call `import_primitive.set_nk2` with the appropriate values.
+            reinterpolation_factor (float): The scale factor to use when
+                reinterpolating. If 1, this function will not perform reinterpolation.
+                Defaults to 1.
+            reinterpolation_size (tuple[int, int, int]): The number of voxels for the
+                output when reinterpolating. Defaults to (300, 300, 306).
+            binarize (bool): Whether to binarize the index before importing. Defaults to
+                False.
+        """
+        # Here cur_density will have values between 0 and 1
+        cur_density = self.get_density().copy()
+
+        # Perform repetition of density values across each axis for shrinking during reinterpolation process
+        if reinterpolation_factor != 1:
+            new_size = tuple(int(x) for x in np.ceil(np.multiply(reinterpolation_factor, self.size)))
+            cur_density_import = repeat(cur_density, new_size)
+            # cur_density_import = np.repeat(
+            #     np.repeat(
+            #         np.repeat(
+            #             cur_density,
+            #             np.ceil(reinterpolation_factor),
+            #             axis=0,
+            #         ),
+            #         np.ceil(reinterpolation_factor),
+            #         axis=1,
+            #     ),
+            #     np.ceil(reinterpolation_factor),
+            #     axis=2,
+            # )
+            design_region = [
+                1e-6
+                * np.linspace(
+                    self.coords[axis][0],
+                    self.coords[axis][-1],
+                    len(self.coords[axis]) * reinterpolation_factor,
+                )
+                for axis in self.coords
+            ]
+            design_region_import = [
+                1e-6
+                * np.linspace(
+                    self.coords[axis][0],
+                    self.coords[axis][-1],
+                    reinterpolation_size[i],
+                )
+                for i, axis in enumerate(self.coords)
+            ]
+        else:
+            cur_density_import = cur_density.copy()
+            design_region = [
+                1e-6 * np.linspace(
+                    self.coords[axis][0], self.coords[axis][-1], cur_density_import.shape[i],
+                )
+                for i, axis in enumerate(self.coords)
+            ]
+            design_region_import = [
+                1e-6 * np.linspace(
+                    self.coords[axis][0], self.coords[axis][-1], self.field_shape[i]
+                )
+                for i, axis in enumerate(self.coords)
+            ]
+
+        design_region_import_grid = np.array(
+            np.meshgrid(*design_region_import, indexing='ij')
+        ).transpose((1, 2, 3, 0))
+
+        # Perform reinterpolation so as to fit into Lumerical mesh.
+        # NOTE: The imported array does not need to have the same size as the
+        # Lumerical mesh. Lumerical will perform its own reinterpolation
+        # (params. of which are unclear).
+        cur_density_import = interpolate.interpn(
+            tuple(design_region),
+            cur_density_import,
+            design_region_import_grid,
+            method='linear',
+        )
+        #! TODO: CHECK - Don't think this is going to work for 2D.
+
+        # Binarize before importing
+        if binarize:
+            cur_density_import = self.binarize(cur_density_import)
+
+        # TODO: Add dispersion. Account for dispersion by using the dispersion_model
+        dispersive_max_permittivity = self.permittivity_constraints[1]
+        self.index_from_permittivity(dispersive_max_permittivity)
+
+        # Convert device to permittivity and then index
+        cur_permittivity = self.density_to_permittivity(
+            cur_density_import,
+            self.permittivity_constraints[0],
+            dispersive_max_permittivity,
+        )
+        # TODO: Another way to do this that can include dispersion is to update the
+        # Scale filter with new permittivity constraint maximum
+        cur_index = self.index_from_permittivity(cur_permittivity)
+
+        # TODO (maybe): cut cur_index by region
+        # Import to simulation
+        import_primitive.set_nk2(cur_index, *design_region_import)
+
+        return cur_density, cur_permittivity
+
+    def interpolate_gradient(
+        self,
+        g: npt.NDArray,
+        dimension: str = '3D'
+        ):
+        """Reinterpolate and import gradient into the shape of the design regions.
+
+        Arguments:
+            g (NDArray): The uninterpolated, but perhaps processed, gradient with shape obtained from
+                        the design efield monitors for adjoint optimization.
+            dimension (str): The dimension of the simulation, either "2D" or "3D". Defaults to "3D".
+        """
+
+        gradient_region_x = 1e-6 * np.linspace(self.coords['x'][0], self.coords['x'][-1], g.shape[0]) #cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
+        gradient_region_y = 1e-6 * np.linspace(self.coords['y'][0], self.coords['y'][-1], g.shape[1])
+        try:
+            gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], g.shape[2])
+        except IndexError as err:	# 2D case
+            gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], 3)
+        design_region_geometry = np.array(np.meshgrid(1e-6*self.coords['x'], 1e-6*self.coords['y'], 1e-6*self.coords['z'], indexing='ij')
+                            ).transpose((1,2,3,0))
+
+        if dimension in '2D':
+            design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                np.repeat(g[..., np.newaxis], 3, axis=2), 	# Repeats 2D array in 3rd dimension, 3 times
+                                                design_region_geometry, method='linear' )
+        elif dimension in '3D':
+            design_gradient_interpolated = interpolate.interpn( ( gradient_region_x, gradient_region_y, gradient_region_z ),
+                                                g,
+                                                design_region_geometry, method='linear' )
+
+        return design_gradient_interpolated
+
+
+    def export_density_as_stl(self, filename):
+        '''Binarizes device density and exports as STL file for fabrication.'''
+        
+        # STL Export requires density to be fully binarized
+        full_density = self.binarize(self.get_density())
+        stl_generator = STL.STL(full_density)
+        stl_generator.generate_stl()
+        stl_generator.save_stl( filename )
+
+    def export_density_as_gds(self, gds_layer_dir):
+        
+        # STL Export requires density to be fully binarized
+        full_density = self.binarize(self.get_density())
+        
+        # GDS Export must be done in layers. We split the full design into individual layers, (not related to design layers)
+        # Express each layer as polygons in an STL Mesh object and write that layer into its own cell of the GDS file
+        layer_mesh_array = []
+        for z_layer in range(full_density.shape[2]):
+            stl_generator = STL.STL(full_density[..., z_layer][..., np.newaxis])
+            stl_generator.generate_stl()
+            layer_mesh_array.append(stl_generator.stl_mesh)
+        
+        # Create a GDS object that contains a Library with Cells corresponding to each 2D layer in the 3D device.
+        gds_generator = GDS.GDS().set_layers(full_density.shape[2], 
+                unit = 1e-6 * np.abs(self.coords['x'][-1] - self.coords['x'][0])/self.size[0])
+        gds_generator.assemble_device(layer_mesh_array, listed=False)
+
+        # Create directory for export
+        Path(gds_layer_dir).mkdir(parents=True, exist_ok=True)
+        # Export both GDS and SVG for easy visualization.
+        gds_generator.export_device(gds_layer_dir, filetype='gds')
+        gds_generator.export_device(gds_layer_dir, filetype='svg')
+        
+        # for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
+        #     gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
+        #     gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
+        
+        # # Here is a function for GDS device import to Lumerical - be warned this takes maybe 3-5 minutes per layer.
+        # def import_gds(sim, device, gds_layer_dir):
+        #     import time
+            
+        #     sim.fdtd.load(sim.info['name'])
+        #     sim.fdtd.switchtolayout()
+        #     device_name = device.import_names()[0]
+        #     sim.disable([device_name])
+            
+        #     z_vals = device.coords['z']
+        #     for z_idx in range(len(z_vals)):
+        #         t = time.time()
+        #         # fdtd.gdsimport(os.path.join(gds_layer_dir, 'device.gds'), f'L{layer_idx}', 0)
+        #         sim.fdtd.gdsimport(os.path.join(gds_layer_dir, 'device.gds'), f'L{z_idx}', 0, "Si (Silicon) - Palik",
+        #                     z_vals[z_idx], z_vals[z_idx+1])
+        #         sim.fdtd.set({'x': device.coords['x'][0], 'y': device.coords['y'][0]})      # Be careful of units - 1e-6
+        #         vipdopt.logger.info(f'Layer {z_idx} imported in {time.time()-t} seconds.')

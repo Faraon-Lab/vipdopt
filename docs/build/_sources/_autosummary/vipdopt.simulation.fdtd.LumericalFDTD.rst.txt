@@ -1,0 +1,50 @@
+vipdopt.simulation.fdtd.LumericalFDTD
+=====================================
+
+.. currentmodule:: vipdopt.simulation.fdtd
+
+.. autoclass:: LumericalFDTD
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~LumericalFDTD.__init__
+      ~LumericalFDTD.addjob
+      ~LumericalFDTD.clearjobs
+      ~LumericalFDTD.close
+      ~LumericalFDTD.connect
+      ~LumericalFDTD.get_efield
+      ~LumericalFDTD.get_efield_magnitude
+      ~LumericalFDTD.get_env_resources
+      ~LumericalFDTD.get_env_vars
+      ~LumericalFDTD.get_field
+      ~LumericalFDTD.get_hfield
+      ~LumericalFDTD.get_overall_power
+      ~LumericalFDTD.get_poynting
+      ~LumericalFDTD.get_source_power
+      ~LumericalFDTD.getresult
+      ~LumericalFDTD.importnk2
+      ~LumericalFDTD.load
+      ~LumericalFDTD.load_simulation
+      ~LumericalFDTD.promise_env_setup
+      ~LumericalFDTD.reformat_monitor_data
+      ~LumericalFDTD.run
+      ~LumericalFDTD.runjobs
+      ~LumericalFDTD.save
+      ~LumericalFDTD.set_resource
+      ~LumericalFDTD.setup_env_resources
+      ~LumericalFDTD.transmission
+   
+   
+
+   
+   
+   

@@ -1,0 +1,32 @@
+vipdopt.gui.config\_editor
+==========================
+
+.. automodule:: vipdopt.gui.config_editor
+  
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: class-template.rst
+   
+      ConfigModel
+      TreeItem
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,0 +1,35 @@
+vipdopt.optimization.fom.ConstantFoM
+====================================
+
+.. currentmodule:: vipdopt.optimization.fom
+
+.. autoclass:: ConstantFoM
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~ConstantFoM.__init__
+      ~ConstantFoM.as_dict
+      ~ConstantFoM.compute_fom
+      ~ConstantFoM.compute_grad
+      ~ConstantFoM.create_adjoint_sim
+      ~ConstantFoM.create_forward_sim
+      ~ConstantFoM.from_dict
+      ~ConstantFoM.link_adjoint_sim
+      ~ConstantFoM.link_forward_sim
+      ~ConstantFoM.performance_weighting
+      ~ConstantFoM.reset_monitors
+   
+   
+
+   
+   
+   

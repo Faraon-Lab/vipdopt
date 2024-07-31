@@ -4,10 +4,9 @@ import pytest
 
 from testing import assert_equal
 from vipdopt.simulation import (
-    LumericalSimObject,
-    LumericalSimObjectType,
     LumericalSimulation,
 )
+from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
 
 # TODO: How to test if I need lumerical? Porbably use a marker and ignore or mark xfail
 # TODO: I should MOCK lumapi! see

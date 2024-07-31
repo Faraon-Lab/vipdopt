@@ -120,17 +120,17 @@ def test_save_load_config(tmp_path, filetype: str, expectation):
         ('border_size_voxels', int(round((5 * 0.051) / 0.085))),
         ('device_voxels_lateral_bordered', int(round(2.04 / 0.085))),
         # FDTD Properties
-        ('vertical_gap_size_um', 0.085 * 15),
+        ('vertical_gap_size_um', 0.085 * 25),
         ('lateral_gap_size_um', 0.051 * 10),
         (
             'fdtd_region_size_vertical_um',
-            2 * (0.085 * 15) + (0.408 * 5) + (0.051 * 30),
+            2 * (0.085 * 25) + (0.408 * 5) + (0.051 * 30),
         ),
         ('fdtd_region_size_lateral_um', 2 * (0.051 * 10) + 2.04),
-        ('fdtd_region_maximum_vertical_um', 2.04 + (0.085 * 15)),
+        ('fdtd_region_maximum_vertical_um', 2.04 + (0.085 * 25)),
         (
             'fdtd_region_minimum_vertical_um',
-            -1 * 0.051 * 30 - (0.085 * 15),
+            -1 * 0.051 * 30 - (0.085 * 25),
         ),
         # Surrounding Properties
         ('pec_aperture_thickness_um', 3 * 0.017),
@@ -181,10 +181,10 @@ def test_save_load_config(tmp_path, filetype: str, expectation):
         ),
         # Forward Properties
         ('lateral_aperture_um', 1.1 * 2.04),
-        ('src_maximum_vertical_um', 0.408 * 5 + (0.085 * 15 * 2 / 3)),
+        ('src_maximum_vertical_um', 0.408 * 5 + (0.085 * 25 * 5 / 6)),
         (
             'src_minimum_vertical_um',
-            -(0.051 * 30) - 0.5 * (0.085 * 15),
+            -(0.051 * 30) - 0.5 * (0.085 * 25),
         ),
         ('mid_lambda_um', (0.375 + 0.725) / 2),
         ('source_angle_theta_rad', np.arcsin(np.sin(0) * 1.0 / 1.5)),

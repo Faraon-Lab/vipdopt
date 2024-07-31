@@ -1,0 +1,32 @@
+﻿vipdopt.optimization.optimization.LumericalOptimization
+=======================================================
+
+.. currentmodule:: vipdopt.optimization.optimization
+
+.. autoclass:: LumericalOptimization
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~LumericalOptimization.__init__
+      ~LumericalOptimization.add_callback
+      ~LumericalOptimization.call_callbacks
+      ~LumericalOptimization.create_history
+      ~LumericalOptimization.generate_plots
+      ~LumericalOptimization.run
+      ~LumericalOptimization.save_histories
+      ~LumericalOptimization.set_env_vars
+   
+   
+
+   
+   
+   
