@@ -1,4 +1,4 @@
-vipdopt.optimization.device.Device
+﻿vipdopt.optimization.device.Device
 ==================================
 
 .. currentmodule:: vipdopt.optimization.device
@@ -20,14 +20,18 @@ vipdopt.optimization.device.Device
       ~Device.as_dict
       ~Device.backpropagate
       ~Device.binarize
+      ~Device.clip
       ~Device.compute_binarization
       ~Device.density_to_permittivity
+      ~Device.export_density_as_gds
+      ~Device.export_density_as_stl
       ~Device.from_source
       ~Device.get_density
       ~Device.get_design_variable
       ~Device.get_permittivity
       ~Device.import_cur_index
       ~Device.index_from_permittivity
+      ~Device.interpolate_gradient
       ~Device.load_dict
       ~Device.load_file
       ~Device.num_filters

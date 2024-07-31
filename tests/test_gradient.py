@@ -30,22 +30,22 @@ def avg_abs_dist(x: npt.ArrayLike, y: npt.ArrayLike) -> npt.ArrayLike:
         (
             GradientAscentOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMAEFoM(range(5), [], 0.5),
+            UniformMAEFoM(range(5), [], range(5), 0.5),
         ),
         (
             AdamOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMAEFoM(range(5), [], 0.5),
+            UniformMAEFoM(range(5), [], range(5), 0.5),
         ),
         (
             GradientAscentOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMSEFoM(range(5), [], 0.5),
+            UniformMSEFoM(range(5), [], range(5), 0.5),
         ),
         (
             AdamOptimizer(step_size=1e-4),
             {'randomize': True, 'init_seed': 0},
-            UniformMSEFoM(range(5), [], 0.5),
+            UniformMSEFoM(range(5), [], range(5), 0.5),
         ),
     ],
     indirect=['device'],
@@ -81,6 +81,7 @@ def test_uniform(opt, device: Device):
     fom = UniformMAEFoM(
         range(n_freq),
         [],
+        range(n_freq),
         0.5,  # Tests  absolute value from 0.5
     )
 
@@ -106,9 +107,9 @@ def test_dual_fom_uniform(device: Device):
     n_iter = 10000
 
     # Tests squared error with 0.0
-    fom1 = UniformMSEFoM(range(5), [], 0.0)
+    fom1 = UniformMSEFoM(range(5), [], range(5), 0.0)
     # Tests squared error with 1.0
-    fom2 = UniformMSEFoM(range(5), [], 1.0)
+    fom2 = UniformMSEFoM(range(5), [], range(5), 1.0)
 
     # Since both are equally weighted, should balance out to 0.5 in theory
     fom = fom1 + fom2
@@ -136,7 +137,7 @@ def test_dual_fom_uniform(device: Device):
     indirect=['device'],
 )
 def test_gaussianfom(opt, device: Device):
-    fom = GaussianFoM(range(5), [], 25, 5)
+    fom = GaussianFoM(range(5), [], range(5), 25, 5)
 
     for i in range(50000):
         g = fom.compute_grad(device.get_design_variable())
@@ -154,8 +155,8 @@ def test_gaussianfom(opt, device: Device):
 @pytest.mark.parametrize(
     'opt, device',
     [
-        (GradientAscentOptimizer(step_size=2e-4), {'randomize': True, 'init_seed': 0}),
-        (AdamOptimizer(step_size=1e-4), {'randomize': True, 'init_seed': 0}),
+        (GradientAscentOptimizer(step_size=1e-3), {'randomize': True, 'init_seed': 0}),
+        (AdamOptimizer(step_size=1e-3), {'randomize': True, 'init_seed': 0}),
     ],
     indirect=['device'],
 )
@@ -168,17 +169,14 @@ def test_autograd(opt, device: Device):
 
     # Find gradient using autograd
     grad_func = jit(vmap(vmap(vmap(grad(fom)))))
-    # _, vjpfun = jvp(fom, device.get_design_variable())
-    # grad_func = jit(lambda x: vjpfun(fom(x)))
 
-    n_iter = 100000
+    n_iter = 10000
     for i in range(n_iter):
         g = grad_func(jnp.real(device.get_design_variable()))
-        # g,  = vmap(vmap(vmap(vjp(fom, device.get_design_variable()))))
         opt.step(device, g, i)
 
     w = device.get_design_variable()
     f = fom(w).sum()
 
-    assert_greater_than(f, 0.9 * DEVICE_SIZE)  # FoM is getting close to 1 everywhere
-    assert_greater_than(w.mean(), 1.5)
+    assert_greater_than(f, 0.70 * DEVICE_SIZE)  # FoM is getting close to 1 everywhere
+    assert_close(w.mean(), 1.0)

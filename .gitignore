@@ -65,6 +65,9 @@ MANIFEST
 !docs/*.gif
 
 docs/source/_autosummary/
+docs/notebooks/pixel_example/template.j2
+docs/**/*.stl
+docs/**/*.gds
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
@@ -186,4 +189,3 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
-docs/notebooks/pixel_example/template.j2

@@ -358,6 +358,7 @@
 </li>
 <li class="toctree-l4 has-children"><a class="reference internal" href="vipdopt.simulation.simobject.html">vipdopt.simulation.simobject</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" role="switch" type="checkbox"/><label for="toctree-checkbox-30"><div class="visually-hidden">Toggle navigation of vipdopt.simulation.simobject</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.Import.html">vipdopt.simulation.simobject.Import</a></li>
+<li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.IndexMonitor.html">vipdopt.simulation.simobject.IndexMonitor</a></li>
 <li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.LumericalSimObject.html">vipdopt.simulation.simobject.LumericalSimObject</a></li>
 <li class="toctree-l5"><a class="reference internal" href="vipdopt.simulation.simobject.LumericalSimObjectType.html">vipdopt.simulation.simobject.LumericalSimObjectType</a></li>
 </ul>
@@ -386,16 +387,20 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="vipdopt.utils.html">vipdopt.utils</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" role="switch" type="checkbox"/><label for="toctree-checkbox-34"><div class="visually-hidden">Toggle navigation of vipdopt.utils</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.apply_args_and_kwargs.html">vipdopt.utils.apply_args_and_kwargs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.convert_path.html">vipdopt.utils.convert_path</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.del_by_path.html">vipdopt.utils.del_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.ensure_path.html">vipdopt.utils.ensure_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.flatten.html">vipdopt.utils.flatten</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.get_by_path.html">vipdopt.utils.get_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.glob_first.html">vipdopt.utils.glob_first</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.import_lumapi.html">vipdopt.utils.import_lumapi</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.ladd_to_all.html">vipdopt.utils.ladd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.radd_to_all.html">vipdopt.utils.radd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.read_config_file.html">vipdopt.utils.read_config_file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.real_part_complex_product.html">vipdopt.utils.real_part_complex_product</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.repeat.html">vipdopt.utils.repeat</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.rmtree.html">vipdopt.utils.rmtree</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.sech.html">vipdopt.utils.sech</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.set_by_path.html">vipdopt.utils.set_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.setup_logger.html">vipdopt.utils.setup_logger</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.split_glob.html">vipdopt.utils.split_glob</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.starmap_with_kwargs.html">vipdopt.utils.starmap_with_kwargs</a></li>
@@ -469,7 +474,10 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.__init__" title="vipdopt.optimization.optimizer.GradientAscentOptimizer.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([step_size])</p></td>
 <td><p>Initialize a GradientDescentOptimizer.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.step" title="vipdopt.optimization.optimizer.GradientAscentOptimizer.step"><code class="xref py py-obj docutils literal notranslate"><span class="pre">step</span></code></a>(device, gradient, iteration)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.scale_step_size" title="vipdopt.optimization.optimizer.GradientAscentOptimizer.scale_step_size"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_step_size</span></code></a>(...)</p></td>
+<td><p>Begin scaling of step size so that the design change stays within epoch_design_change limits in config.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.step" title="vipdopt.optimization.optimizer.GradientAscentOptimizer.step"><code class="xref py py-obj docutils literal notranslate"><span class="pre">step</span></code></a>(device, gradient, iteration)</p></td>
 <td><p>Step with the gradient.</p></td>
 </tr>
 </tbody>
@@ -485,6 +493,12 @@
 </tbody>
 </table>
 </div>
+<dl class="py method">
+<dt class="sig sig-object py" id="vipdopt.optimization.optimizer.GradientAscentOptimizer.scale_step_size">
+<span class="sig-name descname"><span class="pre">scale_step_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch_start_design_change_max</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epoch_end_design_change_min</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epoch_end_design_change_max</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.scale_step_size" title="Link to this definition">¶</a></dt>
+<dd><p>Begin scaling of step size so that the design change stays within epoch_design_change limits in config.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="vipdopt.optimization.optimizer.GradientAscentOptimizer.step">
 <span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="vipdopt.optimization.device.Device.html#vipdopt.optimization.device.Device" title="vipdopt.optimization.device.Device"><span class="pre">Device</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">_SupportsArray</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">_NestedSequence</span><span class="p"><span class="pre">[</span></span><span class="pre">_SupportsArray</span><span class="p"><span class="pre">[</span></span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">complex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">_NestedSequence</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">complex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.step" title="Link to this definition">¶</a></dt>
@@ -553,6 +567,7 @@
 <li><a class="reference internal" href="#">vipdopt.optimization.optimizer.GradientAscentOptimizer</a><ul>
 <li><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer"><code class="docutils literal notranslate"><span class="pre">GradientAscentOptimizer</span></code></a><ul>
 <li><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.__init__"><code class="docutils literal notranslate"><span class="pre">GradientAscentOptimizer.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.scale_step_size"><code class="docutils literal notranslate"><span class="pre">GradientAscentOptimizer.scale_step_size()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.optimizer.GradientAscentOptimizer.step"><code class="docutils literal notranslate"><span class="pre">GradientAscentOptimizer.step()</span></code></a></li>
 </ul>
 </li>

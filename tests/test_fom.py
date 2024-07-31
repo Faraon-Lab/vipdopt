@@ -35,6 +35,7 @@ BASE_FOM = FoM(
     gradient_func,
     [0, 1, 2],
     [],
+    [0, 1, 2]
 )
 
 
@@ -202,7 +203,7 @@ def test_unique_source_map():
     # 0:1, 1:3, 2:5, 3:7, 4:9
     combos = [srcs[i:j] for (i, j) in zip(range(5), range(1, 10, 2), strict=False)]
     foms = [
-        (FoM('TE', src_combo, [], [], [], fom_func, gradient_func, [0, 1, 2], []),)
+        (FoM('TE', src_combo, [], [], [], fom_func, gradient_func, range(2), [], range(2)),)
         for src_combo in combos
     ]
     fom = SuperFoM(foms, np.ones(10))

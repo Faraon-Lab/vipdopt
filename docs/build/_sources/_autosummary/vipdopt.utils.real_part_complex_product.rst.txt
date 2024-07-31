@@ -1,0 +1,6 @@
+vipdopt.utils.real\_part\_complex\_product
+==========================================
+
+.. currentmodule:: vipdopt.utils
+
+.. autofunction:: real_part_complex_product

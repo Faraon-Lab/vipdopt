@@ -1,4 +1,4 @@
-vipdopt.optimization.optimization.LumericalOptimization
+﻿vipdopt.optimization.optimization.LumericalOptimization
 =======================================================
 
 .. currentmodule:: vipdopt.optimization.optimization
@@ -21,12 +21,8 @@ vipdopt.optimization.optimization.LumericalOptimization
       ~LumericalOptimization.call_callbacks
       ~LumericalOptimization.create_history
       ~LumericalOptimization.generate_plots
-      ~LumericalOptimization.load_sims
       ~LumericalOptimization.run
-      ~LumericalOptimization.run2
-      ~LumericalOptimization.run_simulations
       ~LumericalOptimization.save_histories
-      ~LumericalOptimization.save_sims
       ~LumericalOptimization.set_env_vars
    
    

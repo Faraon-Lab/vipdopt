@@ -396,6 +396,7 @@
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.ladd_to_all.html">vipdopt.utils.ladd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.radd_to_all.html">vipdopt.utils.radd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.read_config_file.html">vipdopt.utils.read_config_file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.real_part_complex_product.html">vipdopt.utils.real_part_complex_product</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.repeat.html">vipdopt.utils.repeat</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.rmtree.html">vipdopt.utils.rmtree</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.sech.html">vipdopt.utils.sech</a></li>
@@ -493,28 +494,31 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.read_config_file.html#vipdopt.utils.read_config_file" title="vipdopt.utils.read_config_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_config_file</span></code></a>(fname[, cfg_format])</p></td>
 <td><p>Read a configuration file.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.repeat.html#vipdopt.utils.repeat" title="vipdopt.utils.repeat"><code class="xref py py-obj docutils literal notranslate"><span class="pre">repeat</span></code></a>(a, shape)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.real_part_complex_product.html#vipdopt.utils.real_part_complex_product" title="vipdopt.utils.real_part_complex_product"><code class="xref py py-obj docutils literal notranslate"><span class="pre">real_part_complex_product</span></code></a>(z1, z2)</p></td>
+<td><p>Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.repeat.html#vipdopt.utils.repeat" title="vipdopt.utils.repeat"><code class="xref py py-obj docutils literal notranslate"><span class="pre">repeat</span></code></a>(a, shape)</p></td>
 <td><p>Apply numpy's <cite>repeat</cite> function along multiple axes.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.rmtree.html#vipdopt.utils.rmtree" title="vipdopt.utils.rmtree"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rmtree</span></code></a>(path[, keep_dir])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.rmtree.html#vipdopt.utils.rmtree" title="vipdopt.utils.rmtree"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rmtree</span></code></a>(path[, keep_dir])</p></td>
 <td><p>Delete a directory recursively.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.sech.html#vipdopt.utils.sech" title="vipdopt.utils.sech"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sech</span></code></a>(z)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.sech.html#vipdopt.utils.sech" title="vipdopt.utils.sech"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sech</span></code></a>(z)</p></td>
 <td><p>Hyperbolic Secant.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.set_by_path.html#vipdopt.utils.set_by_path" title="vipdopt.utils.set_by_path"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_by_path</span></code></a>(root, items, value)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.set_by_path.html#vipdopt.utils.set_by_path" title="vipdopt.utils.set_by_path"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_by_path</span></code></a>(root, items, value)</p></td>
 <td><p>Set a value in a nested object in root by item sequence.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.setup_logger.html#vipdopt.utils.setup_logger" title="vipdopt.utils.setup_logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup_logger</span></code></a>(name[, level, log_file])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.setup_logger.html#vipdopt.utils.setup_logger" title="vipdopt.utils.setup_logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup_logger</span></code></a>(name[, level, log_file])</p></td>
 <td><p>Setup logger to use across the program.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.split_glob.html#vipdopt.utils.split_glob" title="vipdopt.utils.split_glob"><code class="xref py py-obj docutils literal notranslate"><span class="pre">split_glob</span></code></a>(pattern)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.split_glob.html#vipdopt.utils.split_glob" title="vipdopt.utils.split_glob"><code class="xref py py-obj docutils literal notranslate"><span class="pre">split_glob</span></code></a>(pattern)</p></td>
 <td><p>Convert a glob pattern into multiple patterns if necessary.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.starmap_with_kwargs.html#vipdopt.utils.starmap_with_kwargs" title="vipdopt.utils.starmap_with_kwargs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">starmap_with_kwargs</span></code></a>(function, args_iter, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.starmap_with_kwargs.html#vipdopt.utils.starmap_with_kwargs" title="vipdopt.utils.starmap_with_kwargs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">starmap_with_kwargs</span></code></a>(function, args_iter, ...)</p></td>
 <td><p>Wrapper around itertools.starmap that can take kwargs.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="vipdopt.utils.subclasses.html#vipdopt.utils.subclasses" title="vipdopt.utils.subclasses"><code class="xref py py-obj docutils literal notranslate"><span class="pre">subclasses</span></code></a>(cls)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="vipdopt.utils.subclasses.html#vipdopt.utils.subclasses" title="vipdopt.utils.subclasses"><code class="xref py py-obj docutils literal notranslate"><span class="pre">subclasses</span></code></a>(cls)</p></td>
 <td><p>Get all subclasses of a given class.</p></td>
 </tr>
 </tbody>

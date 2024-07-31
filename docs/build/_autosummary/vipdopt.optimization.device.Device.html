@@ -396,6 +396,7 @@
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.ladd_to_all.html">vipdopt.utils.ladd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.radd_to_all.html">vipdopt.utils.radd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.read_config_file.html">vipdopt.utils.read_config_file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.real_part_complex_product.html">vipdopt.utils.real_part_complex_product</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.repeat.html">vipdopt.utils.repeat</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.rmtree.html">vipdopt.utils.rmtree</a></li>
 <li class="toctree-l4"><a class="reference internal" href="vipdopt.utils.sech.html">vipdopt.utils.sech</a></li>
@@ -504,29 +505,41 @@ w (npt.NDArray[np.complex128]): The w variable for the device;</p>
 <tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.binarize" title="vipdopt.optimization.device.Device.binarize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">binarize</span></code></a>(variable_in)</p></td>
 <td><p>Assumes density - if not, convert explicitly.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.compute_binarization" title="vipdopt.optimization.device.Device.compute_binarization"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_binarization</span></code></a>(input_variable[, set_point])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.clip" title="vipdopt.optimization.device.Device.clip"><code class="xref py py-obj docutils literal notranslate"><span class="pre">clip</span></code></a>(x)</p></td>
+<td><p>Return x where all values are clipped to the device's constraints.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.compute_binarization" title="vipdopt.optimization.device.Device.compute_binarization"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_binarization</span></code></a>(input_variable[, set_point])</p></td>
 <td><p>Compute what percentage of the device is binarized.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.density_to_permittivity" title="vipdopt.optimization.device.Device.density_to_permittivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">density_to_permittivity</span></code></a>(density, eps_min, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.density_to_permittivity" title="vipdopt.optimization.device.Device.density_to_permittivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">density_to_permittivity</span></code></a>(density, eps_min, ...)</p></td>
 <td><p>Convert density to permittivity.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.from_source" title="vipdopt.optimization.device.Device.from_source"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_source</span></code></a>(source)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">export_density_as_gds</span></code>(gds_layer_dir)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.export_density_as_stl" title="vipdopt.optimization.device.Device.export_density_as_stl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">export_density_as_stl</span></code></a>(filename)</p></td>
+<td><p>Binarizes device density and exports as STL file for fabrication.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.from_source" title="vipdopt.optimization.device.Device.from_source"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_source</span></code></a>(source)</p></td>
 <td><p>Create a new device from a dictionary or load a saved .npy file.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.get_density" title="vipdopt.optimization.device.Device.get_density"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_density</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.get_density" title="vipdopt.optimization.device.Device.get_density"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_density</span></code></a>()</p></td>
 <td><p>Return the density of the device region (i.e. last layer).</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.get_design_variable" title="vipdopt.optimization.device.Device.get_design_variable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_design_variable</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.get_design_variable" title="vipdopt.optimization.device.Device.get_design_variable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_design_variable</span></code></a>()</p></td>
 <td><p>Return the design variable of the device region (i.e. first layer).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.get_permittivity" title="vipdopt.optimization.device.Device.get_permittivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_permittivity</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.get_permittivity" title="vipdopt.optimization.device.Device.get_permittivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_permittivity</span></code></a>()</p></td>
 <td><p>Return the permittivity of the design variable.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.import_cur_index" title="vipdopt.optimization.device.Device.import_cur_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">import_cur_index</span></code></a>(import_primitive[, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.import_cur_index" title="vipdopt.optimization.device.Device.import_cur_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">import_cur_index</span></code></a>(import_primitive[, ...])</p></td>
 <td><p>Reinterpolate and import cur_index into design regions.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.index_from_permittivity" title="vipdopt.optimization.device.Device.index_from_permittivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index_from_permittivity</span></code></a>(permittivity)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.index_from_permittivity" title="vipdopt.optimization.device.Device.index_from_permittivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index_from_permittivity</span></code></a>(permittivity)</p></td>
 <td><p>Takes square root of permittivty to give the index.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.interpolate_gradient" title="vipdopt.optimization.device.Device.interpolate_gradient"><code class="xref py py-obj docutils literal notranslate"><span class="pre">interpolate_gradient</span></code></a>(g[, dimension])</p></td>
+<td><p>Reinterpolate and import gradient into the shape of the design regions.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#vipdopt.optimization.device.Device.load_dict" title="vipdopt.optimization.device.Device.load_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_dict</span></code></a>(device_data)</p></td>
 <td><p>Load attributes from a dictionary.</p></td>
@@ -577,6 +590,12 @@ w (npt.NDArray[np.complex128]): The w variable for the device;</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="vipdopt.optimization.device.Device.clip">
+<span class="sig-name descname"><span class="pre">clip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarType_co</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarType_co</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#vipdopt.optimization.device.Device.clip" title="Link to this definition">¶</a></dt>
+<dd><p>Return x where all values are clipped to the device’s constraints.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="vipdopt.optimization.device.Device.compute_binarization">
 <span class="sig-name descname"><span class="pre">compute_binarization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_variable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">set_point</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vipdopt.optimization.device.Device.compute_binarization" title="Link to this definition">¶</a></dt>
 <dd><p>Compute what percentage of the device is binarized.</p>
@@ -586,6 +605,12 @@ w (npt.NDArray[np.complex128]): The w variable for the device;</p>
 <dt class="sig sig-object py" id="vipdopt.optimization.device.Device.density_to_permittivity">
 <span class="sig-name descname"><span class="pre">density_to_permittivity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">density</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps_min</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps_max</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vipdopt.optimization.device.Device.density_to_permittivity" title="Link to this definition">¶</a></dt>
 <dd><p>Convert density to permittivity.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vipdopt.optimization.device.Device.export_density_as_stl">
+<span class="sig-name descname"><span class="pre">export_density_as_stl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vipdopt.optimization.device.Device.export_density_as_stl" title="Link to this definition">¶</a></dt>
+<dd><p>Binarizes device density and exports as STL file for fabrication.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -636,6 +661,20 @@ Defaults to 1.</p>
 <dt class="sig sig-object py" id="vipdopt.optimization.device.Device.index_from_permittivity">
 <span class="sig-name descname"><span class="pre">index_from_permittivity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">permittivity</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vipdopt.optimization.device.Device.index_from_permittivity" title="Link to this definition">¶</a></dt>
 <dd><p>Takes square root of permittivty to give the index.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vipdopt.optimization.device.Device.interpolate_gradient">
+<span class="sig-name descname"><span class="pre">interpolate_gradient</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">g</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarType_co</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dimension</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'3D'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vipdopt.optimization.device.Device.interpolate_gradient" title="Link to this definition">¶</a></dt>
+<dd><p>Reinterpolate and import gradient into the shape of the design regions.</p>
+<dl>
+<dt>Arguments:</dt><dd><dl class="simple">
+<dt>g (NDArray): The uninterpolated, but perhaps processed, gradient with shape obtained from</dt><dd><p>the design efield monitors for adjoint optimization.</p>
+</dd>
+</dl>
+<p>dimension (str): The dimension of the simulation, either “2D” or “3D”. Defaults to “3D”.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -765,14 +804,17 @@ binarize (bool): Whether to binarize values.</p>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.as_dict"><code class="docutils literal notranslate"><span class="pre">Device.as_dict()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.backpropagate"><code class="docutils literal notranslate"><span class="pre">Device.backpropagate()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.binarize"><code class="docutils literal notranslate"><span class="pre">Device.binarize()</span></code></a></li>
+<li><a class="reference internal" href="#vipdopt.optimization.device.Device.clip"><code class="docutils literal notranslate"><span class="pre">Device.clip()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.compute_binarization"><code class="docutils literal notranslate"><span class="pre">Device.compute_binarization()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.density_to_permittivity"><code class="docutils literal notranslate"><span class="pre">Device.density_to_permittivity()</span></code></a></li>
+<li><a class="reference internal" href="#vipdopt.optimization.device.Device.export_density_as_stl"><code class="docutils literal notranslate"><span class="pre">Device.export_density_as_stl()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.from_source"><code class="docutils literal notranslate"><span class="pre">Device.from_source()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.get_density"><code class="docutils literal notranslate"><span class="pre">Device.get_density()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.get_design_variable"><code class="docutils literal notranslate"><span class="pre">Device.get_design_variable()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.get_permittivity"><code class="docutils literal notranslate"><span class="pre">Device.get_permittivity()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.import_cur_index"><code class="docutils literal notranslate"><span class="pre">Device.import_cur_index()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.index_from_permittivity"><code class="docutils literal notranslate"><span class="pre">Device.index_from_permittivity()</span></code></a></li>
+<li><a class="reference internal" href="#vipdopt.optimization.device.Device.interpolate_gradient"><code class="docutils literal notranslate"><span class="pre">Device.interpolate_gradient()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.load_dict"><code class="docutils literal notranslate"><span class="pre">Device.load_dict()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.load_file"><code class="docutils literal notranslate"><span class="pre">Device.load_file()</span></code></a></li>
 <li><a class="reference internal" href="#vipdopt.optimization.device.Device.num_filters"><code class="docutils literal notranslate"><span class="pre">Device.num_filters()</span></code></a></li>

@@ -226,6 +226,13 @@ class Device:
         d = Device._from_dict(attributes)
         d.set_design_variable(w)
         return d
+    
+    def clip(self, x: npt.NDArray) -> npt.NDArray:
+        """Return x where all values are clipped to the device's constraints."""
+        return np.maximum(
+            np.minimum(x, self.permittivity_constraints[1]),
+            self.permittivity_constraints[0]
+        )
 
     def get_design_variable(self) -> npt.NDArray[np.complex128]:
         """Return the design variable of the device region (i.e. first layer)."""

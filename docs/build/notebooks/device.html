@@ -359,6 +359,7 @@
 </li>
 <li class="toctree-l4 has-children"><a class="reference internal" href="../_autosummary/vipdopt.simulation.simobject.html">vipdopt.simulation.simobject</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" role="switch" type="checkbox"/><label for="toctree-checkbox-30"><div class="visually-hidden">Toggle navigation of vipdopt.simulation.simobject</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l5"><a class="reference internal" href="../_autosummary/vipdopt.simulation.simobject.Import.html">vipdopt.simulation.simobject.Import</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../_autosummary/vipdopt.simulation.simobject.IndexMonitor.html">vipdopt.simulation.simobject.IndexMonitor</a></li>
 <li class="toctree-l5"><a class="reference internal" href="../_autosummary/vipdopt.simulation.simobject.LumericalSimObject.html">vipdopt.simulation.simobject.LumericalSimObject</a></li>
 <li class="toctree-l5"><a class="reference internal" href="../_autosummary/vipdopt.simulation.simobject.LumericalSimObjectType.html">vipdopt.simulation.simobject.LumericalSimObjectType</a></li>
 </ul>
@@ -387,16 +388,20 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../_autosummary/vipdopt.utils.html">vipdopt.utils</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" role="switch" type="checkbox"/><label for="toctree-checkbox-34"><div class="visually-hidden">Toggle navigation of vipdopt.utils</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.apply_args_and_kwargs.html">vipdopt.utils.apply_args_and_kwargs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.convert_path.html">vipdopt.utils.convert_path</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.del_by_path.html">vipdopt.utils.del_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.ensure_path.html">vipdopt.utils.ensure_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.flatten.html">vipdopt.utils.flatten</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.get_by_path.html">vipdopt.utils.get_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.glob_first.html">vipdopt.utils.glob_first</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.import_lumapi.html">vipdopt.utils.import_lumapi</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.ladd_to_all.html">vipdopt.utils.ladd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.radd_to_all.html">vipdopt.utils.radd_to_all</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.read_config_file.html">vipdopt.utils.read_config_file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.real_part_complex_product.html">vipdopt.utils.real_part_complex_product</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.repeat.html">vipdopt.utils.repeat</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.rmtree.html">vipdopt.utils.rmtree</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.sech.html">vipdopt.utils.sech</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.set_by_path.html">vipdopt.utils.set_by_path</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.setup_logger.html">vipdopt.utils.setup_logger</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.split_glob.html">vipdopt.utils.split_glob</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../_autosummary/vipdopt.utils.starmap_with_kwargs.html">vipdopt.utils.starmap_with_kwargs</a></li>
@@ -454,9 +459,8 @@
 <h1>Devices in <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code><a class="headerlink" href="#Devices-in-vipdopt" title="Link to this heading">¶</a></h1>
 <p>The <code class="docutils literal notranslate"><span class="pre">Device</span></code> class is how optical devices are represented in <code class="docutils literal notranslate"><span class="pre">vipdopt</span></code>. A <code class="docutils literal notranslate"><span class="pre">Device</span></code> object contains a 3D voxel-grid design region, with each voxel having its own refractive index, along with a number of helpful methods for interacting with the rest of the code library.</p>
 <p>For later cells to work, please run the following block first.</p>
-<p>TODO: * binarization * exporting design</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># imports</span>
@@ -477,6 +481,8 @@
 <span class="c1"># Imports from vipdopt</span>
 <span class="kn">from</span> <span class="nn">vipdopt.optimization</span> <span class="kn">import</span> <span class="n">Device</span><span class="p">,</span> <span class="n">Sigmoid</span><span class="p">,</span> <span class="n">Scale</span>
 <span class="kn">from</span> <span class="nn">vipdopt.simulation</span> <span class="kn">import</span> <span class="n">LumericalFDTD</span><span class="p">,</span> <span class="n">LumericalSimulation</span><span class="p">,</span> <span class="n">Source</span>
+<span class="kn">from</span> <span class="nn">vipdopt.GDS</span> <span class="kn">import</span> <span class="n">GDS</span>
+<span class="kn">from</span> <span class="nn">vipdopt.STL</span> <span class="kn">import</span> <span class="n">STL</span>
 </pre></div>
 </div>
 </div>
@@ -493,7 +499,7 @@
 </li>
 </ul>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">device_size</span> <span class="o">=</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>  <span class="c1"># use a 5x5x5 grid for the design region</span>
@@ -521,7 +527,7 @@
 </div>
 </div>
 <div class="nboutput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -729,7 +735,60 @@ C:\Users\tytym\Documents\Schmidt Academy\SonyBayerFilter\vipdopt\optimization\de
 </section>
 <section id="Exporting-a-Device">
 <h2>Exporting a <code class="docutils literal notranslate"><span class="pre">Device</span></code><a class="headerlink" href="#Exporting-a-Device" title="Link to this heading">¶</a></h2>
-<p>TODO: GDS and STL exports, and save device to file</p>
+<p>After an optimization, a finished <code class="docutils literal notranslate"><span class="pre">Device</span></code> can be exported to a .GDS or .STL file. The <code class="docutils literal notranslate"><span class="pre">Device</span></code> permittivity will also be <em>binarized</em> (all values will be converted to 0 or 1).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dev</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span>
+    <span class="n">device_size</span><span class="p">,</span>
+    <span class="n">permittivity_bounds</span><span class="p">,</span>
+    <span class="n">coords</span><span class="p">,</span>
+    <span class="n">randomize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">init_seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">filters</span><span class="o">=</span><span class="p">[</span><span class="n">Sigmoid</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)],</span>
+<span class="p">)</span>
+
+<span class="c1"># ========= Export to STL ========</span>
+<span class="c1"># STL Export requires density to be fully binarized</span>
+<span class="n">full_density</span> <span class="o">=</span> <span class="n">dev</span><span class="o">.</span><span class="n">binarize</span><span class="p">(</span><span class="n">dev</span><span class="o">.</span><span class="n">get_density</span><span class="p">())</span>
+<span class="n">stl_generator</span> <span class="o">=</span> <span class="n">STL</span><span class="p">(</span><span class="n">full_density</span><span class="p">)</span>
+<span class="n">stl_generator</span><span class="o">.</span><span class="n">generate_stl</span><span class="p">()</span>
+<span class="n">stl_generator</span><span class="o">.</span><span class="n">save_stl</span><span class="p">(</span><span class="n">dev</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s1">&#39;.stl&#39;</span><span class="p">)</span>
+<span class="n">stl_generator</span><span class="o">.</span><span class="n">viz_stl</span><span class="p">()</span>
+
+<span class="c1"># ======== Export to GDS =========</span>
+
+<span class="c1"># GDS Export must be done in layers. We split the full design into individual</span>
+<span class="c1"># layers, (not related to design layers). Express each layer as polygons in an</span>
+<span class="c1"># STL Mesh object and write that layer into its own cell of the GDS file</span>
+
+<span class="n">layer_mesh_array</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">z_layer</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">full_density</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+    <span class="n">stl_generator</span> <span class="o">=</span> <span class="n">STL</span><span class="p">(</span><span class="n">full_density</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">z_layer</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">])</span>
+    <span class="n">stl_generator</span><span class="o">.</span><span class="n">generate_stl</span><span class="p">()</span>
+    <span class="n">layer_mesh_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stl_generator</span><span class="o">.</span><span class="n">stl_mesh</span><span class="p">)</span>
+
+<span class="c1"># Create a GDS object containing a Library with Cells corresponding to each 2D</span>
+<span class="c1"># layer in the 3D device.</span>
+<span class="n">gds_generator</span> <span class="o">=</span> <span class="n">GDS</span><span class="o">.</span><span class="n">set_layers</span><span class="p">(</span>
+    <span class="n">full_density</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+    <span class="n">unit</span><span class="o">=</span><span class="mf">1e-6</span>
+    <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">dev</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">dev</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+    <span class="o">/</span> <span class="n">dev</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="n">gds_generator</span><span class="o">.</span><span class="n">assemble_device</span><span class="p">(</span><span class="n">layer_mesh_array</span><span class="p">,</span> <span class="n">listed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">gds_generator</span><span class="o">.</span><span class="n">export_device</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">filetype</span><span class="o">=</span><span class="s1">&#39;gds&#39;</span><span class="p">)</span>
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_device_11_0.png" src="../_images/notebooks_device_11_0.png" />
+</div>
+</div>
 </section>
 </section>
 
