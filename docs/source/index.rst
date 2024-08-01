@@ -6,6 +6,10 @@
 Welcome to Vipdopt's documentation!
 ===================================
 
+* GitHub: https://github.com/Faraon-Lab/vidpopt
+* PyPi: https://pypi.org/project/vipdopt/
+* Documentation: https://vidpopt.readthedocs.io/en/latest/
+
 ``vipdopt`` (/vɪpdɑpt/) is a Python library for streamlining the process of **v**\olumetric
 **i**\nverse **p**\hotonic **d**\esign and **opt**\imization. It
 makes use of Lumerical's Python API ``lumapi`` to make the design and optimization of new

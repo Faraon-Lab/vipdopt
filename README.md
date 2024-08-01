@@ -1,5 +1,9 @@
 # `vipdopt`: Volumetric Inverse Photonic Design Optimizer
 
+* GitHub: https://github.com/Faraon-Lab/vidpopt
+* PyPi: https://pypi.org/project/vipdopt/
+* Documentation: https://vidpopt.readthedocs.io/en/latest/
+
 Vipdopt is a package for streamlining the inverse deisgn of nanophotonic devices. This package largely serves as a Python-based wrapper for Lumerical. Vipdopt also provides an interactable GUI for creating optimizations and monitoring their progress.
 
 This code performs an inverse-design optimization based on the adjoint optimization technique [^2] that designs a freeform multilayer optical Bayer filter and focusing lens as described in [^1]. The Bayer filter is multiwavelength and focuses and sorts different spectral bands into different prescribed locations on the focal plane. Otherwise known as a color router, this code is set by default to create a 10-layer filter for the visible spectral range, with lateral and vertical dimensions of 2.04 microns. Different options are available in the config to, for example, enable polarization sorting or adjust the spectral bands as necessary.

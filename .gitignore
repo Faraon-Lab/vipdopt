@@ -57,6 +57,8 @@ share/python-wheels/
 MANIFEST
 *.png
 *.bat
+.pypirc
+pip.ini
 
 # Documentation
 **/.ipynb_checkpoints/
