@@ -15,6 +15,7 @@ tmp/
 !docs/source/notebooks/*.json
 !docs/source/notebooks/example_render.yml
 !docs/source/notebooks/config_example_3d.yml
+!.readthedocs.yaml
 
 # Lumerical files
 *.lsf
