@@ -1,6 +1,6 @@
 """Package for optimization and inverse design of volumetric photonic devices."""
 
-__version__ = '2.0'
+__version__ = '2.0.1'
 
 # Import lumerical
 import logging

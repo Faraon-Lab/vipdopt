@@ -18,7 +18,7 @@ include-package-data = true
 #
 [project]
 name = "vipdopt"
-version ="2.0"
+version ="2.0.1"
 authors = [
   { name="McNichols, N.; Foo, I.; Roberts, G.", email="ianfoo@caltech.edu" },
 ]
