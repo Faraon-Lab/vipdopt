@@ -1,7 +1,7 @@
 Installation
 ============
 
-``vipdopt`` can be installed using ``pip`` or from [source](https://github.com/Faraon-Lab/vidpopt).
+``vipdopt`` can be installed using ``pip`` or from `source <https://github.com/Faraon-Lab/vidpopt>`_.
 
 Requirements
 ------------
@@ -48,7 +48,7 @@ We discuss installation from the source code below.
 Installation from Source
 ------------------------
 
-To install using the source code, first clone the [GitHub repository](https://github.com/Faraon-Lab/vidpopt)
+To install using the source code, first clone the `GitHub repository <https://github.com/Faraon-Lab/vidpopt>`_
 using git. This can be done with the following command:
 
 .. code-block:: bash
