@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 from collections.abc import Callable
+from copy import copy
 from enum import Enum
 from typing import Any
-from copy import copy
 
 import numpy as np
 import numpy.typing as npt
@@ -160,7 +160,7 @@ class Import(LumericalSimObject):
         self.x = np.ones(1)
         self.y = np.ones(1)
         self.z = np.ones(1)
-    
+
     def as_dict(self) -> dict:
         data = copy(vars(self))
         del data['n'], data['x'], data['y'], data['z']
@@ -177,6 +177,7 @@ class Import(LumericalSimObject):
         """Get the relevant data from in order to use `LumericalFDTD.importnk2`."""
         assert self.n is not None
         return (self.n, self.x, self.y, self.z)
+
 
 class IndexMonitor(LumericalSimObject):
     """Class representing an index monitor in Lumerical."""

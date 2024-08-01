@@ -3,7 +3,6 @@
 import abc
 
 import numpy.typing as npt
-import numpy as np
 
 from vipdopt.optimization.device import Device
 
@@ -41,14 +40,16 @@ class GradientAscentOptimizer(GradientOptimizer):
         w_hat = device.get_design_variable() + self.step_size * grad
 
         device.set_design_variable(device.clip(w_hat))
-    
-    # TODO: For Gradient Descent/Ascent only: Need to check whether it's respecting the epochs and everything. 
+
+    # TODO: For Gradient Descent/Ascent only: Need to check whether it's respecting the epochs and everything.
     # todo: At the moment this is implemented in a way where it doesn't respect the epoch maximums and minimums.
-    def scale_step_size(epoch_start_design_change_min, epoch_start_design_change_max, 
-                        epoch_end_design_change_min, epoch_end_design_change_max
-                        ):
-        '''Begin scaling of step size so that the design change stays within epoch_design_change limits in config.'''
-        
+    def scale_step_size(
+        epoch_start_design_change_min,
+        epoch_start_design_change_max,
+        epoch_end_design_change_min,
+        epoch_end_design_change_max,
+    ):
+        """Begin scaling of step size so that the design change stays within epoch_design_change limits in config."""
         # # 20240726 Ian - one day i'll understand this code
         # if use_fixed_step_size:
         #     step_size = fixed_step_size
@@ -60,7 +61,7 @@ class GradientAscentOptimizer(GradientOptimizer):
         #     while True:
         #         # Gets proposed design variable according to Eq. S2, OPTICA Paper Supplement: https://doi.org/10.1364/OPTICA.384228
         #         # Divides step size by 2 until the difference in the design variable is within the ranges set.
-                
+
         #         proposed_design_variable = cur_design_variable + step_size * design_gradient
         #         proposed_design_variable = np.maximum(                       # Makes sure that it's between 0 and 1
         #                                                 np.minimum(proposed_design_variable, 1.0),
@@ -83,5 +84,5 @@ class GradientAscentOptimizer(GradientOptimizer):
         #                 break						# skips the next two lines only if last=1 and check_last=True
         #             check_last = True
         #             last = 0
-    
+
         return 3

@@ -477,7 +477,7 @@ class FoM(SuperFoM):
         return np.dot(total_grad, self.spectral_weights)
 
     def _subtract_neg(self, array: npt.NDArray) -> npt.NDArray:
-        """ [NO LONGER USED] Subtract the restricted indices from the positive ones."""
+        """[NO LONGER USED] Subtract the restricted indices from the positive ones."""
         if len(self.pos_max_freqs) == 0:
             return 0 - array
         if len(self.neg_min_freqs) == 0:
@@ -567,7 +567,16 @@ class ConstantFoM(FoM):
 
     def __init__(self, value: Number):
         super().__init__(
-            'TE+TM', [], [], [], [], self._constant_fom, self._constant_grad, [0], [], [0]
+            'TE+TM',
+            [],
+            [],
+            [],
+            [],
+            self._constant_fom,
+            self._constant_grad,
+            [0],
+            [],
+            [0],
         )
         self.value = value
 
@@ -616,7 +625,8 @@ class BayerFilterFoM(FoM):
 
     def _bayer_fom(self, *args, **kwargs):
         """Compute bayer filter figure of merit.
-        More specifically, this function is customized for the Bayer Filter FoM, which requires both the transmission and intensity."""
+        More specifically, this function is customized for the Bayer Filter FoM, which requires both the transmission and intensity.
+        """
         # for mon in self.fwd_monitors:
         #     vipdopt.logger.debug(vars(mon))
         # TODO: Add functionality for neg_min_freqs
@@ -627,7 +637,7 @@ class BayerFilterFoM(FoM):
         total_ffom = np.zeros(self.fwd_monitors[0].fshape[1:])[..., self.pos_max_freqs]
         # Source weight calculation.
         source_weight = np.zeros(self.fwd_monitors[0].fshape, dtype=np.complex128)
-        
+
         transmission = self.fwd_monitors[1].trans_mag
         total_tfom += transmission[..., self.pos_max_freqs]
 
@@ -635,14 +645,13 @@ class BayerFilterFoM(FoM):
         total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
         # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
         try:
-            total_ffom /= np.array(
-                kwargs.get('max_intensity_by_wavelength', None)
-                )[..., self.pos_max_freqs]
-        except Exception as e:
+            total_ffom /= np.array(kwargs.get('max_intensity_by_wavelength', None))[
+                ..., self.pos_max_freqs
+            ]
+        except Exception:
             pass
         # TODO: CHECK THAT THIS IS THE RIGHT PLACE TO PUT IT. CHECK GREG CODE
 
-        
         # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
         # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
         # to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj) https://stackoverflow.com/a/30032182
@@ -654,7 +663,7 @@ class BayerFilterFoM(FoM):
         # self.source_weight = (
         #     source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
         # )
-        
+
         #! TODO: REDO - direction of source_weight vector potential error.
         # # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
         # # direction along the polarization. This is going to be the amplitude of the
@@ -676,7 +685,7 @@ class BayerFilterFoM(FoM):
         #     )
         # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
-        
+
         # NOTE: Ultimately because of the way SuperFoM is set up, there can only be one return value.
         match kwargs.get('type', None):
             case 'transmission':
@@ -732,7 +741,7 @@ class BayerFilterFoM(FoM):
         # #       self.enabled_restricted
         # ======================================================================================================================
 
-        # return df_dev     
+        # return df_dev
         return df_dev[..., self.pos_max_freqs]
 
 
@@ -801,6 +810,7 @@ class UniformMSEFoM(FoM):
 
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
+
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
 

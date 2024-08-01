@@ -8,7 +8,7 @@ from configparser import ConfigParser
 T = TypeVar('T')
 
 PACKAGE_NAME = 'vipdopt'
-VERSION = '1.0'
+VERSION = '2.0'
 SUPPORTED_LUMERICAL_VERSIONS = 'v2[1-4]*'
 LUMERICAL_DEFAULT_PATH_WINDOWS = Path('C:\\Program Files\\Lumerical\\')
 LUMERICAL_DEFAULT_PATH_LINUX = Path('/opt/lumerical/')

@@ -51,14 +51,18 @@ class AdamOptimizer(GradientOptimizer):
         w_hat = device.get_design_variable() + self.step_size * m_hat / np.sqrt(
             v_hat + self.eps
         )
-        
+
         clipped = device.clip(w_hat)
         device_diff = np.abs(clipped - device.get_design_variable())
         device_diff_without_clipping = np.abs(w_hat - device.get_design_variable())
         vipdopt.logger.info(f'Max change is {np.max(device_diff)}')
-        vipdopt.logger.info(f'Max change without clipping is {np.max(device_diff_without_clipping)}')
+        vipdopt.logger.info(
+            f'Max change without clipping is {np.max(device_diff_without_clipping)}'
+        )
         vipdopt.logger.info(f'Min change is {np.min(device_diff)}')
-        vipdopt.logger.info(f'Min change without clipping is {np.min(device_diff_without_clipping)}')
+        vipdopt.logger.info(
+            f'Min change without clipping is {np.min(device_diff_without_clipping)}'
+        )
 
         # Apply changes
         device.set_design_variable(clipped)

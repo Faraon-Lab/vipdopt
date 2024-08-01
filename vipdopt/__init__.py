@@ -1,12 +1,13 @@
 """Package for optimization and inverse design of volumetric photonic devices."""
 
+__version__ = '2.0'
+
 # Import lumerical
 import logging
-from getpass import getuser
-from types import ModuleType
-from typing import Any
 from configparser import ConfigParser
 from pathlib import Path
+from types import ModuleType
+from typing import Any
 
 from vipdopt.utils import import_lumapi
 

@@ -7,9 +7,9 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Vipdopt'
-copyright = '2024, Nia McNichols'
+copyright = '2024, Caltech'
 author = 'Nia McNichols'
-release = '0.1'
+release = '2.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

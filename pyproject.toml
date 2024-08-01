@@ -18,7 +18,7 @@ include-package-data = true
 #
 [project]
 name = "vipdopt"
-version ="1.1"
+version ="2.0"
 authors = [
   { name="McNichols, N.; Foo, I.; Roberts, G.", email="ianfoo@caltech.edu" },
 ]
@@ -27,7 +27,7 @@ maintainers = [
 ]
 description = "Package for volumetirc inverse photonic design and optimization"
 readme = "README.md"
-requires-python = "3.10"
+requires-python = "==3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
@@ -88,6 +88,7 @@ exclude = [
     "vipdopt/__main__.py",
     "vipdopt/GDS.py",
     "vipdopt/STL.py",
+    "vipdopt/lumerical.cfg",
     ".bzr",
     ".direnv",
     ".eggs",

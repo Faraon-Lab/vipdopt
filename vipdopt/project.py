@@ -32,7 +32,8 @@ sys.path.append(os.getcwd())
 def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False):
     """Create the subdirectories of the project folder.
     pull_files_debug_mode: if True, sets the folder for pulling completed jobs to the debug folder which should contain already-run sims.
-    This is for avoiding simulation runtime during debug testing."""
+    This is for avoiding simulation runtime during debug testing.
+    """
     directories: dict[str, Path] = {'main': root_dir}
 
     # * Output / Save Paths
@@ -189,7 +190,7 @@ class Project:
         self.src_to_sim_map = {
             src: base_sim.with_enabled([src], name=src)
             for src in base_sim.source_names()
-        }                                                   # key, value types here are Dict( str : LumericalSimulation )
+        }  # key, value types here are Dict( str : LumericalSimulation )
         self.base_sim.set_path(self.dir / 'base_sim.fsp')
 
         # TODO: Partitioning the base_sim into simulations: i.e. a list of Simulation objects
@@ -232,9 +233,11 @@ class Project:
             if fom_dict['pos_max_freqs'] == []:
                 #! WAVELENGTH VALUES - INDICES OR ACTUAL VALUES?
                 # fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
-                fom_dict['pos_max_freqs'] = np.array(range(len(cfg['lambda_values_um'])))
+                fom_dict['pos_max_freqs'] = np.array(
+                    range(len(cfg['lambda_values_um']))
+                )
 
-            fom_dict['all_freqs'] = 3e8/np.array(cfg['lambda_values_um'])
+            fom_dict['all_freqs'] = 3e8 / np.array(cfg['lambda_values_um'])
 
             weights.append(fom_dict.pop('weight'))
             self.foms.append(FoM.from_dict(fom_dict))
@@ -243,9 +246,10 @@ class Project:
     def _setup_weights(self, cfg: Config):
         """Setup the weights for each FoM.
         At present this processes spectral weights as a factor to the original weights -
-        i.e. the wavelength-dependent behaviour of each FoM"""
+        i.e. the wavelength-dependent behaviour of each FoM
+        """
         # Overall Weights for each FoM
-        self.weights = np.array(self.weights)           # Just ensure that it's a numpy
+        self.weights = np.array(self.weights)  # Just ensure that it's a numpy
 
         # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM
         # (e.g. spectral sorting)
@@ -364,7 +368,6 @@ class Project:
 
     def _load_config(self, config: Config | dict):
         """Load and setup optimization from an appropriate JSON config file."""
-
         # Load config file
         cfg = copy(config)
         if not isinstance(config, Config):
@@ -399,11 +402,13 @@ class Project:
 
         self.subdirectories = create_internal_folder_structure(
             self.dir,
-            pull_files_debug_mode = True
-            #debug_mode = running_on_local_machine
+            pull_files_debug_mode=True,
+            # debug_mode = running_on_local_machine
         )
         vipdopt.logger.info('Internal folder substructure created.')
-        os.path.dirname(__file__)  # Go up one folder - # todo: 20240724 ian - wait is this line even necessary
+        os.path.dirname(
+            __file__
+        )  # Go up one folder - # todo: 20240724 ian - wait is this line even necessary
 
         # Setup Optimization
         assert self.device is not None
@@ -434,16 +439,15 @@ class Project:
             self.optimizer,
             full_fom,
             # Explicitly declare the fom kwargs passed to compute_fom() as cfg.
-            fom_kwargs = cfg,
+            fom_kwargs=cfg,
             # It could be different but for now it's not
-            cfg = cfg,
-            epoch_list = cfg.get('epoch_list'),
-            true_iteration = iteration,
+            cfg=cfg,
+            epoch_list=cfg.get('epoch_list'),
+            true_iteration=iteration,
             env_vars=env_vars,
             dirs=self.subdirectories,
         )
         vipdopt.logger.info('Optimization initialized.')
-
 
         # Finally, set the remaining config file (now that everything is popped) as the config variable of the Project.
         self.config = cfg
@@ -523,7 +527,6 @@ class Project:
 
     def start_optimization(self):
         """Start this project's optimization."""
-
         self.optimization.loop = True
         # self.optimization.run()
         self.optimization.run()

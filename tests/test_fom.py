@@ -25,18 +25,7 @@ SQUARE_SUM = SQUARED_ARRAY.sum()
 GRADIENT_ARRAY = np.array([[0, 2, 4], [6, 8, 10], [12, 14, 16]])  # 2X
 ONES_ARRAY = np.ones((3, 3))
 
-BASE_FOM = FoM(
-    'TE',
-    [],
-    [],
-    [],
-    [],
-    fom_func,
-    gradient_func,
-    [0, 1, 2],
-    [],
-    [0, 1, 2]
-)
+BASE_FOM = FoM('TE', [], [], [], [], fom_func, gradient_func, [0, 1, 2], [], [0, 1, 2])
 
 
 @pytest.mark.smoke()
@@ -203,7 +192,20 @@ def test_unique_source_map():
     # 0:1, 1:3, 2:5, 3:7, 4:9
     combos = [srcs[i:j] for (i, j) in zip(range(5), range(1, 10, 2), strict=False)]
     foms = [
-        (FoM('TE', src_combo, [], [], [], fom_func, gradient_func, range(2), [], range(2)),)
+        (
+            FoM(
+                'TE',
+                src_combo,
+                [],
+                [],
+                [],
+                fom_func,
+                gradient_func,
+                range(2),
+                [],
+                range(2),
+            ),
+        )
         for src_combo in combos
     ]
     fom = SuperFoM(foms, np.ones(10))

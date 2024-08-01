@@ -2,7 +2,7 @@
 
 from vipdopt.optimization.adam import AdamOptimizer
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.filter import Filter, Sigmoid, Scale
+from vipdopt.optimization.filter import Filter, Scale, Sigmoid
 from vipdopt.optimization.fom import (
     BayerFilterFoM,
     FoM,

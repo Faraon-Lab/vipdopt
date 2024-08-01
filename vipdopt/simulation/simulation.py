@@ -212,11 +212,11 @@ class LumericalSimulation(ISimulation):
         new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
-        
-        try:    # Copy-paste the device imports from the previous simulation into the new simulation.
+
+        try:  # Copy-paste the device imports from the previous simulation into the new simulation.
             for i, imp in enumerate(new_sim.imports()):
                 imp.set_nk2(*self.imports()[i].get_nk2())
-        except Exception as e:
+        except Exception:
             pass
 
         return new_sim
@@ -328,19 +328,25 @@ class LumericalSimulation(ISimulation):
         """Return a list of all import object names."""
         for obj in self.imports():
             yield obj.name
-    
+
     def indexmonitors(self) -> list[LumericalSimObject]:
-        '''Return a list of all indexmonitor objects.'''
-        return [obj for _, obj in self.objects.items() if obj.obj_type == LumericalSimObjectType.INDEX]
-    
+        """Return a list of all indexmonitor objects."""
+        return [
+            obj
+            for _, obj in self.objects.items()
+            if obj.obj_type == LumericalSimObjectType.INDEX
+        ]
+
     def indexmonitor_names(self) -> Iterator[str]:
-        '''Return a list of all indexmonitor object names.'''
+        """Return a list of all indexmonitor object names."""
         for obj in self.indexmonitors():
             yield obj.name
-    
+
     def import_field_shape(self) -> tuple[int, ...]:
         """Return the shape of the fields returned from this simulation's design index monitors."""
-        index_prev = vipdopt.fdtd.getresult(list(self.indexmonitor_names())[0], 'index preview')
+        index_prev = vipdopt.fdtd.getresult(
+            list(self.indexmonitor_names())[0], 'index preview'
+        )
         return np.squeeze(index_prev['index_x']).shape
 
     def new_object(
@@ -413,7 +419,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
 
     with LumericalSimulation(Path(args.simulation_json)) as sim:
-    #with LumericalSimulation() as sim:
+        # with LumericalSimulation() as sim:
         sim.fdtd.promise_env_setup()
         sim.load('test_project/.tmp/sim_0.fsp')
         sys.exit()
