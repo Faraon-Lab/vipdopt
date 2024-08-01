@@ -1,6 +1,0 @@
-vipdopt.gui.run\_gui.start\_gui
-===============================
-
-.. currentmodule:: vipdopt.gui.run_gui
-
-.. autofunction:: start_gui

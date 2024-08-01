@@ -1,6 +1,0 @@
-vipdopt.utils.rmtree
-====================
-
-.. currentmodule:: vipdopt.utils
-
-.. autofunction:: rmtree

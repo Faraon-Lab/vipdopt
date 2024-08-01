@@ -1,6 +1,0 @@
-vipdopt.utils.get\_by\_path
-===========================
-
-.. currentmodule:: vipdopt.utils
-
-.. autofunction:: get_by_path

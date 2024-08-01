@@ -1,6 +1,0 @@
-vipdopt.utils.repeat
-====================
-
-.. currentmodule:: vipdopt.utils
-
-.. autofunction:: repeat

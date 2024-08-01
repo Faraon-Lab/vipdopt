@@ -9,3 +9,4 @@ Below are some Jupyter notebook tutorials to help get familiar with ``vipdopt``.
     notebooks/config
     notebooks/fom
     notebooks/device
+    notebooks/project

@@ -1,6 +1,0 @@
-vipdopt.utils.set\_by\_path
-===========================
-
-.. currentmodule:: vipdopt.utils
-
-.. autofunction:: set_by_path

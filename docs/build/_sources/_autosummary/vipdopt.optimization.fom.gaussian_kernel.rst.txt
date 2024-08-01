@@ -1,6 +1,0 @@
-vipdopt.optimization.fom.gaussian\_kernel
-=========================================
-
-.. currentmodule:: vipdopt.optimization.fom
-
-.. autofunction:: gaussian_kernel

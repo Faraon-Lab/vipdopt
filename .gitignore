@@ -61,7 +61,6 @@ MANIFEST
 # Documentation
 **/.ipynb_checkpoints/
 
-!docs/build/
 !docs/*.png
 !docs/*.gif
 
@@ -69,6 +68,9 @@ docs/source/_autosummary/
 docs/notebooks/pixel_example/template.j2
 docs/**/*.stl
 docs/**/*.gds
+
+docs/build/
+
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/

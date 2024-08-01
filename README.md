@@ -10,7 +10,7 @@ This code performs an inverse-design optimization based on the adjoint optimizat
 
 ## Tutorials, Examples, and Documentation
 
-See [docs/](docs/)
+See the [documentation](http://vidpopt.readthedocs.io/)
 
 ## Requirements
 
@@ -21,7 +21,7 @@ See [docs/](docs/)
 
 If creating a conda environment, there is not official PySide6 package yet. After activating your environment, you will need to install PySide6 with pip.
 
-## Usage
+## Usage (Command Line)
 
 To run an optimization, Vipdopt requires a project_directory containing two files:
 - A configuration file containing optimization parameters

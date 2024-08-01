@@ -48,6 +48,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'nbsphinx',
     'sphinx_gallery.load_style',
+    'sphinx_tabs.tabs',
 ]
 
 autosummary_generate = True  # Turn on sphinx.ext.autosummary

@@ -1,4 +1,4 @@
-name: vipdopt3.10
+name: vipdopt-dev
 channels:
   - conda-forge
   - defaults
@@ -21,6 +21,7 @@ dependencies:
   - furo=2024.5.6
   - nbsphinx=0.9.4
   - sphinx_gallery=0.17.0
+  - sphinx_tabs==3.4.5
   - pandoc=1.13
   # For Jupyter
   - notebook==7.2.1
