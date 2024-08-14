@@ -256,6 +256,7 @@ class BasicPlot:
         SAVE_LOCATION = os.path.abspath(
             os.path.join(plot_directory_location, plot_subfolder_name)
         )
+        #SAVE_LOCATION.mkdir(parents=True, exist_ok=True)
         if not os.path.isdir(SAVE_LOCATION):
             os.makedirs(SAVE_LOCATION)
 
@@ -607,9 +608,7 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, iterati
     }
 
     plot_subfolder_name = 'quad_trans'
-    plot_directory_location = plot_directory_location / plot_subfolder_name
-    if not os.path.isdir(plot_directory_location):
-        os.makedirs(plot_directory_location)
+    plot_directory_location = plot_directory_location
 
     bp = BasicPlot(plot_data)
     fig, ax = bp.fig, bp.ax
@@ -619,7 +618,7 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, iterati
     bp.assign_axis_labels(y_label_string='Quad Trans.')
     # for i in range(0,numEpochs+1):
     # 	plt.vlines(i*numIter, 0,upperRange, **vline_style)
-    bp.export_plot_config(plot_directory_location, 'quad_trans', f'trans_i{iteration}')
+    bp.export_plot_config(plot_directory_location, plot_subfolder_name, f'trans_i{iteration}')
 
     return fig
 
@@ -772,10 +771,11 @@ def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs=No
         bp.assign_axis_labels(y_label_string='Intensity')
         # for i in range(0,numEpochs+1):
         # 	plt.vlines(i*numIter, 0,upperRange, **vline_style)
+        wl_str = f'{wl[wl_idx]:.3f}um' if 1e3*wl[wl_idx] >= 1000 else f'{int(1e3*wl[wl_idx]):d}nm'
         bp.export_plot_config(
             plot_directory_location,
             'Efield_plots',
-            f'Enorm_wl{int(1e9 * wl[wl_idx]):.3f}nm_i{iteration}',
+            f'Enorm_wl{wl_str}_i{iteration}',
         )
 
 

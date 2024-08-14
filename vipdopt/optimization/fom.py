@@ -91,7 +91,7 @@ class SuperFoM:
         # if np.min(weights) < 0:
         #     weights -= np.min(weights)
         #     weights /= np.sum(weights)
-        
+
         # Max(x,0) according to Eq. (2), https://www.nature.com/articles/s41598-021-88785-5
         weights = np.fmax(weights, 0)
 
@@ -511,10 +511,10 @@ class FoM(SuperFoM):
         data: dict = {}
         data['type'] = type(self).__name__
         data['polarization'] = self.polarization
-        data['fwd_srcs'] = self.fwd_srcs
-        data['adj_srcs'] = self.adj_srcs
-        data['fwd_monitors'] = self.fwd_monitors
-        data['adj_monitors'] = self.adj_monitors
+        data['fwd_srcs'] = [f['name'] for f in self.fwd_srcs]
+        data['adj_srcs'] = [f['name'] for f in self.adj_srcs]
+        data['fom_monitors'] = [f['name'] for f in self.fwd_monitors]
+        data['grad_monitors'] = [f['name'] for f in self.adj_monitors]
         if data['type'] == 'FoM':  # Generic FoM needs to copy functions
             data['fom_func'] = self.fom_func
             data['grad_func'] = self.grad_func
@@ -599,7 +599,7 @@ class BayerFilterFoM(FoM):
         total_ffom = np.zeros(self.fwd_monitors[0].fshape[1:])[..., self.pos_max_freqs]
         # Source weight calculation.
         source_weight = np.zeros(self.fwd_monitors[0].fshape, dtype=np.complex128)
-        
+
         transmission = self.fwd_monitors[1].trans_mag
         total_tfom += transmission[..., self.pos_max_freqs]
 
@@ -614,7 +614,7 @@ class BayerFilterFoM(FoM):
             pass
         # TODO: CHECK THAT THIS IS THE RIGHT PLACE TO PUT IT. CHECK GREG CODE
 
-        
+
         # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
         # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
         # to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj) https://stackoverflow.com/a/30032182
@@ -626,7 +626,7 @@ class BayerFilterFoM(FoM):
         # self.source_weight = (
         #     source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
         # )
-        
+
         #! TODO: REDO - direction of source_weight vector potential error.
         # # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
         # # direction along the polarization. This is going to be the amplitude of the
@@ -648,7 +648,7 @@ class BayerFilterFoM(FoM):
         #     )
         # )
         # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
-        
+
         # NOTE: Ultimately because of the way SuperFoM is set up, there can only be one return value.
         match kwargs.get('type', None):
             case 'transmission':
@@ -710,8 +710,8 @@ class BayerFilterFoM(FoM):
                 )[..., self.pos_max_freqs]
         except Exception as e:
             pass
-        
-        # return df_dev   
+
+        # return df_dev
         return df_dev[..., self.pos_max_freqs]
 
 

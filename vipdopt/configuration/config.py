@@ -30,7 +30,7 @@ class Config(UserDict):
         if config is not None:
             self.update(config)
 
-        vipdopt.logger.info(f'\nSuccesfully loaded configuration from {fname}')
+        vipdopt.logger.info(f'\nSuccessfully loaded configuration from {fname}')
 
     @classmethod
     def from_file(cls: type[Config], fname: Path) -> Config:
@@ -51,7 +51,10 @@ class Config(UserDict):
         match cfg_format.lower():
             case '.yaml' | '.yml':
                 with path_filename.open('w') as f:
-                    yaml.dump(config_data, f, **kwargs)
+                    try:
+                        yaml.dump(config_data, f, **kwargs)
+                    except Exception as err:    # yaml dump function can't take unexpected kwargs
+                        yaml.dump(config_data, f)
             case '.json':
                 with path_filename.open('w') as f:
                     json.dump(config_data, f, indent=4, ensure_ascii=True, **kwargs)

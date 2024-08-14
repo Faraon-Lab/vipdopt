@@ -22,7 +22,7 @@ from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import BayerFilterFoM, FoM, SuperFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.simulation import LumericalFDTD, LumericalSimulation
-from vipdopt.utils import rmtree, real_part_complex_product
+from vipdopt.utils import glob_first, rmtree, real_part_complex_product, replace_border
 
 DEFAULT_OPT_FOLDERS = {
     'temp': Path('./optimization/temp'),
@@ -52,6 +52,7 @@ class LumericalOptimization:
         true_iteration: int = 0,
         dirs: dict[str, Path] = DEFAULT_OPT_FOLDERS,
         env_vars: dict = {},
+        project: Any = None
     ):
         """Initialize Optimization object."""
         self.base_sim = base_sim
@@ -98,6 +99,9 @@ class LumericalOptimization:
                 self.fom_hist.update( {f'{metric}_{i}': []} )
         self.fom_hist.update( {'intensity_overall_xyzwl': []} )
         self.param_hist.update({'design': []})
+        
+        # Set up parent project
+        self.project = project
 
         # Setup callback functions
         self._callbacks: list[Callable[[LumericalOptimization], None]] = []
@@ -188,15 +192,35 @@ class LumericalOptimization:
                 # zip(self.sims, self.sim_files)
             )
 
-    def save_histories(self):
+    def save_histories(self, folder=None):
         """Save the fom and parameter histories to file."""
-        folder = self.dirs['opt_info']
+        if folder is None:
+            folder = self.dirs['opt_info']
         foms = np.array(self.fom_hist)
         with (folder / 'fom_history.npy').open('wb') as f:
             np.save(f, foms)
         params = np.array(self.param_hist)
         with (folder / 'parameter_history.npy').open('wb') as f:
             np.save(f, params)
+    
+    def load_histories(self, folder=None):
+        """Load the fom and parameter histories from file."""
+        if folder is None:
+            folder = self.dirs['opt_info']
+        
+        fom_hist_file = folder / 'fom_history.npy'
+        param_hist_file = folder / 'parameter_history.npy'
+        
+        if not fom_hist_file.exists():
+            # Search the directory for a configuration file
+            fom_hist_file = glob_first(self.dirs['root'], '**/*fom_history*.{npy,npz}')
+        if not param_hist_file.exists():
+            # Search the directory for a configuration file
+            param_hist_file = glob_first(self.dirs['root'], '**/*parameter_history*.{npy,npz}')
+            
+        self.fom_hist = np.load(folder / 'fom_history.npy', allow_pickle=True).item()
+        self.param_hist = np.load(folder / 'parameter_history.npy', allow_pickle=True).item()
+        
 
     def generate_plots(self):
         """Generate the plots and save to file."""
@@ -205,7 +229,7 @@ class LumericalOptimization:
 
         # Placeholder indiv_quad_trans
         import matplotlib.pyplot as plt
-        getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
+        # getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
         # self.generate_plots_efield_focalplane_1d()
 
         # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
@@ -253,8 +277,9 @@ class LumericalOptimization:
             #     wl_idxs=[9, 29, 49],
             # )
 
+        trans_quadrants = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
         indiv_trans_fig = plotter_v2.plot_individual_quadrant_transmission(
-            np.array([self.fom_hist[f'transmission_{x}'][-1] for x in [0,1]]),
+            np.array([self.fom_hist[f'transmission_{x}'][-1] for x in trans_quadrants]),
             self.cfg['lambda_values_um'],
             folder,
             self.iteration,
@@ -275,8 +300,8 @@ class LumericalOptimization:
             pickle.dump(quad_trans_fig, f)
         with (folder / 'overall_trans.pkl').open('wb') as f:
             pickle.dump(overall_trans_fig, f)
-        with (folder / 'enorm.pkl').open('wb') as f:
-            pickle.dump(intensity_fig, f)
+        # with (folder / 'enorm.pkl').open('wb') as f:
+        #     pickle.dump(intensity_fig, f)
         with (folder / 'indiv_trans.pkl').open('wb') as f:
             pickle.dump(indiv_trans_fig, f)
         with (folder / 'final_device_layer.pkl').open('wb') as f:
@@ -371,11 +396,10 @@ class LumericalOptimization:
 
     def _post_run(self):
         """Final post-processing after running the optimization."""
-        # Disconnect from Lumerical
         self.loop = False
         self.save_histories()
         self.generate_plots()
-        self.fdtd.close()
+        self.fdtd.close()       # Disconnect from Lumerical
 
     def run_simulations(self):
         """Run all of the simulations in parallel."""
@@ -789,7 +813,7 @@ class LumericalOptimization:
                     self.binarization_evolution,
                 )
 
-                self.param_hist.get('design').append( self.device.get_design_variable() )
+                # self.param_hist.get('design').append( self.device.get_design_variable() )
 
                 # TODO: Here is where we would start plotting the loss landscape. Probably should be accessed by a separate class...
                 # Or we could move it to the device step part
@@ -916,8 +940,7 @@ class LumericalOptimization:
                 #     method='linear',
                 # )
 
-                # Each device needs to remember its gradient!
-                # TODO: refine this
+
                 if self.cfg['enforce_xy_gradient_symmetry']:
                     if self.cfg['simulator_dimension'] in '2D':
                         transpose_design_gradient_interpolated = np.flip(
@@ -931,9 +954,14 @@ class LumericalOptimization:
                         design_gradient_interpolated
                         + transpose_design_gradient_interpolated
                     )
-                self.device.gradient = (
-                    design_gradient_interpolated.copy()
-                )  # This is BEFORE backpropagation
+                
+
+                
+                # # Each device needs to remember its gradient!
+                # # TODO: refine this
+                # self.device.gradient = (
+                #     design_gradient_interpolated.copy()
+                # )  # This is BEFORE backpropagation
 
                 vipdopt.logger.info(
                     'Completed Step 5: Adjoint Optimization Jobs and '
@@ -1100,7 +1128,8 @@ class LumericalOptimization:
 
     def run2(self):
         """Run the optimization"""
-        self._pre_run() # Connects to Lumerical if it's not already connected. #! Warning - starts a new project if already connected!
+        self._pre_run() # Connects to Lumerical if it's not already connected. 
+        #! Warning - starts a new FDTD instance if already connected!
 
         # If an error is encountered while running the optimization still want to
         # clean up afterwards
@@ -1161,19 +1190,26 @@ class LumericalOptimization:
                     epoch = np.max( np.where( np.array(self.epoch_list)<=self.iteration ) )
                     )
                 self.device.update_density()
+                # If final iteration, binarize device for good
+                if self.iteration==self.epoch_list[-1]:
+                    self.device.set_design_variable(self.device.binarize(self.device.get_design_variable()))
                 # Import device index now into base simulation
                 import_primitive = self.base_sim.imports()[0]
+                # Hard-code reinterpolation size as this seems to be what works for accurate Lumerical imports.
+                reinterpolation_size = (300,306,3) if self.cfg['simulator_dimension']=='2D' else (300,300,306)
+                
                 cur_density, cur_permittivity = self.device.import_cur_index(
                     import_primitive,
-                    reinterpolation_factor=1,
+                    reinterpolation_factors=(1,1,1),    # For 2D the last entry of the tuple must always be 1.
+                    reinterpolation_size=reinterpolation_size,   # For 2D the last entry of the tuple must be 3.
                     binarize=False,
                 )
                 # Sync up with FDTD to properly import device.
                 self.fdtd.save(self.base_sim.get_path(), self.base_sim)
 
                 # # Save statistics to do with design variable away before running simulations.
-                # Save current design before iteration
-                self.param_hist.get('design').append( self.device.get_design_variable() )
+                # Save device and design variable
+                self.device.save(self.project.current_device_path())
                 # # Calculate material % and binarization level, store away
                 # # todo: redo this section once you get sigmoid filters up and can start counting materials
                 # cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
@@ -1280,7 +1316,7 @@ class LumericalOptimization:
                 get_grad_density = real_part_complex_product(delta_permittivity, g)
                 #! This is where the gradient picks up a permittivity factor i.e. becomes larger than 1!
                 #! Mitigated by backpropagating through the Scale filter.
-                get_grad_density = 2 * get_grad_density		# Factor of 2 after taking the real part according to algorithm
+                get_grad_density = 2 * get_grad_density		    # Factor of 2 after taking the real part according to algorithm
 
                 # # Get the full design gradient by summing the x,y polarization components
                 # # todo: Do we need to consider polarization in the same way with the new implementation??
@@ -1292,24 +1328,46 @@ class LumericalOptimization:
                         dimension=self.cfg['simulator_dimension']
                     )
 
-                # Each device needs to remember its gradient!
-                # todo: refine this
+                # Replaces a border of width <in config> with zeros.
+                # TODO: Put into the config as border_constant_index or something like this
+                if self.cfg['border_constant_width']:
+                    design_gradient_interpolated = replace_border(design_gradient_interpolated,
+                                                    self.cfg['border_constant_width'],
+                                                    const=0, only_sides=True
+                                                    )
+
                 if self.cfg['enforce_xy_gradient_symmetry']:
                     if self.cfg['simulator_dimension'] in '2D':
                         transpose_design_gradient_interpolated = np.flip(design_gradient_interpolated, 1)
                     if self.cfg['simulator_dimension'] in '3D':
                         transpose_design_gradient_interpolated = np.swapaxes( design_gradient_interpolated, 0, 1 )
                     design_gradient_interpolated = 0.5 * ( design_gradient_interpolated + transpose_design_gradient_interpolated )
+                # Each device needs to remember its gradient! # todo: refine this
                 # self.device.gradient = design_gradient_interpolated.copy()	# This is BEFORE backpropagation
 
                 # Step the device with the gradient
                 vipdopt.logger.debug('Stepping device along gradient.')
                 self.optimizer.step(self.device, design_gradient_interpolated.copy(), self.iteration)
+                
+                # Perturb design variable appropriately
+                if self.cfg['border_constant_width']:
+                    self.device.set_design_variable(replace_border(self.device.get_design_variable(),
+                                                        self.cfg['border_constant_width'],
+                                                        const = self.cfg['border_constant_density'],
+                                                        only_sides=True
+                                                        ))
+                self.device.visualize_layer(layer_num=0)
 
+                # Save design variable
+                self.device.save(self.project.current_device_path())
+                
                 # Generate Plots and call callback functions
                 self.save_histories()
                 self.generate_plots()
                 self.call_callbacks()
+                
+                # Save Project
+                self.project.save_as(self.project.subdirectories['checkpoints'])
 
                 self.iteration += 1
             if not self.loop:

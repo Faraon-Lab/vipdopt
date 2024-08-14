@@ -196,12 +196,12 @@
                 "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {%- endif %}
-                "material": "PEC (Perfect Electrical Conductor)"
                 {%- if data.boundary_conditions == 'periodic' %}
-                "enabled": False,
+                "enabled": false,
                 "x span": {{data.fdtd_region_size_lateral_um * 1e-6}},
                 "y span": {{data.fdtd_region_size_lateral_um * 1e-6}},
                 {% endif -%}
+                "material": "PEC (Perfect Electrical Conductor)"
             }
         },
         "source_aperture": {
@@ -219,10 +219,10 @@
                 "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {%- endif %}
-                "index": {{ data.background_index }}
                 {%- if data.boundary_conditions == 'periodic' %}
-                "enabled": False,
+                "enabled": false,
                 {% endif -%}
+                "index": {{ data.background_index }}
             }
         },
         {% endif -%}

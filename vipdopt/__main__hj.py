@@ -105,11 +105,6 @@ if __name__ == '__main__':
     # 'foms': list of FoM objects, 'weights': array of shape (#FoMs, nλ)
     vipdopt.logger.info('Completed Step 0: Project Setup')
 
-    # What happens if the optimization breaks? Go into project.subdirectories['checkpoints']
-    # Copy project.json and config.json to the current folder (e.g. runs\test_run)
-    # Launch vipdopt again but with "--config config.json" i.e. point the config file to the savestate
-    # TODO: Write Tests
-
     # Now that config is loaded, set up lumapi
     if os.getenv('SLURM_JOB_NODELIST') is None:
         vipdopt.lumapi = import_lumapi(
@@ -123,15 +118,12 @@ if __name__ == '__main__':
         )  # HPC (Linux)
         vipdopt.logger.info(f'HPC Lumapi path is: {project.config.data["lumapi_filepath_hpc"]}')
         hide_fdtd=True
-        with open(project.dir / f'slurm_{os.getenv("SLURM_JOB_ID")}.log', "w") as f:
-            f.write(' ')
 
     fdtd = project.optimization.fdtd    # NOTE: - the instantiation is called in optimization.py
     vipdopt.fdtd = fdtd      # Makes it available to global
 
     fdtd.connect(hide=hide_fdtd)
     project.start_optimization()
-
     
     # STL Export final design
     project.device.export_density_as_stl( project.subdirectories['data'] / 'final_device.stl' )

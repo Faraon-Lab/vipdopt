@@ -60,6 +60,11 @@ class LumericalEncoder(json.JSONEncoder):
             return copy(vars(o))
         if isinstance(o, np.ndarray):
             return o.tolist()
+        elif isinstance(o, np.generic):
+            return o.item()
+        if isinstance(o, complex) and np.imag(o)==0:
+            # We purposely want it to break for actual complex numbers
+            return np.real(o)
         if isinstance(o, Path):
             return str(o)
         return super().default(o)
@@ -146,7 +151,7 @@ class LumericalSimulation(ISimulation):
         vipdopt.logger.debug(f'Loading simulation from {fname}...')
         sim = read_config_file(fname)
         self._load_dict(sim)
-        vipdopt.logger.info(f'Succesfully loaded {fname}\n')
+        vipdopt.logger.info(f'Successfully loaded {fname}\n')
 
     def _load_dict(self, d: dict):
         """Load a simulation from a dictionary."""
@@ -167,11 +172,13 @@ class LumericalSimulation(ISimulation):
         content = self.as_json()
         with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             f.write(content)
-        vipdopt.logger.debug(f'Succesfully saved simulation to {fname}.\n')
+        vipdopt.logger.debug(f'Successfully saved simulation to {fname}.\n')
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this simulation."""
-        return {'objects': {name: vars(obj) for name, obj in self.objects.items()}}
+        return {'info': {name: obj for name, obj in self.info.items()},
+                'objects': {name: vars(obj) for name, obj in self.objects.items()}
+                }
 
     def as_json(self) -> str:
         """Return a JSON representation of this simulation."""

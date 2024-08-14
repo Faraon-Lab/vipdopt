@@ -194,7 +194,7 @@ class LumericalFDTD(ISolver):
         if self.fdtd is not None:
             vipdopt.logger.debug('Closing connection with Lumerical...')
             self.fdtd.close()
-            vipdopt.logger.debug('Succesfully closed connection with Lumerical.')
+            vipdopt.logger.debug('Successfully closed connection with Lumerical.')
             self.fdtd = None
             # self._synced = False
 
@@ -281,7 +281,7 @@ class LumericalFDTD(ISolver):
     #     vipdopt.logger.debug(f'Loading simulation from {path!s} into Lumerical...')
     #     fname = str(path)
     #     self.fdtd.load(fname)  # type: ignore
-    #     vipdopt.logger.debug(f'Succesfully loaded simulation from {fname}.\n')
+    #     vipdopt.logger.debug(f'Successfully loaded simulation from {fname}.\n')
 
     @overload
     @ensure_path
@@ -562,6 +562,16 @@ class LumericalFDTD(ISolver):
         """
         self.fdtd.select(import_name)
         self.fdtd.importnk2(n, x, y, z)
+    
+    @_check_lum_fdtd
+    def exportnk2(
+        self,
+        indexmonitor_name: str,
+        component: str='x'
+    ) -> npt.NDArray:
+        """Return the index values returned from this simulation's design index monitors."""
+        index_prev = self.fdtd.getresult(indexmonitor_name, 'index preview')
+        return index_prev[f'index_{component}']     # might need np.squeeze()
 
 
 ISolver.register(LumericalFDTD)

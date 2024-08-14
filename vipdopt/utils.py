@@ -21,6 +21,7 @@ import numpy as np
 import numpy.typing as npt
 import yaml
 from yaml.constructor import SafeConstructor
+from scipy import ndimage
 
 PathLike = TypeVar('PathLike', str, Path, bytes, os.PathLike)
 
@@ -190,6 +191,7 @@ def _yaml_loader(fname: PathLike) -> dict:
     )
     with open(fname, 'rb') as stream:
         return yaml.safe_load(stream)
+    
 
 
 def subclasses(cls: type) -> list[str]:
@@ -314,6 +316,73 @@ def repeat(a: npt.NDArray, shape: tuple[int, ...]) -> npt.NDArray:
 def real_part_complex_product(z1, z2):
     """Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)"""
     return np.real(z1)*np.real(z2) + np.imag(z1) * (-1*np.imag(z2))
+
+# Borders, Masking, and Padding
+def pad_all_sides(arr:npt.NDArray, pad_width:int=2, constant:float=0) -> npt.NDArray:
+    return np.pad(arr,(pad_width,),'constant',constant_values=(constant,))
+
+def unpad(arr: npt.NDArray, pad_widths: tuple[tuple[int,int],...]) -> npt.NDArray:
+    b = arr.copy()
+    slice_list = [slice(None)]*b.ndim
+    for i in range(b.ndim):
+        sz = b.shape[i]
+        slice_list[i] = slice(pad_widths[i][0], sz - pad_widths[i][1])
+    return b[tuple(slice_list)]
+
+def unpad_all_sides(arr: npt.NDArray, pad_width:int=2):
+    pad_widths = tuple([(pad_width, pad_width) for i in range(arr.ndim)])
+    return unpad(arr, pad_widths)
+
+def replace_border(arr: npt.NDArray, pad_width:int=2, const:float=0, only_sides:bool=False) -> npt.NDArray:
+    if arr.ndim == 3 and only_sides:
+        # split it into 2d layers and replace borders for those instead
+        new_arr = arr.copy()
+        for i in range(arr.shape[3-1]):
+            new_arr[...,i] = pad_all_sides(unpad_all_sides(arr[...,i], pad_width),
+                                            pad_width, constant=const)
+        return new_arr
+    else:
+        return pad_all_sides(unpad_all_sides(arr, pad_width),
+                        pad_width, constant=const)
+
+def create_centered_square_mask(arr: npt.NDArray, width):
+    coord_axes = np.ogrid[[slice(-x//2+1,x//2+1,1) for x in arr.shape]]
+    full_coord_grid = sum(coord_axes)       # NOT NP.SUM
+    # NOTE: Will be off-center for arrays of odd shape-length.
+    mask = np.abs(coord_axes[0]) <= width
+    for i in range(1,len(coord_axes)):
+        mask = mask & (np.abs(coord_axes[i]) <= width)
+    return mask
+
+def create_centered_square_ring_mask(arr: npt.NDArray, outer_width, inner_width):
+    # NOTE: Will be off-center for arrays of odd shape-length.
+    mask_outer = create_centered_square_mask(arr, outer_width)
+    mask_inner = create_centered_square_mask(arr, inner_width)
+    return mask_outer ^ mask_inner
+
+def create_centered_circle_mask(arr: npt.NDArray, radius):
+    coord_axes = np.ogrid[[slice(-x//2+1,x//2+1,1) for x in arr.shape]]
+    full_coord_grid = sum(coord_axes)       # NOT NP.SUM
+    # NOTE: Will be off-center for arrays of odd shape-length.
+    mask = sum([x**2 for x in coord_axes]) <= radius**2
+    return mask
+
+def get_mask_edge(mask, thickness=1):
+    '''Uses a binary structure to erode an existing mask, then takes the XOR to produce the edge.
+    Higher thicknesses mean more iterations of the binary erosion.'''
+    # https://stackoverflow.com/questions/33742098/border-edge-operations-on-numpy-arrays
+    
+    struct = ndimage.generate_binary_structure(mask.ndim, mask.ndim)
+    erode = ndimage.binary_erosion(mask, struct, iterations=thickness)
+    edges = mask ^ erode
+    return edges
+
+def replace_mask_values(arr, mk, value):
+    '''Applies a mask (mk) to an array, then replaces masked values with a specific fill value.'''
+    # https://numpy.org/doc/stable/reference/maskedarray.generic.html#accessing-the-data
+    import numpy.ma as ma
+    maskArr = ma.masked_array(arr,mask=mk)
+    return ma.filled(maskArr, fill_value=value)
     
 # Nested dictionary handling - https://stackoverflow.com/a/14692747
 def get_by_path(root, items):

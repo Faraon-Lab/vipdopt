@@ -1,4 +1,4 @@
-Python Library Documentation: class Lumerical 
+Python Library Documentation: class Lumerical
 
 class Lumerical(builtins.object)
  |  Lumerical(product, filename, key, hide, serverArgs, remoteArgs, **kwargs)

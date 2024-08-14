@@ -1,19 +1,19 @@
 #!/bin/bash
 #SBATCH -A Faraon_Computing
-#SBATCH --time=4:00:00   # walltime
+#SBATCH --time=60:00:00   # walltime
 
-#SBATCH --nodes=2   # number of nodes
+#SBATCH --nodes=5   # number of nodes
 #SBATCH --ntasks-per-node=8  # number of processor cores (i.e. tasks)
 #SBATCH --mem-per-cpu=8G
 ##SBATCH --mem=16G
 
-#SBATCH -J "v2_nia_v4 test_cluster"   # job name
+##SBATCH -J "Sb2S3_300iter_symm_borderconst_3lyr"   # job name
 
 #SBATCH --mail-user=ianfoomz@gmail.com
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL
-#SBATH --qos=normal
+#SBATCH --qos=normal
 
 ## /SBATCH -p general # partition (queue)
 ## /SBATCH -o slurm.%N.%j.out # STDOUT
@@ -24,4 +24,9 @@
 # source /central/groups/Faraon_Computing/nia/miniconda3/etc/profile.d/conda.sh
 source activate vipdopt3.10
 
-xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize "runs/test_run" "--config" "processed_config.yml"
+DIR=${1:-test_run}
+CONFIG=${2:-processed_config.yml}
+
+python -m vipdopt.configuration.template derived_simulation_properties.j2 $DIR/config_bilge_3d.yml $DIR/processed_config.yml
+python -m vipdopt.configuration.template simulation_template.j2 $DIR/processed_config.yml $DIR/sim.json
+xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize $DIR --config $CONFIG

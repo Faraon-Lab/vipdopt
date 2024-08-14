@@ -23,7 +23,7 @@ GAUSSIAN_SCALE = 0.27
 REINTERPOLATION_SIZE = (300, 300, 306)
 
 
-# TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
+# TODO: Add `feature_dimensions` for allowing z layers to have thickness other than 1
 class Device:
     """An optical device / object that can be optimized.
 
@@ -45,7 +45,7 @@ class Device:
 
     def __init__(
         self,
-        size: tuple[int, int, int],  # ! 20240227 Ian - Added second device
+        size: tuple[int, int, int],
         permittivity_constraints: tuple[Real, Real],
         coords: Coordinates,
         name: str = 'device',
@@ -193,10 +193,11 @@ class Device:
     @ensure_path
     def save(self, fname: Path, binarize: bool = False):
         """Save device to a .npz file."""
+        fname.parent.mkdir(parents=True, exist_ok=True)
         with fname.open('wb') as f:
             np.save(f, self.as_dict())  # type: ignore
             if binarize:
-                np.save(f, self.pass_through_filters(self.get_design_variable(), True))
+                np.save(f, self.binarize(self.pass_through_filters(self.get_design_variable(), True)))
             else:
                 np.save(f, self.get_design_variable())
 
@@ -340,7 +341,7 @@ class Device:
     def import_cur_index(
         self,
         import_primitive: Import,
-        reinterpolation_factor: float = 1,
+        reinterpolation_factors: tuple[int, int, int] = (1,1,1),
         reinterpolation_size: tuple[int, int, int] = REINTERPOLATION_SIZE,
         binarize: bool = False,
     ):
@@ -361,9 +362,8 @@ class Device:
         cur_density = self.get_density().copy()
 
         # Perform repetition of density values across each axis for shrinking during reinterpolation process
-        if reinterpolation_factor != 1:
-            new_size = tuple(int(x) for x in np.ceil(np.multiply(reinterpolation_factor, self.size)))
-            cur_density_import = repeat(cur_density, new_size)
+        if reinterpolation_factors != (1,1,1):
+            cur_density_import = repeat(cur_density, reinterpolation_factors)
             # cur_density_import = np.repeat(
             #     np.repeat(
             #         np.repeat(
@@ -378,17 +378,15 @@ class Device:
             #     axis=2,
             # )
             design_region = [
-                1e-6
-                * np.linspace(
+                1e-6 * np.linspace(
                     self.coords[axis][0],
                     self.coords[axis][-1],
-                    len(self.coords[axis]) * reinterpolation_factor,
+                    len(self.coords[axis]) * reinterpolation_factors[idx],
                 )
-                for axis in self.coords
+                for idx, axis in enumerate(self.coords)
             ]
             design_region_import = [
-                1e-6
-                * np.linspace(
+                1e-6 * np.linspace(
                     self.coords[axis][0],
                     self.coords[axis][-1],
                     reinterpolation_size[i],
@@ -424,7 +422,6 @@ class Device:
             design_region_import_grid,
             method='linear',
         )
-        #! TODO: CHECK - Don't think this is going to work for 2D.
 
         # Binarize before importing
         if binarize:
@@ -488,7 +485,21 @@ class Device:
 
         return design_gradient_interpolated
 
-
+    def visualize_layer(self, layer_num=0, w_num=0, dimension='3D', plot_index=False):
+        '''Uses Matplotlib to visualize the layer number of the design variable at stage w_num.
+        w_num=0 images design variable,
+        w_num=-2 images density,
+        w_num=-1 images permittivity'''
+        import matplotlib.pyplot as plt
+        d = np.real(self.w[..., layer_num, w_num])
+        if w_num==-1 and plot_index:
+            d = self.index_from_permittivity(d)
+        X,Y = np.meshgrid(self.coords['x'], self.coords['y'], indexing='ij')
+        plt.pcolor(X,Y,d)
+        plt.gca().set_aspect('auto')
+        plt.colorbar()
+        # plt.close()
+        
     def export_density_as_stl(self, filename):
         '''Binarizes device density and exports as STL file for fabrication.'''
         
