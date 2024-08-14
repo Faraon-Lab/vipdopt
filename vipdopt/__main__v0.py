@@ -9,7 +9,7 @@ import numpy as np
 
 sys.path.append(
     os.getcwd()
-)  # 20240219 Ian: Only added this so I could debug some things from my local VSCode
+)  # 20240219 Ian: Only added this so I could debug some things from my local VS Code
 import vipdopt
 from vipdopt.utils import import_lumapi, setup_logger
 
