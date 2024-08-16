@@ -4,7 +4,7 @@
 # - Use of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 # - Use in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the software.
 # - Neither the name of the California Institute of Technology (Caltech) nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
@@ -35,13 +35,13 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.051 # 0.017
+mesh_spacing_um: 0.051 # 0.017          # NOTE: Same mesh spacing is used for ALL dimensions.
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
-geometry_spacing_lateral_um: 0.085 #0.051 # 0.085
+geometry_spacing_lateral_um: 0.106 # 0.085 # 0.051
 
-device_scale_um: 0.051    # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
+device_scale_um: 0.102 # 0.051    # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
 # Edit: device_scale_um is just meant to arbitrarily scale a few things it's not necessarily ONLY used for vertical dimensions
-# TODO: Consolidate with geometry_spacing_lateral_um 
+# TODO: At present this is used to determine the device voxels in the vertical. We should track down what else uses device_scale_um
 
 use_smooth_blur: False
 min_feature_size_um: 0.085  # used only for blurring
@@ -59,8 +59,8 @@ focal_plane_center_lateral_um: 0
 
 #* Device
 
-num_vertical_layers: 10 # 10
-vertical_layer_height_um: 0.204 #0.051 * 4 #0.017 * 8
+num_vertical_layers: 5 # 10
+vertical_layer_height_um: 0.408 #0.051 * 4 #0.017 * 8
 
 device_size_lateral_um: 3.06 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
 
@@ -121,7 +121,7 @@ source_angle_theta_vacuum_deg: 0 #46
 source_angle_phi_deg: 0
 
 # General polarized source information
-xy_phi_rotations: [0, 90] #2D, apply this to polarization angle of the forward source. 
+xy_phi_rotations: [0, 90] #2D, apply this to polarization angle of the forward source.
 xy_adjtheta_rotations: [90, 0]  #2D settings. 3D is: [0, 90] applied to phi, and theta=90 for all
 xy_pol_rotations: [0, 90]
 xy_names: ['x', 'y']
@@ -154,8 +154,8 @@ enforce_xy_gradient_symmetry: False #True#False#True
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-total_num_iterations: 80 # 20 # 1  #40 #20 #300
-epoch_list: [0, 16, 32, 48, 64, 80] # [0, 4, 8, 12, 16, 20] # [0,1]  #[0, 30, 40] # [0,16,20]   #[0,30,60,90,120,150,180,210,240,270,300]
+total_num_iterations: 80 #40 20 # 1  #300
+epoch_list: [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80]  # [0, 4, 8, 12, 16, 20] # [0,1] # [0,30,60,90,120,150,180,210,240,270,300]
 
 # optimizer_algorithm: 'ADAM' #'Gradient Descent'
 # adam_betas: !!python/tuple [0.9, 0.999]
@@ -218,7 +218,7 @@ boundary_conditions: 'pml' # 'periodic'
 use_source_aperture: True # False
 
 #* Border aperiodic
-evaluate_bordered_extended: False # True   
+evaluate_bordered_extended: False # True
 # You only see this in the evaluate code block, so can ignore. But also, part of it is in
 # the restart block in order to truncate the cur_design_variable?
 

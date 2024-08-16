@@ -146,7 +146,7 @@ adjoint_src_to_dispersive_range_map: [
 
 #* Optimization
 
-enforce_xy_gradient_symmetry: True # False
+enforce_xy_gradient_symmetry: False
 
 # Alternative is to weight by focal intensity - need to check max intensity weighting
 weight_by_quadrant_transmission: True
@@ -178,7 +178,7 @@ reinterpolate_type: 'nearest' #'linear'   #NOTE: In the end we implement both an
 #! new-------
 border_optimization: False
 
-border_constant_width: 2 # False if not used
+border_constant_width: 2 # False if not used, integer num. pixels if used
 border_constant_density: 0
 
 layer_gradient: False
@@ -252,9 +252,9 @@ optimizer_settings: {
             0.0
         ]
 }
-fom_dict: [{'fwd': [0], 'adj': [0], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []},
-            {'fwd': [0], 'adj': [2], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []}
-            ]
+# fom_dict: [{'fwd': [0], 'adj': [0], 'freq_idx_opt': 'f_bin_all', 'freq_idx_restricted_opt': []},
+#             {'fwd': [0], 'adj': [2], 'freq_idx_opt': 'f_bin_all', 'freq_idx_restricted_opt': []}
+#             ]
 
 figures_of_merit: {
     "fom_0": {
