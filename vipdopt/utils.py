@@ -333,17 +333,22 @@ def unpad_all_sides(arr: npt.NDArray, pad_width:int=2):
     pad_widths = tuple([(pad_width, pad_width) for i in range(arr.ndim)])
     return unpad(arr, pad_widths)
 
-def replace_border(arr: npt.NDArray, pad_width:int=2, const:float=0, only_sides:bool=False) -> npt.NDArray:
-    if arr.ndim == 3 and only_sides:
-        # split it into 2d layers and replace borders for those instead
-        new_arr = arr.copy()
-        for i in range(arr.shape[3-1]):
-            new_arr[...,i] = pad_all_sides(unpad_all_sides(arr[...,i], pad_width),
-                                            pad_width, constant=const)
-        return new_arr
-    else:
-        return pad_all_sides(unpad_all_sides(arr, pad_width),
-                        pad_width, constant=const)
+def replace_border(arr: npt.NDArray, pad_widths:tuple[tuple[int,int],...]=((2,2),(2,2),(0,0)), 
+                   const:float=0) -> npt.NDArray:
+    return np.pad( unpad(arr, pad_widths=pad_widths),
+                pad_widths, 'constant', constant_values=(const,) )
+    
+    ###### Old version wit uniform pad widths on all sides
+    # if arr.ndim == 3 and only_sides:
+    #     # split it into 2d layers and replace borders for those instead
+    #     new_arr = arr.copy()
+    #     for i in range(arr.shape[3-1]):
+    #         new_arr[...,i] = pad_all_sides(unpad_all_sides(arr[...,i], pad_width),
+    #                                         pad_width, constant=const)
+    #     return new_arr
+    # else:
+    #     return pad_all_sides(unpad_all_sides(arr, pad_width),
+    #                     pad_width, constant=const)
 
 def create_centered_square_mask(arr: npt.NDArray, width):
     coord_axes = np.ogrid[[slice(-x//2+1,x//2+1,1) for x in arr.shape]]

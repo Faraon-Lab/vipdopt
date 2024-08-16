@@ -27,6 +27,6 @@ source activate vipdopt3.10
 DIR=${1:-test_run}
 CONFIG=${2:-processed_config.yml}
 
-python -m vipdopt.configuration.template derived_simulation_properties.j2 $DIR/config_bilge_3d.yml $DIR/processed_config.yml
+python -m vipdopt.configuration.template derived_simulation_properties.j2 $DIR/config_example_2d.yml $DIR/processed_config.yml
 python -m vipdopt.configuration.template simulation_template.j2 $DIR/processed_config.yml $DIR/sim.json
 xvfb-run --server-args="-screen 0 1280x1024x24" python vipdopt optimize $DIR --config $CONFIG

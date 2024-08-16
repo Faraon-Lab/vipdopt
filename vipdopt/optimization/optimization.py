@@ -99,7 +99,7 @@ class LumericalOptimization:
                 self.fom_hist.update( {f'{metric}_{i}': []} )
         self.fom_hist.update( {'intensity_overall_xyzwl': []} )
         self.param_hist.update({'design': []})
-        
+
         # Set up parent project
         self.project = project
 
@@ -202,30 +202,38 @@ class LumericalOptimization:
         params = np.array(self.param_hist)
         with (folder / 'parameter_history.npy').open('wb') as f:
             np.save(f, params)
-    
+
     def load_histories(self, folder=None):
         """Load the fom and parameter histories from file."""
         if folder is None:
             folder = self.dirs['opt_info']
-        
+
         fom_hist_file = folder / 'fom_history.npy'
         param_hist_file = folder / 'parameter_history.npy'
-        
+
         if not fom_hist_file.exists():
             # Search the directory for a configuration file
             fom_hist_file = glob_first(self.dirs['root'], '**/*fom_history*.{npy,npz}')
         if not param_hist_file.exists():
             # Search the directory for a configuration file
             param_hist_file = glob_first(self.dirs['root'], '**/*parameter_history*.{npy,npz}')
-            
+
         self.fom_hist = np.load(folder / 'fom_history.npy', allow_pickle=True).item()
         self.param_hist = np.load(folder / 'parameter_history.npy', allow_pickle=True).item()
-        
+
+        # Remove the latest history values so as to match up to the iteration.
+        for _, v in {**self.fom_hist, **self.param_hist}.items():
+            for _ in range( len(v) - self.iteration ):
+                try:
+                    v.pop(-1)
+                except Exception as err:
+                    pass
 
     def generate_plots(self):
         """Generate the plots and save to file."""
         folder = self.dirs['opt_plots']
         iteration = self.iteration if self.iteration==self.epoch_list[-1] else self.iteration+1
+        vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
 
         # Placeholder indiv_quad_trans
         import matplotlib.pyplot as plt
@@ -234,23 +242,18 @@ class LumericalOptimization:
 
         # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
 
+        # TODO: Assert iteration == len(self.fom_hist['intensity_overall']); if unequal, make it equal.
         # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
         fom_fig = plotter_v2.plot_fom_trace(
-            np.array(self.fom_hist['intensity_overall']).reshape(
-                            (iteration, -1)
-                            ),
+            np.array(self.fom_hist['intensity_overall']),
             folder, self.epoch_list
         )
         quad_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
-            np.array([self.fom_hist[f'transmission_{x}'] for x in [0,1]]).reshape(
-                            (iteration, -1, self.cfg['num_design_frequency_points'])
-                            ),
+            np.array([self.fom_hist[f'transmission_{x}'] for x in [0,1]]).swapaxes(0,1),
             folder, self.epoch_list
         )
         overall_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
-            np.array(self.fom_hist['transmission_overall']).reshape(
-                            (iteration, -1, self.cfg['num_design_frequency_points'])
-                            ),
+            np.expand_dims(np.array(self.fom_hist['transmission_overall']), axis=1),
             folder, self.epoch_list,
             filename='overall_trans_trace',
         )
@@ -287,6 +290,7 @@ class LumericalOptimization:
 
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
         final_device_layer_fig, _ = plotter_v2.visualize_device(
+            self.device.coords['x'], self.device.coords['y'],
             cur_index, folder, iteration=iteration
         )
 
@@ -954,9 +958,9 @@ class LumericalOptimization:
                         design_gradient_interpolated
                         + transpose_design_gradient_interpolated
                     )
-                
 
-                
+
+
                 # # Each device needs to remember its gradient!
                 # # TODO: refine this
                 # self.device.gradient = (
@@ -1128,7 +1132,7 @@ class LumericalOptimization:
 
     def run2(self):
         """Run the optimization"""
-        self._pre_run() # Connects to Lumerical if it's not already connected. 
+        self._pre_run() # Connects to Lumerical if it's not already connected.
         #! Warning - starts a new FDTD instance if already connected!
 
         # If an error is encountered while running the optimization still want to
@@ -1154,6 +1158,7 @@ class LumericalOptimization:
         for epoch, max_iter in enumerate(self.epoch_list):
 
             if max_iter < self.iteration:
+                vipdopt.logger.debug(f'Skipping Iteration {self.iteration}. Current epoch has max. iteration {max_iter}.')
                 continue
 
             vipdopt.logger.info(
@@ -1190,14 +1195,11 @@ class LumericalOptimization:
                     epoch = np.max( np.where( np.array(self.epoch_list)<=self.iteration ) )
                     )
                 self.device.update_density()
-                # If final iteration, binarize device for good
-                if self.iteration==self.epoch_list[-1]:
-                    self.device.set_design_variable(self.device.binarize(self.device.get_design_variable()))
                 # Import device index now into base simulation
                 import_primitive = self.base_sim.imports()[0]
                 # Hard-code reinterpolation size as this seems to be what works for accurate Lumerical imports.
                 reinterpolation_size = (300,306,3) if self.cfg['simulator_dimension']=='2D' else (300,300,306)
-                
+
                 cur_density, cur_permittivity = self.device.import_cur_index(
                     import_primitive,
                     reinterpolation_factors=(1,1,1),    # For 2D the last entry of the tuple must always be 1.
@@ -1331,10 +1333,13 @@ class LumericalOptimization:
                 # Replaces a border of width <in config> with zeros.
                 # TODO: Put into the config as border_constant_index or something like this
                 if self.cfg['border_constant_width']:
-                    design_gradient_interpolated = replace_border(design_gradient_interpolated,
-                                                    self.cfg['border_constant_width'],
-                                                    const=0, only_sides=True
-                                                    )
+                    x = self.cfg['border_constant_width']
+                    if self.cfg['simulator_dimension']=='3D':
+                        border_pad_widths = [(x,x),(x,x),(0,0)]
+                    elif self.cfg['simulator_dimension']=='2D':
+                        border_pad_widths = [(x,x),(0,0),(0,0)]
+                    design_gradient_interpolated = replace_border( design_gradient_interpolated,
+                                                                    border_pad_widths, const=0 )
 
                 if self.cfg['enforce_xy_gradient_symmetry']:
                     if self.cfg['simulator_dimension'] in '2D':
@@ -1348,28 +1353,29 @@ class LumericalOptimization:
                 # Step the device with the gradient
                 vipdopt.logger.debug('Stepping device along gradient.')
                 self.optimizer.step(self.device, design_gradient_interpolated.copy(), self.iteration)
-                
+
                 # Perturb design variable appropriately
                 if self.cfg['border_constant_width']:
                     self.device.set_design_variable(replace_border(self.device.get_design_variable(),
-                                                        self.cfg['border_constant_width'],
-                                                        const = self.cfg['border_constant_density'],
-                                                        only_sides=True
-                                                        ))
-                self.device.visualize_layer(layer_num=0)
+                                                        border_pad_widths, const = self.cfg['border_constant_density']
+                                                    ))
+
+                # If final iteration, binarize device for good
+                if self.iteration==self.epoch_list[-1]-1:
+                    self.device.set_design_variable(self.device.binarize(self.device.get_density()))
+                    self.device.update_density()
 
                 # Save design variable
                 self.device.save(self.project.current_device_path())
-                
+
                 # Generate Plots and call callback functions
                 self.save_histories()
                 self.generate_plots()
                 self.call_callbacks()
-                
-                # Save Project
-                self.project.save_as(self.project.subdirectories['checkpoints'])
 
                 self.iteration += 1
+                # Save Project
+                self.project.save_as(self.project.subdirectories['checkpoints'])
             if not self.loop:
                 break
 

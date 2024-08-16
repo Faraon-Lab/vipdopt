@@ -176,7 +176,7 @@ if __name__ == '__main__':
         plt.imshow(np.abs(project.device.get_design_variable()[...,0]), cmap=plt.get_cmap('gray'))
         cur_density, cur_permittivity = project.device.import_cur_index(
                     fwd_sim.objects['design_import'],
-                    reinterpolation_factors = (1,1,1), # project.config.get('reinterpolate_permittivity_factor'),
+                    reinterpolation_factors = 1, # project.config.get('reinterpolate_permittivity_factor'),
                     binarize=False
                 )
         

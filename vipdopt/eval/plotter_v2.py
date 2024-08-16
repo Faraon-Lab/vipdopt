@@ -623,8 +623,9 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, iterati
     return fig
 
 
-def visualize_device(
-    cur_data, plot_directory_location, num_visualize_layers=1, iteration=''
+def visualize_device(r1,r2, cur_data, 
+                     plot_directory_location, 
+                     num_visualize_layers=1, iteration=''
 ):
     """Visualizes each (voxel) layer of cur_data. This data can be either density, permittivity, or index,
     and should be processed as such before passing to this function.
@@ -634,8 +635,8 @@ def visualize_device(
     r_vectors = []  # Variables
     f_vectors = []  # Functions
 
-    r_vectors.append({'var_name': 'x-axis', 'var_values': range(cur_data.shape[0])})
-    r_vectors.append({'var_name': 'y-axis', 'var_values': range(cur_data.shape[1])})
+    r_vectors.append({'var_name': 'x-axis', 'var_values': r1})
+    r_vectors.append({'var_name': 'y-axis', 'var_values': r2})
 
     f_vectors.append({'var_name': 'Device Data', 'var_values': cur_data})
 
@@ -650,16 +651,16 @@ def visualize_device(
     for layer_idx, layer in enumerate(plot_layers):
         fig, ax = plt.subplots()
 
-        Y_grid, X_grid = np.meshgrid(
+        X_grid, Y_grid = np.meshgrid(
             np.squeeze(r_vectors[0]['var_values']),
             np.squeeze(r_vectors[1]['var_values']),
+            indexing='ij'
         )
         # todo: Something is wrong here. The top face (y=2.04) gets printed as the left face in the device plot
 
-        c = ax.pcolormesh(
-            X_grid,
-            Y_grid,
-            np.transpose(np.real(f_vectors[0]['var_values'][:, :, layer])),
+        c = ax.pcolor(
+            X_grid, Y_grid,
+            np.real(f_vectors[0]['var_values'][:, :, layer]),
             # f_vectors[0]['var_values'][:,:,layer],
             # f_vectors[0]['var_values'][:,:,layer][:-1, :-1],	# compensate for error when shading='flat'
             cmap='jet',

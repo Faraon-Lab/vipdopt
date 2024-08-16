@@ -22,7 +22,7 @@ from vipdopt.optimization import (
     LumericalOptimization,
     SuperFoM,
 )
-from vipdopt.optimization.filter import Scale, Sigmoid
+from vipdopt.optimization.filter import Scale, Sigmoid, Layering
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
 from vipdopt.utils import Coordinates, PathLike, ensure_path, flatten, glob_first, read_config_file
 
@@ -144,12 +144,12 @@ class Project:
 
         MUST have a config file in the project directory.
         """
-        
+
         self.dir = project_dir
-        
+
         project_save_file = project_dir / project_name
         cfg_file = project_dir / config_name
-        
+
         if project_save_file.exists():          # Restarting from save
             vipdopt.logger.info("Found project savefile. Loading settings.")
             project_save = read_config_file(project_save_file)
@@ -161,14 +161,14 @@ class Project:
             # Search the directory for a configuration file
             cfg_file = glob_first(project_dir, '**/*config*.{yaml,yml,json}')
         cfg = Config.from_file(cfg_file)
-        
+
         # Append simulation data from sim.json to the config from config.json
         if not project_save_file.exists():      # Initializing
             cfg_sim = Config.from_file(self.dir / 'sim.json')
             cfg.data['base_simulation'] = cfg_sim.data
 
         self._load_config(cfg)
-        
+
         # Load histories
         if project_save_file.exists():
             self.optimization.load_histories()
@@ -380,11 +380,13 @@ class Project:
                 init_seed=0,
                 # todo: add filters to config
                 filters=[
-                    Sigmoid(0.5, 1.0),
-                    Scale((
-                        cfg['min_device_permittivity'],
-                        cfg['max_device_permittivity'],
-                    )),
+                    Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+                             cfg['num_vertical_layers'] , (0,1),
+                             spacer_height_voxels=0, spacer_voxels_value=0 
+                            ),
+                    Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
+                    Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], )),
+                    # Bridging is performed in the STL export and has minimal performance reduction.
                 ],
             )
         vipdopt.logger.info('Device loaded.')
@@ -516,18 +518,18 @@ class Project:
         # Optimization:
 
         # Optimizer: Handled below in generate_config()
-        
+
         # Device:
         assert self.device is not None
         self.device.save(self.current_device_path())
-        
+
         # Base Sim: Handled below in _generate_config()
         # src_to_sim_map: Handled in _load_config()
         # FoMs: Handled below in _generate_config()
         # Weights: Handled in _load_config()
         # Subdirectories: Handled in _load_config()
         # Spectral weights: Handled in _load_config()
-        
+
         # Config
         cfg = self._generate_config()
         cfg.save(project_dir / 'config.json', cls=LumericalEncoder)

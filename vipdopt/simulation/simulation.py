@@ -176,8 +176,9 @@ class LumericalSimulation(ISimulation):
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this simulation."""
+        # We could use vars() here but as_dict() gives more customizability
         return {'info': {name: obj for name, obj in self.info.items()},
-                'objects': {name: vars(obj) for name, obj in self.objects.items()}
+                'objects': {name: obj.as_dict() for name, obj in self.objects.items()}
                 }
 
     def as_json(self) -> str:
@@ -219,7 +220,7 @@ class LumericalSimulation(ISimulation):
         new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
-        
+
         try:    # Copy-paste the device imports from the previous simulation into the new simulation.
             for i, imp in enumerate(new_sim.imports()):
                 imp.set_nk2(*self.imports()[i].get_nk2())
@@ -335,16 +336,16 @@ class LumericalSimulation(ISimulation):
         """Return a list of all import object names."""
         for obj in self.imports():
             yield obj.name
-    
+
     def indexmonitors(self) -> list[LumericalSimObject]:
         '''Return a list of all indexmonitor objects.'''
         return [obj for _, obj in self.objects.items() if obj.obj_type == LumericalSimObjectType.INDEX]
-    
+
     def indexmonitor_names(self) -> Iterator[str]:
         '''Return a list of all indexmonitor object names.'''
         for obj in self.indexmonitors():
             yield obj.name
-    
+
     def import_field_shape(self) -> tuple[int, ...]:
         """Return the shape of the fields returned from this simulation's design index monitors."""
         index_prev = vipdopt.fdtd.getresult(list(self.indexmonitor_names())[0], 'index preview')

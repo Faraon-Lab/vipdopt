@@ -132,7 +132,9 @@ if __name__ == '__main__':
     fdtd.connect(hide=hide_fdtd)
     project.start_optimization()
 
-    
+
+    # Numpy Export final design
+    project.device.save( project.subdirectories['data'] / 'final_device.npy' )
     # STL Export final design
     project.device.export_density_as_stl( project.subdirectories['data'] / 'final_device.stl' )
     # GDS Export final design

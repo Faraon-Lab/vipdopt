@@ -14,7 +14,7 @@ import numpy.typing as npt
 from scipy import interpolate
 
 from vipdopt import STL, GDS
-from vipdopt.optimization.filter import Filter, Scale, Sigmoid
+from vipdopt.optimization.filter import Filter, Scale, Sigmoid, Layering
 from vipdopt.simulation import Import
 from vipdopt.utils import Coordinates, PathLike, ensure_path, repeat
 
@@ -240,16 +240,43 @@ class Device:
     def num_filters(self):
         """Return the number of filters in this device."""
         return len(self.filters)
+    
+    def set_filters(self, f:list[Filter]):
+        """Overwrite the filters in this device."""
+        self.filters = f
 
     def update_filters(self, epoch=0):
         """Update the filters of the device."""
-        # TODO: Make this more general.
-        sigmoid_beta = 0.0625 * (2**epoch)
-        sigmoid_eta = 0.5
-        self.filters = [
-            Sigmoid(sigmoid_eta, sigmoid_beta),
-            Scale(self.permittivity_constraints),
-        ]
+        # Filters are coded so that they can be re-initialized without problems.
+        
+        # We may actually need to regenerate the filters explicitly at each iteration
+        # for everything to work correctly.
+        # TODO: Test
+        self.filters = [type(f)(**f.init_vars) for f in self.filters]
+        
+        for f in self.filters:
+            if isinstance(f, Sigmoid):
+                f = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
+        
+        # self.filters = [
+        #     Layering( **filter_vars[0] ),
+        #     Sigmoid( eta=0.5, beta=0.0625*(2**epoch) ),         
+        #     ## if use_smooth_blur...
+        #     # Max_Blur_XY(),
+        #     # Sigmoid( eta=0.5, beta=0.0625*(2**epoch) ),
+        #     Scale( self.permittivity_constraints ),
+        # ]
+        
+        # TODO: Change layering so that it works with masks.
+        # TODO: Blurring
+        # self.max_blur_xy_2 = square_blur_smooth.SquareBlurSmooth(
+        #     [ gp.blur_half_width_voxels, gp.blur_half_width_voxels, 0 ] )
+        # TODO: Erosion-Dilation
+        # TODO: Conical/Pillars: Top layer must have bottom layer below. 
+        # https://arxiv.org/abs/2404.07104
+        # TODO: Perlin Noise Islands / Posts
+
+
 
     def get_density(self):
         """Return the density of the device region (i.e. last layer)."""
@@ -499,10 +526,10 @@ class Device:
         plt.gca().set_aspect('auto')
         plt.colorbar()
         # plt.close()
-        
+
     def export_density_as_stl(self, filename):
         '''Binarizes device density and exports as STL file for fabrication.'''
-        
+
         # STL Export requires density to be fully binarized
         full_density = self.binarize(self.get_density())
         stl_generator = STL.STL(full_density)
@@ -510,10 +537,10 @@ class Device:
         stl_generator.save_stl( filename )
 
     def export_density_as_gds(self, gds_layer_dir):
-        
+
         # STL Export requires density to be fully binarized
         full_density = self.binarize(self.get_density())
-        
+
         # GDS Export must be done in layers. We split the full design into individual layers, (not related to design layers)
         # Express each layer as polygons in an STL Mesh object and write that layer into its own cell of the GDS file
         layer_mesh_array = []
@@ -521,9 +548,9 @@ class Device:
             stl_generator = STL.STL(full_density[..., z_layer][..., np.newaxis])
             stl_generator.generate_stl()
             layer_mesh_array.append(stl_generator.stl_mesh)
-        
+
         # Create a GDS object that contains a Library with Cells corresponding to each 2D layer in the 3D device.
-        gds_generator = GDS.GDS().set_layers(full_density.shape[2], 
+        gds_generator = GDS.GDS().set_layers(full_density.shape[2],
                 unit = 1e-6 * np.abs(self.coords['x'][-1] - self.coords['x'][0])/self.size[0])
         gds_generator.assemble_device(layer_mesh_array, listed=False)
 
@@ -532,20 +559,20 @@ class Device:
         # Export both GDS and SVG for easy visualization.
         gds_generator.export_device(gds_layer_dir, filetype='gds')
         gds_generator.export_device(gds_layer_dir, filetype='svg')
-        
+
         # for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
         #     gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
         #     gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
-        
+
         # # Here is a function for GDS device import to Lumerical - be warned this takes maybe 3-5 minutes per layer.
         # def import_gds(sim, device, gds_layer_dir):
         #     import time
-            
+
         #     sim.fdtd.load(sim.info['name'])
         #     sim.fdtd.switchtolayout()
         #     device_name = device.import_names()[0]
         #     sim.disable([device_name])
-            
+
         #     z_vals = device.coords['z']
         #     for z_idx in range(len(z_vals)):
         #         t = time.time()
