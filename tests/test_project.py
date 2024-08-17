@@ -23,3 +23,15 @@ def test_load(device_dict: dict, fom_dict: dict):
         FoM.from_dict(name, data, src_to_sim_map) for name, data in fom_dict.items()
     ]
     assert_equal(project.foms[0], foms[0])
+
+# TODO: Write more tests e.g. the below:
+# def save_and_load():
+#     project_dir = Path('./test_project/')
+#     output_dir = Path('./test_output_optimization/')
+
+#     project = Project()
+#     project.load_project(project_dir, config_name='test_config.yml')
+#     #output_dir = project.subdirectories['checkpoints']
+#     project.save_as(output_dir)
+#     # Test that the saved format is loadable
+#     project2 = Project.from_dir(output_dir)

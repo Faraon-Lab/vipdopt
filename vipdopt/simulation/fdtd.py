@@ -5,6 +5,7 @@ from __future__ import annotations
 import abc
 import contextlib
 import functools
+import os
 import time
 import typing
 from collections.abc import Callable
@@ -193,7 +194,7 @@ class LumericalFDTD(ISolver):
         if self.fdtd is not None:
             vipdopt.logger.debug('Closing connection with Lumerical...')
             self.fdtd.close()
-            vipdopt.logger.debug('Succesfully closed connection with Lumerical.')
+            vipdopt.logger.debug('Successfully closed connection with Lumerical.')
             self.fdtd = None
             # self._synced = False
 
@@ -251,10 +252,22 @@ class LumericalFDTD(ISolver):
         for obj in sim.objects.values():
             # Create an object for each of those in the simulation
             with contextlib.suppress(BaseException):
+                # LumericalSimObjectType.get_add_function(obj.obj_type)(
+                #     self.fdtd,
+                #     **obj.properties,
+                # )     
+                # Some property in the obj.properties dictionary is inactive, which breaks everything after it.
+                # So instead we must add just the object, then set each property individually.
                 LumericalSimObjectType.get_add_function(obj.obj_type)(
-                    self.fdtd,
-                    **obj.properties,
+                    self.fdtd, {'name': obj.name}
                 )
+                for p, r in obj.properties.items():
+                    try:
+                        self.fdtd.setnamed(obj.name, p, r)
+                    except Exception as err:
+                        # vipdopt.logger.debug(err + f": {p}")
+                        pass
+                    
                 # Import nk2 if possible
                 if isinstance(obj, Import) and obj.n is not None:
                     self.importnk2(obj.name, *obj.get_nk2())
@@ -268,7 +281,7 @@ class LumericalFDTD(ISolver):
     #     vipdopt.logger.debug(f'Loading simulation from {path!s} into Lumerical...')
     #     fname = str(path)
     #     self.fdtd.load(fname)  # type: ignore
-    #     vipdopt.logger.debug(f'Succesfully loaded simulation from {fname}.\n')
+    #     vipdopt.logger.debug(f'Successfully loaded simulation from {fname}.\n')
 
     @overload
     @ensure_path
@@ -359,6 +372,9 @@ class LumericalFDTD(ISolver):
             'mpi_exe',
             Path('/central/software/mpich/4.0.0/bin/mpirun'),
         )
+        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+            # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
+            mpi_exe = "/central/home/ifoo/lumerical/2021a_r22/mpich2/nemesis/bin/mpiexec"
         self.set_resource(1, 'mpi executable', str(mpi_exe))
 
         nprocs = kwargs.pop('nprocs', 8)
@@ -372,6 +388,9 @@ class LumericalFDTD(ISolver):
             'solver_exe',
             Path('/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem'),
         )
+        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+            # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
+            solver_exe = "/central/home/ifoo/lumerical/2021a_r22/bin/fdtd-engine-mpich2nem"
         self.set_resource(1, 'solver executable', str(solver_exe))
 
         self.set_resource(
@@ -545,6 +564,16 @@ class LumericalFDTD(ISolver):
         """
         self.fdtd.select(import_name)
         self.fdtd.importnk2(n, x, y, z)
+    
+    @_check_lum_fdtd
+    def exportnk2(
+        self,
+        indexmonitor_name: str,
+        component: str='x'
+    ) -> npt.NDArray:
+        """Return the index values returned from this simulation's design index monitors."""
+        index_prev = self.fdtd.getresult(indexmonitor_name, 'index preview')
+        return index_prev[f'index_{component}']     # might need np.squeeze()
 
 
 ISolver.register(LumericalFDTD)

@@ -36,11 +36,14 @@ class AdamOptimizer(GradientOptimizer):
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Take gradient step using Adam algorithm."""
         gradient = device.backpropagate(gradient)
-
-        # Changed to gradient descent for now...
         b1, b2 = self.betas
-        m = self.moments[0, ...]
-        v = self.moments[1, ...]
+        save_history = False
+        if save_history:    # This is if you want to save the entire moment history.
+            m = self.moments[0, ...]      
+            v = self.moments[1, ...]
+        else:               # Drastically reduces the checkpoint savefile size
+            m = self.moments[0]
+            v = self.moments[1]
 
         m = b1 * m + (1 - b1) * gradient
         v = b2 * v + (1 - b2) * gradient**2

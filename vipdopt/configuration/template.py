@@ -39,7 +39,7 @@ class TemplateRenderer:
         with open(fname, 'w') as f:
             f.write(output)
 
-        vipdopt.logger.debug(f'Succesfully rendered and saved output to {fname}')
+        vipdopt.logger.debug(f'Successfully rendered and saved output to {fname}')
 
     @ensure_path
     def set_template(self, template: Path) -> None:

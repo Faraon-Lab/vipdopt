@@ -13,8 +13,8 @@ import numpy as np
 import numpy.typing as npt
 from scipy import interpolate
 
-from vipdopt import GDS, STL
-from vipdopt.optimization.filter import Filter, Scale, Sigmoid
+from vipdopt import STL, GDS
+from vipdopt.optimization.filter import Filter, Scale, Sigmoid, Layering
 from vipdopt.simulation import Import
 from vipdopt.utils import Coordinates, PathLike, ensure_path, repeat
 
@@ -23,7 +23,7 @@ GAUSSIAN_SCALE = 0.27
 REINTERPOLATION_SIZE = (300, 300, 306)
 
 
-# TODO: Add `feature_dimensions` for allowing z layers to have thickness otehr than 1
+# TODO: Add `feature_dimensions` for allowing z layers to have thickness other than 1
 class Device:
     """An optical device / object that can be optimized.
 
@@ -45,7 +45,7 @@ class Device:
 
     def __init__(
         self,
-        size: tuple[int, int, int],  # ! 20240227 Ian - Added second device
+        size: tuple[int, int, int],
         permittivity_constraints: tuple[Real, Real],
         coords: Coordinates,
         name: str = 'device',
@@ -193,10 +193,11 @@ class Device:
     @ensure_path
     def save(self, fname: Path, binarize: bool = False):
         """Save device to a .npz file."""
+        fname.parent.mkdir(parents=True, exist_ok=True)
         with fname.open('wb') as f:
             np.save(f, self.as_dict())  # type: ignore
             if binarize:
-                np.save(f, self.pass_through_filters(self.get_design_variable(), True))
+                np.save(f, self.binarize(self.pass_through_filters(self.get_design_variable(), True)))
             else:
                 np.save(f, self.get_design_variable())
 
@@ -246,16 +247,43 @@ class Device:
     def num_filters(self):
         """Return the number of filters in this device."""
         return len(self.filters)
+    
+    def set_filters(self, f:list[Filter]):
+        """Overwrite the filters in this device."""
+        self.filters = f
 
     def update_filters(self, epoch=0):
         """Update the filters of the device."""
-        # TODO: Make this more general.
-        sigmoid_beta = 0.0625 * (2**epoch)
-        sigmoid_eta = 0.5
-        self.filters = [
-            Sigmoid(sigmoid_eta, sigmoid_beta),
-            Scale(self.permittivity_constraints),
-        ]
+        # Filters are coded so that they can be re-initialized without problems.
+        
+        # We may actually need to regenerate the filters explicitly at each iteration
+        # for everything to work correctly.
+        # TODO: Test
+        self.filters = [type(f)(**f.init_vars) for f in self.filters]
+        
+        for f in self.filters:
+            if isinstance(f, Sigmoid):
+                f = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
+        
+        # self.filters = [
+        #     Layering( **filter_vars[0] ),
+        #     Sigmoid( eta=0.5, beta=0.0625*(2**epoch) ),         
+        #     ## if use_smooth_blur...
+        #     # Max_Blur_XY(),
+        #     # Sigmoid( eta=0.5, beta=0.0625*(2**epoch) ),
+        #     Scale( self.permittivity_constraints ),
+        # ]
+        
+        # TODO: Change layering so that it works with masks.
+        # TODO: Blurring
+        # self.max_blur_xy_2 = square_blur_smooth.SquareBlurSmooth(
+        #     [ gp.blur_half_width_voxels, gp.blur_half_width_voxels, 0 ] )
+        # TODO: Erosion-Dilation
+        # TODO: Conical/Pillars: Top layer must have bottom layer below. 
+        # https://arxiv.org/abs/2404.07104
+        # TODO: Perlin Noise Islands / Posts
+
+
 
     def get_density(self):
         """Return the density of the device region (i.e. last layer)."""
@@ -347,7 +375,7 @@ class Device:
     def import_cur_index(
         self,
         import_primitive: Import,
-        reinterpolation_factor: float = 1,
+        reinterpolation_factors: tuple[int, int, int] = (1,1,1),
         reinterpolation_size: tuple[int, int, int] = REINTERPOLATION_SIZE,
         binarize: bool = False,
     ):
@@ -368,11 +396,8 @@ class Device:
         cur_density = self.get_density().copy()
 
         # Perform repetition of density values across each axis for shrinking during reinterpolation process
-        if reinterpolation_factor != 1:
-            new_size = tuple(
-                int(x) for x in np.ceil(np.multiply(reinterpolation_factor, self.size))
-            )
-            cur_density_import = repeat(cur_density, new_size)
+        if reinterpolation_factors != (1,1,1):
+            cur_density_import = repeat(cur_density, reinterpolation_factors)
             # cur_density_import = np.repeat(
             #     np.repeat(
             #         np.repeat(
@@ -387,17 +412,15 @@ class Device:
             #     axis=2,
             # )
             design_region = [
-                1e-6
-                * np.linspace(
+                1e-6 * np.linspace(
                     self.coords[axis][0],
                     self.coords[axis][-1],
-                    len(self.coords[axis]) * reinterpolation_factor,
+                    len(self.coords[axis]) * reinterpolation_factors[idx],
                 )
-                for axis in self.coords
+                for idx, axis in enumerate(self.coords)
             ]
             design_region_import = [
-                1e-6
-                * np.linspace(
+                1e-6 * np.linspace(
                     self.coords[axis][0],
                     self.coords[axis][-1],
                     reinterpolation_size[i],
@@ -437,7 +460,6 @@ class Device:
             design_region_import_grid,
             method='linear',
         )
-        #! TODO: CHECK - Don't think this is going to work for 2D.
 
         # Binarize before importing
         if binarize:
@@ -471,28 +493,15 @@ class Device:
                         the design efield monitors for adjoint optimization.
             dimension (str): The dimension of the simulation, either "2D" or "3D". Defaults to "3D".
         """
-        gradient_region_x = 1e-6 * np.linspace(
-            self.coords['x'][0], self.coords['x'][-1], g.shape[0]
-        )  # cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
-        gradient_region_y = 1e-6 * np.linspace(
-            self.coords['y'][0], self.coords['y'][-1], g.shape[1]
-        )
-        try:
-            gradient_region_z = 1e-6 * np.linspace(
-                self.coords['z'][0], self.coords['z'][-1], g.shape[2]
-            )
-        except IndexError:  # 2D case
-            gradient_region_z = 1e-6 * np.linspace(
-                self.coords['z'][0], self.coords['z'][-1], 3
-            )
-        design_region_geometry = np.array(
-            np.meshgrid(
-                1e-6 * self.coords['x'],
-                1e-6 * self.coords['y'],
-                1e-6 * self.coords['z'],
-                indexing='ij',
-            )
-        ).transpose((1, 2, 3, 0))
+
+        gradient_region_x = 1e-6 * np.linspace(self.coords['x'][0], self.coords['x'][-1], g.shape[0]) #cfg.pv.device_voxels_simulation_mesh_lateral_bordered)
+        gradient_region_y = 1e-6 * np.linspace(self.coords['y'][0], self.coords['y'][-1], g.shape[1])
+        if dimension in '3D':
+            gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], g.shape[2])
+        elif dimension in '2D':
+            gradient_region_z = 1e-6 * np.linspace(self.coords['z'][0], self.coords['z'][-1], 3)
+        design_region_geometry = np.array(np.meshgrid(1e-6*self.coords['x'], 1e-6*self.coords['y'], 1e-6*self.coords['z'], indexing='ij')
+                            ).transpose((1,2,3,0))
 
         if dimension in '2D':
             design_gradient_interpolated = interpolate.interpn(
@@ -511,7 +520,27 @@ class Device:
                 method='linear',
             )
 
+        try:
+            design_gradient_interpolated = np.squeeze(design_gradient_interpolated, axis=3)
+        except Exception as err:
+            pass
+
         return design_gradient_interpolated
+
+    def visualize_layer(self, layer_num=0, w_num=0, dimension='3D', plot_index=False):
+        '''Uses Matplotlib to visualize the layer number of the design variable at stage w_num.
+        w_num=0 images design variable,
+        w_num=-2 images density,
+        w_num=-1 images permittivity'''
+        import matplotlib.pyplot as plt
+        d = np.real(self.w[..., layer_num, w_num])
+        if w_num==-1 and plot_index:
+            d = self.index_from_permittivity(d)
+        X,Y = np.meshgrid(self.coords['x'], self.coords['y'], indexing='ij')
+        plt.pcolor(X,Y,d)
+        plt.gca().set_aspect('auto')
+        plt.colorbar()
+        # plt.close()
 
     def export_density_as_stl(self, filename):
         """Binarizes device density and exports as STL file for fabrication."""
@@ -534,12 +563,8 @@ class Device:
             layer_mesh_array.append(stl_generator.stl_mesh)
 
         # Create a GDS object that contains a Library with Cells corresponding to each 2D layer in the 3D device.
-        gds_generator = GDS.GDS().set_layers(
-            full_density.shape[2],
-            unit=1e-6
-            * np.abs(self.coords['x'][-1] - self.coords['x'][0])
-            / self.size[0],
-        )
+        gds_generator = GDS.GDS().set_layers(full_density.shape[2],
+                unit = 1e-6 * np.abs(self.coords['x'][-1] - self.coords['x'][0])/self.size[0])
         gds_generator.assemble_device(layer_mesh_array, listed=False)
 
         # Create directory for export

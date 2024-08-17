@@ -14,7 +14,7 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.configuration import Config, SonyBayerConfig
+from vipdopt.configuration import Config, ProjectConfig, SonyBayerConfig
 from vipdopt.optimization import (
     Device,
     FoM,
@@ -22,9 +22,9 @@ from vipdopt.optimization import (
     LumericalOptimization,
     SuperFoM,
 )
-from vipdopt.optimization.filter import Scale, Sigmoid
+from vipdopt.optimization.filter import Scale, Sigmoid, Layering
 from vipdopt.simulation import LumericalEncoder, LumericalSimulation
-from vipdopt.utils import Coordinates, PathLike, ensure_path, flatten, glob_first
+from vipdopt.utils import Coordinates, PathLike, ensure_path, flatten, glob_first, read_config_file
 
 sys.path.append(os.getcwd())
 
@@ -39,6 +39,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
     # * Output / Save Paths
     data_folder = root_dir / 'data'
     temp_folder = root_dir / '.tmp'
+    device_folder = root_dir / 'device'
     checkpoint_folder = data_folder / 'checkpoints'
     saved_scripts_folder = data_folder / 'saved_scripts'
     optimization_info_folder = data_folder / 'opt_info'
@@ -94,6 +95,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
         'opt_plots': optimization_plots_folder,
         'pull_completed_jobs': pull_completed_jobs_folder,
         'debug_completed_jobs': debug_completed_jobs_folder,
+        'device': device_folder,
         'evaluation': evaluation_folder,
         'eval_config': evaluation_config_folder,
         'eval_utils': evaluation_utils_folder,
@@ -136,22 +138,41 @@ class Project:
         return proj
 
     @ensure_path
-    def load_project(self, project_dir: Path, config_name: str = 'config.yaml'):
+    def load_project(self, project_dir: Path,
+                     project_name: str = 'project.json', config_name: str = 'config.json',
+                     override_dir: bool=True):
         """Load settings from a project directory - or create them if initializing.
 
         MUST have a config file in the project directory.
         """
+
         self.dir = project_dir
+
+        project_save_file = project_dir / project_name
         cfg_file = project_dir / config_name
+
+        if project_save_file.exists():          # Restarting from save
+            vipdopt.logger.info("Found project savefile. Loading settings.")
+            project_save = read_config_file(project_save_file)
+            if override_dir:
+                self.dir = Path(project_save['dir'])
+            cfg_file = cfg_file.with_suffix('.json')
+
         if not cfg_file.exists():
             # Search the directory for a configuration file
             cfg_file = glob_first(project_dir, '**/*config*.{yaml,yml,json}')
         cfg = Config.from_file(cfg_file)
+
         # Append simulation data from sim.json to the config from config.json
-        cfg_sim = Config.from_file(project_dir / 'sim.json')
-        cfg.data['base_simulation'] = cfg_sim.data
+        if not project_save_file.exists():      # Initializing
+            cfg_sim = Config.from_file(self.dir / 'sim.json')
+            cfg.data['base_simulation'] = cfg_sim.data
 
         self._load_config(cfg)
+
+        # Load histories
+        if project_save_file.exists():
+            self.optimization.load_histories()
 
     def _load_optimizer(self, cfg: Config):
         """Load the optimizer from a config."""
@@ -243,13 +264,13 @@ class Project:
             self.foms.append(FoM.from_dict(fom_dict))
         self.weights = np.array(weights)
 
-    def _setup_weights(self, cfg: Config):
-        """Setup the weights for each FoM.
+    def _setup_spectral_weights(self, cfg: Config):
+        """Setup the spectral weights for each FoM, and assigns according to config order.
         At present this processes spectral weights as a factor to the original weights -
         i.e. the wavelength-dependent behaviour of each FoM
         """
         # Overall Weights for each FoM
-        self.weights = np.array(self.weights)  # Just ensure that it's a numpy
+        # self.weights = np.array(self.weights)           # Just ensure that it's a numpy
 
         # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM
         # (e.g. spectral sorting)
@@ -279,7 +300,8 @@ class Project:
             wl_band_bound_idxs[key] = np.searchsorted(cfg['lambda_values_um'], val)
 
         spectral_weights_by_fom = determine_spectral_weights(
-            spectral_weights_by_fom, wl_band_bound_idxs, mode='gaussian'
+            spectral_weights_by_fom, wl_band_bound_idxs,
+            mode='gaussian', dimension=cfg['simulator_dimension']
         )
 
         # Repeat green weighting for other FoM such that green weighting applies to
@@ -290,7 +312,12 @@ class Project:
             )
         vipdopt.logger.info('Spectral weights assigned.')
 
-        self.weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
+        # self.spectral_weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
+        self.spectral_weights = spectral_weights_by_fom
+
+        # Assign each spectral weight vector to each FoM. Order matters!
+        for i,f in enumerate(self.foms):
+            f.spectral_weights = self.spectral_weights[i]
 
     def _load_device(self, cfg: Config):
         """Load device from a config, or create a new one if it doesn't exist yet."""
@@ -324,8 +351,8 @@ class Project:
                         cfg['device_voxels_vertical'],
                     ),
                     'z': np.linspace(
-                        -0.5 * cfg['mesh_spacing_um'] * 1e-6,
-                        0.5 * cfg['mesh_spacing_um'] * 1e-6,
+                        -1.5 * cfg['mesh_spacing_um'],
+                        1.5 * cfg['mesh_spacing_um'],
                         3,
                     ),
                 })
@@ -353,15 +380,17 @@ class Project:
                 voxel_array_size,
                 (cfg['min_device_permittivity'], cfg['max_device_permittivity']),
                 region_coordinates,
-                randomize=False,
+                randomize=True,#False,
                 init_seed=0,
                 # todo: add filters to config
                 filters=[
-                    Sigmoid(0.5, 1.0),
-                    Scale((
-                        cfg['min_device_permittivity'],
-                        cfg['max_device_permittivity'],
-                    )),
+                    Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+                             cfg['num_vertical_layers'] , (0,1),
+                             spacer_height_voxels=0, spacer_voxels_value=0 
+                            ),
+                    Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
+                    Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], )),
+                    # Bridging is performed in the STL export and has minimal performance reduction.
                 ],
             )
         vipdopt.logger.info('Device loaded.')
@@ -382,15 +411,14 @@ class Project:
 
         # Load Figures of Merit (FoMs)
         self._load_foms(cfg)
+        self._setup_spectral_weights(cfg)
         full_fom = SuperFoM([(f,) for f in self.foms], self.weights)
-        self._setup_weights(cfg)
 
         # Load Device
         self._load_device(cfg)
 
         # General (Other) Settings
         iteration = cfg.get('current_iteration', 0)
-        epoch = cfg.get('current_epoch', 0)
 
         # ================================================================================================================
 
@@ -446,6 +474,7 @@ class Project:
             true_iteration=iteration,
             env_vars=env_vars,
             dirs=self.subdirectories,
+            project=self
         )
         vipdopt.logger.info('Optimization initialized.')
 
@@ -471,9 +500,8 @@ class Project:
     def current_device_path(self) -> Path:
         """Get the current device path for saving."""
         assert self.optimization is not None
-        epoch = self.optimization.epoch
         iteration = self.optimization.iteration
-        return self.dir / 'device' / f'e_{epoch}_i_{iteration}.npy'
+        return self.subdirectories['device'] / f'i_{iteration}.npy'
 
     def save(self):
         """Save this project to it's pre-assigned directory."""
@@ -482,17 +510,37 @@ class Project:
     @ensure_path
     def save_as(self, project_dir: Path):
         """Save this project to a specified directory, creating it if necessary."""
-        (project_dir / 'device').mkdir(parents=True, exist_ok=True)
-        self.dir = project_dir
-        cfg = self._generate_config()
+        # NOTE: Created this according to vars(project) after creating a fresh project.
 
+        # This dictionary will be saved as a YAML/JSON and stores all the variables that aren't class objects.
+        # Coding each key-value pair manually so as to be careful.
+        proj_cfg = ProjectConfig()
+
+        # Dir
+        proj_cfg.update({'dir': self.dir})
+
+        # Optimization:
+
+        # Optimizer: Handled below in generate_config()
+
+        # Device:
         assert self.device is not None
-
-        # Save device to file for current epoch/iter
         self.device.save(self.current_device_path())
-        cfg.save(project_dir / 'config.json', cls=LumericalEncoder)
 
-        # ! TODO: Save histories and plots
+        # Base Sim: Handled below in _generate_config()
+        # src_to_sim_map: Handled in _load_config()
+        # FoMs: Handled below in _generate_config()
+        # Weights: Handled in _load_config()
+        # Subdirectories: Handled in _load_config()
+        # Spectral weights: Handled in _load_config()
+
+        # Config
+        cfg = self._generate_config()
+        cfg.save(project_dir / 'config.json', cls=LumericalEncoder)
+        # Config Type:
+        proj_cfg.update({'config_type': self.config_type.__name__})
+
+        proj_cfg.save(project_dir / 'project.json', cls=LumericalEncoder)
 
     def _generate_config(self) -> Config:
         """Create a JSON config for this project's settings."""
@@ -502,7 +550,6 @@ class Project:
         assert self.base_sim is not None
 
         # Miscellaneous Settings
-        cfg['current_epoch'] = self.optimization.epoch
         cfg['current_iteration'] = self.optimization.iteration
 
         # Optimizer
@@ -510,17 +557,18 @@ class Project:
         cfg['optimizer_settings'] = vars(self.optimizer)
 
         # FoMs
+        cfg['figures_of_merit'] = {}
         foms = []
         for i, fom in enumerate(self.foms):
             data = fom.as_dict()
             data['weight'] = self.weights[i]
             foms.append(data)
-        cfg['figures_of_merit'] = {fom.name: foms[i] for i, fom in enumerate(self.foms)}
+        cfg['figures_of_merit'].update({f'fom_{i}': foms[i] for i, fom in enumerate(self.foms)})
 
         # Device
         cfg['device'] = self.current_device_path()
 
-        # Simulation
+        # Base Simulation
         cfg['base_simulation'] = self.base_sim.as_dict()
 
         return cfg
@@ -600,7 +648,13 @@ def determine_spectral_weights(
             ] = 1
 
         elif mode == 'gaussian':  # gaussians centered on peaks
-            scaling_exp = -(4 / 7) / np.log(0.5)
+            # TODO: Add a dial for these gaussian widths to config
+            # For now:
+            if kwargs.get('dimension','')=='3D':
+                # scaling_exp = -(4 / 7) / np.log(0.5)      # 3D Bayer
+                scaling_exp = -(1.5 / 7) / np.log(0.5)      # 3D Bayer
+            else:
+                scaling_exp = -(1.5 / 7) / np.log(0.5)    # 2D Bayer
             band_peak = wl_band_bound_idxs['peak'][fom_idx]
             band_width = (
                 wl_band_bound_idxs['left'][fom_idx]
@@ -611,13 +665,13 @@ def determine_spectral_weights(
                 -((wl_idxs - band_peak) ** 2) / (scaling_exp * band_width) ** 2
             )
 
-    # # Plotting code to check weighting shapes
+    # Plotting code to check weighting shapes
     # import matplotlib.pyplot as plt
     # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
     # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
     # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
     # for fom in spectral_weights_by_fom:
-    # 	plt.plot(fom)
+    #     plt.plot(fom)
     # plt.show()
     # print(3)
 
@@ -628,9 +682,9 @@ if __name__ == '__main__':
     project_dir = Path('./test_project/')
     output_dir = Path('./test_output_optimization/')
 
-    opt = Project.from_dir(project_dir)
-    opt.save_as(output_dir)
-
+    project = Project()
+    project.load_project(project_dir, config_name='test_config.yml')
+    #output_dir = project.subdirectories['checkpoints']
+    project.save_as(output_dir)
     # Test that the saved format is loadable
-
-    # # Also this way
+    project2 = Project.from_dir(output_dir)

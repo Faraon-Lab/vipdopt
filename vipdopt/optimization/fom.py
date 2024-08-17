@@ -87,11 +87,13 @@ class SuperFoM:
         """
         weights = (2.0 / len(fom_values)) - fom_values**2 / np.sum(fom_values**2)
 
-        # Zero-shift and renormalize
-        #! Check: Maybe not zero-shift(x) but instead max(x,0) ? Compare and contrast
-        if np.min(weights) < 0:
-            weights -= np.min(weights)
-            weights /= np.sum(weights)
+        # # Zero-shift and renormalize
+        # if np.min(weights) < 0:
+        #     weights -= np.min(weights)
+        #     weights /= np.sum(weights)
+
+        # Max(x,0) according to Eq. (2), https://www.nature.com/articles/s41598-021-88785-5
+        weights = np.fmax(weights, 0)
 
         self.performance_weights = weights
 
@@ -174,7 +176,8 @@ class SuperFoM:
         ])
         # grad_results = np.dot(grad_results, spectral_weights).dot(performance_weights)
         if apply_performance_weights:
-            return np.einsum('i,i...->...', self.performance_weights, grad_results)
+            assert len(self.weights)==len(self.performance_weights)
+            return np.einsum('i,i...->...', self.weights*self.performance_weights, grad_results)
         return np.einsum('i,i...->...', self.weights, grad_results)
 
     def create_forward_sim(
@@ -523,10 +526,10 @@ class FoM(SuperFoM):
         data: dict = {}
         data['type'] = type(self).__name__
         data['polarization'] = self.polarization
-        data['fwd_srcs'] = self.fwd_srcs
-        data['adj_srcs'] = self.adj_srcs
-        data['fwd_monitors'] = self.fwd_monitors
-        data['adj_monitors'] = self.adj_monitors
+        data['fwd_srcs'] = [f['name'] for f in self.fwd_srcs]
+        data['adj_srcs'] = [f['name'] for f in self.adj_srcs]
+        data['fom_monitors'] = [f['name'] for f in self.fwd_monitors]
+        data['grad_monitors'] = [f['name'] for f in self.adj_monitors]
         if data['type'] == 'FoM':  # Generic FoM needs to copy functions
             data['fom_func'] = self.fom_func
             data['grad_func'] = self.grad_func
@@ -645,12 +648,13 @@ class BayerFilterFoM(FoM):
         total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
         # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
         try:
-            total_ffom /= np.array(kwargs.get('max_intensity_by_wavelength', None))[
-                ..., self.pos_max_freqs
-            ]
-        except Exception:
+            total_ffom /= np.array(
+                kwargs.get('max_intensity_by_wavelength', None)
+                )[..., self.pos_max_freqs]
+        except Exception as e:
             pass
         # TODO: CHECK THAT THIS IS THE RIGHT PLACE TO PUT IT. CHECK GREG CODE
+
 
         # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
         # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
@@ -695,7 +699,7 @@ class BayerFilterFoM(FoM):
             case _:
                 return total_ffom
 
-    def _bayer_gradient(self):
+    def _bayer_gradient(self, *args, **kwargs):
         """Compute the gradient of the bayer filter figure of merit."""
         # e_fwd = self.design_fwd_fields
         e_fwd = self.fwd_monitors[2].e
@@ -740,6 +744,13 @@ class BayerFilterFoM(FoM):
         # # self.restricted_gradient = df_dev[..., neg_gradient_indices] * \
         # #       self.enabled_restricted
         # ======================================================================================================================
+
+        try:
+            df_dev[..., self.pos_max_freqs] /= np.array(
+                kwargs.get('max_intensity_by_wavelength', None)
+                )[..., self.pos_max_freqs]
+        except Exception as e:
+            pass
 
         # return df_dev
         return df_dev[..., self.pos_max_freqs]

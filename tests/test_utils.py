@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from testing import assert_close, assert_equal
-from vipdopt.utils import read_config_file, sech, setup_logger
+from vipdopt.utils import read_config_file, sech, setup_logger, unpad
 
 TEST_YAML_PATH = 'vipdopt/configuration/config_example.yml'
 
@@ -164,3 +164,12 @@ def test_json_loader(
     else:
         cfg = read_config_file(fname)
         assert_equal(cfg['objects']['source_aperture']['obj_type'], 'rect')
+
+
+def test_unpad(
+    
+):
+    z = (10*np.random.rand(100,100)).astype(int)
+    e = unpad(z, ((1,2),(3,5)))
+    assert_equal(z[1,3],e[0,0]) and assert_equal(z[(-2)-1,(-5)-1]==e[-1,-1])
+    

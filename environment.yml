@@ -13,20 +13,13 @@ dependencies:
   - types-PyYAML=6.*
   - python-magic=0.4.*
   - Jinja2=3.1.*
-  - PySide6=6.3.0
-  - PySide6-stubs=6.4.2
   - gdstk=0.9.50
   # For autodocs
   - sphinx=7.3.7
   - furo=2024.5.6
   - nbsphinx=0.9.4
-  - sphinx_gallery=0.17.0
-  - sphinx_tabs==3.4.5
-  - pandoc=1.13
   # For Jupyter
   - notebook==7.2.1
-  # Pip
-  - pip
   # For Linting
   - ruff=0.3.5
   # For static type checking
@@ -38,5 +31,11 @@ dependencies:
   - pytest-xdist=3.5.*
   - pytest-mock=3.12.*
   - coverage[toml]=7.4.3
-  - jax=0.4.30
   - jaxlib=0.4.30
+  # Pip
+  - pip:
+    - jax==0.4.30
+    - sphinx_gallery==0.17.0
+    - PySide6==6.3.0
+    - PySide6-stubs==6.4.2
+    - pandoc==1.13

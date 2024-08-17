@@ -11,12 +11,14 @@ import copy
 import os
 import sys
 
+import matplotlib
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
 from matplotlib.ticker import (  # type: ignore
     AutoMinorLocator,
 )
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # type: ignore 
+matplotlib.use('TkAgg')
 
 # Custom Classes and Imports
 sys.path.append(os.path.dirname(__file__))
@@ -254,6 +256,7 @@ class BasicPlot:
         SAVE_LOCATION = os.path.abspath(
             os.path.join(plot_directory_location, plot_subfolder_name)
         )
+        #SAVE_LOCATION.mkdir(parents=True, exist_ok=True)
         if not os.path.isdir(SAVE_LOCATION):
             os.makedirs(SAVE_LOCATION)
 
@@ -501,7 +504,7 @@ def plot_fom_trace(f, plot_directory_location, epoch_list=None):
     iterations = copy.deepcopy(TEMPLATE_R_VECTOR)
     iterations.update({
         'var_name': 'Iterations',
-        'var_values': range(f.size),
+        'var_values': range(len(f)),
         'short_form': 'iter',
     })
     fom = copy.deepcopy(TEMPLATE_F_VECTOR)
@@ -525,6 +528,8 @@ def plot_quadrant_transmission_trace(
     f, plot_directory_location, epoch_list=None, filename='quad_trans_trace'
 ):
     """Plot evolution trace of quadrant transmission."""
+    f = np.array(f)
+    
     if epoch_list is None:
         epoch_list = np.linspace(0, len(f), 10)
     upperRange = np.ceil(np.max(f))
@@ -578,10 +583,10 @@ def plot_quadrant_transmission_trace(
 
 def plot_individual_quadrant_transmission(f, r, plot_directory_location, iteration):
     """Plot the most updated quadrant transmission."""
-    f = f[iteration]
-    np.max(f)
+    # f = f[iteration]
+    # np.max(f)
 
-    num_adjoint_src = 4
+    num_adjoint_src = f.shape[0]
     lambda_vector = copy.deepcopy(TEMPLATE_R_VECTOR)
     lambda_vector.update({
         'var_name': 'Wavelength',
@@ -602,10 +607,8 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, iterati
         'title': 'Quadrant Transmissions - Trace',
     }
 
-    # plot_subfolder_name = 'quad_trans'
-    # plot_directory_location = plot_directory_location / plot_subfolder_name
-    # if not os.path.isdir(plot_directory_location):
-    #     os.makedirs(plot_directory_location)
+    plot_subfolder_name = 'quad_trans'
+    plot_directory_location = plot_directory_location
 
     bp = BasicPlot(plot_data)
     fig, ax = bp.fig, bp.ax
@@ -615,13 +618,14 @@ def plot_individual_quadrant_transmission(f, r, plot_directory_location, iterati
     bp.assign_axis_labels(y_label_string='Quad Trans.')
     # for i in range(0,numEpochs+1):
     # 	plt.vlines(i*numIter, 0,upperRange, **vline_style)
-    bp.export_plot_config(plot_directory_location, 'quad_trans', f'trans_i{iteration}')
+    bp.export_plot_config(plot_directory_location, plot_subfolder_name, f'trans_i{iteration}')
 
     return fig
 
 
-def visualize_device(
-    cur_data, plot_directory_location, num_visualize_layers=1, iteration=''
+def visualize_device(r1,r2, cur_data, 
+                     plot_directory_location, 
+                     num_visualize_layers=1, iteration=''
 ):
     """Visualizes each (voxel) layer of cur_data. This data can be either density, permittivity, or index,
     and should be processed as such before passing to this function.
@@ -631,8 +635,8 @@ def visualize_device(
     r_vectors = []  # Variables
     f_vectors = []  # Functions
 
-    r_vectors.append({'var_name': 'x-axis', 'var_values': range(cur_data.shape[0])})
-    r_vectors.append({'var_name': 'y-axis', 'var_values': range(cur_data.shape[1])})
+    r_vectors.append({'var_name': 'x-axis', 'var_values': r1})
+    r_vectors.append({'var_name': 'y-axis', 'var_values': r2})
 
     f_vectors.append({'var_name': 'Device Data', 'var_values': cur_data})
 
@@ -647,16 +651,16 @@ def visualize_device(
     for layer_idx, layer in enumerate(plot_layers):
         fig, ax = plt.subplots()
 
-        Y_grid, X_grid = np.meshgrid(
+        X_grid, Y_grid = np.meshgrid(
             np.squeeze(r_vectors[0]['var_values']),
             np.squeeze(r_vectors[1]['var_values']),
+            indexing='ij'
         )
         # todo: Something is wrong here. The top face (y=2.04) gets printed as the left face in the device plot
 
-        c = ax.pcolormesh(
-            X_grid,
-            Y_grid,
-            np.transpose(np.real(f_vectors[0]['var_values'][:, :, layer])),
+        c = ax.pcolor(
+            X_grid, Y_grid,
+            np.real(f_vectors[0]['var_values'][:, :, layer]),
             # f_vectors[0]['var_values'][:,:,layer],
             # f_vectors[0]['var_values'][:,:,layer][:-1, :-1],	# compensate for error when shading='flat'
             cmap='jet',
@@ -759,7 +763,7 @@ def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs=No
                 'var_name': f'F{adj_src}',
                 'var_values': f[adj_src, :, wl_idx],
             })
-        plot_data = {'r': [r_vector], 'f': quad_trace, 'title': 'E-field Plot'}
+        plot_data = {'r': [r_vector], 'f': quad_trace, 'title': f'E-field at Focal Plane, {int(1e9 * wl[wl_idx]):.3f}nm'}
 
         bp = BasicPlot(plot_data)
         # bp.plot_config['y_axis']['limits'] = [0.0, 1.0]
@@ -768,10 +772,11 @@ def plot_Enorm_focal_2d(f, r, wl, plot_directory_location, iteration, wl_idxs=No
         bp.assign_axis_labels(y_label_string='Intensity')
         # for i in range(0,numEpochs+1):
         # 	plt.vlines(i*numIter, 0,upperRange, **vline_style)
+        wl_str = f'{wl[wl_idx]:.3f}um' if 1e3*wl[wl_idx] >= 1000 else f'{int(1e3*wl[wl_idx]):d}nm'
         bp.export_plot_config(
             plot_directory_location,
             'Efield_plots',
-            f'Enorm_wl{int(1e9 * wl[wl_idx])}nm_i{iteration}',
+            f'Enorm_wl{wl_str}_i{iteration}',
         )
 
 
@@ -1387,6 +1392,7 @@ def plot_sorting_transmission_sweep_1d(
 
 def close_all():
     plt.close('all')
+
 
 if __name__ == '__main__':
     plot_directory_location = 'plots'

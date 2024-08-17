@@ -184,11 +184,11 @@ if __name__ == '__main__':
             cmap=plt.get_cmap('gray'),
         )
         cur_density, cur_permittivity = project.device.import_cur_index(
-            fwd_sim.objects['design_import'],
-            reinterpolation_factor=1,  # project.config.get('reinterpolate_permittivity_factor'),
-            binarize=False,
-        )
-
+                    fwd_sim.objects['design_import'],
+                    reinterpolation_factors = 1, # project.config.get('reinterpolate_permittivity_factor'),
+                    binarize=False
+                )
+        
         # fdtd.save(project.base_sim.get_path(), project.base_sim)
         # fdtd.save(project.dir / 'base_sim.fsp', project.base_sim)
         fdtd.save(fwd_sim.get_path(), fwd_sim)
