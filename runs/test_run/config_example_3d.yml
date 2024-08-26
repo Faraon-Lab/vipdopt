@@ -35,13 +35,13 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.051 # 0.017
+mesh_spacing_um: 0.051 # 0.017          # NOTE: Same mesh spacing is used for ALL dimensions.
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.085 #0.051 # 0.085
 
 device_scale_um: 0.051    # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
 # Edit: device_scale_um is just meant to arbitrarily scale a few things it's not necessarily ONLY used for vertical dimensions
-# TODO: Consolidate with geometry_spacing_lateral_um 
+# TODO: At present this is used to determine the device voxels in the vertical. We should track down what else uses device_scale_um
 
 use_smooth_blur: False
 min_feature_size_um: 0.085  # used only for blurring
@@ -126,6 +126,8 @@ xy_adjtheta_rotations: [90, 0]  #2D settings. 3D is: [0, 90] applied to phi, and
 xy_pol_rotations: [0, 90]
 xy_names: ['x', 'y']
 
+use_source_aperture: True
+
 #* Adjoint Source
 
 num_focal_spots: 4
@@ -146,7 +148,7 @@ adjoint_src_to_dispersive_range_map: [
 
 #* Optimization
 
-enforce_xy_gradient_symmetry: False
+enforce_xy_gradient_symmetry: False #True#False#True
 
 # Alternative is to weight by focal intensity - need to check max intensity weighting
 weight_by_quadrant_transmission: True
@@ -165,6 +167,9 @@ epoch_start_design_change_max: 0.15
 epoch_end_design_change_max: 0.05
 epoch_start_design_change_min: 0.05
 epoch_end_design_change_min: 0
+
+# Layering changes with each epoch - scales to epoch list
+num_layers_epoch: [32, 32, 24, 24, 12, 12, 8, 8]
 
 fom_types: ['transmission', 'overall_transmission', 'intensity']
 optimization_fom: 'intensity'    # Has to be one from the fom_types list
@@ -299,7 +304,7 @@ figures_of_merit: {
             "pos_max_freqs": [],
             "neg_min_freqs": [],
             # "opt_ids": [0,1,2],
-            "weight": 1.0
+            "weight": 0.5
         },
     "fom_2": {
             "type": "BayerFilterFoM",
@@ -321,7 +326,7 @@ figures_of_merit: {
             "pos_max_freqs": [],
             "neg_min_freqs": [],
             # "opt_ids": [0,1,2],
-            "weight": 1.0
+            "weight": 1.5
         },
     "fom_3": {
             "type": "BayerFilterFoM",
@@ -343,6 +348,6 @@ figures_of_merit: {
             "pos_max_freqs": [],
             "neg_min_freqs": [],
             # "opt_ids": [0,1,2],
-            "weight": 1.0
+            "weight": 0.5
         }
 }

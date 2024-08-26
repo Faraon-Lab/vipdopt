@@ -4,7 +4,7 @@
 # - Use of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 # - Use in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the software.
 # - Neither the name of the California Institute of Technology (Caltech) nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-#
+# 
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
@@ -37,7 +37,7 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 mesh_spacing_um: 0.051 # 0.017          # NOTE: Same mesh spacing is used for ALL dimensions.
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
-geometry_spacing_lateral_um: 0.106 # 0.085 # 0.051
+geometry_spacing_lateral_um: 0.102 # 0.085 # 0.051
 
 device_scale_um: 0.102 # 0.051    # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
 # Edit: device_scale_um is just meant to arbitrarily scale a few things it's not necessarily ONLY used for vertical dimensions
@@ -121,7 +121,7 @@ source_angle_theta_vacuum_deg: 0 #46
 source_angle_phi_deg: 0
 
 # General polarized source information
-xy_phi_rotations: [0, 90] #2D, apply this to polarization angle of the forward source.
+xy_phi_rotations: [0, 90] #2D, apply this to polarization angle of the forward source. 
 xy_adjtheta_rotations: [90, 0]  #2D settings. 3D is: [0, 90] applied to phi, and theta=90 for all
 xy_pol_rotations: [0, 90]
 xy_names: ['x', 'y']
@@ -182,7 +182,8 @@ reinterpolate_type: 'nearest' #'linear'   #NOTE: In the end we implement both an
 
 #! new-------
 border_optimization: False
-border_constant_width: 2 # False if not used
+
+border_constant_width: 2 # False if not used, integer num. pixels if used
 border_constant_density: 0
 
 layer_gradient: False
@@ -221,7 +222,7 @@ boundary_conditions: 'pml' # 'periodic'
 use_source_aperture: True # False
 
 #* Border aperiodic
-evaluate_bordered_extended: False # True
+evaluate_bordered_extended: False # True   
 # You only see this in the evaluate code block, so can ignore. But also, part of it is in
 # the restart block in order to truncate the cur_design_variable?
 
@@ -255,9 +256,9 @@ optimizer_settings: {
             0.0
         ]
 }
-fom_dict: [{'fwd': [0], 'adj': [0], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []},
-            {'fwd': [0], 'adj': [2], 'freq_idx_opt': f_bin_all, 'freq_idx_restricted_opt': []}
-            ]
+# fom_dict: [{'fwd': [0], 'adj': [0], 'freq_idx_opt': 'f_bin_all', 'freq_idx_restricted_opt': []},
+#             {'fwd': [0], 'adj': [2], 'freq_idx_opt': 'f_bin_all', 'freq_idx_restricted_opt': []}
+#             ]
 
 figures_of_merit: {
     "fom_0": {
