@@ -168,6 +168,9 @@ epoch_end_design_change_max: 0.05
 epoch_start_design_change_min: 0.05
 epoch_end_design_change_min: 0
 
+# Layering changes with each epoch - scales to epoch list
+num_layers_epoch: [32, 32, 24, 24, 12, 12, 8, 8]
+
 fom_types: ['transmission', 'overall_transmission', 'intensity']
 optimization_fom: 'intensity'    # Has to be one from the fom_types list
 
