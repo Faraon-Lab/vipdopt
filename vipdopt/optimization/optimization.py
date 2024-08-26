@@ -248,8 +248,9 @@ class LumericalOptimization:
             np.array(self.fom_hist['intensity_overall']),
             folder, self.epoch_list
         )
+        quads_to_plot = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
         quad_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
-            np.array([self.fom_hist[f'transmission_{x}'] for x in [0,1]]).swapaxes(0,1),
+            np.array([self.fom_hist[f'transmission_{x}'] for x in quads_to_plot]).swapaxes(0,1),
             folder, self.epoch_list
         )
         overall_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
@@ -1191,8 +1192,10 @@ class LumericalOptimization:
 
                 # Each epoch the filters get stronger and so the permittivity must be passed through the new filters
                 self.device.update_filters(
-                    epoch=np.max(np.where(np.array(self.epoch_list) <= self.iteration))
-                )
+                    epoch = np.max( np.where( np.array(self.epoch_list)<=self.iteration ) ), # NOTE: separate from epoch
+                    epoch_list = self.epoch_list,
+                    num_layers_epoch = self.cfg['num_layers_epoch']     # Added to test layering changes during optimization
+                    )
                 self.device.update_density()
                 # Import device index now into base simulation
                 import_primitive = self.base_sim.imports()[0]
@@ -1289,18 +1292,13 @@ class LumericalOptimization:
                 # Compute transmission FoM and apply spectral and performance weights.
                 fom_kwargs_trans = self.fom_kwargs.copy()
                 fom_kwargs_trans.update({'type': 'transmission'})
-                t = np.array([
-                    fom[0].fom_func(*self.fom_args, **fom_kwargs_trans)
+                t = np.array([ fom[0].fom_func(*self.fom_args, **fom_kwargs_trans)
                     for fom in self.fom.foms
                 ])
-                [
-                    self.fom_hist.get(f'transmission_{idx}').append(t_i)
-                    for idx, t_i in enumerate(t)
-                ]
-                self.fom_hist.get('transmission_overall').append(
-                    np.squeeze(np.sum(t, 0))
-                )
+                [ self.fom_hist.get(f'transmission_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
+                self.fom_hist.get('transmission_overall').append( np.squeeze(np.sum(t, 0)) )
                 # [plt.plot(np.squeeze(t_i)) for t_i in t]
+                # todo: remove hardcode for the monitor.
                 intensity = np.sum(np.square(np.abs(fwd_sims[0].monitors()[4].e)), axis=0)
                 self.fom_hist.get('intensity_overall_xyzwl').append(intensity)
 

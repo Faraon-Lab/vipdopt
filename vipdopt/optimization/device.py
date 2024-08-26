@@ -252,7 +252,7 @@ class Device:
         """Overwrite the filters in this device."""
         self.filters = f
 
-    def update_filters(self, epoch=0):
+    def update_filters(self, epoch=0, epoch_list=[0], num_layers_epoch=[10]):
         """Update the filters of the device."""
         # Filters are coded so that they can be re-initialized without problems.
         
@@ -261,9 +261,15 @@ class Device:
         # TODO: Test
         self.filters = [type(f)(**f.init_vars) for f in self.filters]
         
-        for f in self.filters:
+        for i, f in enumerate(self.filters):
             if isinstance(f, Sigmoid):
-                f = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
+                self.filters[i] = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
+            elif isinstance(f, Layering):
+                g = f.init_vars
+                g.update({'num_layers': num_layers_epoch[round(
+                                            ((epoch+1)/(len(epoch_list)-1)*(len(num_layers_epoch))) - 1
+                                        )]})
+                self.filters[i] = Layering(**g)
         
         # self.filters = [
         #     Layering( **filter_vars[0] ),
