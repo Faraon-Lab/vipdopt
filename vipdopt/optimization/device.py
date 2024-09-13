@@ -228,11 +228,11 @@ class Device:
         d.set_design_variable(w)
         return d
 
-    def clip(self, x: npt.NDArray) -> npt.NDArray:
+    def clip(self, x: npt.NDArray, constraints:list=[0,1]) -> npt.NDArray:
         """Return x where all values are clipped to the device's constraints."""
         return np.maximum(
-            np.minimum(x, self.permittivity_constraints[1]),
-            self.permittivity_constraints[0],
+            np.minimum(x, constraints[1]),
+            constraints[0],
         )
 
     def get_design_variable(self) -> npt.NDArray[np.complex128]:
@@ -252,7 +252,7 @@ class Device:
         """Overwrite the filters in this device."""
         self.filters = f
 
-    def update_filters(self, epoch=0, epoch_list=[0], num_layers_epoch=[10]):
+    def update_filters(self, epoch=0, epoch_list=[0], num_layers_per_epoch=[10]):
         """Update the filters of the device."""
         # Filters are coded so that they can be re-initialized without problems.
         
@@ -264,12 +264,12 @@ class Device:
         for i, f in enumerate(self.filters):
             if isinstance(f, Sigmoid):
                 self.filters[i] = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
-            elif isinstance(f, Layering):
-                g = f.init_vars
-                g.update({'num_layers': num_layers_epoch[round(
-                                            ((epoch+1)/(len(epoch_list)-1)*(len(num_layers_epoch))) - 1
-                                        )]})
-                self.filters[i] = Layering(**g)
+            # elif isinstance(f, Layering):
+            #     g = f.init_vars
+            #     g.update({'num_layers': num_layers_per_epoch[round(
+            #                                 ((epoch+1)/(len(epoch_list)-1)*(len(num_layers_per_epoch))) - 1
+            #                             )]})
+            #     self.filters[i] = Layering(**g)
         
         # self.filters = [
         #     Layering( **filter_vars[0] ),

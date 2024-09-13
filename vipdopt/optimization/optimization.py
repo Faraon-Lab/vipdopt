@@ -37,6 +37,7 @@ class LumericalOptimization:
     def __init__(
         self,
         base_sim: LumericalSimulation,
+        sims: list[LumericalSimulation,...],
         device: Device,
         optimizer: GradientOptimizer,
         fom: SuperFoM,
@@ -53,6 +54,7 @@ class LumericalOptimization:
     ):
         """Initialize Optimization object."""
         self.base_sim = base_sim
+        self.sims = sims
         self.device = device
         self.optimizer = optimizer
         if isinstance(fom, FoM):
@@ -98,7 +100,7 @@ class LumericalOptimization:
             for i, f in enumerate(self.fom.foms):
                 self.fom_hist.update( {f'{metric}_{i}': []} )
         self.fom_hist.update( {'intensity_overall_xyzwl': []} )
-        self.param_hist.update({'design': []})
+        # self.param_hist.update({'design': []})
 
         # Set up parent project
         self.project = project
@@ -197,6 +199,7 @@ class LumericalOptimization:
         if folder is None:
             folder = self.dirs['opt_info']
         foms = np.array(self.fom_hist)
+        # Todo: need to explore different compression algorithms
         with (folder / 'fom_history.npy').open('wb') as f:
             np.save(f, foms)
         params = np.array(self.param_hist)
@@ -1194,7 +1197,7 @@ class LumericalOptimization:
                 self.device.update_filters(
                     epoch = np.max( np.where( np.array(self.epoch_list)<=self.iteration ) ), # NOTE: separate from epoch
                     epoch_list = self.epoch_list,
-                    num_layers_epoch = self.cfg['num_layers_epoch']     # Added to test layering changes during optimization
+                    num_layers_per_epoch = self.cfg['num_layers_per_epoch']     # Added to test layering changes during optimization
                     )
                 self.device.update_density()
                 # Import device index now into base simulation

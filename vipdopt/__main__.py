@@ -110,21 +110,18 @@ if __name__ == '__main__':
     # Launch vipdopt again but with "--config config.json" i.e. point the config file to the savestate
     # TODO: Write Tests
 
-    # Now that config is loaded, set up lumapi
+    # Now that config is loaded, check if SLURM Job Scheduler is being used
     if os.getenv('SLURM_JOB_NODELIST') is None:
-        vipdopt.lumapi = import_lumapi(
-            project.config.data['lumapi_filepath_local']
-        )  # Windows (local machine)
-        vipdopt.logger.info(f'Local Lumapi path is: {project.config.data["lumapi_filepath_local"]}')
+        # Windows (local machine)
+        domain_str = 'Local'
         hide_fdtd=False
     else:
-        vipdopt.lumapi = import_lumapi(
-            project.config.data['lumapi_filepath_hpc']
-        )  # HPC (Linux)
-        vipdopt.logger.info(f'HPC Lumapi path is: {project.config.data["lumapi_filepath_hpc"]}')
+        # SLURM HPC (Linux)
+        domain_str = 'SLURM HPC'
         hide_fdtd=True
         with open(project.dir / f'slurm_{os.getenv("SLURM_JOB_ID")}.log', "w") as f:
             f.write(' ')
+    vipdopt.logger.info(f'{domain_str} Lumapi path is: {vipdopt.lumapi_path}')
 
     fdtd = project.optimization.fdtd    # NOTE: - the instantiation is called in optimization.py
     vipdopt.fdtd = fdtd      # Makes it available to global
