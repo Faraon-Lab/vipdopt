@@ -20,14 +20,15 @@ pull_sim_files_from_debug_folder: False
 
 #* File Options
 
-lumapi_filepath_local: "C:\\Program Files\\Lumerical\\v212\\api\\python\\lumapi.py"
-lumapi_filepath_hpc: "/central/home/ifoo/lumerical/2021a_r22/api/python/lumapi.py"
-#! do not include spaces in filepaths passed to linux
+# lumapi_filepath_local: "C:\\Program Files\\Lumerical\\v212\\api\\python\\lumapi.py"
+# lumapi_filepath_hpc: "/central/home/ifoo/lumerical/2022a_r24/api/python/lumapi.py"
+# #! do not include spaces in filepaths passed to linux
 
 simulator_name: 'LumericalFDTD'
 simulator_dimension: '2D'       # capital D please
 simulator_max_wait_time: 3600   # seconds
 use_autograd: False
+use_GUI_license: True
 
 #* Back-Compatibility
 
@@ -35,7 +36,7 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.051 # 0.017          # NOTE: Same mesh spacing is used for ALL dimensions.
+mesh_spacing_um: 0.034 # 0.017          # NOTE: Same mesh spacing is used for ALL dimensions.
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
 geometry_spacing_lateral_um: 0.102 # 0.085 # 0.051
 
@@ -59,10 +60,10 @@ focal_plane_center_lateral_um: 0
 
 #* Device
 
-num_vertical_layers: 5 # 10
-vertical_layer_height_um: 0.408 #0.051 * 4 #0.017 * 8
+num_vertical_layers: 10 # 10
+vertical_layer_height_um: 0.204 #0.051 * 4 #0.017 * 8
 
-device_size_lateral_um: 3.06 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
+device_size_lateral_um: 3.96 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
 
 device_vertical_minimum_um: 0
 
@@ -154,8 +155,8 @@ enforce_xy_gradient_symmetry: False #True#False#True
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-total_num_iterations: 80 #40 20 # 1  #300
-epoch_list: [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80]  # [0, 4, 8, 12, 16, 20] # [0,1] # [0,30,60,90,120,150,180,210,240,270,300]
+total_num_iterations:  80 #40 #20 # 1  #300
+epoch_list: [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80] # [0, 4, 8, 12, 16, 20] # [0,1]  # [0,30,60,90,120,150,180,210,240,270,300]
 
 # optimizer_algorithm: 'ADAM' #'Gradient Descent'
 # adam_betas: !!python/tuple [0.9, 0.999]
@@ -168,8 +169,9 @@ epoch_end_design_change_max: 0.05
 epoch_start_design_change_min: 0.05
 epoch_end_design_change_min: 0
 
-# Layering changes with each epoch - scales to epoch list
-num_layers_per_epoch: [32, 32, 24, 24, 12, 12, 8, 8]
+# Layering changes with each epoch - scales to epoch list. # True or empty list: automatic scaling
+# False: Same num. layers throughout. # Otherwise: Custom setting
+num_layers_per_epoch: False
 
 fom_types: ['transmission', 'overall_transmission', 'intensity']
 optimization_fom: 'intensity'    # Has to be one from the fom_types list
@@ -239,8 +241,8 @@ fixed_layers_density: 0
 
 #* New Stuff 20240222:
 # NOTE: If this needs troubleshooting, open Lumerical in a GUI in the environment you intend to run this in, and check the resource config job launch presets.
-mpi_exe: 'C:\Program Files (x86)\IntelSWToolsMPI\compilers_and_libraries_2020.4.321\windows\mpi\intel64\bin\mpiexec.exe' #"/central/home/ifoo/lumerical/2021a_r22/mpich2/nemesis/bin/mpiexec" # "/central/software/mpich/4.0.0/bin/mpirun"
-solver_exe: 'C:\Program Files\Lumerical\v212\bin\fdtd-engine-impi.exe' # "/central/home/ifoo/lumerical/2021a_r22/bin/fdtd-engine-mpich2nem" # "/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem"
+mpi_exe: 'C:\Program Files (x86)\IntelSWToolsMPI\compilers_and_libraries_2020.4.321\windows\mpi\intel64\bin\mpiexec.exe' #"/central/home/ifoo/lumerical/2022a_r24/mpich2/nemesis/bin/mpiexec" # "/central/software/mpich/4.0.0/bin/mpirun"
+solver_exe: 'C:\Program Files\Lumerical\v222\bin\fdtd-engine-impi.exe' # "/central/home/ifoo/lumerical/2022a_r24/bin/fdtd-engine-mpich2nem" # "/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem"
 nprocs: 8
 
 optimizer: "AdamOptimizer"

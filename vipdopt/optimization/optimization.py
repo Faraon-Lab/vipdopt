@@ -1268,7 +1268,8 @@ class LumericalOptimization:
                         'FDTD'
                     ):  # Existing job list still occupied
                         # Run simulations from existing job list
-                        self.fdtd.runjobs()
+                        use_GUI_license = self.cfg['use_GUI_license'] if os.getenv('SLURM_JOB_NODELIST') is None else False
+                        self.fdtd.runjobs( use_GUI_license )
 
                         # Check if there are any jobs that didn't run
                         for sim in chain(fwd_sims, adj_sims):
@@ -1342,7 +1343,7 @@ class LumericalOptimization:
 
                 # Project / interpolate the design_gradient, the values of which we have at each (mesh) voxel point, and obtain it at each (geometry) voxel point
                 design_gradient_interpolated = self.device.interpolate_gradient(
-                    get_grad_density, 
+                    get_grad_density,
                     dimension=self.cfg['simulator_dimension']
                 )
 

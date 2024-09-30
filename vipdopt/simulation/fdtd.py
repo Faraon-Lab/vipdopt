@@ -7,6 +7,7 @@ import contextlib
 import functools
 import os
 import time
+import shlex, subprocess
 import typing
 from collections.abc import Callable
 from functools import partial
@@ -132,7 +133,7 @@ class LumericalFDTD(ISolver):
     def connect(self, hide: bool = True) -> None:
         if vipdopt.lumapi is None:
             raise ModuleNotFoundError(
-                'Module "vipdopt.lumapi" has not yet been instatiated.'
+                'Module "vipdopt.lumapi" has not yet been instantiated.'
             )
         while self.fdtd is None:
             try:
@@ -151,10 +152,16 @@ class LumericalFDTD(ISolver):
         """Sync local environment variables with those of `vipdopt.lumapi.FDTD`."""
         if self._synced:
             return
-        if self._env_vars is not None:
+        else:
             self.setup_env_resources(**self._env_vars)
-            self._env_vars = None
-        self._synced = True
+            self._synced = True
+            
+        # # Amended 20240927. Previously:
+        # if self._env_vars is not None:
+        #     self.setup_env_resources(**self._env_vars)
+        #     self._env_vars = None
+        # self._synced = True
+            
         vipdopt.logger.debug('Resynced LumericalFDTD.')
 
     @_check_lum_fdtd
@@ -170,17 +177,73 @@ class LumericalFDTD(ISolver):
 
     @_sync_lum_fdtd_solver
     # @override
-    def runjobs(self, option: int = 1):
+    def runjobs(self, use_GUI_license=False, option: int = 1,  bypass_MPI=True):
         """Run all simulations in the job queue.
 
         Arguments:
+            use_GUI_license (bool): Indicates whether or not to use a GUI license.
+                0: Closes FDTD instance, runs using subprocess.POpen(). Costs 0 GUI license and N engines.
+                1: Keeps FDTD instance open, runs using runjobs(). Costs 1 GUI license and N engines. Preferable but makes people angry.
             option (int): Indicates the resources to use when running simulations.
                 0: Run jobs in single process mode using only the local machine.
                 1: Run jobs using the resources and parallel settings specified in
                     the resource manager. (default)
+            bypass_MPI (bool): 
+                0: Runs without MPI. MPI and License Sharing cannot be concurrent.
+                1: Runs with MPI. In order to run simultaneous jobs, should spawn N subprocesses.
+                # TODO: Multiple subprocess spawning. Also consider distributing to cluster hosts.
         """
         vipdopt.logger.info(f'Running simulations: {self.fdtd.listjobs("FDTD")}')
-        self.fdtd.runjobs('FDTD', option)  # type: ignore
+        
+        if use_GUI_license:
+            # Remove every single resource except the custom one (should be resource number 1)
+            for resource_num in range(int(self.fdtd.getresource("FDTD"))):
+                self.delete_resource(resource_num)
+            # Run all jobs using the native Lumerical GUI
+            self.fdtd.runjobs('FDTD', option)  # type: ignore
+            
+        else:
+            # Extract command-line submission script from existing FDTD instance
+            args = self.env_vars_to_commandline_script(bypass_MPI)
+            
+            # Close current FDTD GUI instance
+            self.close()
+            
+            # Use subprocess to call a command-line submission script
+            subp_shell = False      # Really shouldn't ever be set to True
+            subp_args = ''.join(args) if subp_shell else shlex.split(args)[1:-2]    # Eliminate script start and end
+            subp_kwargs = {} if bypass_MPI else {'cwd': Path(subp_args[0]).parent}
+            process = subprocess.Popen( args=subp_args,
+                                        shell=subp_shell,
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                        **subp_kwargs
+                                    )
+                        
+            # Monitor when all files have completed running
+            # process.wait()
+            
+            # rc = process.poll()
+            # while rc != 0:
+            #     while True:
+            #         line = process.stdout.readline()
+            #         if not line:
+            #             break
+            #         print(line)
+            #     rc = process.poll()
+            # print('Process complete.')
+            
+            while process.poll() != 0:
+                while True:
+                    line = process.stdout.readline()
+                    if not line:    break
+                    vipdopt.logger.debug(line)
+            vipdopt.logger.debug('Process complete.')
+            
+            # Re-open FDTD GUI instance
+            hide_fdtd = False if os.getenv('SLURM_JOB_NODELIST') is None else True
+            self.connect(hide_fdtd)
+            self.promise_env_setup(**self._env_vars)
+            
         self.current_sim = None
         vipdopt.logger.info('Finished running job queue')
 
@@ -335,8 +398,11 @@ class LumericalFDTD(ISolver):
         if self.fdtd is None:
             self._env_vars = kwargs if len(kwargs) > 0 else None
         else:
-            if self._env_vars is None:
-                self._env_vars = kwargs
+            self._env_vars = kwargs
+            
+            # # Amended 20240927. Previously:
+            # if self._env_vars is None:
+            #     self._env_vars = kwargs
             self.setup_env_resources(**kwargs)
 
     def get_env_vars(self) -> dict:
@@ -352,7 +418,18 @@ class LumericalFDTD(ISolver):
     def set_resource(self, resource_num: int, resource: str, value: Any):
         """Set the specified job manager resource for this simulation."""
         self.fdtd.setresource('FDTD', resource_num, resource, value)  # type: ignore
-
+    
+    @_check_lum_fdtd
+    def delete_resource(self, resource_num: int):
+        """Delete the specified job manager resource for this simulation."""
+        try:
+            resource_dict = self.get_env_resources(resource_num)
+            self.fdtd.deleteresource('FDTD', resource_num)  # type: ignore
+            vipdopt.logger.debug(f'Removed job manager resource {resource_num}: {resource_dict["job launching preset"]}')
+            return True
+        except Exception as ex:
+            return False
+        
     def setup_env_resources(self, **kwargs):
         """Configure the environment resources for running this simulation.
 
@@ -374,7 +451,7 @@ class LumericalFDTD(ISolver):
         )
         if not os.getenv('SLURM_JOB_NODELIST') is None:     
             # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
-            mpi_exe = "/central/home/ifoo/lumerical/2021a_r22/mpich2/nemesis/bin/mpiexec"
+            mpi_exe = "/central/home/ifoo/lumerical/2022a_r24/mpich2/nemesis/bin/mpiexec"
         self.set_resource(1, 'mpi executable', str(mpi_exe))
 
         nprocs = kwargs.pop('nprocs', 8)
@@ -390,19 +467,86 @@ class LumericalFDTD(ISolver):
         )
         if not os.getenv('SLURM_JOB_NODELIST') is None:     
             # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
-            solver_exe = "/central/home/ifoo/lumerical/2021a_r22/bin/fdtd-engine-mpich2nem"
+            solver_exe = "/central/home/ifoo/lumerical/2022a_r24/bin/fdtd-engine-mpich2nem"
         self.set_resource(1, 'solver executable', str(solver_exe))
 
         self.set_resource(
             1,
             'submission script',
             '#!/bin/sh\n'
-            f'{mpi_exe} {mpi_opt} {solver_exe} {{PROJECT_FILE_PATH}}\n'
+            f'"{mpi_exe}" {mpi_opt} "{solver_exe}" {{PROJECT_FILE_PATH}}\n'
             'exit 0',
         )
         vipdopt.logger.debug('Updated lumerical job manager resources:')
         for resource, value in self.get_env_resources().items():
             vipdopt.logger.debug(f'\t"{resource}" = {value}')
+
+    def env_vars_to_commandline_script(self, bypass_mpi=False, **kwargs):
+        """Convert environment resources to a script to submit to the terminal.
+
+        self._env_vars should contain:
+            mpi_exe (Path): Path to the mpi executable to use
+            nprocs (int): The number of processes to run the simulation with
+            hostfile (Path | None): Path to a hostfile for running distributed jobs
+            solver_exe (Path): Path to the fdtd-solver to run
+            nsims (int): The number of simulations being run
+        """
+        
+        #* This should be used when no GUI/task licenses are intended to be checked out.
+        # Running simulations using terminal on Linux – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/360024974033-Running-simulations-using-terminal-on-Linux
+        # Ansys optics solve, accelerator, and Ansys HPC license consumption – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/360058577794-Ansys-optics-solve-accelerator-and-Ansys-HPC-license-consumption
+        # Compute resource configuration use cases – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/360025161033-Compute-resource-configuration-use-cases
+        # Distributed computing – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/360026321353-Distributed-computing
+        # Resource configuration elements and controls – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/360058790674-Resource-configuration-elements-and-controls
+        # Running simulations with MPI on Linux – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/20741668696467-Running-simulations-with-MPI-on-Linux
+        # Running simulations remotely with Intel MPI – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/5615899829907-Running-simulations-remotely-with-Intel-MPI
+
+        nsims = self._env_vars.get('nsims', 1)
+        # Actually capacity (max. possible num. sims), not actual number of sims
+        
+        mpi_exe = self._env_vars.get('mpi_exe', Path('/central/software/mpich/4.0.0/bin/mpirun'))
+        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+            # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
+            mpi_exe = "/central/home/ifoo/lumerical/2022a_r24/mpich2/nemesis/bin/mpiexec"
+        nprocs = self._env_vars.get('nprocs', 8)
+        hostfile = self._env_vars.get('hostfile', None)
+        
+        mpi_opt = f'-n {nprocs}'
+        if hostfile is not None:
+            mpi_opt += f' --hostfile {hostfile}'
+        
+        solver_exe = self._env_vars.get('solver_exe',
+            Path('/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem'))
+        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+            # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
+            solver_exe = "/central/home/ifoo/lumerical/2022a_r24/bin/fdtd-engine-mpich2nem"
+            
+        cores_per_sim = 4
+        
+        sim_filenames = self.fdtd.listjobs().replace('"','').split('\n')
+        sim_filenames.pop(0)        # remove "FDTD:" header
+
+        if bypass_mpi:
+            mpirun_pre_script = ''
+        else:
+            # mpirun_pre_script = f'mpirun {mpi_exe} {mpi_opt} '
+            mpirun_pre_script = f'"{mpi_exe}" {mpi_opt} '
+        fdtd_engine_script = f'"{solver_exe}" -t {cores_per_sim}'
+        for file in sim_filenames:
+
+            # # Relative Path
+            # parent = Path.cwd()
+            # son = Path(file)
+            # if parent in son.parents or parent==son:
+            #     root = son.relative_to(parent) # returns Path object equivalent to 'c/d'
+            # fdtd_engine_script = fdtd_engine_script + f'  "{root}"'
+            
+            # # Absolute Path
+            fdtd_engine_script = fdtd_engine_script + f' "{file}"'
+            
+        submission_script = f"#!/bin/sh\n{mpirun_pre_script}{fdtd_engine_script}\nexit 0"
+        
+        return submission_script
 
     @_check_lum_fdtd
     @typing.no_type_check

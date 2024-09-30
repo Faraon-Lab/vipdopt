@@ -259,6 +259,20 @@ class StoppableThread(threading.Thread):
         """Return whther this thread has been stopped."""
         return self._stop_event.is_set()
 
+def invoke_at(path: str|Path):
+    def parameterized(func):
+        def wrapper(*args, **kwargs):
+            cwd = os.getcwd()
+            os.chdir(path)
+
+            try:
+                ret = func(*args, **kwargs)
+            finally:
+                os.chdir(cwd)
+
+            return ret
+        return wrapper
+    return parameterized        
 
 class Coordinates(TypedDict):
     """Class representing coordinates in 3D space."""
