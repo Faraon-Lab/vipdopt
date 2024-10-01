@@ -132,6 +132,7 @@ if __name__ == '__main__':
 
     # Numpy Export final design
     project.device.save( project.subdirectories['data'] / 'final_device.npy' )
+    project.device.save( project.subdirectories['summary'] / 'last_device.npy' )
     # STL Export final design
     project.device.export_density_as_stl( project.subdirectories['data'] / 'final_device.stl' )
     # GDS Export final design

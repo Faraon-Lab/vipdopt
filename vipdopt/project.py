@@ -38,6 +38,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
 
     # * Output / Save Paths
     data_folder = root_dir / 'data'
+    summary_folder = root_dir / 'summary'
     temp_folder = root_dir / '.tmp'
     device_folder = root_dir / 'device'
     checkpoint_folder = data_folder / 'checkpoints'
@@ -393,6 +394,16 @@ class Project:
                     # Bridging is performed in the STL export and has minimal performance reduction.
                 ],
             )
+        
+        # TODO: 20240930 - Testing =========================
+        f = Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+                             3 , (0,1),
+                             spacer_height_voxels=2, spacer_voxels_value=0.5 
+                            )
+        g = f.get_layer_idxs(voxel_array_size)
+        h = f.layer_averaging(self.device.get_design_variable(), 0.1)
+        # ==================================================    
+        
         vipdopt.logger.info('Device loaded.')
 
     def _load_config(self, config: Config | dict):

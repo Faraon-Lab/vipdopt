@@ -205,6 +205,12 @@ class LumericalOptimization:
         params = np.array(self.param_hist)
         with (folder / 'parameter_history.npy').open('wb') as f:
             np.save(f, params)
+        
+        with (self.dirs['summary'] / 'fom_history.npy').open('wb') as f:
+            np.save(f, foms)
+        with (self.dirs['summary'] / 'parameter_history.npy').open('wb') as f:
+            np.save(f, params)
+        
 
     def load_histories(self, folder=None):
         """Load the fom and parameter histories from file."""
@@ -237,6 +243,8 @@ class LumericalOptimization:
         folder = self.dirs['opt_plots']
         iteration = self.iteration if self.iteration==self.epoch_list[-1] else self.iteration+1
         vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
+        
+        # TODO: Copy all to summary folder as well.
 
         # Placeholder indiv_quad_trans
         import matplotlib.pyplot as plt
@@ -263,7 +271,7 @@ class LumericalOptimization:
         )
 
         if self.cfg['simulator_dimension'] == '2D':
-            intensity_f = np.squeeze(self.fom_hist.get('intensity_overall_xyzwl')[-1])
+            intensity_f = np.squeeze(self.fom_hist.get('intensity_overall_xyzwl')) #[-1]) only if we're recording more than the most recent one
             spatial_x = np.linspace(self.device.coords['x'][0], self.device.coords['x'][-1], intensity_f.shape[0])
             intensity_fig = plotter_v2.plot_Enorm_focal_2d(
                 intensity_f,
@@ -1304,7 +1312,9 @@ class LumericalOptimization:
                 # [plt.plot(np.squeeze(t_i)) for t_i in t]
                 # todo: remove hardcode for the monitor.
                 intensity = np.sum(np.square(np.abs(fwd_sims[0].monitors()[4].e)), axis=0)
-                self.fom_hist.get('intensity_overall_xyzwl').append(intensity)
+                self.fom_hist['intensity_overall_xyzwl'] = intensity
+                # # We need to save space for fom_history. Just save the most recent iteration's data.
+                # self.fom_hist.get('intensity_overall_xyzwl').append(intensity)
 
                 # # Here is where we would start plotting the loss landscape. Probably should be accessed by a separate class...
                 # # Or we could move it to the device step part
@@ -1386,6 +1396,7 @@ class LumericalOptimization:
 
                 # Save design variable
                 self.device.save(self.project.current_device_path())
+                self.device.save( self.project.subdirectories['summary'] / 'last_device.npy' )
 
                 # Generate Plots and call callback functions
                 self.save_histories()
