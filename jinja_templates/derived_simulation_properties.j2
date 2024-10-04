@@ -21,8 +21,12 @@ focal_length_um: {{ focal_length_um }}
 focal_plane_center_vertical_um: {{ -1 * focal_length_um }}
 
 #* Device Properties
+{# {% set num_vertical_spacers: {{data.num_vertical_spacers}} -%} #}
+{% set num_vertical_spacers = data.num_vertical_layers-1 | int -%}
+num_vertical_spacers: {{ num_vertical_spacers }}
+
 vertical_layer_height_voxels: {{ (data.vertical_layer_height_um / data.device_scale_um ) | int }}
-{% set device_size_vertical_um = data.vertical_layer_height_um * data.num_vertical_layers -%}
+{% set device_size_vertical_um = data.vertical_layer_height_um * data.num_vertical_layers + data.vertical_spacer_height_um * num_vertical_spacers -%}
 device_size_vertical_um: {{ device_size_vertical_um }}
 device_voxels_lateral: {{ (data.device_size_lateral_um / data.geometry_spacing_lateral_um) | round | int }}
 device_voxels_vertical: {{ (device_size_vertical_um / data.device_scale_um) | round | int }}

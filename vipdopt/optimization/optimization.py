@@ -205,12 +205,12 @@ class LumericalOptimization:
         params = np.array(self.param_hist)
         with (folder / 'parameter_history.npy').open('wb') as f:
             np.save(f, params)
-        
+
         with (self.dirs['summary'] / 'fom_history.npy').open('wb') as f:
             np.save(f, foms)
         with (self.dirs['summary'] / 'parameter_history.npy').open('wb') as f:
             np.save(f, params)
-        
+
 
     def load_histories(self, folder=None):
         """Load the fom and parameter histories from file."""
@@ -243,7 +243,7 @@ class LumericalOptimization:
         folder = self.dirs['opt_plots']
         iteration = self.iteration if self.iteration==self.epoch_list[-1] else self.iteration+1
         vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
-        
+
         # TODO: Copy all to summary folder as well.
 
         # Placeholder indiv_quad_trans
@@ -303,7 +303,10 @@ class LumericalOptimization:
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
         final_device_layer_fig, _ = plotter_v2.visualize_device(
             self.device.coords['x'], self.device.coords['y'],
-            cur_index, folder, iteration=iteration
+            cur_index,
+            # self.device.coords['x'], self.device.coords['z'],
+            # np.rot90(cur_index),         # 20241003: Want to see the side view for layering.
+            folder, iteration=iteration
         )
 
     #     # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)

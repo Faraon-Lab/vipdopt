@@ -1,12 +1,13 @@
 """Module for the abstract Filter class and all its implementations."""
 
 import abc
+import copy
 
 import numpy as np
 import numpy.typing as npt
 from overrides import override
 
-from vipdopt.utils import sech
+from vipdopt.utils import sech, flatten
 
 SIGMOID_BOUNDS = (0.0, 1.0)
 
@@ -213,15 +214,16 @@ class Scale(Filter):
         """Calls forward()."""
         return self.forward(x)
 
+
 class Layering(Filter):
-    """'''Takes a device and splits it into layers in the dimension requested. Gives the 
+    """'''Takes a device and splits it into layers in the dimension requested. Gives the
     functionality to get the indices of each layer, and add spacers in between each layer.
-    
+
     Restricts optimization by averaging the calculated sensitivity in the vertical direction
     within EACH layer, such that voxels within each layer are governed by a shared 2D profile.
-    i.e. n layers, 1 layer has m voxels, all voxels have a shared 2D permittivity profile 
+    i.e. n layers, 1 layer has m voxels, all voxels have a shared 2D permittivity profile
     WITHIN the nth layer, but each layer differs from the rest in its 2D profile
-    
+
     See OPTICA paper supplement Section IIC, https://doi.org/10.1364/OPTICA.384228, for details.
     """
 
@@ -235,34 +237,43 @@ class Layering(Filter):
     def init_vars(self) -> dict:
         return {'dim': self.dim,
                 'num_layers': self.num_layers,
+                'num_spacers': self.num_spacers,
                 'variable_bounds': self.variable_bounds,
+                'layer_height_voxels': self.layer_height_voxels,
                 'spacer_height_voxels':self.spacer_height_voxels,
-                'spacer_voxels_value':self.spacer_voxels_value}
+                'spacer_voxels_value':self.spacer_voxels_value,
+                }
 
-    def __init__(self, dim:str|int, num_layers:int, 
+    def __init__(self, dim:str|int, num_layers:int, num_spacers:int,
                 variable_bounds:tuple[float, float]=(0,1),
-                spacer_height_voxels=0, 
-                spacer_voxels_value=0, *args, **kwargs):
+                layer_height_voxels=None, spacer_height_voxels=0,
+                spacer_voxels_value=0,):
         """Initialize a Layering filter.
         dim: dimension to layer on
         num_layers: number of layers
         variable_bounds: taken as density for default.
         spacer_height_voxels: height of each spacer in voxels
         spacer_voxels_value: value to set spacer voxels to. should be in the range of the variable_bounds
-        NOTE: By default this sets spacers of equal voxel height in between every layer, and
-              spacer_voxels_value must be < the resulting layer height in voxels.
+        NOTE: By default this sets spacers of equal voxel height in between every layer.
+        If you want to change that, recalculate the start indices via self.get_layer_start_idxs().
         """
         dim_strs = ['x','y','z']
         if isinstance(dim, str) and dim.lower() in dim_strs:
             dim = dim_strs.index(dim)
-        
+
         self.dim = dim
         self.num_layers = num_layers
+        self.num_spacers = num_spacers
         self.variable_bounds = variable_bounds
+        self.layer_height_voxels = layer_height_voxels
         self.spacer_height_voxels = spacer_height_voxels
         self.spacer_voxels_value = spacer_voxels_value
 
+        print(f'Layer, spacer:{self.layer_height_voxels, self.spacer_height_voxels}')
+
         self.range = self._bounds[1] - self._bounds[0]
+        
+        self.layer_start_idxs = {} 
 
     def __eq__(self, __value: object) -> bool:
         """Test equality."""
@@ -274,26 +285,86 @@ class Layering(Filter):
         """Return a string representation of the filter."""
         return f'Layering filter: {self.num_layers}-layer in {self.dimension}.'
 
+    def get_layer_spacer_idxs(self, variable_shape, start_from:str ='bottom',
+                       layer_height_voxels = None, layer_type_nums = None,
+                       spacer_first:bool = False,
+                       mode:str = 'auto'):
 
-    def get_layer_idxs(self, variable_shape, start_from:str ='bottom'):
-        '''Gets the indices of each layer in the dimension that was declared to the Layering object'''
-        num_voxels_total = variable_shape[self.dim]
-        layer_idxs = []
+        '''Gets the indices of each layer in the dimension that was declared to the Layering object.
+         Return list of tuples, indicating start (inclusive) and end (exclusive).'''
+        #! This method assumes height of each layer is fixed via self.layer(spacer)_height_voxels
+        # Consequently the last layer(spacer) will be thicker to fill out the device size.
 
-        num_voxels_per_layer = int(num_voxels_total / self.num_layers)
-        num_voxels_last_layer = num_voxels_total - (self.num_layers - 1) * num_voxels_per_layer
+        layer_type_names = ['design','spacers']
+        if layer_type_nums is None:
+            # Default: N design layers, N-1 spacers.
+            layer_type_nums = [self.num_layers, self.num_layers-1]
+        if layer_height_voxels is None:
+            layer_height_voxels = [self.layer_height_voxels, self.spacer_height_voxels]
+        if mode=='auto':
+            pass    # todo:
+        num_voxels_total = int(variable_shape[self.dim])
 
-        if start_from=='bottom':
-            # Start from bottom - the top layer will have leftovers (extra thickness).
-            return list(np.arange(0, self.num_layers*num_voxels_per_layer, num_voxels_per_layer))
-        else:
-            # Start from top - the bottom layer will have leftovers (extra thickness).
-            return [0] + list(np.arange(num_voxels_last_layer, num_voxels_total, num_voxels_per_layer))
+        # If there are N layers, N-1 spacers, a design layer is on the bottom.
+        match layer_type_nums[1] - layer_type_nums[0]:
+            case -1:
+                spacer_first = False
+        # If there are N layers, N+1 spacers, a spacer layer is on the bottom.
+            case 1:
+                spacer_first = True
+        # If there are N layers, N spacers, either a design or spacer layer can be on the bottom.
 
-    def do_layering(self, data, dim, output):
-        '''data: the unperturbed input variable, with slicing already performed.
+        layer_start_idxs = dict(zip(layer_type_names, [[] for x in layer_type_names]))
+         # -> Assemble list of tuples, indicating start (inclusive) and end (exclusive).
+        current_idx = 0
+        for n in range(np.sum(layer_type_nums)):
+            # Which of the layer types is it? We cycle through
+            layer_type_idx = (spacer_first + n) % len(layer_type_names)
+            # Get name and height
+            layer_type_name = layer_type_names[layer_type_idx]
+            height_voxels = layer_height_voxels[layer_type_idx]
+            # Append resulting tuple [start, end) to the correct key
+            if n == np.sum(layer_type_nums)-1:
+                layer_start_idxs[layer_type_name].append((current_idx, num_voxels_total))
+            else:
+                print(current_idx, height_voxels)
+                layer_start_idxs[layer_type_name].append((current_idx, current_idx + height_voxels))
+            # Update current index
+            current_idx = current_idx + height_voxels
+
+        if not start_from=='bottom':    # Flip
+            for k in layer_start_idxs:
+                # Superimpose into a reversed array, 1 larger to account for zero-index
+                layer_start_idxs[k] = np.arange(num_voxels_total + 1)[::-1][layer_start_idxs[k]]
+                # list[list] -> list[tuple]
+                layer_start_idxs[k] = [tuple(np.sort(x)) for x in layer_start_idxs[k]]
+                # It will be in reversed order, flip it back
+                layer_start_idxs[k] = layer_start_idxs[k][::-1]
+
+        return layer_start_idxs
+    
+    # def get_layer_idxs(self, variable_shape, start_from:str ='bottom'):
+    #     '''Gets the indices of each layer in the dimension that was declared to the Layering object'''
+    #     num_voxels_total = variable_shape[self.dim]
+    #     layer_idxs = []
+
+    #     num_voxels_per_layer = int(num_voxels_total / self.num_layers)
+    #     num_voxels_last_layer = num_voxels_total - (self.num_layers - 1) * num_voxels_per_layer
+
+    #     if start_from=='bottom':
+    #         # Start from bottom - the top layer will have leftovers (extra thickness).
+    #         return list(np.arange(0, self.num_layers*num_voxels_per_layer, num_voxels_per_layer))
+    #     else:
+    #         # Start from top - the bottom layer will have leftovers (extra thickness).
+    #         return [0] + list(np.arange(num_voxels_last_layer, num_voxels_total, num_voxels_per_layer))
+
+    def do_averaging(self, data, dim, output, *args, **kwargs):
+        '''Averages out all the voxels within one layer in a specific (usually vertical) direction,
+           such that they all have the same n-D profile within that layer.
+           
+           data: the unperturbed input variable, with slicing already performed.
            dim: the dimension in which to average.
-           output: serves as a template, the values of the input variable are averaged and pasted in. '''
+           output: serves as a template, the values of the input variable are averaged and pasted in.'''
 
         # Takes the average of the data along the dimension declared to the Layering object
         average = np.mean(data, axis=dim)
@@ -306,46 +377,59 @@ class Layering(Filter):
 
         return output
 
-    def layer_averaging(self, variable, spacer_value):
-        '''Averages out all the voxels within one layer in a specific (usually vertical) direction,
-        such that they all have the same n-D profile within that layer.'''
-        variable_shape = variable.shape
-        variable_out = np.zeros(variable_shape)
+    def do_constant(self, data, dim, output, const_value):
+        '''Sets all the voxels within one spacer in a specific (usually vertical) direction,
+           such that they all have the same constant density value within layer.
+           
+           data: the unperturbed input variable, with slicing already performed.
+           dim: the dimension in which to average.
+           output: serves as a template, the values of the input variable are averaged and pasted in.'''
+
+        # Constant value to assign
+        const = const_value
+
+        for idx in range(0, data.shape[dim]):
+            idx_bunch = [slice(None)] * data.ndim
+            idx_bunch[dim] = np.array(idx)
+            # Populates all entries of this slice with the constant value from above
+            output[tuple(idx_bunch)] = const
+
+        return output
+    
+    def iterate_through_layers(self, layer_start_idxs, variable, func, *args, **kwargs):
+        '''Given a design region and start indices for each layer/region, iterates through them
+        and performs some function on those regions only.'''
+        variable_out = copy.deepcopy(variable)
         
-        num_voxels_total = variable_shape[self.dim]
-        num_voxels_per_layer = int(num_voxels_total / self.num_layers)
-        num_voxels_last_layer = num_voxels_total - (self.num_layers - 1) * num_voxels_per_layer
-        assert all(self.spacer_height_voxels < x for x in [num_voxels_per_layer, num_voxels_last_layer])
-
-        # todo: By default this says that the exact same spacers happen in between every layer.
-        for layer_start in self.get_layer_idxs(variable_shape):
-            # Set up the slices/ranges for each layer.
-            idx_bunch = [slice(None)] * variable.ndim
-            idx_bunch_spacer = [slice(None)] * variable.ndim
-            
-            spacer_start_idx = layer_start + num_voxels_per_layer - self.spacer_height_voxels
-            if layer_start==self.get_layer_idxs(variable_shape)[-1]:
-                spacer_start_idx = num_voxels_total - self.spacer_height_voxels
-                
-            idx_bunch[self.dim] = np.arange(layer_start, 
-                                            spacer_start_idx)
-            idx_bunch_spacer[self.dim] = np.arange(spacer_start_idx, 
-                                                   layer_start + num_voxels_per_layer)
-
-            # Average the gradient for the layer indices
-            variable_out[tuple(idx_bunch)] = self.do_layering(variable[tuple(idx_bunch)], 
-                                                              self.dim, 
-                                                              variable_out[tuple(idx_bunch)])
-            # Set the spacer value for the spacer indices
-            variable_out[tuple(idx_bunch_spacer)] = spacer_value
+        for layer_range in layer_start_idxs:
+            idx_slice = [slice(None)] * variable.ndim
+            idx_slice[self.dim] = np.arange(*layer_range)
+            idx_slice = tuple(idx_slice)
+            region = variable[idx_slice]
+            variable_out[idx_slice] = func(region, self.dim, variable[idx_slice], *args, **kwargs)
 
         return variable_out
 
+    def layer_averaging(self, variable, layer_start_idxs):
+        return self.iterate_through_layers(layer_start_idxs, variable, self.do_averaging)
+    
+    def make_spacer(self, variable, layer_start_idxs, spacer_value):
+        return self.iterate_through_layers(layer_start_idxs, variable, self.do_constant, spacer_value)
 
     @override
-    def forward(self, x: npt.NDArray | float) -> npt.NDArray | float:
-        """Performs normal layer averaging."""
-        return self.layer_averaging(x, self.spacer_voxels_value)
+    def forward(self, x: npt.NDArray | float, spacer_value=None) -> npt.NDArray | float:
+        """Performs normal layer averaging and spacer assignment."""
+        if spacer_value is None:
+            spacer_value = self.spacer_voxels_value
+        
+        # Here we set the default number of spacers to be (num_layers - 1).
+        self.layer_start_idxs = self.get_layer_spacer_idxs(x.shape, layer_type_nums=[self.num_layers, self.num_spacers],
+                                    spacer_first=False, start_from='bottom',
+                                    mode='auto')
+        
+        x_out = self.layer_averaging(x, self.layer_start_idxs['design'])
+        x_out = self.make_spacer(x_out, self.layer_start_idxs['spacers'], spacer_value)
+        return x_out
 
     @override  # type: ignore
     def chain_rule(
@@ -355,7 +439,7 @@ class Layering(Filter):
         var_in: npt.NDArray | float,  # noqa: ARG002
     ) -> npt.NDArray | float:
         """Apply the chain rule and propagate the derivative back one step."""
-        return self.layer_averaging(deriv_out, 0)
+        return self.forward(deriv_out, 0)
 
     @override
     def fabricate(self, x: npt.NDArray | float) -> npt.NDArray | float:
@@ -367,7 +451,7 @@ class Layering(Filter):
 # class SquareBlur(Filter):
 #     # TODO: Could combine square_blur.py and square_blur_smooth.py into the same file.
 # 	# alpha: strength of blur
- 
+
 # 	def __init__(self, alpha, blur_half_width, variable_bounds=[0, 1]):
 # 		super(SquareBlur, self).__init__(variable_bounds)
 

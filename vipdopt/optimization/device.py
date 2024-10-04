@@ -270,6 +270,24 @@ class Device:
             #                                 ((epoch+1)/(len(epoch_list)-1)*(len(num_layers_per_epoch))) - 1
             #                             )]})
             #     self.filters[i] = Layering(**g)
+            #     # TODO: Add a setting such that the num_layers_per_epoch splits only the design layers and not the spacers.
+            #     # Example: L S L is the desired final configuration
+            #     # At epoch 1 maybe the num_layers is 4 -> LLLLSLLLL where L,S have their own thicknesses
+            #     # At epoch 2 num_layers is 2 -> LLSLL
+            #     # At epoch 3 num_layers is 1 -> LSL
+            #     # TODO: 20241002: OR just straight up implement the layering projection filter. [Update 62]
+            #     # See vipdopt.optimization.multilevelsigmoid
+                
+                
+            #     #! 20241002: Updated Layering class.
+            #     # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+            #     #         cfg['num_vertical_layers'] , 
+            #     #         cfg['num_vertical_spacers'], (0,1),
+            #     #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+            #     #         spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+            #     #         # layer_height_voxels=4, spacer_height_voxels=2,
+            #     #         spacer_voxels_value=cfg['spacer_density'],
+            #     #         ),
         
         # self.filters = [
         #     Layering( **filter_vars[0] ),

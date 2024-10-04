@@ -91,6 +91,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
     directories = {
         'root': root_dir,
         'data': data_folder,
+        'summary': summary_folder,
         'saved_scripts': saved_scripts_folder,
         'opt_info': optimization_info_folder,
         'opt_plots': optimization_plots_folder,
@@ -386,8 +387,12 @@ class Project:
                 # todo: add filters to config
                 filters=[
                     Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
-                             cfg['num_vertical_layers'] , (0,1),
-                             spacer_height_voxels=0, spacer_voxels_value=0 
+                            cfg['num_vertical_layers'] , 
+                            cfg['num_vertical_spacers'], (0,1),
+                            layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+                            spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+                            # layer_height_voxels=4, spacer_height_voxels=2,
+                            spacer_voxels_value=cfg['spacer_density'],
                             ),
                     Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
                     Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], )),
@@ -396,14 +401,32 @@ class Project:
             )
         
         # TODO: 20240930 - Testing =========================
-        f = Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
-                             3 , (0,1),
-                             spacer_height_voxels=2, spacer_voxels_value=0.5 
-                            )
-        g = f.get_layer_idxs(voxel_array_size)
-        h = f.layer_averaging(self.device.get_design_variable(), 0.1)
-        # ==================================================    
+        # f = Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+        #              cfg['num_vertical_layers'], 
+        #              cfg['num_vertical_spacers'], (0,1),
+        #              layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+        #              spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+        #             # layer_height_voxels=4, spacer_height_voxels=2,
+        #             spacer_voxels_value=cfg['spacer_density'],
+        #             )
+        # g = f.get_layer_spacer_idxs(voxel_array_size, layer_type_nums=[3,2], spacer_first=True, start_from='top')
         
+        # import matplotlib.pyplot as plt
+        # test = np.zeros((voxel_array_size[1],voxel_array_size[1]))
+        # region_n = [1, 0.5]
+        # for ik, k in enumerate(g):
+        #     for _range in g[k]:
+        #         test[np.arange(*_range), :] = region_n[ik]
+        # plt.imshow(test)
+        # plt.colorbar()
+        
+        # f.layer_start_idxs = g
+        # x = self.device.get_design_variable()
+        # h = f.forward(x)
+        # # h = f.layer_averaging(self.device.get_design_variable(), 0.1, g)
+        # # ==================================================    
+        # import matplotlib.pyplot as plt
+        # plt.imshow(np.real(h[...,0]))
         vipdopt.logger.info('Device loaded.')
 
     def _load_config(self, config: Config | dict):

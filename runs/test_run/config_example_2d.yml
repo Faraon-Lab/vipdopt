@@ -64,8 +64,16 @@ num_vertical_layers: 10 # 10
 vertical_layer_height_um: 0.204 #0.051 * 4 #0.017 * 8
 
 device_size_lateral_um: 3.96 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
-
 device_vertical_minimum_um: 0
+
+#* Spacers
+# Assuming we don't have something like vertically blurring - i.e. - each layer is controlled independently
+# self.get_layer_idxs() of the Layering filter returns a dictionary with region names as keys and [start, end) indices as values.
+# Customize as needed. e.g. 3 layers, height 4, 2 layers, height 2
+# ->
+num_vertical_spacers: 0 #9
+vertical_spacer_height_um: 0.510
+spacer_density: 0
 
 #* Surroundings
 
@@ -231,13 +239,6 @@ evaluate_bordered_extended: False # True
 
 #* Three-material levels
 do_normalize: False
-
-#* Spacers
-# assuming we don't have something like vertically blurring - i.e. - each layer is controlled independently
-should_fix_layers: False
-fixed_layers: [ 1, 2, 3, 5, 6, 7 ]
-# fixed_layers: [ 1, 3 ]
-fixed_layers_density: 0
 
 #* New Stuff 20240222:
 # NOTE: If this needs troubleshooting, open Lumerical in a GUI in the environment you intend to run this in, and check the resource config job launch presets.
