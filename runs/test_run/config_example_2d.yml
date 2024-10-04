@@ -71,7 +71,7 @@ device_vertical_minimum_um: 0
 # self.get_layer_idxs() of the Layering filter returns a dictionary with region names as keys and [start, end) indices as values.
 # Customize as needed. e.g. 3 layers, height 4, 2 layers, height 2
 # ->
-num_vertical_spacers: 0 #9
+num_vertical_spacers: 0 #9      #! 20241004: By default right now the derived_simulation_properties.j2 sets it to (num_layers - 1)
 vertical_spacer_height_um: 0.510
 spacer_density: 0
 
@@ -81,7 +81,7 @@ spacer_density: 0
 substrates_above_device: [{'name': 'glass_substrate', 'thickness_um': 0.4, 'material': "SiO2 (Glass) - Palik"}
                 ] #['permittivity_layer_substrate', #'silicon_substrate']
 # todo: substrates should use substrates_above_device instead.
-substrate_thickness_um: 0.4
+substrate_thickness_um: 0.4     # TODO: Set this variable to point to thickness_um above
 
 num_sidewalls: 0 #4
 sidewall_material: 'etch'
