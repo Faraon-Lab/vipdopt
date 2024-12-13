@@ -446,14 +446,14 @@ class LumericalSimulation(ISimulation):
                 binarize=False,
             )
 
-    def run_sims(cls, program, sim_list, file_dir, add_job_to_fdtd=True):
+    def run_sims(self, program, sim_list, file_dir, add_job_to_fdtd=True):
         # program is either a LumericalOptimization or a LumericalEvaluation.
         
-        cls.save_to_fsp(program, sim_list, file_dir, add_job_to_fdtd=add_job_to_fdtd)
+        self.save_to_fsp(program, sim_list, file_dir, add_job_to_fdtd=add_job_to_fdtd)
         vipdopt.logger.info(
             'In-Progress Step 1: All Simulations Setup and Jobs Added.'
         )
-        cls.run_jobs_to_completion(program, sim_list)
+        self.run_jobs_to_completion(program, sim_list)
     
     @classmethod
     def save_to_fsp(cls, program, sim_list, file_dir, add_job_to_fdtd=True):

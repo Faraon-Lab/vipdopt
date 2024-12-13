@@ -38,8 +38,8 @@ class Monitor(LumericalSimObject):
     def set_source(self, src: Path):
         """Set the source file this monitor is connected to."""
         self.src = src
-        self.reset()
 
+        self.reset()
     def __repr__(self) -> str:
         """Return a string representation of the monitor."""
         data = {

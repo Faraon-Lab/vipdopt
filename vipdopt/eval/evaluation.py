@@ -43,7 +43,7 @@ class LumericalEvaluation:
         # optimizer: GradientOptimizer,               #! NOT USED
         fom: SuperFoM,
         # fom_args: tuple[Any, ...] = tuple(),        #! NOT USED
-        # fom_kwargs: dict = {},                      #! NOT USED
+        fom_kwargs: dict = {},
         # grad_args: tuple[Any, ...] = tuple(),       #! NOT USED
         # grad_kwargs: dict = {},                     #! NOT USED
         cfg: Config = Config(),
@@ -52,7 +52,7 @@ class LumericalEvaluation:
         project: Any = None
     ):
         """Initialize Evaluation object."""
-        self.base_sim = base_sim    
+        self.base_sim = base_sim
         # self.sims = sims
         self.device = copy.deepcopy(device)         # Whatever changes we make here cannot affect the original.
         # self.optimizer = optimizer
@@ -71,8 +71,24 @@ class LumericalEvaluation:
 
         # self.sim_files = [dirs['temp'] / f'sim_{i}.fsp' for i in range(self.nsims)]
         self.cfg = (cfg)
+        self.fom_kwargs = self.cfg if bool(fom_kwargs) else fom_kwargs
+        
+        # Setup histories - #! SHOULD MATCH THE ONE IN OPTIMIZATION
+        self.fom_hist: dict[
+            str, list[npt.NDArray]
+        ] = {}  # History of FoM-related parameters with each iteration
+        self.param_hist: dict[
+            str, list[npt.NDArray]
+        ] = {}  # History of all other parameters with each iteration
+        #! These will be fed directly into plotter.py so this is the place to be changing labels / variable names and somesuch.
+        for metric in ['transmission', 'intensity']:
+            self.fom_hist.update({f'{metric}_overall': []})
+            for i, f in enumerate(self.fom.foms):
+                self.fom_hist.update( {f'{metric}_{i}': []} )
+        self.fom_hist.update( {'intensity_overall_xyzwl': []} )
 
         self.loop = True
+        self.iteration = 0
 
         # self.spectral_weights = np.array(1)
         # self.performance_weights = np.array(1)
@@ -90,13 +106,13 @@ class LumericalEvaluation:
 
         # Setup callback functions
         self._callbacks: list[Callable[[LumericalEvaluation], None]] = []
-        
+
         # Turn off structures that should not exist in periodic BCs.
-        # right now that is every dict in simulation_template.j2 that relies on data.boundary_conditions 
+        # right now that is every dict in simulation_template.j2 that relies on data.boundary_conditions
         # and isn't overwritten by an equivalent in eval_objects
         # PEC_screen; source_aperture; substrate(s)
         self.base_sim.disable(['PEC_screen', 'source_aperture', 'substrate'])
-        
+
 
     def add_callback(self, func: Callable[[LumericalEvaluation], None]):
         """Register a callback function to call after each iteration."""
@@ -153,7 +169,7 @@ class LumericalEvaluation:
     def generate_plots(self):
         """Generate the plots and save to file."""
         folder = self.dirs['opt_plots']
-        iteration = self.iteration if self.iteration==self.epoch_list[-1] else self.iteration+1
+        iteration = self.iteration #  if self.iteration==self.epoch_list[-1] else self.iteration+1
         vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
 
         # TODO: Copy all to summary folder as well.
@@ -169,16 +185,15 @@ class LumericalEvaluation:
         # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
         fom_fig = plotter_v2.plot_fom_trace(
             np.array(self.fom_hist['intensity_overall']),
-            folder, self.epoch_list
-        )
+            folder)
         quads_to_plot = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
         quad_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
             np.array([self.fom_hist[f'transmission_{x}'] for x in quads_to_plot]).swapaxes(0,1),
-            folder, self.epoch_list
+            folder,
         )
         overall_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
             np.expand_dims(np.array(self.fom_hist['transmission_overall']), axis=1),
-            folder, self.epoch_list,
+            folder,
             filename='overall_trans_trace',
         )
 
@@ -352,12 +367,12 @@ class LumericalEvaluation:
         # finally:
         #     self._post_run()
         self._post_run()
-    
+
     def obtain_device(self, device_source:Any|Path, lum_obj_name='design_import'):
         '''Pull the device from input device_source.'''
-        
+
         if isinstance(device_source, os.PathLike):
-            
+
             #  1) From a .npy file
             if device_source.suffix in ['.npy','.npz']:
                 self.device = Device.from_source(device_source)
@@ -365,28 +380,28 @@ class LumericalEvaluation:
             elif device_source.suffix in ['.fsp']:
                 # TODO: CODE TO IMPORT PERMITTIVITY FROM FSP
                 pass
-        
+
         elif isinstance(device_source, npt.NDArray):
             #  3) Update the device design variable directly
             self.device.set_design_variable(device_source)
-        
+
         else:
             return None
-    
+
     def _inner_evaluation(self):
         """The core evaluation function."""
-        
+
         # # Disable device index monitor(s) to save memory
         self.base_sim.disable(self.base_sim.indexmonitor_names())
         # # Disable cross section monitor(s) to save memory
         self.base_sim.disable(self.base_sim.crosssection_monitor_names())
 
         #** =====THIS PART OF THE CODE SHOULD MATCH optimization._inner_optimization_loop()=====)
-        self.base_sim.upload_device_index_to_sim(self.base_sim, 
-                                                 self.device, 
-                                                 self.fdtd, 
+        self.base_sim.upload_device_index_to_sim(self.base_sim,
+                                                 self.device,
+                                                 self.fdtd,
                                                  self.cfg['simulator_dimension'])
-        
+
         # Sync up with FDTD to properly import device.
         self.fdtd.save(self.base_sim.get_path(), self.base_sim)
 
@@ -407,15 +422,15 @@ class LumericalEvaluation:
         # # todo: re-code binarization for multiple materials.
 
         vipdopt.logger.info('EVAL: Step 1: All Simulations Setup')
-        
-        # TODO: This should be put outside. i.e. several different LumericalEvaluation objects 
+
+        # TODO: This should be put outside. i.e. several different LumericalEvaluation objects
         # todo: with adjusted params. Use param_config_array to generate the different config ymls,
         # todo: then run separate LumericalEvaluations for each.
-		# Import sweep parameters, assemble jobs corresponding to each value of the sweep. 
+		# Import sweep parameters, assemble jobs corresponding to each value of the sweep.
         # Edit the environment of each job accordingly.
 		# Queue and run parallel, save out.
 		# todo: ====================================================================================
-        
+
         #
         # NOTE: This next block should be wrapped in a function.
         # Step 1: After importing the current epoch's permittivity value to the device;
@@ -425,33 +440,34 @@ class LumericalEvaluation:
         # We then enqueue each job and run them all in parallel.
 
         # Create jobs
-        fwd_sims = self.fom.create_forward_sim(self.base_sim, link_sims=False)
+        fwd_sims = self.fom.create_forward_sim(self.base_sim, 
+                                               link_sims=self.cfg['pull_sim_files_from_debug_folder'])
         # adj_sims = self.fom.create_adjoint_sim(self.base_sim)
         nodev_sims = [sim.with_monitors(['src_transmission_monitor', 'src_spill_monitor'],
-                                        name = sim.info['name'].replace('_fwd_','_nodev_')) 
+                                        name = sim.info['name'].replace('_fwd_','_nodev_'))
                       for sim in fwd_sims]
         [nds.disable(self.base_sim.import_names()) for nds in nodev_sims]
-        
-        self.base_sim.run_sims(self, sim_list=chain(fwd_sims, nodev_sims), 
-                               file_dir=self.dirs['eval_temp'], 
+
+        self.base_sim.run_sims(self, sim_list=list(chain(fwd_sims, nodev_sims)),
+                               file_dir=self.dirs['eval_temp'],
                                add_job_to_fdtd=True)
-        
+
         vipdopt.logger.info('Completed Step 1: All Simulations Run.')
 
         # Reformat monitor data for easy use
         self.fdtd.reformat_monitor_data(list(chain(fwd_sims, nodev_sims)))
-        
+
         #** ====================================================================================
 
         # Compute intensity FoM and apply spectral and performance weights.
-        f = self.fom.compute_fom(*self.fom_args, **self.fom_kwargs)
+        f = self.fom.compute_fom(**self.fom_kwargs) # self.fom_args,
         self.fom_hist.get('intensity_overall').append(f)
         vipdopt.logger.debug(f'FoM: {f}')
 
         # Compute transmission FoM and apply spectral and performance weights.
         fom_kwargs_trans = self.fom_kwargs.copy()
         fom_kwargs_trans.update({'type': 'transmission'})
-        t = np.array([ fom[0].fom_func(*self.fom_args, **fom_kwargs_trans)
+        t = np.array([ fom[0].fom_func(**self.fom_kwargs) # self.fom_args,
             for fom in self.fom.foms
         ])
         [ self.fom_hist.get(f'transmission_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
@@ -466,7 +482,7 @@ class LumericalEvaluation:
         # # Here is where we would start plotting the loss landscape. Probably should be accessed by a separate class...
         # # Or we could move it to the device step part
         # loss_landscape_mapper = LossLandscapeMapper.LossLandscapeMapper(simulations, devices)
-        
+
         print(3)
 
     def call_callbacks(self):

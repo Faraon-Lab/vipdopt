@@ -646,8 +646,8 @@ class BayerFilterFoM(FoM):
         source_weight = np.zeros(self.fwd_monitors[0].fshape, dtype=np.complex128)
 
         transmission = self.fwd_monitors[1].trans_mag
-        total_tfom += transmission[..., self.pos_max_freqs]
 
+        total_tfom += transmission[..., self.pos_max_freqs]
         efield = self.fwd_monitors[0].e
         total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
         # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
