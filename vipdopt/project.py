@@ -6,7 +6,7 @@ import contextlib
 import os
 import shutil
 import sys
-from copy import copy
+from copy import copy, deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ import numpy.typing as npt
 
 import vipdopt
 from vipdopt.configuration import Config, ProjectConfig, SonyBayerConfig
+from vipdopt.eval.evaluation import LumericalEvaluation
 from vipdopt.optimization import (
     Device,
     FoM,
@@ -53,6 +54,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
     evaluation_folder = root_dir / 'eval'
     evaluation_config_folder = evaluation_folder / 'configs'
     evaluation_utils_folder = evaluation_folder / 'utils'
+    evaluation_temp_folder = evaluation_folder / '.tmp'
 
     # parameters['MODEL_PATH'] = DATA_FOLDER / 'model.pth'
     # parameters['OPTIMIZER_PATH'] = DATA_FOLDER / 'optimizer.pth'
@@ -101,6 +103,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
         'evaluation': evaluation_folder,
         'eval_config': evaluation_config_folder,
         'eval_utils': evaluation_utils_folder,
+        'eval_temp': evaluation_temp_folder,
         'checkpoints': checkpoint_folder,
         'temp': temp_folder,
     }
@@ -192,12 +195,19 @@ class Project:
         self.optimizer = optimizer_type(**optimizer_settings)
 
     def _load_base_sim(self, cfg: Config):
-        """Load the base simulation from a config."""
+        """Load the base simulation from a config.
+        Also loads the evaluation base simulation."""
         try:
             # Initialize base simulation -
             # Are we running using Lumerical or ceviche or fdtd-z or SPINS or?
             vipdopt.logger.info('Loading base simulation from sim.json...')
-            base_sim = LumericalSimulation(cfg.pop('base_simulation'))
+            
+            base_sim_dict = cfg.pop('base_simulation')
+            eval_base_sim_dict = deepcopy(base_sim_dict)
+            eval_base_sim_dict['objects'].update(eval_base_sim_dict['eval_objects'])    # overwrite
+            
+            base_sim = LumericalSimulation(base_sim_dict)
+            eval_base_sim = LumericalSimulation(eval_base_sim_dict)
             # TODO: 20240724 ian - IT'S NOT LOADING
             # cfg.data['base_simulation']['objects']['FDTD']['dimension'] properly!
             # TODO: Switch that property in the config to 2D and then check the following code:
@@ -206,6 +216,7 @@ class Project:
             vipdopt.logger.info('...successfully loaded base simulation!')
         except BaseException:  # noqa: BLE001
             base_sim = LumericalSimulation()
+            eval_base_sim = LumericalSimulation()
 
         self.base_sim = base_sim
         # NOTE: (Not used here):
@@ -219,6 +230,9 @@ class Project:
         # TODO: Partitioning the base_sim into simulations: i.e. a list of Simulation objects
         # TODO: And the same with devices
         # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
+        
+        self.eval_base_sim = eval_base_sim
+        self.eval_base_sim.set_path(self.subdirectories['evaluation'] / 'eval_base_sim.fsp')
 
     def _load_foms(self, cfg: Config):
         """Load figures of merit from a config."""
@@ -436,6 +450,21 @@ class Project:
         if not isinstance(config, Config):
             cfg = self.config_type(cfg)
         assert isinstance(cfg, Config)
+        
+        # Setup Folder Structure
+        running_on_local_machine = False
+        slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
+        if slurm_job_env_variable is None:
+            running_on_local_machine = True
+
+        self.subdirectories = create_internal_folder_structure(
+            self.dir,
+            pull_files_debug_mode=True, #running_on_local_machine
+        )
+        vipdopt.logger.info('Internal folder substructure created.')
+        os.path.dirname(
+            __file__
+        )  # Go up one folder - # todo: 20240724 ian - wait is this line even necessary
 
         # Load optimizer
         self._load_optimizer(cfg)
@@ -455,22 +484,6 @@ class Project:
         iteration = cfg.get('current_iteration', 0)
 
         # ================================================================================================================
-
-        # Setup Folder Structure
-        running_on_local_machine = False
-        slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
-        if slurm_job_env_variable is None:
-            running_on_local_machine = True
-
-        self.subdirectories = create_internal_folder_structure(
-            self.dir,
-            pull_files_debug_mode=True,
-            # debug_mode = running_on_local_machine
-        )
-        vipdopt.logger.info('Internal folder substructure created.')
-        os.path.dirname(
-            __file__
-        )  # Go up one folder - # todo: 20240724 ian - wait is this line even necessary
 
         # Setup Optimization
         assert self.device is not None
@@ -511,6 +524,17 @@ class Project:
             project=self
         )
         vipdopt.logger.info('Optimization initialized.')
+        
+        self.evaluation = LumericalEvaluation(
+            self.eval_base_sim,
+            self.device,
+            full_fom,
+            cfg=cfg,
+            dirs=self.subdirectories,
+            env_vars=env_vars,
+            project=self
+        )
+        vipdopt.logger.info('Evaluation initialized.')
 
         # Finally, set the remaining config file (now that everything is popped) as the config variable of the Project.
         self.config = cfg
@@ -626,6 +650,25 @@ class Project:
         """Stop this project's optimization."""
         vipdopt.logger.info('stopping optimization early')
         self.optimization.loop = False
+    
+    def start_evaluation(self):
+        """Start this project's evaluation."""
+        self.evaluation.loop = True
+        self.evaluation.run()
+
+        #! DEBUG 20240721 ian - uncomment this block for the git push
+        # try:
+        #     self.optimization.loop = True
+        #     # self.optimization.run()
+        #     self.optimization.run2()
+        # finally:
+        #     vipdopt.logger.info('Saving optimization after early stop...')
+        #     self.save()
+
+    def stop_evaluation(self):
+        """Stop this project's evaluation."""
+        vipdopt.logger.info('stopping evaluation early')
+        self.evaluation.loop = False
 
 
 #

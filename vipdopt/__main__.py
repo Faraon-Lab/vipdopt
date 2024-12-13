@@ -123,11 +123,14 @@ if __name__ == '__main__':
             f.write(' ')
     vipdopt.logger.info(f'{domain_str} Lumapi path is: {vipdopt.lumapi_path}')
 
-    fdtd = project.optimization.fdtd    # NOTE: - the instantiation is called in optimization.py
-    vipdopt.fdtd = fdtd      # Makes it available to global
+    fdtd = project.optimization.fdtd            # NOTE: - the instantiation is called in optimization.py
+    vipdopt.fdtd = fdtd                         # Makes it available to global
+    project.evaluation.fdtd = vipdopt.fdtd      # Link explicitly to the evaluator
 
     fdtd.connect(hide=hide_fdtd)
-    project.start_optimization()
+    # project.start_optimization()
+    # project.evaluation.obtain_device( project.subdirectories['summary']/'final_device.npy' )
+    project.start_evaluation()
 
 
     # Numpy Export final design

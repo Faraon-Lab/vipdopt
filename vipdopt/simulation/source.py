@@ -31,6 +31,11 @@ class TFSFSource(Source):
         super().__init__(name, LumericalSimObjectType.TFSF)
 
 
+class PlaneSource(Source):
+    def __init__(self, name: str):
+        super().__init__(name, LumericalSimObjectType.PLANE)
+
+
 class GaussianSource(Source):
     def __init__(self, name: str):
         super().__init__(name, LumericalSimObjectType.GAUSSIAN)

@@ -1254,46 +1254,12 @@ class LumericalOptimization:
                 # Create jobs
                 fwd_sims = self.fom.create_forward_sim(self.base_sim)
                 adj_sims = self.fom.create_adjoint_sim(self.base_sim)
-                for sim in chain(fwd_sims, adj_sims):
-                    sim_file = self.dirs['temp'] / f'{sim.info["name"]}.fsp'
-                    # sim.link_monitors()
-
-                    self.fdtd.save(sim_file, sim)  # Saving also sets the path
-                    self.fdtd.addjob(sim_file)
-                vipdopt.logger.info(
-                    'In-Progress Step 1: All Simulations Setup and Jobs Added'
-                )
-
-                # If true, we're in debugging mode and it means no simulations are run.
-                # Data is instead pulled from finished simulation files in the debug folder.
-                # If false, run jobs and check that they all ran to completion.
-                if self.cfg['pull_sim_files_from_debug_folder']:
-                    for sim in chain(fwd_sims, adj_sims):
-                        sim_file = (
-                            self.dirs['debug_completed_jobs']
-                            / f'{sim.info["name"]}.fsp'
-                        )
-                        sim.set_path(sim_file)
-                else:
-                    while self.fdtd.fdtd.listjobs(
-                        'FDTD'
-                    ):  # Existing job list still occupied
-                        # Run simulations from existing job list
-                        use_GUI_license = self.cfg['use_GUI_license'] if os.getenv('SLURM_JOB_NODELIST') is None else False
-                        self.fdtd.runjobs( use_GUI_license )
-
-                        # Check if there are any jobs that didn't run
-                        for sim in chain(fwd_sims, adj_sims):
-                            sim_file = sim.get_path()
-                            # self.fdtd.load(sim_file)
-                            # if self.fdtd.layoutmode():
-                            cond = [self.cfg['simulator_dimension'], sim_file.stat().st_size]
-                            if (cond[0]=='3D' and cond[1]<=2e7) or (cond[0]=='2D' and cond[1]<=5e5):
-                                # Arbitrary 500KB filesize for 2D sims, 20MB filesize for 3D sims. That didn't run completely
-                                self.fdtd.addjob(sim_file)
-                                vipdopt.logger.info(
-                                    f'Failed to run: {sim_file.name}. Re-adding ...'
-                                )
+                
+                self.base_sim.run_sims(self, 
+                                sim_list=chain(fwd_sims, adj_sims), 
+                               file_dir=self.dirs['temp'], 
+                               add_job_to_fdtd=True)
+                
                 vipdopt.logger.info('Completed Step 1: All Simulations Run.')
 
                 # Reformat monitor data for easy use

@@ -22,6 +22,7 @@ class LumericalSimObjectType(str, Enum):
     MESH = 'mesh'
     GAUSSIAN = 'gaussian'
     TFSF = 'tfsf'
+    PLANE = 'plane'
     DIPOLE = 'dipole'
     POWER = 'power'
     PROFILE = 'profile'
@@ -42,6 +43,7 @@ SOURCE_TYPES = [
     LumericalSimObjectType.DIPOLE,
     LumericalSimObjectType.TFSF,
     LumericalSimObjectType.GAUSSIAN,
+    LumericalSimObjectType.PLANE,
 ]
 MONITOR_TYPES = [
     LumericalSimObjectType.POWER,

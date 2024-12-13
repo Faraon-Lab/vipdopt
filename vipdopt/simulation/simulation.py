@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+import os
 import json
 import logging
 from argparse import ArgumentParser
@@ -17,7 +18,6 @@ from overrides import override
 
 import vipdopt
 
-# from vipdopt.optimization import Device
 from vipdopt.simulation.monitor import Monitor
 from vipdopt.simulation.simobject import (
     IMPORT_TYPES,
@@ -240,7 +240,7 @@ class LumericalSimulation(ISimulation):
         names = [m.name if isinstance(m, Monitor) else m for m in objs]
         for name in new_sim.monitor_names():
             if name not in names:
-                del self.objects[name]
+                del new_sim.objects[name]
         return new_sim
 
     def enable(self, names: Iterable[str]):
@@ -309,6 +309,12 @@ class LumericalSimulation(ISimulation):
         """Return a list of all monitor object names."""
         for obj in self.monitors():
             yield obj.name
+    
+    def monitors_by_name(self, string_list) -> list[Monitor]:
+        """Return a list of all monitor objects, with names filtered by a string."""
+        if isinstance(string_list, str):
+            string_list = [string_list]
+        return [m for m in self.monitors() if any(substring in m.name for substring in string_list)]
 
     @overload
     def link_monitors(self): ...
@@ -344,6 +350,15 @@ class LumericalSimulation(ISimulation):
     def indexmonitor_names(self) -> Iterator[str]:
         """Return a list of all indexmonitor object names."""
         for obj in self.indexmonitors():
+            yield obj.name
+    
+    def crosssection_monitors(self) -> list[LumericalSimObject]:
+        '''Return a list of all cross-section monitor objects.'''
+        return self.monitors_by_name('cross_monitor')
+    
+    def crosssection_monitor_names(self) -> Iterator[str]:
+        """Return a list of all cross-section monitor object names."""
+        for obj in self.crosssection_monitors():
             yield obj.name
 
     def import_field_shape(self) -> tuple[int, ...]:
@@ -396,7 +411,95 @@ class LumericalSimulation(ISimulation):
         if isinstance(__value, LumericalSimulation):
             return self.objects == __value.objects
         return super().__eq__(__value)
+    
+    @classmethod
+    def upload_device_index_to_sim(cls, 
+                                   base_sim:LumericalSimulation,
+                                   device,      # Device
+                                   fdtd,        # LumericalFDTD
+                                   simulator_dimension:str,
+                                ):
+        '''Takes a device and:
+        - calculates its field shape;
+        - performs interpolation to match the Lumerical mesh;
+        - syncs the permittivity with the device's design variable.
+        '''
+        # Sync up base sim LumericalSimObject with FDTD in order to get device index monitor shape.
+        fdtd.save(base_sim.get_path(), base_sim)
+        # Reassign field shape now that the device has been properly imported into Lumerical.
+        device.field_shape = base_sim.import_field_shape()
+        # Handle 2D exception
+        if simulator_dimension=='2D' and len(device.field_shape) == 2:
+            device.field_shape += tuple([3])
+        
+        device.update_density()
+        # Import device index now into base simulation
+        import_primitives = base_sim.imports()
+        # Hard-code reinterpolation size as this seems to be what works for accurate Lumerical imports.
+        reinterpolation_size = (300,306,3) if simulator_dimension=='2D' else (300,300,306)
 
+        for import_primitive in import_primitives:
+            cur_density, cur_permittivity = device.import_cur_index(
+                import_primitive,
+                reinterpolation_factors=(1,1,1),    # For 2D the last entry of the tuple must always be 1.
+                reinterpolation_size=reinterpolation_size,   # For 2D the last entry of the tuple must be 3.
+                binarize=False,
+            )
+
+    def run_sims(cls, program, sim_list, file_dir, add_job_to_fdtd=True):
+        # program is either a LumericalOptimization or a LumericalEvaluation.
+        
+        cls.save_to_fsp(program, sim_list, file_dir, add_job_to_fdtd=add_job_to_fdtd)
+        vipdopt.logger.info(
+            'In-Progress Step 1: All Simulations Setup and Jobs Added.'
+        )
+        cls.run_jobs_to_completion(program, sim_list)
+    
+    @classmethod
+    def save_to_fsp(cls, program, sim_list, file_dir, add_job_to_fdtd=True):
+        # program is either a LumericalOptimization or a LumericalEvaluation
+        for sim in sim_list:
+            sim_file = program.dirs['eval_temp'] / f'{sim.info["name"]}.fsp'
+            # sim.link_monitors()
+
+            program.fdtd.save(sim_file, sim)  # Saving also sets the path
+            if add_job_to_fdtd:
+                program.fdtd.addjob(sim_file)
+    
+    @classmethod
+    def run_jobs_to_completion(cls, program, sim_list):
+        # program is either a LumericalOptimization or a LumericalEvaluation
+        
+        # If true, we're in debugging mode and it means no simulations are run.
+        # Data is instead pulled from finished simulation files in the debug folder.
+        # If false, run jobs and check that they all ran to completion.
+        if program.cfg['pull_sim_files_from_debug_folder']:
+            for sim in sim_list:
+                sim_file = (
+                    program.dirs['debug_completed_jobs']
+                    / f'{sim.info["name"]}.fsp'
+                )
+                sim.set_path(sim_file)
+        else:
+            while program.fdtd.fdtd.listjobs(
+                'FDTD'
+            ):  # Existing job list still occupied
+                # Run simulations from existing job list
+                use_GUI_license = program.cfg['use_GUI_license'] if os.getenv('SLURM_JOB_NODELIST') is None else False
+                program.fdtd.runjobs( use_GUI_license )
+
+                # Check if there are any jobs that didn't run
+                for sim in sim_list:
+                    sim_file = sim.get_path()
+                    # program.fdtd.load(sim_file)
+                    # if program.fdtd.layoutmode():
+                    cond = [program.cfg['simulator_dimension'], sim_file.stat().st_size]
+                    if (cond[0]=='3D' and cond[1]<=2e7) or (cond[0]=='2D' and cond[1]<=5e5):
+                        # Arbitrary 500KB filesize for 2D sims, 20MB filesize for 3D sims. That didn't run completely
+                        program.fdtd.addjob(sim_file)
+                        vipdopt.logger.info(
+                            f'Failed to run: {sim_file.name}. Re-adding ...'
+                        )
 
 ISimulation.register(LumericalSimulation)
 

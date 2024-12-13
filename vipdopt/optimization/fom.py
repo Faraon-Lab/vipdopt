@@ -181,7 +181,8 @@ class SuperFoM:
         return np.einsum('i,i...->...', self.weights, grad_results)
 
     def create_forward_sim(
-        self, base_sim: LumericalSimulation
+        self, base_sim: LumericalSimulation,
+        link_sims:bool = True,
     ) -> list[LumericalSimulation]:
         """Create all unique forward simulations needed to compute this FoM."""
         fwd_sim_map = unique_fwd_sim_map(flatten(self.foms))
@@ -194,13 +195,15 @@ class SuperFoM:
             )
             for srcs in fwd_sim_map
         ]
-        for i, foms in enumerate(fwd_sim_map.values()):
-            for fom in foms:
-                fom.link_forward_sim(sims[i])
+        if link_sims:
+            for i, foms in enumerate(fwd_sim_map.values()):
+                for fom in foms:
+                    fom.link_forward_sim(sims[i])
         return sims
 
     def create_adjoint_sim(
-        self, base_sim: LumericalSimulation
+        self, base_sim: LumericalSimulation,
+        link_sims:bool = True,
     ) -> list[LumericalSimulation]:
         """Create all unique adjoint simulations needed to compute this FoM."""
         adj_sim_map = unique_adj_sim_map(flatten(self.foms))
@@ -213,9 +216,10 @@ class SuperFoM:
             )
             for srcs in adj_sim_map
         ]
-        for i, foms in enumerate(adj_sim_map.values()):
-            for fom in foms:
-                fom.link_adjoint_sim(sims[i])
+        if link_sims:
+            for i, foms in enumerate(adj_sim_map.values()):
+                for fom in foms:
+                    fom.link_adjoint_sim(sims[i])
         return sims
 
     @staticmethod

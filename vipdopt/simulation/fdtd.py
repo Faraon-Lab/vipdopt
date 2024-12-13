@@ -321,6 +321,7 @@ class LumericalFDTD(ISolver):
                 # )     
                 # Some property in the obj.properties dictionary is inactive, which breaks everything after it.
                 # So instead we must add just the object, then set each property individually.
+                
                 LumericalSimObjectType.get_add_function(obj.obj_type)(
                     self.fdtd, {'name': obj.name}
                 )
@@ -654,8 +655,12 @@ class LumericalFDTD(ISolver):
                 mname = monitor.name
                 # vipdopt.logger.debug(mname)
                 # vipdopt.logger.debug(self.fdtd.getdata(mname))
-                data = self.fdtd.getdata(mname).split()
+                if sim.objects[mname].properties.get('enabled', True):  
+                    # some monitors don't have 'enabled' property at all but are created nonetheless
+                    data = self.fdtd.getdata(mname).split()
+                else:   data = []
                 # vipdopt.logger.debug(data)
+                
                 e = self.get_efield(mname) if 'Ex' in data else None
                 h = self.get_hfield(mname) if 'Hx' in data else None
                 p = self.get_poynting(mname) if 'Px' in data else None
@@ -667,7 +672,10 @@ class LumericalFDTD(ISolver):
                     t = self.transmission(mname)
                 except vipdopt.lumapi.LumApiError:
                     t = None
-                sp = self.get_source_power(mname)
+                try:
+                    sp = self.get_source_power(mname)
+                except vipdopt.lumapi.LumApiError:
+                    sp = None
                 power = self.fdtd.getdata(mname, 'power') if 'power' in data else None
 
                 with monitor.src.open('wb') as f:

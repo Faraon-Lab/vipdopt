@@ -597,9 +597,9 @@ class Device:
         gds_generator.export_device(gds_layer_dir, filetype='gds')
         gds_generator.export_device(gds_layer_dir, filetype='svg')
 
-        # for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
-        #     gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
-        #     gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
+        for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
+            gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
+            gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
 
         # # Here is a function for GDS device import to Lumerical - be warned this takes maybe 3-5 minutes per layer.
         # def import_gds(sim, device, gds_layer_dir):
