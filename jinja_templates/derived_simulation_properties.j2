@@ -21,8 +21,8 @@ focal_length_um: {{ focal_length_um }}
 focal_plane_center_vertical_um: {{ -1 * focal_length_um }}
 
 #* Device Properties
-{# {% set num_vertical_spacers: {{data.num_vertical_spacers}} -%} #}
-{% set num_vertical_spacers = data.num_vertical_layers-1 | int -%}
+{% set num_vertical_spacers = data.num_vertical_spacers -%}
+{# {% set num_vertical_spacers = data.num_vertical_layers-1 | int -%} #}
 num_vertical_spacers: {{ num_vertical_spacers }}
 
 vertical_layer_height_voxels: {{ (data.vertical_layer_height_um / data.device_scale_um ) | int }}

@@ -26,6 +26,7 @@ sys.path.append(os.getcwd())
 # # Gets all parameters from config file - store all those variables within the namespace. Editing cfg edits it for all modules accessing it
 # # See https://docs.python.org/3/faq/programming.html#how-do-i-share-global-variables-across-modules
 import vipdopt
+from vipdopt import utils
 
 # * Template
 # The structure of the dictionaries we are passing into these functions are as follows:
@@ -220,9 +221,9 @@ class BasicPlot:
             nested_keys = []
         for line_idx, line_data in enumerate(self.plot_config['lines']):
             if not isinstance(new_value, list):
-                utility.set_by_path(line_data, [*nested_keys, key], new_value)
+                utils.set_by_path(line_data, [*nested_keys, key], new_value)
             else:
-                utility.set_by_path(line_data, [*nested_keys, key], new_value[line_idx])
+                utils.set_by_path(line_data, [*nested_keys, key], new_value[line_idx])
 
     def assign_title(self, title_string=None):
         """Replaces title of plot."""
@@ -309,7 +310,7 @@ class SpectrumPlot(BasicPlot):
         )
         if not os.path.isdir(SAVE_LOCATION):
             os.makedirs(SAVE_LOCATION)
-        filename = utility.isolate_filename(filename).replace('.fsp', '')
+        filename = utils.isolate_filename(filename).replace('.fsp', '')
 
         plt.savefig(SAVE_LOCATION + f'/{filename}.png', bbox_inches='tight')
 

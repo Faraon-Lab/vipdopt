@@ -128,9 +128,9 @@ if __name__ == '__main__':
     project.evaluation.fdtd = vipdopt.fdtd      # Link explicitly to the evaluator
 
     fdtd.connect(hide=hide_fdtd)
-    # project.start_optimization()
+    project.start_optimization()
     # project.evaluation.obtain_device( project.subdirectories['summary']/'final_device.npy' )
-    project.start_evaluation()
+    # project.start_evaluation()
 
 
     # Numpy Export final design

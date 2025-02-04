@@ -15,7 +15,7 @@ import numpy.typing as npt
 import vipdopt
 from vipdopt import GDS, STL
 from vipdopt.configuration import Config
-from vipdopt.eval import plotter_v2
+from vipdopt.eval import plotter_v2, plotter_v3
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import BayerFilterFoM, FoM, SuperFoM
 from vipdopt.optimization.optimizer import GradientOptimizer
@@ -27,6 +27,11 @@ DEFAULT_OPT_FOLDERS = {
     'opt_info': Path('./optimization'),
     'opt_plots': Path('./optimization/plots'),
 }
+DEFAULT_EVAL_FOLDERS = {
+    'temp': Path('./evaluation/temp'),
+    'eval_info': Path('./evaluation'),
+    'eval_plots': Path('./evaluation/plots'),
+}
 
 TI02_THRESHOLD = 0.5
 
@@ -37,7 +42,7 @@ class LumericalOptimization:
     def __init__(
         self,
         base_sim: LumericalSimulation,
-        sims: list[LumericalSimulation,...],
+        sims: list[LumericalSimulation, ...],
         device: Device,
         optimizer: GradientOptimizer,
         fom: SuperFoM,
@@ -117,6 +122,7 @@ class LumericalOptimization:
         self.env_vars = env_vars
 
     def create_history(self, fom_types, max_iter, num_design_frequency_points):
+        #! UNUSED
         """Set up numpy arrays to track the FoMs and progress of the simulation."""
         # # By iteration	# TODO: store in a block of lists?
         self.figure_of_merit_evolution = np.zeros(max_iter)
@@ -246,40 +252,34 @@ class LumericalOptimization:
 
         # TODO: Copy all to summary folder as well.
 
-        # Placeholder indiv_quad_trans
-        import matplotlib.pyplot as plt
-        # getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
-        # self.generate_plots_efield_focalplane_1d()
-
+        # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
         # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
 
-        # TODO: Assert iteration == len(self.fom_hist['intensity_overall']); if unequal, make it equal.
-        # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
-        fom_fig = plotter_v2.plot_fom_trace(
+        fom_fig = plotter_v3.plot_fom_trace(
             np.array(self.fom_hist['intensity_overall']),
-            folder, self.epoch_list
-        )
+            folder)
+
         quads_to_plot = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
-        quad_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
+        quad_trans_fig = plotter_v3.plot_bayer_quadrant_transmission_trace(
             np.array([self.fom_hist[f'transmission_{x}'] for x in quads_to_plot]).swapaxes(0,1),
-            folder, self.epoch_list
+            folder,
         )
-        overall_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
+        overall_trans_fig = plotter_v3.plot_bayer_quadrant_transmission_trace(
             np.expand_dims(np.array(self.fom_hist['transmission_overall']), axis=1),
-            folder, self.epoch_list,
+            folder,
             filename='overall_trans_trace',
         )
 
         if self.cfg['simulator_dimension'] == '2D':
             intensity_f = np.squeeze(self.fom_hist.get('intensity_overall_xyzwl')) #[-1]) only if we're recording more than the most recent one
             spatial_x = np.linspace(self.device.coords['x'][0], self.device.coords['x'][-1], intensity_f.shape[0])
-            intensity_fig = plotter_v2.plot_Enorm_focal_2d(
-                intensity_f,
+            intensity_figs = plotter_v3.plot_Enorm_2d(
                 spatial_x,
+                intensity_f,
                 self.cfg['lambda_values_um'],
                 folder,
-                iteration,
-                wl_idxs=[7, 22]
+                filename = 'Enorm', #f'Enorm_wl{wl_str}_i{iteration}'
+                wl_idxs=[7, 22],
             )
         # elif self.cfg['simulator_dimension'] == '3D':
             # intensity_fig = plotter.plot_Enorm_focal_3d(
@@ -293,21 +293,24 @@ class LumericalOptimization:
             # )
 
         trans_quadrants = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
-        indiv_trans_fig = plotter_v2.plot_individual_quadrant_transmission(
-            np.array([self.fom_hist[f'transmission_{x}'][-1] for x in trans_quadrants]),
-            self.cfg['lambda_values_um'],
-            folder,
-            self.iteration,
-        )  # continuously produces only one plot per epoch to save space
+        indiv_trans_fig = plotter_v3.plot_bayer_quadrant_transmission_spectra(
+                                self.cfg['lambda_values_um'],
+                                np.array([self.fom_hist[f'transmission_{x}'][-1] for x in trans_quadrants]),
+                                folder,
+                                filename='trans_spec', # f'trans_i{iteration}',
+                                line_labels=['Q0', 'Q1', 'Q2', 'Q3'],
+                                plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'],
+                            ) # continuously produces only one plot per epoch to save space
+
 
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
-        final_device_layer_fig, _ = plotter_v2.visualize_device(
-            self.device.coords['x'], self.device.coords['y'],
-            cur_index,
-            # self.device.coords['x'], self.device.coords['z'],
-            # np.rot90(cur_index),         # 20241003: Want to see the side view for layering.
-            folder, iteration=iteration
-        )
+        final_device_layer_fig, _ = plotter_v3.visualize_device(
+                                            self.device.coords['x'], self.device.coords['y'], cur_index,
+                                            # self.device.coords['x'], self.device.coords['z'],
+                                            # np.rot90(cur_index),         # 20241003: Want to see the side view for layering.
+                                            folder,
+                                            filename='', # f'_{iteration}'
+                                        )
 
     #     # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
     #     # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
@@ -835,6 +838,7 @@ class LumericalOptimization:
                 # self.param_hist.get('design').append( self.device.get_design_variable() )
 
                 # TODO: Here is where we would start plotting the loss landscape. Probably should be accessed by a separate class...
+                # TODO: This would be a series of Evaluation classes.
                 # Or we could move it to the device step part
                 # loss_landscape_mapper = LossLandscapeMapper.LossLandscapeMapper(
                 #     simulations,
@@ -1254,12 +1258,12 @@ class LumericalOptimization:
                 # Create jobs
                 fwd_sims = self.fom.create_forward_sim(self.base_sim)
                 adj_sims = self.fom.create_adjoint_sim(self.base_sim)
-                
-                self.base_sim.run_sims(self, 
-                                sim_list=chain(fwd_sims, adj_sims), 
-                               file_dir=self.dirs['temp'], 
+
+                self.base_sim.run_sims(self,
+                                sim_list=chain(fwd_sims, adj_sims),
+                               file_dir=self.dirs['temp'],
                                add_job_to_fdtd=True)
-                
+
                 vipdopt.logger.info('Completed Step 1: All Simulations Run.')
 
                 # Reformat monitor data for easy use

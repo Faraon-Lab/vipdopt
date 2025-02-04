@@ -826,9 +826,6 @@ class UniformMSEFoM(FoM):
     def _uniform_mse_fom(self, x: npt.NDArray):
         return 1 - np.square(x - self.constant)
 
-    def _uniform_mse_fom(self, x: npt.NDArray):
-        return 1 - np.square(x - self.constant)
-
     def _uniform_mse_gradient(self, x: npt.NDArray):
         return self.constant - x
 

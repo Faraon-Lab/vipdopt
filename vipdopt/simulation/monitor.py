@@ -152,6 +152,11 @@ class Monitor(LumericalSimObject):
         if self._sync:
             self.load_source()
         return np.abs(self._t)
+    
+    @property
+    def intensity(self) -> npt.NDArray:
+        """Return the E-field intensity across this monitor."""
+        return np.sum(np.square(np.abs(self.e)), axis=0)
 
 
 class Profile(Monitor):

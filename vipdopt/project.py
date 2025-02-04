@@ -53,6 +53,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
 
     evaluation_folder = root_dir / 'eval'
     evaluation_config_folder = evaluation_folder / 'configs'
+    evaluation_info_folder = evaluation_folder / 'opt_info'
     evaluation_utils_folder = evaluation_folder / 'utils'
     evaluation_temp_folder = evaluation_folder / '.tmp'
 
@@ -102,6 +103,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
         'device': device_folder,
         'evaluation': evaluation_folder,
         'eval_config': evaluation_config_folder,
+        'eval_info': evaluation_info_folder,
         'eval_utils': evaluation_utils_folder,
         'eval_temp': evaluation_temp_folder,
         'checkpoints': checkpoint_folder,
@@ -459,7 +461,7 @@ class Project:
 
         self.subdirectories = create_internal_folder_structure(
             self.dir,
-            pull_files_debug_mode=True, #running_on_local_machine
+            pull_files_debug_mode=cfg.get('pull_sim_files_from_debug_folder') # False, #running_on_local_machine
         )
         vipdopt.logger.info('Internal folder substructure created.')
         os.path.dirname(

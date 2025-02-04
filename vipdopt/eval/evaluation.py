@@ -16,9 +16,10 @@ import numpy.typing as npt
 import vipdopt
 from vipdopt import GDS, STL
 from vipdopt.configuration import Config
-from vipdopt.eval import plotter_v2
+from vipdopt.eval import plotter_v2, plotter_v3
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import BayerFilterFoM, FoM, SuperFoM
+from vipdopt.optimization.optimization import LumericalOptimization
 from vipdopt.optimization.optimizer import GradientOptimizer
 from vipdopt.simulation import LumericalFDTD, LumericalSimulation
 from vipdopt.utils import glob_first, rmtree, real_part_complex_product, replace_border
@@ -32,7 +33,7 @@ DEFAULT_EVAL_FOLDERS = {
 TI02_THRESHOLD = 0.5
 
 
-class LumericalEvaluation:
+class LumericalEvaluation(LumericalOptimization):
     """Class for orchestrating all the pieces of an evaluation."""
 
     def __init__(
@@ -72,7 +73,7 @@ class LumericalEvaluation:
         # self.sim_files = [dirs['temp'] / f'sim_{i}.fsp' for i in range(self.nsims)]
         self.cfg = (cfg)
         self.fom_kwargs = self.cfg if bool(fom_kwargs) else fom_kwargs
-        
+
         # Setup histories - #! SHOULD MATCH THE ONE IN OPTIMIZATION
         self.fom_hist: dict[
             str, list[npt.NDArray]
@@ -125,7 +126,7 @@ class LumericalEvaluation:
     def save_histories(self, folder=None):
         """Save the fom and parameter histories to file."""
         if folder is None:
-            folder = self.dirs['opt_info']
+            folder = self.dirs['eval_info']
         foms = np.array(self.fom_hist)
         # Todo: need to explore different compression algorithms
         with (folder / 'fom_history.npy').open('wb') as f:
@@ -143,7 +144,7 @@ class LumericalEvaluation:
     def load_histories(self, folder=None):
         """Load the fom and parameter histories from file."""
         if folder is None:
-            folder = self.dirs['opt_info']
+            folder = self.dirs['eval_info']
 
         fom_hist_file = folder / 'fom_history.npy'
         param_hist_file = folder / 'parameter_history.npy'
@@ -168,7 +169,7 @@ class LumericalEvaluation:
 
     def generate_plots(self):
         """Generate the plots and save to file."""
-        folder = self.dirs['opt_plots']
+        folder = self.dirs['eval_info']
         iteration = self.iteration #  if self.iteration==self.epoch_list[-1] else self.iteration+1
         vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
 
@@ -183,15 +184,19 @@ class LumericalEvaluation:
 
         # TODO: Assert iteration == len(self.fom_hist['intensity_overall']); if unequal, make it equal.
         # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
-        fom_fig = plotter_v2.plot_fom_trace(
+
+        #!! TODO:  generate_plots() should also be a function that is passed in, btw
+
+        fom_fig = plotter_v3.plot_fom_trace(
             np.array(self.fom_hist['intensity_overall']),
             folder)
+
         quads_to_plot = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
-        quad_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
+        quad_trans_fig = plotter_v3.plot_bayer_quadrant_transmission_trace(
             np.array([self.fom_hist[f'transmission_{x}'] for x in quads_to_plot]).swapaxes(0,1),
             folder,
         )
-        overall_trans_fig = plotter_v2.plot_quadrant_transmission_trace(
+        overall_trans_fig = plotter_v3.plot_bayer_quadrant_transmission_trace(
             np.expand_dims(np.array(self.fom_hist['transmission_overall']), axis=1),
             folder,
             filename='overall_trans_trace',
@@ -200,13 +205,13 @@ class LumericalEvaluation:
         if self.cfg['simulator_dimension'] == '2D':
             intensity_f = np.squeeze(self.fom_hist.get('intensity_overall_xyzwl')) #[-1]) only if we're recording more than the most recent one
             spatial_x = np.linspace(self.device.coords['x'][0], self.device.coords['x'][-1], intensity_f.shape[0])
-            intensity_fig = plotter_v2.plot_Enorm_focal_2d(
-                intensity_f,
+            intensity_figs = plotter_v3.plot_Enorm_2d(
                 spatial_x,
+                intensity_f,
                 self.cfg['lambda_values_um'],
                 folder,
-                iteration,
-                wl_idxs=[7, 22]
+                filename = 'Enorm', #f'Enorm_wl{wl_str}_i{iteration}'
+                wl_idxs=[7, 22],
             )
         # elif self.cfg['simulator_dimension'] == '3D':
             # intensity_fig = plotter.plot_Enorm_focal_3d(
@@ -220,24 +225,30 @@ class LumericalEvaluation:
             # )
 
         trans_quadrants = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
-        indiv_trans_fig = plotter_v2.plot_individual_quadrant_transmission(
-            np.array([self.fom_hist[f'transmission_{x}'][-1] for x in trans_quadrants]),
-            self.cfg['lambda_values_um'],
-            folder,
-            self.iteration,
-        )  # continuously produces only one plot per epoch to save space
+        indiv_trans_fig = plotter_v3.plot_bayer_quadrant_transmission_spectra(
+                                self.cfg['lambda_values_um'],
+                                np.array([self.fom_hist[f'transmission_{x}'][-1] for x in trans_quadrants]),
+                                folder,
+                                filename='trans_spec', # f'trans_i{iteration}',
+                                line_labels=['Q0', 'Q1', 'Q2', 'Q3'],
+                                plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'],
+                            ) # continuously produces only one plot per epoch to save space
+
 
         cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
-        final_device_layer_fig, _ = plotter_v2.visualize_device(
-            self.device.coords['x'], self.device.coords['y'],
-            cur_index,
-            # self.device.coords['x'], self.device.coords['z'],
-            # np.rot90(cur_index),         # 20241003: Want to see the side view for layering.
-            folder, iteration=iteration
-        )
+        final_device_layer_fig, _ = plotter_v3.visualize_device(
+                                            self.device.coords['x'], self.device.coords['y'], cur_index,
+                                            # self.device.coords['x'], self.device.coords['z'],
+                                            # np.rot90(cur_index),         # 20241003: Want to see the side view for layering.
+                                            folder,
+                                            filename='', # f'_{iteration}'
+                                        )
 
     #     # # plotter.plot_moments(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
     #     # # plotter.plot_step_size(adam_moments, OPTIMIZATION_PLOTS_FOLDER)
+
+        # Evaluation Plots
+
 
         # Create plot pickle files for GUI visualization
         with (folder / 'fom.pkl').open('wb') as f:
@@ -254,85 +265,8 @@ class LumericalEvaluation:
             pickle.dump(final_device_layer_fig, f)
     #     # TODO: rest of the plots
 
-        plotter_v2.close_all()
+        plotter_v3.close_all()
 
-    def generate_plots_3d_v2(self):
-        import matplotlib.pyplot as plt
-        plt.close('all')
-
-        quad_trans = []
-        quad_colors = ['blue','xkcd:grass green','red','xkcd:olive green','black','green']
-        quad_labels = ['B','G1','R','G2','Total','G1+G2']
-        # for idx, num in enumerate([5,4,7,6,8]):
-        #     quad_trans.append(fwd_sim.monitors()[num].trans_mag)
-        for suffix in ['0','1','2','3','overall']:
-            quad_trans.append(self.fom_hist[f'transmission_{suffix}'][-1])
-        quad_trans.append(quad_trans[1]+quad_trans[3])
-
-        fig, ax = plt.subplots()
-        for idx, num in enumerate([0,2,-1]):
-            plt.plot(self.cfg['lambda_values_um'], quad_trans[num], color=quad_colors[num], label=quad_labels[num])
-        for idx, num in enumerate([1,3]):
-            plt.plot(self.cfg['lambda_values_um'], quad_trans[num], linestyle='--', color=quad_colors[num], label=quad_labels[num])
-
-        plt.plot(self.cfg['lambda_values_um'], quad_trans[-2], color='black', label=f'Overall')
-        plt.hlines(0.225, self.cfg['lambda_values_um'][0], self.cfg['lambda_values_um'][-1],
-                    color='black', linestyle='--',label="22.5%")
-        # Put a legend to the right of the current axis
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.ylim([0,1])
-        plt.xlabel('Wavelength (um)')
-        plt.ylabel('Transmission')
-        plt.title('PML BCs')
-        plt.tight_layout()
-        plt.savefig(self.dirs['opt_plots'] / f'quad_trans_i{self.iteration}.png', bbox_inches='tight')
-
-    def generate_plots_2d_v2(self):
-        import matplotlib.pyplot as plt
-        plt.close('all')
-
-        quad_trans = []
-        quad_colors = ['blue','red','black']
-        quad_labels = ['B','R','Overall']
-        # for idx, num in enumerate([5,4,7,6,8]):
-        #     quad_trans.append(fwd_sim.monitors()[num].trans_mag)
-        for suffix in ['0','1','overall']:
-            quad_trans.append(self.fom_hist[f'transmission_{suffix}'][-1])
-        # quad_trans.append(quad_trans[1]+quad_trans[3])
-
-        fig, ax = plt.subplots()
-        for idx, num in enumerate([0,1,-1]):
-            plt.plot(self.cfg['lambda_values_um'], quad_trans[num], color=quad_colors[num], label=quad_labels[num])
-
-        # plt.hlines(0.225, self.cfg['lambda_values_um'][0], self.cfg['lambda_values_um'][-1],
-        #             color='black', linestyle='--',label="22.5%")
-        # Put a legend to the right of the current axis
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.ylim([0,1])
-        plt.xlabel('Wavelength (um)')
-        plt.ylabel('Transmission')
-        plt.title('PML BCs')
-        plt.tight_layout()
-        plt.savefig(self.dirs['opt_plots'] / f'quad_trans_i{self.iteration}.png', bbox_inches='tight')
-
-    def generate_plots_efield_focalplane_1d(self):
-        import matplotlib.pyplot as plt
-        plt.close('all')
-
-        fig, ax = plt.subplots()
-        intensity = np.squeeze(self.fom_hist.get('intensity_overall_xyzwl')[-1])
-        spatial_x = np.linspace(self.device.coords['x'][0], self.device.coords['x'][-1], intensity.shape[0])
-        for peak_ind in self.cfg['desired_peak_location_per_band']:
-            wl = self.cfg['lambda_values_um'][peak_ind]
-            plt.plot(spatial_x, intensity[:, peak_ind], label='spatial')
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-            # plt.ylim([0,1])
-            plt.xlabel('x (um)')
-            plt.ylabel('Intensity')
-            plt.title(f'E-field at Focal Plane, {wl:.3f}um')
-            plt.tight_layout()
-            plt.savefig(self.dirs['opt_plots'] / f'efield_focal_wl{wl:.3f}um_i{self.iteration}.png', bbox_inches='tight')
-            plt.close()
 
     def _pre_run(self):
         """Final pre-processing before running the optimization."""
@@ -343,6 +277,7 @@ class LumericalEvaluation:
     def _post_run(self):
         """Final post-processing after running the optimization."""
         self.loop = False
+        self.save_histories()
         self.generate_plots()
         self.fdtd.close()       # Disconnect from Lumerical
 
@@ -440,7 +375,7 @@ class LumericalEvaluation:
         # We then enqueue each job and run them all in parallel.
 
         # Create jobs
-        fwd_sims = self.fom.create_forward_sim(self.base_sim, 
+        fwd_sims = self.fom.create_forward_sim(self.base_sim,
                                                link_sims=self.cfg['pull_sim_files_from_debug_folder'])
         # adj_sims = self.fom.create_adjoint_sim(self.base_sim)
         nodev_sims = [sim.with_monitors(['src_transmission_monitor', 'src_spill_monitor'],
@@ -474,7 +409,7 @@ class LumericalEvaluation:
         self.fom_hist.get('transmission_overall').append( np.squeeze(np.sum(t, 0)) )
         # [plt.plot(np.squeeze(t_i)) for t_i in t]
         # todo: remove hardcode for the monitor.
-        intensity = np.sum(np.square(np.abs(fwd_sims[0].monitors()[4].e)), axis=0)
+        intensity = fwd_sims[0].monitors()[4].intensity
         self.fom_hist['intensity_overall_xyzwl'] = intensity
         # # We need to save space for fom_history. Just save the most recent iteration's data.
         # self.fom_hist.get('intensity_overall_xyzwl').append(intensity)
@@ -483,7 +418,85 @@ class LumericalEvaluation:
         # # Or we could move it to the device step part
         # loss_landscape_mapper = LossLandscapeMapper.LossLandscapeMapper(simulations, devices)
 
+        # TODO: Wrap the below in an evaluation function ===============
+
+        # Power Quantities
+        attribute = 'power'
+        sourcepower = fwd_sims[0].monitors()[0].sp
+        wavelength = np.array(self.cfg['lambda_values_um'])
+
+        P_incident = self.get_attribute(fwd_sims[0], 'incident_aperture_monitor', attribute)
+
+        P_reflected = self.get_attribute(nodev_sims[0], 'src_spill_monitor', attribute) -\
+                        self.get_attribute(fwd_sims[0], 'src_spill_monitor', attribute)
+                    # getattr(fwd_sims[0].monitors_by_name('src_spill_monitor')[0], attribute) -\
+                        
+        P_sides = {}
+        for mntr in fwd_sims[0].monitors_by_name('side'):
+            P_sides[mntr.name] = getattr(mntr, attribute, None)
+        P_exit = self.get_attribute(fwd_sims[0], 'exit_aperture_monitor', attribute)
+
+        P_focal = self.get_attribute(fwd_sims[0], 'transmission_focal_monitor_', attribute)
+        
+        #!! TODO: 20241218: WOW EVERYTHING IS WRONG.
+        
+        # TODO: Wrap the above in an evaluation function ===============
+
+
+
+
         print(3)
+
+        def calc_normalize_power(monitors_data, normalize_option):
+            baseline_power = 0
+
+            if normalize_option == 'input_power':
+                baseline_power = monitors_data['incident_aperture_monitor']['P']
+
+            elif normalize_option == 'sourcepower':
+                baseline_power = monitors_data['sourcepower']
+
+            elif normalize_option in ['power_sum', 'uniform_cube']:
+                sourcepower = monitors_data['sourcepower']
+                input_power = monitors_data['incident_aperture_monitor']['P']
+
+                R_coeff_4 = monitors_data['incident_aperture_monitor']['R_power']		# this is actually power not R-coefficient
+                R_coeff_5 = monitors_data['src_spill_monitor']['P'] - input_power		# this is actually power not R-coefficient
+                R_power = (np.abs(R_coeff_4)) # + R_coeff_5) * 0.5
+                side_powers = []
+                side_directions = ['E','N','W','S']
+                sides_power = 0
+                for idx in range(0, 4):
+                    side_powers.append(monitors_data['side_monitor_'+str(idx)]['P'])
+                    sides_power = sides_power + monitors_data['side_monitor_'+str(idx)]['P']
+                focal_power = monitors_data['transmission_focal_monitor_']['P']
+                scatter_power = 0
+                for idx in range(0,4):
+                    scatter_power = scatter_power + monitors_data['vertical_scatter_monitor_'+str(idx)]['P']
+
+                power_sum = R_power + focal_power + scatter_power
+                sides_power_2 = sides_power#  - (sourcepower - input_power)
+                power_sum += sides_power_2
+
+                baseline_power = power_sum
+
+            elif normalize_option == 'unity':
+                baseline_power = 1
+
+
+            return baseline_power
+
+    def get_attribute(self, sim, monitor_name, attribute):
+        try:
+            monitor = sim.monitors_by_name(monitor_name)[0]
+        except Exception as ex:
+            vipdopt.logger.warning(f'Monitor {monitor_name} not active for sim {sim.info["name"]}.')
+            return None
+        try:
+            return getattr(monitor, attribute)
+        except Exception as ex:
+            vipdopt.logger.warning(f'Attribute does not exist for monitor {monitor_name}.')
+            return None
 
     def call_callbacks(self):
         """Call all of the callback functions."""
