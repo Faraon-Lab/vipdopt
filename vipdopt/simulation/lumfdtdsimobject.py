@@ -1,4 +1,4 @@
-"""Abstractions of simulation objects."""
+"""Abstractions of Lumerical simulation objects."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ import numpy.typing as npt
 import vipdopt
 
 
-class SimObjectType(str, Enum):
-    """Types of generic simulation objects."""
+class LumericalSimObjectType(str, Enum):
+    """Types of simulation objects in Lumerical."""
 
     FDTD = 'fdtd'
     MESH = 'mesh'
@@ -31,9 +31,8 @@ class SimObjectType(str, Enum):
     INDEX = 'index'
     IMPORT = 'import'
     RECT = 'rect'
-    CIRCLE = 'circle'
 
-    def get_add_lumerical_function(self) -> Callable:
+    def get_add_function(self) -> Callable:
         """Get the correct lumapi function to add an object."""
         if vipdopt.lumapi is None:
             raise ModuleNotFoundError(
@@ -43,45 +42,45 @@ class SimObjectType(str, Enum):
 
 
 SOURCE_TYPES = [
-    SimObjectType.DIPOLE,
-    SimObjectType.TFSF,
-    SimObjectType.GAUSSIAN,
-    SimObjectType.PLANE,
+    LumericalSimObjectType.DIPOLE,
+    LumericalSimObjectType.TFSF,
+    LumericalSimObjectType.GAUSSIAN,
+    LumericalSimObjectType.PLANE,
 ]
 MONITOR_TYPES = [
-    SimObjectType.POWER,
-    SimObjectType.PROFILE,
+    LumericalSimObjectType.POWER,
+    LumericalSimObjectType.PROFILE,
 ]
-IMPORT_TYPES = [SimObjectType.IMPORT]
+IMPORT_TYPES = [LumericalSimObjectType.IMPORT]
 
 
 OBJECT_TYPE_NAME_MAP = {
-    'FDTD': SimObjectType.FDTD,
-    'GaussianSource': SimObjectType.GAUSSIAN,
-    'DipoleSource': SimObjectType.DIPOLE,
-    'Rectangle': SimObjectType.RECT,
-    'Mesh': SimObjectType.MESH,
-    'Import': SimObjectType.IMPORT,
-    'IndexMonitor': SimObjectType.INDEX,
+    'FDTD': LumericalSimObjectType.FDTD,
+    'GaussianSource': LumericalSimObjectType.GAUSSIAN,
+    'DipoleSource': LumericalSimObjectType.DIPOLE,
+    'Rectangle': LumericalSimObjectType.RECT,
+    'Mesh': LumericalSimObjectType.MESH,
+    'Import': LumericalSimObjectType.IMPORT,
+    'IndexMonitor': LumericalSimObjectType.INDEX,
 }
 
 
-class SimObject:
-    """Generic Simulation Object.
+class LumericalSimObject:
+    """Lumerical Simulation Object.
 
     Attributes:
         name (str): name of the object
-        obj_type (SimObjectType): the type of object
+        obj_type (LumericalSimObjectType): the type of object
         properties (OrderedDict[str, Any]): Map of named properties and their values
     """
 
-    def __init__(self, name: str, obj_type: SimObjectType) -> None:
-        """Create a SimObject."""
+    def __init__(self, name: str, obj_type: LumericalSimObjectType) -> None:
+        """Create a LumericalSimObject."""
         self.name = name
         self.obj_type = obj_type
         self.info: OrderedDict[str, Any] = OrderedDict([('name', '')])
         self.properties: OrderedDict[str, Any] = OrderedDict()
-        if obj_type != SimObjectType.FDTD:
+        if obj_type != LumericalSimObjectType.FDTD:
             self.properties['name'] = name
 
     def __repr__(self) -> str:
@@ -109,27 +108,27 @@ class SimObject:
         self.properties.update(vals)
 
     def __eq__(self, __value: object) -> bool:
-        """Test equality of SimObjects."""
-        if isinstance(__value, SimObject):
+        """Test equality of LumericalSimObjects."""
+        if isinstance(__value, LumericalSimObject):
             return (
                 self.obj_type == __value.obj_type
                 and self.properties == __value.properties
             )
         return super().__eq__(__value)
 
-    def __lt__(self, obj2: SimObject) -> bool:
+    def __lt__(self, obj2: LumericalSimObject) -> bool:
         """Test if this object comes before another alphabetically."""
         return self.name < obj2.name
 
-    def __gt__(self, obj2: SimObject) -> bool:
+    def __gt__(self, obj2: LumericalSimObject) -> bool:
         """Test if this object comes after another alphabetically."""
         return self.name > obj2.name
 
-    def __le__(self, obj2: SimObject) -> bool:
+    def __le__(self, obj2: LumericalSimObject) -> bool:
         """Test if this object is less than or equal to another alphabetically."""
         return self.name <= obj2.name
 
-    def __ge__(self, obj2: SimObject) -> bool:
+    def __ge__(self, obj2: LumericalSimObject) -> bool:
         """Test if this object is greater than or equal to another alphabetically."""
         return self.name >= obj2.name
 
@@ -138,28 +137,28 @@ class SimObject:
         return vars(self)
 
     @classmethod
-    def from_lumerical(cls, obj) -> SimObject:
-        """Return a SimObject from the Lumerical equivalent."""
+    def from_fdtd(cls, obj) -> LumericalSimObject:
+        """Return a LumericalSimObject from the fdtd equivalent."""
         otype = obj['type']
         if otype == 'DFTMonitor':
             if obj['spatiazl interpolation'] == 'specified position':
-                obj_type = SimObjectType.PROFILE
+                obj_type = LumericalSimObjectType.PROFILE
             else:
-                obj_type = SimObjectType.POWER
+                obj_type = LumericalSimObjectType.POWER
         else:
             obj_type = OBJECT_TYPE_NAME_MAP[otype]
         oname = obj._id.name.split('::')[-1]
-        sim_obj = SimObject(oname, obj_type)
+        sim_obj = LumericalSimObject(oname, obj_type)
         sim_obj.update(**obj._nameMap)
 
         return sim_obj
 
 
-class Import(SimObject):
-    """Class representing a freeform import primitive of a Device."""
+class Import(LumericalSimObject):
+    """Class representing an import primitive in Lumerical."""
 
     def __init__(self, name: str) -> None:
-        super().__init__(name, SimObjectType.IMPORT)
+        super().__init__(name, LumericalSimObjectType.IMPORT)
         # Create dummy values until otherwise
         self.n = None
         self.x = np.ones(1)
@@ -184,16 +183,23 @@ class Import(SimObject):
         return (self.n, self.x, self.y, self.z)
 
 
+class IndexMonitor(LumericalSimObject):
+    """Class representing an index monitor in Lumerical."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name, LumericalSimObjectType.INDEX)
 
 
-class SimEncoder(json.JSONEncoder):
-    """Encodes SimObjects in JSON format."""
+
+
+class LumericalEncoder(json.JSONEncoder):
+    """Encodes LumericalSim objects in JSON format."""
 
     @override
     def default(self, o: Any) -> Any:
-        if isinstance(o, SimObjectType):
+        if isinstance(o, LumericalSimObjectType):
             return {'obj_type': str(o)}
-        if isinstance(o, SimObject):
+        if isinstance(o, LumericalSimObject):
             return copy(vars(o))
         if isinstance(o, np.ndarray):
             return o.tolist()

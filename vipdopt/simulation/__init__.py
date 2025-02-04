@@ -1,18 +1,19 @@
-"""Package for abstracting interactions with the Lumerical Python API."""
+"""Package for abstracting interactions with the simulations."""
 
-from vipdopt.simulation.fdtd import ISolver, LumericalFDTD
-from vipdopt.simulation.monitor import Monitor, Power, Profile
-from vipdopt.simulation.simobject import (
+from vipdopt.simulation.lumfdtd import ISolver, LumericalFDTD
+# from vipdopt.simulation.monitor import Monitor, Power, Profile
+from vipdopt.simulation.lumfdtdsimobject import (
     Import,
+    LumericalEncoder,
     LumericalSimObject,
     LumericalSimObjectType,
 )
 from vipdopt.simulation.simulation import (
     ISimulation,
-    LumericalEncoder,
-    LumericalSimulation,
+    Simulation,
+    # LumericalSimulation,
 )
-from vipdopt.simulation.source import DipoleSource, GaussianSource, Source, TFSFSource
+from vipdopt.simulation.source import DipoleSource, GaussianSource, Source, TFSFSource, PlaneSource
 
 __all__ = [
     'ISimulation',
@@ -27,6 +28,7 @@ __all__ = [
     'DipoleSource',
     'GaussianSource',
     'TFSFSource',
+    'PlaneSource',
     'Import',
     'ISolver',
     'LumericalFDTD',

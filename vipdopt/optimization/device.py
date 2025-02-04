@@ -13,10 +13,12 @@ import numpy as np
 import numpy.typing as npt
 from scipy import interpolate
 
-from vipdopt import STL, GDS
-from vipdopt.optimization.filter import Filter, Scale, Sigmoid, Layering
+import vipdopt
+# from vipdopt import STL, GDS
+from vipdopt.configuration import Config
+# from vipdopt.optimization.filter import Filter, Scale, Sigmoid, Layering
 from vipdopt.simulation import Import
-from vipdopt.utils import Coordinates, PathLike, ensure_path, repeat
+from vipdopt.utils import Coordinates, PathLike, ensure_path
 
 CONTROL_AVERAGE_PERMITTIVITY = 3
 GAUSSIAN_SCALE = 0.27
@@ -77,11 +79,11 @@ class Device:
             raise ValueError('Maximum permittivity must be greater than minimum')
         self.permittivity_constraints = permittivity_constraints
 
-        # Make sure there is always a Scale filter at the end
-        if filters is None:
-            filters = [Scale(permittivity_constraints)]
-        elif not isinstance(filters[-1], Scale):
-            filters.append(Scale(permittivity_constraints))
+        # # Make sure there is always a Scale filter at the end
+        # if filters is None:
+        #     filters = [Scale(permittivity_constraints)]
+        # elif not isinstance(filters[-1], Scale):
+        #     filters.append(Scale(permittivity_constraints))
 
         if (
             not isinstance(coords, dict)
@@ -166,6 +168,118 @@ class Device:
 
         return data
 
+    @classmethod
+    def load_config(cls, cfg: Config):
+        """Load device from a config, or create a new one if it doesn't exist yet."""
+        
+        if 'device' in cfg:
+            device_source = cfg.pop('device')
+            return Device.from_source(device_source)
+
+        else:
+            # * Design Region(s) + Constraints
+            # e.g. feature sizes, bridging/voids, permittivity constraints,
+            # corresponding E-field monitor regions
+            region_coordinates = Coordinates({
+                'x': np.linspace(
+                    -0.5 * cfg['device_size_lateral_bordered_um'],
+                    0.5 * cfg['device_size_lateral_bordered_um'],
+                    cfg['device_voxels_lateral_bordered'],
+                ),
+                'y': np.array([]),
+                'z': np.array([]),
+            })
+            if cfg['simulator_dimension'] == '2D':
+                voxel_array_size = (
+                    cfg['device_voxels_lateral_bordered'],
+                    cfg['device_voxels_vertical'],
+                    3,
+                )
+                region_coordinates.update({
+                    'y': np.linspace(
+                        cfg['device_vertical_minimum_um'],
+                        cfg['device_vertical_maximum_um'],
+                        cfg['device_voxels_vertical'],
+                    ),
+                    'z': np.linspace(
+                        -1.5 * cfg['mesh_spacing_um'],
+                        1.5 * cfg['mesh_spacing_um'],
+                        3,
+                    ),
+                })
+
+            elif cfg['simulator_dimension'] == '3D':
+                voxel_array_size = (
+                    cfg['device_voxels_lateral_bordered'],
+                    cfg['device_voxels_lateral_bordered'],
+                    cfg['device_voxels_vertical'],
+                )
+                region_coordinates.update({
+                    'y': np.linspace(
+                        -0.5 * cfg['device_size_lateral_bordered_um'],
+                        0.5 * cfg['device_size_lateral_bordered_um'],
+                        cfg['device_voxels_lateral_bordered'],
+                    ),
+                    'z': np.linspace(
+                        cfg['device_vertical_minimum_um'],
+                        cfg['device_vertical_maximum_um'],
+                        cfg['device_voxels_vertical'],
+                    ),
+                })
+
+            device = Device(
+                voxel_array_size,
+                (cfg['min_device_permittivity'], cfg['max_device_permittivity']),
+                region_coordinates,
+                randomize=True,#False,
+                init_seed=0,
+                # todo: add filters to config
+                filters=[], # [
+                #     Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+                #             cfg['num_vertical_layers'] , 
+                #             cfg['num_vertical_spacers'], (0,1),
+                #             layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+                #             spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+                #             # layer_height_voxels=4, spacer_height_voxels=2,
+                #             spacer_voxels_value=cfg['spacer_density'],
+                #             ),
+                #     Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
+                #     Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], )),
+                #     # Bridging is performed in the STL export and has minimal performance reduction.
+                # ],
+            )
+        
+        # TODO: 20240930 - Testing =========================
+        # f = Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+        #              cfg['num_vertical_layers'], 
+        #              cfg['num_vertical_spacers'], (0,1),
+        #              layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+        #              spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+        #             # layer_height_voxels=4, spacer_height_voxels=2,
+        #             spacer_voxels_value=cfg['spacer_density'],
+        #             )
+        # g = f.get_layer_spacer_idxs(voxel_array_size, layer_type_nums=[3,2], spacer_first=True, start_from='top')
+        
+        # import matplotlib.pyplot as plt
+        # test = np.zeros((voxel_array_size[1],voxel_array_size[1]))
+        # region_n = [1, 0.5]
+        # for ik, k in enumerate(g):
+        #     for _range in g[k]:
+        #         test[np.arange(*_range), :] = region_n[ik]
+        # plt.imshow(test)
+        # plt.colorbar()
+        
+        # f.layer_start_idxs = g
+        # x = self.device.get_design_variable()
+        # h = f.forward(x)
+        # # h = f.layer_averaging(self.device.get_design_variable(), 0.1, g)
+        # # ==================================================    
+        # import matplotlib.pyplot as plt
+        # plt.imshow(np.real(h[...,0]))
+        
+        vipdopt.logger.info('Device loaded.')
+        return device
+
     def load_dict(self, device_data: dict):
         """Load attributes from a dictionary."""
         vars(self).update(vars(Device._from_dict(device_data)))
@@ -228,11 +342,11 @@ class Device:
         d.set_design_variable(w)
         return d
 
-    def clip(self, x: npt.NDArray) -> npt.NDArray:
+    def clip(self, x: npt.NDArray, constraints:list=[0,1]) -> npt.NDArray:
         """Return x where all values are clipped to the device's constraints."""
         return np.maximum(
-            np.minimum(x, self.permittivity_constraints[1]),
-            self.permittivity_constraints[0],
+            np.minimum(x, constraints[1]),
+            constraints[0],
         )
 
     def get_design_variable(self) -> npt.NDArray[np.complex128]:
@@ -252,7 +366,7 @@ class Device:
         """Overwrite the filters in this device."""
         self.filters = f
 
-    def update_filters(self, epoch=0):
+    def update_filters(self, epoch=0, epoch_list=[0], num_layers_per_epoch=[10]):
         """Update the filters of the device."""
         # Filters are coded so that they can be re-initialized without problems.
         
@@ -261,9 +375,33 @@ class Device:
         # TODO: Test
         self.filters = [type(f)(**f.init_vars) for f in self.filters]
         
-        for f in self.filters:
+        for i, f in enumerate(self.filters):
             if isinstance(f, Sigmoid):
-                f = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
+                self.filters[i] = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
+            # elif isinstance(f, Layering):
+            #     g = f.init_vars
+            #     g.update({'num_layers': num_layers_per_epoch[round(
+            #                                 ((epoch+1)/(len(epoch_list)-1)*(len(num_layers_per_epoch))) - 1
+            #                             )]})
+            #     self.filters[i] = Layering(**g)
+            #     # TODO: Add a setting such that the num_layers_per_epoch splits only the design layers and not the spacers.
+            #     # Example: L S L is the desired final configuration
+            #     # At epoch 1 maybe the num_layers is 4 -> LLLLSLLLL where L,S have their own thicknesses
+            #     # At epoch 2 num_layers is 2 -> LLSLL
+            #     # At epoch 3 num_layers is 1 -> LSL
+            #     # TODO: 20241002: OR just straight up implement the layering projection filter. [Update 62]
+            #     # See vipdopt.optimization.multilevelsigmoid
+                
+                
+            #     #! 20241002: Updated Layering class.
+            #     # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+            #     #         cfg['num_vertical_layers'] , 
+            #     #         cfg['num_vertical_spacers'], (0,1),
+            #     #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+            #     #         spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+            #     #         # layer_height_voxels=4, spacer_height_voxels=2,
+            #     #         spacer_voxels_value=cfg['spacer_density'],
+            #     #         ),
         
         # self.filters = [
         #     Layering( **filter_vars[0] ),
@@ -573,9 +711,9 @@ class Device:
         gds_generator.export_device(gds_layer_dir, filetype='gds')
         gds_generator.export_device(gds_layer_dir, filetype='svg')
 
-        # for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
-        #     gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
-        #     gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
+        for layer_idx in range(0, full_density.shape[2]):         # Individual layer as GDS file export
+            gds_generator.export_device(gds_layer_dir, filetype='gds', layer_idx=layer_idx)
+            gds_generator.export_device(gds_layer_dir, filetype='svg', layer_idx=layer_idx)
 
         # # Here is a function for GDS device import to Lumerical - be warned this takes maybe 3-5 minutes per layer.
         # def import_gds(sim, device, gds_layer_dir):
@@ -594,3 +732,9 @@ class Device:
         #                     z_vals[z_idx], z_vals[z_idx+1])
         #         sim.fdtd.set({'x': device.coords['x'][0], 'y': device.coords['y'][0]})      # Be careful of units - 1e-6
         #         vipdopt.logger.info(f'Layer {z_idx} imported in {time.time()-t} seconds.')
+
+    def partition(self, sim_regions):
+        # TODO: Partitioning the base_sim into simulations: i.e. a list of Simulation objects
+        # TODO: And the same with devices
+        # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
+        return [self]

@@ -1,15 +1,16 @@
-"""Module for representing sources in Lumerical simulations."""
+"""Module for representing sources in simulations."""
 
-from vipdopt.simulation.simobject import LumericalSimObject, LumericalSimObjectType
+from vipdopt.simulation.simobject import SimObject, SimObjectType
 
 
 # TODO: Create an __eq__ function and also rework what a source stores. Basically
 # just needs to be the name of the source in the base_sim, or some unique identifier.
 # Could also just use the source names instead I suppose...
-class Source(LumericalSimObject):
-    """Representation of a Lumerical source object."""
 
-    def __init__(self, name: str, obj_type: LumericalSimObjectType) -> None:
+class Source(SimObject):
+    """Representation of a source object."""
+
+    def __init__(self, name: str, obj_type: SimObjectType) -> None:
         super().__init__(name, obj_type)
 
     def __eq__(self, __value: object) -> bool:
@@ -23,17 +24,22 @@ class Source(LumericalSimObject):
 
 class DipoleSource(Source):
     def __init__(self, name: str):
-        super().__init__(name, LumericalSimObjectType.DIPOLE)
+        super().__init__(name, SimObjectType.DIPOLE)
 
 
 class TFSFSource(Source):
     def __init__(self, name: str):
-        super().__init__(name, LumericalSimObjectType.TFSF)
+        super().__init__(name, SimObjectType.TFSF)
+
+
+class PlaneSource(Source):
+    def __init__(self, name: str):
+        super().__init__(name, SimObjectType.PLANE)
 
 
 class GaussianSource(Source):
     def __init__(self, name: str):
-        super().__init__(name, LumericalSimObjectType.GAUSSIAN)
+        super().__init__(name, SimObjectType.GAUSSIAN)
 
 
 class ForwardSource(Source):

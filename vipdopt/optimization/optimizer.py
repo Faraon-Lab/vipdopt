@@ -96,3 +96,11 @@ class NonGradientOptimizer(abc.ABC):
     @abc.abstractmethod
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
+
+class NLOptOptimizer():
+    def __init__(self, **kwargs):
+        """Initialize an Optimizer class interfacing with NLOpt package."""
+        vars(self).update(kwargs)
+
+    def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
+        """Step forward one iteration in the optimization process."""

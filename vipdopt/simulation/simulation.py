@@ -1,8 +1,7 @@
-"""FDTD Simulation Interface Code."""
-
 from __future__ import annotations
 
 import abc
+import os
 import json
 import logging
 from argparse import ArgumentParser
@@ -16,25 +15,24 @@ import numpy as np
 from overrides import override
 
 import vipdopt
-
-# from vipdopt.optimization import Device
+from vipdopt.configuration import Config
 from vipdopt.simulation.monitor import Monitor
+# from vipdopt.simulation.lumfdtdsimobject import LumericalEncoder, LumericalSimObject #, LumericalSimObjectType
 from vipdopt.simulation.simobject import (
     IMPORT_TYPES,
     MONITOR_TYPES,
     SOURCE_TYPES,
+    SimEncoder,
+    SimObject,
+    SimObjectType,
     Import,
-    LumericalSimObject,
-    LumericalSimObjectType,
 )
 from vipdopt.simulation.source import Source
 from vipdopt.utils import PathLike, ensure_path, read_config_file
 
-# TODO: Create simulation subpackage and add this, monitors, sources, and maybe devices
-
 
 class ISimulation(abc.ABC):
-    """Abstract class for an FDTD simulation."""
+    """Abstract class for a simulation."""
 
     @abc.abstractmethod
     def __init__(self, source: PathLike | dict | None) -> None:
@@ -48,40 +46,16 @@ class ISimulation(abc.ABC):
     def save(self, fname: PathLike):
         """Save simulation data to a file."""
 
-
-class LumericalEncoder(json.JSONEncoder):
-    """Encodes LumericalSim objects in JSON format."""
-
-    @override
-    def default(self, o: Any) -> Any:
-        if isinstance(o, LumericalSimObjectType):
-            return {'obj_type': str(o)}
-        if isinstance(o, LumericalSimObject):
-            return copy(vars(o))
-        if isinstance(o, np.ndarray):
-            return o.tolist()
-        elif isinstance(o, np.generic):
-            return o.item()
-        if isinstance(o, complex) and np.imag(o)==0:
-            # We purposely want it to break for actual complex numbers
-            return np.real(o)
-        if isinstance(o, Path):
-            return str(o)
-        return super().default(o)
-
-
-class LumericalSimulation(ISimulation):
-    """Lumerical FDTD Simulation Code.
-
-    Attributes:
+class Simulation(ISimulation):
+    """Attributes:
         info (OrderedDict[str]): Info about this simulation. Contains the keys
             "filename", "path", "simulator", and "coordinates".
-        objects (OrderedDict[str, LumericalSimObject]): The objects within
+        objects (OrderedDict[str, SimObject]): The objects within
             the simulation
     """
-
-    def __init__(self, source: PathLike | dict | None = None) -> None:
-        """Create a LumericalSimulation.
+    
+    def __init__(self, source: PathLike | dict | None = None, solver:str=None) -> None:
+        """Create a Simulation.
 
         Arguments:
             source (PathLike | dict | None): optional source to load the simulation from
@@ -95,77 +69,30 @@ class LumericalSimulation(ISimulation):
 
         if source:
             self.load(source)
+        
+        self.solver = None
+        self.encoder = None
+        if solver:
+            self.set_solver(solver)
+
+    def set_solver(self, solver='LumericalFDTD'):
+        self.solver = solver
+        match solver:
+            case 'LumericalFDTD':
+                self.encoder = SimEncoder # LumericalEncoder
+            case _:
+                self.encoder = SimEncoder
 
     @override
     def __str__(self) -> str:
         return self.as_json()
-
-    def get_env_vars(self) -> dict:
-        """Return the current pending environment variables to be set.
-
-        Returns:
-            dict: The current pending environment variables to be set. If
-                `self._env_vars` is None, returns an empty dictionary.
-        """
-        return {} if self._env_vars is None else self._env_vars
-
-    @override
-    def load(self, source: PathLike | dict):
-        if isinstance(source, dict):
-            self._load_dict(source)
-        else:
-            self._load_file(source)
-
-    # @_check_fdtd
-    @ensure_path
-    def _load_fsp(self, fname: Path):
-        """Load a simulation from a Lumerical .fsp file."""
-        vipdopt.logger.debug(f'Loading simulation from {fname}...')
-        self._clear_objects()
-        self.fdtd.load(str(fname))  # type: ignore
-        self.fdtd.selectall()  # type: ignore
-        objects = self.fdtd.getAllSelectedObjects()  # type: ignore
-        # vipdopt.logger.debug(list(vars(objects[0]).keys()))
-        # vipdopt.logger.debug(list(objects[0].__dict__.keys()))
-        # print(objects[0]['type'])
-        for o in objects:
-            otype = o['type']
-            if otype == 'DFTMonitor':
-                if o['spatial interpolation'] == 'specified position':
-                    obj_type = LumericalSimObjectType.PROFILE
-                else:
-                    obj_type = LumericalSimObjectType.POWER
-            else:
-                obj_type = OBJECT_TYPE_NAME_MAP[otype]
-            oname = o._id.name.split('::')[-1]  # noqa: SLF001
-            sim_obj = LumericalSimObject(oname, obj_type)
-            for name in o._nameMap:  # noqa: SLF001
-                sim_obj[name] = o[name]
-
-            self.objects[oname] = sim_obj
-        vipdopt.logger.debug(self.as_json())
-
-    @ensure_path
-    def _load_file(self, fname: Path):
-        """Load a simulation from a JSON file."""
-        vipdopt.logger.debug(f'Loading simulation from {fname}...')
-        sim = read_config_file(fname)
-        self._load_dict(sim)
-        vipdopt.logger.info(f'Successfully loaded {fname}\n')
-
-    def _load_dict(self, d: dict):
-        """Load a simulation from a dictionary."""
-        self._clear_info()
-        self.info.update(d.get('info', {}))
-
-        self.clear_objects()
-        for obj in d['objects'].values():
-            self.new_object(
-                obj['name'],
-                LumericalSimObjectType(obj['obj_type']),
-                **obj['properties'],
-            )
-
+    
+    def __eq__(self, __value: object) -> bool:
+        """Test equality of simulations."""
+        if isinstance(__value, Simulation):
+            return self.objects == __value.objects
+        return super().__eq__(__value)
+    
     @ensure_path
     @override
     def save(self, fname: Path):
@@ -187,7 +114,7 @@ class LumericalSimulation(ISimulation):
             self.as_dict(),
             indent=4,
             ensure_ascii=True,
-            cls=LumericalEncoder,
+            cls=self.encoder,
         )
 
     def _clear_info(self):
@@ -196,27 +123,105 @@ class LumericalSimulation(ISimulation):
 
     def clear_objects(self):
         """Clear all existing objects and create a new project."""
-        self.objects: OrderedDict[str, LumericalSimObject] = OrderedDict()
+        self.objects: OrderedDict[str, SimObject] = OrderedDict()
+    
+    @override
+    def load(self, source: PathLike | dict, *args, **kwargs):
+        if isinstance(source, Config):
+            self._load_from_config(source, *args, **kwargs)
+        elif isinstance(source, dict):
+            self._load_dict(source)
+        else:
+            self._load_file(source)
+    
+    # # TODO: MOVE TO LUMERICALSIMULATION
+    # # @_check_fdtd
+    # @ensure_path
+    # def _load_fsp(self, fname: Path):
+    #     """Load a simulation from a Lumerical .fsp file."""
+    #     vipdopt.logger.debug(f'Loading simulation from {fname}...')
+    #     self._clear_objects()
+    #     self.fdtd.load(str(fname))  # type: ignore
+    #     self.fdtd.selectall()  # type: ignore
+    #     objects = self.fdtd.getAllSelectedObjects()  # type: ignore
+    #     # vipdopt.logger.debug(list(vars(objects[0]).keys()))
+    #     # vipdopt.logger.debug(list(objects[0].__dict__.keys()))
+    #     # print(objects[0]['type'])
+    #     for o in objects:
+    #         otype = o['type']
+    #         if otype == 'DFTMonitor':
+    #             if o['spatial interpolation'] == 'specified position':
+    #                 obj_type = LumericalSimObjectType.PROFILE
+    #             else:
+    #                 obj_type = LumericalSimObjectType.POWER
+    #         else:
+    #             obj_type = OBJECT_TYPE_NAME_MAP[otype]
+    #         oname = o._id.name.split('::')[-1]  # noqa: SLF001
+    #         sim_obj = LumericalSimObject(oname, obj_type)
+    #         for name in o._nameMap:  # noqa: SLF001
+    #             sim_obj[name] = o[name]
+
+    #         self.objects[oname] = sim_obj
+    #     vipdopt.logger.debug(self.as_json())
 
     @ensure_path
-    def set_path(self, path: Path):
-        """Set the save path of the simulation."""
-        self.info['path'] = path.absolute()
+    def _load_file(self, fname: Path):
+        """Load a simulation from a JSON file."""
+        vipdopt.logger.debug(f'Loading simulation from {fname}...')
+        sim = read_config_file(fname)
+        self._load_dict(sim)
+        vipdopt.logger.info(f'Successfully loaded {fname}\n')
 
-    def get_path(self) -> Path | None:
-        """Get the save path of the simulation."""
-        return self.info.get('path', None)
+    def _load_dict(self, d: dict):
+        """Load a simulation from a dictionary."""
+        self._clear_info()
+        self.info.update(d.get('info', {}))
 
-    # def get_path(self) -> Path:
-    #     """Get the save path of the simulation."""
-    #     p = self.info['path']
-    #     if not isinstance(p, Path):
-    #         p = Path(p)
-    #     return p
+        self.clear_objects()
+        
+        for obj in d['objects'].values():
+            self.new_object(
+                obj['name'],
+                SimObjectType(obj['obj_type']),
+                **obj['properties'],
+            )
+    
+    @classmethod
+    def _load_from_config(cls, cfg, folder, solver='LumericalFDTD', *args, **kwargs):
+        '''Create a simulation from config'''
+        
+        try:
+            # Initialize base simulation -
+            # Are we running using Lumerical or ceviche or fdtd-z or SPINS or?
+            vipdopt.logger.info('Loading base simulation from sim.json...')
+            
+            base_sim_dict = cfg.pop('base_simulation')
+            
+            base_sim = Simulation(base_sim_dict)
+            vipdopt.logger.info('...successfully loaded base simulation!')
+        except BaseException:  # noqa: BLE001
+            base_sim = Simulation()
+        
+        base_sim.set_solver(solver)
+        
+        path = Path(folder) / 'base_sim'
+        match base_sim.solver:
+            case 'LumericalFDTD':
+                path = path.with_suffix('.fsp')
+        base_sim.set_path(path)
+        
+        # NOTE: (Not used here):
+        # We can create new simulations from the foMs by using fom.create_forward_sim() and passing base sim as a template
+        src_to_sim_map = {
+            src: base_sim.with_enabled([src], name=src)
+            for src in base_sim.source_names()
+        }           # key, value types here are Dict( str : Simulation )
+        
+        return base_sim, src_to_sim_map
 
-    def copy(self) -> LumericalSimulation:
+    def copy(self) -> Simulation:
         """Return a copy of this simulation."""
-        new_sim = LumericalSimulation()
+        new_sim = Simulation()
         new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
@@ -229,37 +234,81 @@ class LumericalSimulation(ISimulation):
 
         return new_sim
 
-    def with_monitors(
-        self, objs: Iterable[str] | Iterable[Monitor], name: str | None = None
-    ):
-        """Return a copy of this simulation with only the specified monitors."""
-        new_sim = self.copy()  # Unlinked
-        if name is not None:
-            # Create the simulation with the provided name
-            new_sim.info['name'] = name
-        names = [m.name if isinstance(m, Monitor) else m for m in objs]
-        for name in new_sim.monitor_names():
-            if name not in names:
-                del self.objects[name]
-        return new_sim
+    @ensure_path
+    def set_path(self, path: Path):
+        """Set the save path of the simulation."""
+        self.info['path'] = path.absolute()
 
+    def get_path(self) -> Path | None:
+        """Get the save path of the simulation."""
+        p = self.info.get('path', None)
+        if p is not None and not isinstance(p, Path):
+            p = Path(p)
+        return p
+
+    def partition(self):
+        # TODO: Partitioning the base_sim into simulations: i.e. a list of Simulation objects
+        # TODO: And the same with devices
+        # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
+        return [self]
+    
+    def new_object(
+        self,
+        obj_name: str,
+        obj_type: SimObjectType,
+        **properties,
+    ) -> SimObject:
+        """Create a new object and add it to the simulation.
+
+        Arguments:
+            obj_name (str): Name of the object
+            obj_type (LumericalSimObjectType): type of the object
+            properties (dict[str, Any]): optional dictionary to populate
+                the new object with
+        """
+        vipdopt.logger.debug(f"Creating new object: '{obj_name}'...")
+        obj: SimObject
+        if obj_type in MONITOR_TYPES:
+            obj = Monitor(obj_name, obj_type)
+            pass
+        elif obj_type in SOURCE_TYPES:
+            obj = Source(obj_name, obj_type)
+            pass
+        elif obj_type in IMPORT_TYPES:
+            obj = Import(obj_name)
+        else:
+            obj = SimObject(obj_name, obj_type)
+        obj.update(**properties)
+        self.add_object(obj)
+        return obj
+    
+    def add_object(self, obj: SimObject) -> None:
+        """Add an existing object to the simulation."""
+        # Add copy to the vipdopt.lumapi.FDTD
+        self.objects[obj.name] = obj
+
+    def update_object(self, name: str, **properties):
+        """Update object with new property values."""
+        obj = self.objects[name]
+        obj.update(**properties)
+    
     def enable(self, names: Iterable[str]):
         """Enable all objects in provided list."""
         for name in names:
             self.update_object(name, enabled=1)
-
+        
     def with_enabled(
         self,
         objs: Iterable[Source] | Iterable[str],
         name: str | None = None,
-    ) -> LumericalSimulation:
+    ) -> Simulation:
         """Return copy of this simulation with only objects in objs enabled."""
         new_sim = self.copy()  # Unlinked
         if name is not None:
             # Create the simulation with the provided name
             new_sim.info['name'] = name
         new_sim.disable_all_sources()
-        names = [o.name if isinstance(o, LumericalSimObject) else o for o in objs]
+        names = [o.name if isinstance(o, SimObject) else o for o in objs]
         new_sim.enable(names)
         return new_sim
 
@@ -272,14 +321,14 @@ class LumericalSimulation(ISimulation):
         self,
         objs: Iterable[Source] | Iterable[str],
         name: str | None = None,
-    ) -> LumericalSimulation:
+    ) -> Simulation:
         """Return copy of this simulation with only objects in objs disabled."""
         new_sim = self.copy()  # Unlinked
         if name is not None:
             # Create the simulation with the provided name
             new_sim.info['name'] = name
         new_sim.enable_all_sources()
-        names = [o.name if isinstance(o, LumericalSimObject) else o for o in objs]
+        names = [o.name if isinstance(o, SimObject) else o for o in objs]
         new_sim.disable(names)
         return new_sim
 
@@ -291,10 +340,10 @@ class LumericalSimulation(ISimulation):
         """Disable all sources in this simulation."""
         self.disable(self.source_names())
 
-    def sources(self) -> list[LumericalSimObject]:
+    def sources(self) -> list[SimObject]:
         """Return a list of all source objects."""
         return [obj for _, obj in self.objects.items() if isinstance(obj, Source)]
-
+    
     def source_names(self) -> Iterator[str]:
         """Return a list of all source object names."""
         for obj in self.sources():
@@ -309,7 +358,13 @@ class LumericalSimulation(ISimulation):
         """Return a list of all monitor object names."""
         for obj in self.monitors():
             yield obj.name
-
+    
+    def monitors_by_name(self, string_list) -> list[Monitor]:
+        """Return a list of all monitor objects, with names filtered by a string."""
+        if isinstance(string_list, str):
+            string_list = [string_list]
+        return [m for m in self.monitors() if any(substring in m.name for substring in string_list)]
+    
     @overload
     def link_monitors(self): ...
 
@@ -327,7 +382,7 @@ class LumericalSimulation(ISimulation):
         for mon in monitors:
             output_path = sim_path.parent / (sim_path.stem + f'_{mon.name}.npz')
             mon.set_source(output_path)
-
+    
     def imports(self) -> list[Import]:
         """Return a list of all import objects."""
         return [obj for _, obj in self.objects.items() if isinstance(obj, Import)]
@@ -337,71 +392,45 @@ class LumericalSimulation(ISimulation):
         for obj in self.imports():
             yield obj.name
 
-    def indexmonitors(self) -> list[LumericalSimObject]:
+    def indexmonitors(self) -> list[SimObject]:
         '''Return a list of all indexmonitor objects.'''
-        return [obj for _, obj in self.objects.items() if obj.obj_type == LumericalSimObjectType.INDEX]
+        return [obj for _, obj in self.objects.items() if obj.obj_type == SimObjectType.INDEX]
 
     def indexmonitor_names(self) -> Iterator[str]:
         """Return a list of all indexmonitor object names."""
         for obj in self.indexmonitors():
             yield obj.name
-
+    
+    def crosssection_monitors(self) -> list[SimObject]:
+        '''Return a list of all cross-section monitor objects.'''
+        return self.monitors_by_name('cross_monitor')
+    
+    def crosssection_monitor_names(self) -> Iterator[str]:
+        """Return a list of all cross-section monitor object names."""
+        for obj in self.crosssection_monitors():
+            yield obj.name
+    
     def import_field_shape(self) -> tuple[int, ...]:
-        """Return the shape of the fields returned from this simulation's design index monitors."""
-        index_prev = vipdopt.fdtd.getresult(
-            list(self.indexmonitor_names())[0], 'index preview'
-        )
+        """Return the shape of the fields returned from this simulation's design index monitors."""\
+        
+        match self.solver:
+            case 'LumericalFDTD':
+                # TODO: Revisit if/when adjusting interface with FDTD
+                index_prev = vipdopt.fdtd.getresult(
+                    list(self.indexmonitor_names())[0], 'index preview'
+                )
+            case _:
+                return None
         return np.squeeze(index_prev['index_x']).shape
 
-    def new_object(
-        self,
-        obj_name: str,
-        obj_type: LumericalSimObjectType,
-        **properties,
-    ) -> LumericalSimObject:
-        """Create a new object and add it to the simulation.
-
-        Arguments:
-            obj_name (str): Name of the object
-            obj_type (LumericalSimObjectType): type of the object
-            properties (dict[str, Any]): optional dictionary to populate
-                the new object with
-        """
-        vipdopt.logger.debug(f"Creating new object: '{obj_name}'...")
-        obj: LumericalSimObject
-        if obj_type in MONITOR_TYPES:
-            obj = Monitor(obj_name, obj_type)
-        elif obj_type in SOURCE_TYPES:
-            obj = Source(obj_name, obj_type)
-        elif obj_type in IMPORT_TYPES:
-            obj = Import(obj_name)
-        else:
-            obj = LumericalSimObject(obj_name, obj_type)
-        obj.update(**properties)
-        self.add_object(obj)
-        return obj
-
-    def add_object(self, obj: LumericalSimObject) -> None:
-        """Add an existing object to the simulation."""
-        # Add copy to the vipdopt.lumapi.FDTD
-        self.objects[obj.name] = obj
-
-    def update_object(self, name: str, **properties):
-        """Update object with new property values."""
-        obj = self.objects[name]
-        obj.update(**properties)
-
-    def __eq__(self, __value: object) -> bool:
-        """Test equality of simulations."""
-        if isinstance(__value, LumericalSimulation):
-            return self.objects == __value.objects
-        return super().__eq__(__value)
+    
 
 
-ISimulation.register(LumericalSimulation)
+ISimulation.register(Simulation)
 
 
 if __name__ == '__main__':
+    import sys
     parser = ArgumentParser()
     parser.add_argument(
         'simulation_json',
@@ -422,7 +451,7 @@ if __name__ == '__main__':
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level)
 
-    with LumericalSimulation(Path(args.simulation_json)) as sim:
+    with Simulation(Path(args.simulation_json)) as sim:
         # with LumericalSimulation() as sim:
         sim.fdtd.promise_env_setup()
         sim.load('test_project/.tmp/sim_0.fsp')

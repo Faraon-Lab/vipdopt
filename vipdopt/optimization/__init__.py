@@ -2,16 +2,16 @@
 
 from vipdopt.optimization.adam import AdamOptimizer
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.filter import Filter, Scale, Sigmoid
+# from vipdopt.optimization.filter import Filter, Scale, Sigmoid
 from vipdopt.optimization.fom import (
-    BayerFilterFoM,
+#     BayerFilterFoM,
     FoM,
-    GaussianFoM,
-    SuperFoM,
-    UniformMAEFoM,
+#     GaussianFoM,
+#     SuperFoM,
+#     UniformMAEFoM,
     UniformMSEFoM,
 )
-from vipdopt.optimization.optimization import LumericalOptimization
+from vipdopt.optimization.optimization import Optimization #, LumericalOptimization
 from vipdopt.optimization.optimizer import GradientAscentOptimizer, GradientOptimizer
 
 __all__ = [

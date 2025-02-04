@@ -5,7 +5,7 @@ import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from copy import copy
-from functools import reduce, partial
+from functools import reduce
 from itertools import product
 from typing import Any, Concatenate
 
@@ -13,14 +13,14 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.simulation import Simulation
-from vipdopt.simulation.monitor import Monitor, Power, Profile
-from vipdopt.simulation.source import Source, DipoleSource, GaussianSource
+from vipdopt.simulation import Simulation, Monitor, Source
+from vipdopt.simulation.monitor import Power, Profile
+from vipdopt.simulation.source import DipoleSource, GaussianSource
 from vipdopt.utils import (
     Number,
     P,
     flatten,
-    # import_lumapi,
+    import_lumapi,
     setup_logger,
     starmap_with_kwargs,
 )
@@ -29,46 +29,12 @@ POLARIZATIONS = ['TE', 'TM', 'TE+TM']
 
 
 class FoM:
-    """Generic class for computing a figure of merit (FoM).
-
-    Attributes:
-        fom_func (Callable[..., npt.ArrayLike]): The function to compute the FoM.
-        grad_func (Callable[..., npt.ArrayLike]): The function to compute the gradient.
-        fwd_srcs (list[Source]): The sources needed for computing the FoM; used to
-            create the forward simulation.
-        fom_monitors (list[Monitor]): The monitors to track in the forward simulation.
-        adj_srcs (list[Source]): The sources needed for computing the adjoint; used to
-            create the adjoint simulation
-        adj_monitors (list[Monitor]): The monitors to track in the adjoint simulation.
-        
-        polarization (str): Polarization to use, can be "TE", "TM", or "TE+TM".
-        pos_max_freqs (list[int]): List of **indices** specifying which frequency bands are
-            being maximized in the optimization.
-        neg_min_freqs (list[int]): List of **indices** specifying which frequency bands are
-            being minimized in the optimization.
-        all_freqs (list[float]): List of frequencies (absolute values) across the entire
-            simulation.
     
-    If self.foms is not an empty list, then this class is instead a representation of a
-    weighted sum of FoMs that take the same arguments.
-    
-    self.foms stores a list of tuples of FoMs. When computing the overall FoM, the
-    SuperFoM returns the weighted sum of all its parts. Tuples containing multiple
-    FoMs represent the product of each element. For example, if you have FoMs (X, Y) and
-    (Z,) with weights k and j respectively, the output would be kXY + jZ.
-    
-    Attributes:
-        foms (list[tuple[FoM, ...]]): The (groups of) FoMs contained in the overall FoM
-        weights (list[float]): The weights to apply to each FoM
-    """
-    
-    
-
-    def __init__(self,
+    def __init__(self, 
             fom_func: Callable[Concatenate[FoM, P], npt.NDArray],
             grad_func: Callable[Concatenate[FoM, P], npt.NDArray],
-            foms: Sequence[Iterable[FoM]],
-            weights: Sequence[float] = (1.0,),      # NOTE: normalized so their sum is 1.0!!!
+            foms: Sequence[Iterable[FoM]], 
+            weights: Sequence[float] = (1.0,), 
             fwd_srcs:list[Source] = [],
             fwd_monitors:list[Monitor] = [],
             adj_srcs:list[Source] = [],
@@ -77,12 +43,12 @@ class FoM:
             pos_max_freqs: Sequence[int] = [],      # wrap this somehow into the Optimization?
             neg_min_freqs: Sequence[int] = [],      # as max/minimization should be chosen external of the FoM
             all_freqs: Sequence[float] = [],
-            # spectral_weights: npt.NDArray = np.array(1),
-            reduce_func = lambda x: x,              # condenses result of fom_func into a single number if called
+            # spectral_weights, # wrap into weights
+            # reduce_func,
             *args, **kwargs,
         ) -> None:
         """Initialize a FoM object."""
-
+        
         self.foms: list[tuple[FoM,...]] = [tuple(f) for f in foms]
         self.fom_func = fom_func
         self.grad_func = grad_func
@@ -92,7 +58,7 @@ class FoM:
         self.fwd_monitors = fwd_monitors
         self.adj_srcs = adj_srcs
         self.adj_monitors = adj_monitors
-
+        
         if polarization not in POLARIZATIONS:
             raise ValueError(
                 f'Polarization must be one of {POLARIZATIONS}; got {polarization}'
@@ -102,8 +68,8 @@ class FoM:
         self.neg_min_freqs = list(neg_min_freqs)
         self.all_freqs = list(all_freqs)
         # self.spectral_weights = spectral_weights
-        self.reduce_func = reduce_func
-
+        # self.reduce_func = reduce_func
+        
     def __eq__(self, other: Any) -> bool:
         """Test equality."""
         if isinstance(other, FoM):
@@ -121,10 +87,10 @@ class FoM:
                 and self.neg_min_freqs == other.neg_min_freqs
                 and self.all_freqs == other.all_freqs
                 # and self.spectral_weights == other.spectral_weights
-                and self.reduce_func == other.reduce_func
+                # and self.reduce_func == other.reduce_func
             )
         return super().__eq__(other)
-
+    
     def __copy__(self) -> FoM:
         """Create a copy of this FoM."""
         return FoM(
@@ -141,12 +107,12 @@ class FoM:
             self.neg_min_freqs,
             self.all_freqs,
             # self.spectral_weights,
-            self.reduce_func,
+            # self.reduce_func,
         )
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this FoM."""
-
+        
         self.fom_func,
         self.grad_func,
         self.foms,
@@ -160,11 +126,11 @@ class FoM:
         self.neg_min_freqs,
         self.all_freqs,
         # self.spectral_weights,
-        self.reduce_func,
-
+        # self.reduce_func,
+        
         data: dict[str, Any] = {}
         data['type'] = type(self).__name__
-
+        
         if data['type'] == 'FoM':  # Generic FoM needs to copy functions
             data['fom_func'] = self.fom_func
             data['grad_func'] = self.grad_func
@@ -174,7 +140,7 @@ class FoM:
         data['fom_monitors'] = [f['name'] for f in self.fwd_monitors]
         data['adj_srcs'] = [f['name'] for f in self.adj_srcs]
         data['grad_monitors'] = [f['name'] for f in self.adj_monitors]
-
+        
         data['polarization'] = self.polarization
         data['pos_max_freqs'] = self.pos_max_freqs
         data['neg_min_freqs'] = self.neg_min_freqs
@@ -188,14 +154,10 @@ class FoM:
         data = copy(input_dict)
         fom_cls: type[FoM] = getattr(sys.modules[__name__], data.pop('type'))
         return fom_cls(**data)
-
-    def partition(self):
-        # todo
-        return [self]
-
+    
     def reset_monitors(self):
         """Reset all of the monitors used to calculate the FoM."""
-
+    
         if len(self.foms) > 0:
             map(FoM.reset_monitors, flatten(self.foms))
         else:
@@ -203,10 +165,9 @@ class FoM:
                 mon.reset()
             for mon in self.adj_monitors:
                 mon.reset()
-
-
+    
     # Creating and linking new simulations
-
+    
     def link_forward_sim(self, sim: Simulation):
         """Link this FoM's fwd_monitors to a provided simulation."""
         self.fwd_monitors = [sim.objects[m.name] for m in self.fwd_monitors]
@@ -235,7 +196,7 @@ class FoM:
                     for fom in foms:
                         fom.link_forward_sim(sims[i])
             return sims
-
+    
     def create_adjoint_sim(
             self, base_sim: Simulation,
             link_sims:bool = True,
@@ -258,7 +219,7 @@ class FoM:
         return sims
 
     # Figure of Merit Function Handling
-
+    
     @staticmethod
     def _compute_prod(
         function: Callable, foms: tuple[FoM, ...], *args, **kwargs
@@ -309,103 +270,54 @@ class FoM:
         )
         return np.prod(fom_vals, axis=0) * term2
 
-    def performance_weighting(self, fom_values: npt.NDArray):
-        """Recompute the weights based on the performance of the optimization.
-
-        All gradients are combined with a weighted average in Eq.(3), with weights
-        chosen according to Eq.(2) such that all figures of merit seek the same
-        efficiency. In these equations, FoM represents the current value of a figure of
-        merit, N is the total number of figures of merit, and wi represents the weight
-        applied to its respective merit function's gradient. The maximum operator is
-        used to ensure the weights are never negative, thus ignoring the gradient of
-        high-performing figures of merit rather than forcing the figure of merit to
-        decrease. The 2/N factor is used to ensure all weights conveniently sum to 1
-        unless some weights were negative before the maximum operation. Although the
-        maximum operator is non-differentiable, this function is used only to apply the
-        gradient rather than to compute it. Therefore, it does not affect the
-        applicability of the adjoint method. Taken from: https://doi.org/10.1038/s41598-021-88785-5
-
-        Arguments:
-            fom_values (npt.NDArray): The values of the computed FoMs to determine the
-                new weights from. Should have shape 1 x N where N is the number of
-                FoMs.
-        """
-        weights = (2.0 / len(fom_values)) - fom_values**2 / np.sum(fom_values**2)
-
-        # # Zero-shift and renormalize
-        # if np.min(weights) < 0:
-        #     weights -= np.min(weights)
-        #     weights /= np.sum(weights)
-
-        # Max(x,0) according to Eq. (2), https://www.nature.com/articles/s41598-021-88785-5
-        weights = np.fmax(weights, 0)
-
-        self.performance_weights = weights
 
     def compute_fom(self, reduce: bool = True, *args, **kwargs) -> npt.NDArray:
-        """Recursive function that either computes the figure of merit (directly from self.fom_func)
-           or combines the FoM results from self.foms by calling THEIR compute_fom()"""
-
-        if len(self.foms) > 0:
-            if self.fom_func is None:
-                # Compute the weighted sum of the FoMs.
-                fom_results = np.array([
-                    FoM._compute_prod(
-                        FoM.compute_fom,
-                        fom_tup,
-                        *args,
-                        **kwargs,
-                    )
-                    for fom_tup in self.foms
-                ])
-                self.performance_weighting(fom_results)
-                # fom_results = np.dot(fom_results, spectral_weights).dot(performance_weights)
-                return np.einsum('i,i...->...', self.weights, fom_results)
-            
-            else:
-                return self.fom_func(self.foms, self.weights, *args, **kwargs)
-
-        else:
-            # Compute the figure of merit.
-            total_fom = self.fom_func(*args, **kwargs)
-            self.reset_monitors()
-            f = total_fom
-            # f = np.dot(total_fom, self.spectral_weights)      # TODO: Put this inside the definition of fom_func
-            if reduce:
-                return self.reduce_func(f)
-            return f
+        """Compute the figure of merit."""
+        total_fom = self.fom_func(*args, **kwargs)
+        self.reset_monitors()
+        # return self._subtract_neg(total_fom)
+        f = np.dot(total_fom, self.spectral_weights)
+        if reduce:
+            return self.reduce_func(f)
+        return f
+    
+        # """Compute the weighted sum of the FoMs."""
+        # fom_results = np.array([
+        #     SuperFoM._compute_prod(
+        #         FoM.compute_fom,
+        #         fom_tup,
+        #         *args,
+        #         **kwargs,
+        #     )
+        #     for fom_tup in self.foms
+        # ])
+        # self.performance_weighting(fom_results)
+        # # fom_results = np.dot(fom_results, spectral_weights).dot(performance_weights)
+        # return np.einsum('i,i...->...', self.weights, fom_results)
 
 
-
-    def compute_grad(self, apply_performance_weights=False,
+    def compute_grad(self, apply_performance_weights=False, 
                      *args, **kwargs) -> npt.NDArray:
-        """Recursive function that either computes the grad of the figure of merit (directly from self.grad_func)
-           or combines the grad results from self.foms by calling THEIR compute_grad()"""
+        """Compute the gradient of the figure of merit."""
+        total_grad = self.grad_func(*args, **kwargs)
+        self.reset_monitors()
+        # return self._subtract_neg(total_grad)
+        return np.dot(total_grad, self.spectral_weights)
 
-        if len(self.foms) > 0:
-            # Compute the weighted sum of the gradients of the FoMs.
-            grad_results = np.array([
-                FoM._prod_rule(
-                    fom_tup,
-                    *args,
-                    **kwargs,
-                )
-                for fom_tup in self.foms
-            ])
-            # grad_results = np.dot(grad_results, spectral_weights).dot(performance_weights)
-            if apply_performance_weights:
-                assert len(self.weights)==len(self.performance_weights)
-                return np.einsum('i,i...->...', self.weights*self.performance_weights, grad_results)
-            return np.einsum('i,i...->...', self.weights, grad_results)
-
-        else:
-            # Compute the gradient of the figure of merit.
-            total_grad = self.grad_func(*args, **kwargs)
-            self.reset_monitors()
-            # return np.dot(total_grad, self.spectral_weights)      # TODO: Put this inside the definition of fom_func
-            ## return self._subtract_neg(total_grad)
-            return total_grad
-
+        # """Compute the weighted sum of the gradients."""
+        # grad_results = np.array([
+        #     SuperFoM._prod_rule(
+        #         fom_tup,
+        #         *args,
+        #         **kwargs,
+        #     )
+        #     for fom_tup in self.foms
+        # ])
+        # # grad_results = np.dot(grad_results, spectral_weights).dot(performance_weights)
+        # if apply_performance_weights:
+        #     assert len(self.weights)==len(self.performance_weights)
+        #     return np.einsum('i,i...->...', self.weights*self.performance_weights, grad_results)
+        # return np.einsum('i,i...->...', self.weights, grad_results)
 
 
 
@@ -429,43 +341,6 @@ def unique_adj_sim_map(foms: Iterable[FoM]) -> dict[frozenset[Source], list[FoM]
         adj_srcs = frozenset(fom.adj_srcs)
         sim_map[adj_srcs].append(fom)
     return sim_map
-
-
-
-
-class UniformMSEFoM(FoM):
-    """A figure of merit for a uniform density using mean squared error."""
-
-    def __init__(
-        self,
-        fom_func=None, grad_func=None,
-        constant: float = 1,
-        # spectral_weights: npt.NDArray = np.array(1),
-    ) -> None:
-        """Initialize a UniformFoM."""
-
-        self.constant = constant
-        if fom_func is None:
-            fom_func = partial(self._uniform_mse_fom, constant=self.constant)
-        if grad_func is None:
-            grad_func = partial(self._uniform_mse_gradient, constant=self.constant)
-
-        super().__init__(
-            fom_func, grad_func, foms=[],
-        )
-
-    @classmethod
-    def _uniform_mse_fom(cls, x: npt.NDArray, constant=1):
-        xi = np.real(x)
-        return np.mean(np.square(xi - constant))
-
-    @classmethod
-    def _uniform_mse_gradient(cls, x: npt.NDArray, constant=1):
-        xi = np.real(x)
-        return (2/xi.size)*(xi-constant)
-
-
-
 
 
 

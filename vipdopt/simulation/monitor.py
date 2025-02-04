@@ -1,4 +1,4 @@
-"""Class for general sources in a simulation."""
+"""Class for general monitors in a simulation."""
 
 import json
 from pathlib import Path
@@ -9,19 +9,19 @@ import numpy.typing as npt
 import vipdopt
 from vipdopt.simulation.simobject import (
     MONITOR_TYPES,
-    LumericalSimObject,
-    LumericalSimObjectType,
+    SimObject,
+    SimObjectType,
 )
 from vipdopt.utils import ensure_path
 
 
-class Monitor(LumericalSimObject):
+class Monitor(SimObject):
     """Class representing the different source monitors in a simulation."""
 
     def __init__(
         self,
         name: str,
-        obj_type: LumericalSimObjectType,
+        obj_type: SimObjectType,
         src: Path | None = None,
     ) -> None:
         """Initialize a Monitor."""
@@ -38,8 +38,8 @@ class Monitor(LumericalSimObject):
     def set_source(self, src: Path):
         """Set the source file this monitor is connected to."""
         self.src = src
-        self.reset()
 
+        self.reset()
     def __repr__(self) -> str:
         """Return a string representation of the monitor."""
         data = {
@@ -152,6 +152,11 @@ class Monitor(LumericalSimObject):
         if self._sync:
             self.load_source()
         return np.abs(self._t)
+    
+    @property
+    def intensity(self) -> npt.NDArray:
+        """Return the E-field intensity across this monitor."""
+        return np.sum(np.square(np.abs(self.e)), axis=0)
 
 
 class Profile(Monitor):
@@ -160,7 +165,7 @@ class Profile(Monitor):
         name: str,
         src: Path | None = None,
     ) -> None:
-        super().__init__(name, LumericalSimObjectType.PROFILE, src)
+        super().__init__(name, SimObjectType.PROFILE, src)
 
 
 class Power(Monitor):
@@ -169,13 +174,13 @@ class Power(Monitor):
         name: str,
         src: Path | None = None,
     ) -> None:
-        super().__init__(name, LumericalSimObjectType.POWER, src)
+        super().__init__(name, SimObjectType.POWER, src)
 
 
-# class Index(Monitor):
-#     def __init__(
-#         self,
-#         name: str,
-#         src: Path | None = None,
-#     ) -> None:
-#         super().__init__(name, LumericalSimObjectType.INDEX, src)
+class IndexMonitor(Monitor):
+    def __init__(
+        self,
+        name: str,
+        src: Path | None = None,
+    ) -> None:
+        super().__init__(name, SimObjectType.INDEX, src)
