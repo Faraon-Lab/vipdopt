@@ -19,7 +19,7 @@ from vipdopt.utils import setup_logger
 
 f = sys.modules[__name__].__file__
 if not f:
-    raise ModuleNotFoundError('SHOULD NEVER REACH HERE')
+    raise ModuleNotFoundError('SHOULD NEVER REACH HERE.')
 
 if __name__ == '__main__':
 
