@@ -8,6 +8,7 @@ import yaml
 from yaml.constructor import SafeConstructor
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from typing import Any, Concatenate, ParamSpec, TypeAlias, TypedDict, TypeVar
+import numpy as np
 import numpy.typing as npt
 
 #* Type Hints - Generic Types
@@ -26,6 +27,8 @@ class Coordinates(TypedDict):
     y: npt.NDArray
     z: npt.NDArray
 
+
+#* Paths and Directories
 
 def convert_path(path: PathLike) -> Path:
     """Ensure that a Path is a Path object."""
@@ -240,3 +243,13 @@ def starmap_with_kwargs(
 def apply_args_and_kwargs(function: Callable[P, R], args: tuple, kwargs: dict) -> R:
     """Call a function with the provided args and kwargs."""
     return function(*args, **kwargs)
+
+#* Math
+
+def sech(z: npt.ArrayLike | Number) -> npt.ArrayLike | Number:
+    """Hyperbolic Secant."""
+    return 1.0 / np.cosh(np.asanyarray(z))
+
+def real_part_complex_product(z1, z2):
+    """Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)"""
+    return np.real(z1)*np.real(z2) + np.imag(z1) * (-1*np.imag(z2))

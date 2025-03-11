@@ -3,8 +3,6 @@ from pathlib import Path
 from argparse import SUPPRESS, ArgumentParser
 import logging
 
-import vipdopt.optimization
-
 # Import main package and add program folder to PATH.
 sys.path.append(Path.cwd()) # 20240219 Ian: Only added this so I could debug some things from my local VSCode
 import vipdopt
@@ -18,7 +16,6 @@ from vipdopt.optimization import (
     # LumericalOptimization,
     # SuperFoM,
 )
-from vipdopt.optimization.optimizer import NLOptOptimizer, GradientAscentOptimizer, AdamOptimizer
 from vipdopt.utils import setup_logger
 
 f = sys.modules[__name__].__file__
@@ -65,7 +62,6 @@ if __name__ == '__main__':
     )
     opt_parser.add_argument(
         '--log', type=Path, default=SUPPRESS, help='Path to the log file.'
-
     )
     opt_parser.add_argument(
         '--config',
@@ -98,29 +94,16 @@ if __name__ == '__main__':
     #! Each Project should correspond only to one Device optimized for a certain functionality and situation.
     #! Optimization parameter sweeps necessitate multiple Projects.
 
-    import numpy.typing as npt
     import numpy as np
-    import matplotlib
-    matplotlib.use('TkAgg')
-    import matplotlib.pyplot as plt
-
-    # FoM_1 = MSEFoM()
-    # from PIL import Image
-    # im = Image.open('example.jpg').resize(project.device.size[:2], Image.Resampling.LANCZOS)
-    # im = np.repeat(np.array(im)[:, :, np.newaxis], project.device.size[2], axis=2)
-    # FoM_1 = MSEFoM(target=im)
-    # FoM_2 = MSEFoM(target=im)
-
-    # FoM_1 = MSEFoM(target=2*np.ones(project.device.size))
-    # FoM_1.set_target_2d_gaussian(arr_shape=project.device.size, peak=7.5, N=9, std=2, center_point=(6,6))
-    # FoM_2 = MSEFoM(target=-5*np.ones(project.device.size))
-    # FoM_2.set_target_2d_gaussian(arr_shape=project.device.size, peak=7.5, N=9, std=2, center_point=(18,18))
-    # project.fom = FoM(None, None, [(FoM_1,), (FoM_2,)], (1.0,2.0))
+    import numpy.typing as npt
+    # > Method 1
+    # FoM_1 = UniformMSEFoM(constant=-3)
+    # FoM_2 = UniformMSEFoM(constant=5)
+    # > Method 2 (equivalent) - both provided for instruction purposes
+    FoM_1 = MSEFoM(target=2*np.ones(project.device.size))
+    FoM_2 = MSEFoM(target=-5*np.ones(project.device.size))
     
-    foms, weights = FoM._load_from_config(project.config, project.base_sim)
-    FoM._setup_spectral_weights(foms, project.config)  #! TODO:
-    project.fom = FoM(None, None, [(f,) for f in foms], tuple(weights))
-    
+    project.fom = FoM(None, None, [(FoM_1,), (FoM_2,)], (1.0,2.0))
 
     # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
     assert project.base_sim is not None
@@ -138,12 +121,10 @@ if __name__ == '__main__':
 
         cfg = project.config
         # NOTE: The optimizer is explicitly only a property of the Optimization, not the containing Project.
-        # optimizer = NLOptOptimizer()
-        # base_sim = base_sim.set_solver(None)
-        # optimizer = GradientAscentOptimizer()
-        base_sim = base_sim.set_solver('LumericalFDTD')
-        # optimizer = AdamOptimizer()
-        optimizer = vipdopt.optimization.optimizer._load_optimizer(project.config)
+        # optimizer = project.load_optimizer(cfg)
+        from vipdopt.optimization.optimizer import NLOptOptimizer
+        optimizer = NLOptOptimizer()
+        base_sim.set_solver(None)
 
         optimization = Optimization(
             base_sim,
@@ -185,20 +166,7 @@ if __name__ == '__main__':
     # project.device.export_density_as_gds( project.subdirectories['data'] / 'gds' )
 
     import matplotlib.pyplot as plt
-    import matplotlib
-    matplotlib.use('TkAgg')
     project.device.visualize_layer()
     plt.show()
 
     print('End of code reached.')
-
-# TO SAVE:
-# project
-# - base sim / partitioned sims
-# - device / partitioned devices
-# optimization
-# - optimizer
-# NO NEED TO SAVE:
-# FoM (shouldn't change)
-# config
-# args

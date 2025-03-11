@@ -276,7 +276,6 @@ class FoM:
         total_fom = self.fom_func(*args, **kwargs)
         self.reset_monitors()
         # return self._subtract_neg(total_fom)
-        f = np.dot(total_fom, self.spectral_weights)
         if reduce:
             return self.reduce_func(f)
         return f

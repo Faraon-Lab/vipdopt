@@ -11,7 +11,7 @@ from vipdopt.simulation.lumfdtdsimobject import (
 from vipdopt.simulation.simulation import (
     ISimulation,
     Simulation,
-    # LumericalSimulation,
+    LumericalSimulation,
 )
 from vipdopt.simulation.source import DipoleSource, GaussianSource, Source, TFSFSource, PlaneSource
 

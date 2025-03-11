@@ -12,14 +12,19 @@ import typing
 from collections.abc import Callable
 from functools import partial
 from typing import Any, Concatenate, overload
+from types import ModuleType
+
+from configparser import ConfigParser
+import importlib.util as imp
+from importlib.abc import Loader
 
 import numpy as np
 import numpy.typing as npt
 
 import vipdopt
 from vipdopt.configuration import Config
-from vipdopt.simulation.lumfdtdsimobject import Import, LumericalSimObjectType
-from vipdopt.simulation.simulation import ISimulation #, LumericalSimulation
+from vipdopt.simulation.simobject import Import, SimObjectType
+from vipdopt.simulation.simulation import ISimulation, Simulation, LumericalSimulation
 from vipdopt.utils import (
     P,
     Path,
@@ -27,7 +32,6 @@ from vipdopt.utils import (
     R,
     convert_path,
     ensure_path,
-    # import_lumapi,
     setup_logger,
 )
 
@@ -120,6 +124,21 @@ def _sync_lum_fdtd_solver(
     return wrapped
 
 
+def import_lumapi(loc: str) -> ModuleType:
+    """Import the Lumerical python api from a specified location."""
+    lumapi = ModuleType('lumapi')
+
+    spec_lin = imp.spec_from_file_location('lumapi', loc)
+
+    # These assertions are so MyPy doesn't get mad
+    assert spec_lin is not None
+    assert isinstance(spec_lin.loader, Loader)
+
+    lumapi = imp.module_from_spec(spec_lin)
+    spec_lin.loader.exec_module(lumapi)
+
+    return lumapi
+
 class LumericalFDTD(ISolver):
     """Class interfacing with the lumapi FDTD class."""
 
@@ -128,14 +147,33 @@ class LumericalFDTD(ISolver):
         self.fdtd: vipdopt.lumapi.FDTD | None = None  # type: ignore
         self._synced: bool = False
         self._env_vars: dict | None = None
-        self.current_sim: LumericalSimulation | None = None
+        self.current_sim: Simulation | None = None
 
     # @override
     def connect(self, hide: bool = True) -> None:
-        if vipdopt.lumapi is None:
-            raise ModuleNotFoundError(
-                'Module "vipdopt.lumapi" has not yet been instantiated.'
-            )
+
+        if not hasattr(vipdopt, 'lumapi') or vipdopt.lumapi is None:
+            vipdopt.logging.debug('Module "vipdopt.lumapi" has not yet been instantiated.')
+
+            LUMERICAL_LOCATION_FILE = Path(__file__).parents[1] / 'lumerical.cfg'
+            cfg = ConfigParser()
+            cfg.read(LUMERICAL_LOCATION_FILE)
+            vipdopt.logging.debug(f'Accessing {LUMERICAL_LOCATION_FILE}...')
+
+            # Now that config is loaded, set up lumapi
+            if os.getenv('SLURM_JOB_NODELIST') is None:
+                lumapi_path = cfg['Lumerical'].get('lumapi_path_local', None)   # Windows (local machine)
+            else:
+                lumapi_path = cfg['Lumerical'].get('lumapi_path_hpc', None)     # SLURM HPC (Linux)
+            if lumapi_path is None:
+                try:
+                    lumapi_path = cfg['Lumerical']['lumapi_path']
+                except Exception as err:
+                    vipdopt.logger.info(f'Lumapi path not found. Check {LUMERICAL_LOCATION_FILE}')
+
+            vipdopt.lumapi = import_lumapi(lumapi_path)
+
+
         while self.fdtd is None:
             try:
                 self.fdtd = vipdopt.lumapi.FDTD(hide=hide)
@@ -156,13 +194,13 @@ class LumericalFDTD(ISolver):
         else:
             self.setup_env_resources(**self._env_vars)
             self._synced = True
-            
+
         # # Amended 20240927. Previously:
         # if self._env_vars is not None:
         #     self.setup_env_resources(**self._env_vars)
         #     self._env_vars = None
         # self._synced = True
-            
+
         vipdopt.logger.debug('Resynced LumericalFDTD.')
 
     @_check_lum_fdtd
@@ -189,27 +227,27 @@ class LumericalFDTD(ISolver):
                 0: Run jobs in single process mode using only the local machine.
                 1: Run jobs using the resources and parallel settings specified in
                     the resource manager. (default)
-            bypass_MPI (bool): 
+            bypass_MPI (bool):
                 0: Runs without MPI. MPI and License Sharing cannot be concurrent.
                 1: Runs with MPI. In order to run simultaneous jobs, should spawn N subprocesses.
                 # TODO: Multiple subprocess spawning. Also consider distributing to cluster hosts.
         """
         vipdopt.logger.info(f'Running simulations: {self.fdtd.listjobs("FDTD")}')
-        
+
         if use_GUI_license:
             # Remove every single resource except the custom one (should be resource number 1)
             for resource_num in range(int(self.fdtd.getresource("FDTD"))):
                 self.delete_resource(resource_num)
             # Run all jobs using the native Lumerical GUI
             self.fdtd.runjobs('FDTD', option)  # type: ignore
-            
+
         else:
             # Extract command-line submission script from existing FDTD instance
             args = self.env_vars_to_commandline_script(bypass_MPI)
-            
+
             # Close current FDTD GUI instance
             self.close()
-            
+
             # Use subprocess to call a command-line submission script
             subp_shell = False      # Really shouldn't ever be set to True
             subp_args = ''.join(args) if subp_shell else shlex.split(args)[1:-2]    # Eliminate script start and end
@@ -219,10 +257,10 @@ class LumericalFDTD(ISolver):
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                         **subp_kwargs
                                     )
-                        
+
             # Monitor when all files have completed running
             # process.wait()
-            
+
             # rc = process.poll()
             # while rc != 0:
             #     while True:
@@ -232,19 +270,19 @@ class LumericalFDTD(ISolver):
             #         print(line)
             #     rc = process.poll()
             # print('Process complete.')
-            
+
             while process.poll() != 0:
                 while True:
                     line = process.stdout.readline()
                     if not line:    break
                     vipdopt.logger.debug(line)
             vipdopt.logger.debug('Process complete.')
-            
+
             # Re-open FDTD GUI instance
             hide_fdtd = False if os.getenv('SLURM_JOB_NODELIST') is None else True
             self.connect(hide_fdtd)
             self.promise_env_setup(**self._env_vars)
-            
+
         self.current_sim = None
         vipdopt.logger.info('Finished running job queue')
 
@@ -316,14 +354,14 @@ class LumericalFDTD(ISolver):
         for obj in sim.objects.values():
             # Create an object for each of those in the simulation
             with contextlib.suppress(BaseException):
-                # LumericalSimObjectType.get_add_function(obj.obj_type)(
+                # SimObjectType.get_add_lumerical_function(obj.obj_type)(
                 #     self.fdtd,
                 #     **obj.properties,
-                # )     
+                # )
                 # Some property in the obj.properties dictionary is inactive, which breaks everything after it.
                 # So instead we must add just the object, then set each property individually.
-                
-                LumericalSimObjectType.get_add_function(obj.obj_type)(
+
+                SimObjectType.get_add_lumerical_function(obj.obj_type)(
                     self.fdtd, {'name': obj.name}
                 )
                 for p, r in obj.properties.items():
@@ -332,7 +370,7 @@ class LumericalFDTD(ISolver):
                     except Exception as err:
                         # vipdopt.logger.debug(err + f": {p}")
                         pass
-                    
+
                 # Import nk2 if possible
                 if isinstance(obj, Import) and obj.n is not None:
                     self.importnk2(obj.name, *obj.get_nk2())
@@ -401,7 +439,7 @@ class LumericalFDTD(ISolver):
             self._env_vars = kwargs if len(kwargs) > 0 else None
         else:
             self._env_vars = kwargs
-            
+
             # # Amended 20240927. Previously:
             # if self._env_vars is None:
             #     self._env_vars = kwargs
@@ -420,7 +458,7 @@ class LumericalFDTD(ISolver):
     def set_resource(self, resource_num: int, resource: str, value: Any):
         """Set the specified job manager resource for this simulation."""
         self.fdtd.setresource('FDTD', resource_num, resource, value)  # type: ignore
-    
+
     @_check_lum_fdtd
     def delete_resource(self, resource_num: int):
         """Delete the specified job manager resource for this simulation."""
@@ -431,7 +469,7 @@ class LumericalFDTD(ISolver):
             return True
         except Exception as ex:
             return False
-        
+
     def setup_env_resources(self, **kwargs):
         """Configure the environment resources for running this simulation.
 
@@ -451,7 +489,7 @@ class LumericalFDTD(ISolver):
             'mpi_exe',
             Path('/central/software/mpich/4.0.0/bin/mpirun'),
         )
-        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+        if not os.getenv('SLURM_JOB_NODELIST') is None:
             # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
             mpi_exe = "/central/home/ifoo/lumerical/2022a_r24/mpich2/nemesis/bin/mpiexec"
         self.set_resource(1, 'mpi executable', str(mpi_exe))
@@ -467,7 +505,7 @@ class LumericalFDTD(ISolver):
             'solver_exe',
             Path('/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem'),
         )
-        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+        if not os.getenv('SLURM_JOB_NODELIST') is None:
             # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
             solver_exe = "/central/home/ifoo/lumerical/2022a_r24/bin/fdtd-engine-mpich2nem"
         self.set_resource(1, 'solver executable', str(solver_exe))
@@ -493,7 +531,7 @@ class LumericalFDTD(ISolver):
             solver_exe (Path): Path to the fdtd-solver to run
             nsims (int): The number of simulations being run
         """
-        
+
         #* This should be used when no GUI/task licenses are intended to be checked out.
         # Running simulations using terminal on Linux – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/360024974033-Running-simulations-using-terminal-on-Linux
         # Ansys optics solve, accelerator, and Ansys HPC license consumption – Ansys Optics: https://optics.ansys.com/hc/en-us/articles/360058577794-Ansys-optics-solve-accelerator-and-Ansys-HPC-license-consumption
@@ -505,26 +543,26 @@ class LumericalFDTD(ISolver):
 
         nsims = self._env_vars.get('nsims', 1)
         # Actually capacity (max. possible num. sims), not actual number of sims
-        
+
         mpi_exe = self._env_vars.get('mpi_exe', Path('/central/software/mpich/4.0.0/bin/mpirun'))
-        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+        if not os.getenv('SLURM_JOB_NODELIST') is None:
             # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
             mpi_exe = "/central/home/ifoo/lumerical/2022a_r24/mpich2/nemesis/bin/mpiexec"
         nprocs = self._env_vars.get('nprocs', 8)
         hostfile = self._env_vars.get('hostfile', None)
-        
+
         mpi_opt = f'-n {nprocs}'
         if hostfile is not None:
             mpi_opt += f' --hostfile {hostfile}'
-        
+
         solver_exe = self._env_vars.get('solver_exe',
             Path('/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem'))
-        if not os.getenv('SLURM_JOB_NODELIST') is None:     
+        if not os.getenv('SLURM_JOB_NODELIST') is None:
             # 20240729 Ian - Just for automatic switching between SLURM HPC and otherwise
             solver_exe = "/central/home/ifoo/lumerical/2022a_r24/bin/fdtd-engine-mpich2nem"
-            
+
         cores_per_sim = 4
-        
+
         sim_filenames = self.fdtd.listjobs().replace('"','').split('\n')
         sim_filenames.pop(0)        # remove "FDTD:" header
 
@@ -542,12 +580,12 @@ class LumericalFDTD(ISolver):
             # if parent in son.parents or parent==son:
             #     root = son.relative_to(parent) # returns Path object equivalent to 'c/d'
             # fdtd_engine_script = fdtd_engine_script + f'  "{root}"'
-            
+
             # # Absolute Path
             fdtd_engine_script = fdtd_engine_script + f' "{file}"'
-            
+
         submission_script = f"#!/bin/sh\n{mpirun_pre_script}{fdtd_engine_script}\nexit 0"
-        
+
         return submission_script
 
     @_check_lum_fdtd
@@ -656,12 +694,12 @@ class LumericalFDTD(ISolver):
                 mname = monitor.name
                 # vipdopt.logger.debug(mname)
                 # vipdopt.logger.debug(self.fdtd.getdata(mname))
-                if sim.objects[mname].properties.get('enabled', True):  
+                if sim.objects[mname].properties.get('enabled', True):
                     # some monitors don't have 'enabled' property at all but are created nonetheless
                     data = self.fdtd.getdata(mname).split()
                 else:   data = []
                 # vipdopt.logger.debug(data)
-                
+
                 e = self.get_efield(mname) if 'Ex' in data else None
                 h = self.get_hfield(mname) if 'Hx' in data else None
                 p = self.get_poynting(mname) if 'Px' in data else None
@@ -717,7 +755,7 @@ class LumericalFDTD(ISolver):
         """
         self.fdtd.select(import_name)
         self.fdtd.importnk2(n, x, y, z)
-    
+
     @_check_lum_fdtd
     def exportnk2(
         self,
@@ -727,7 +765,7 @@ class LumericalFDTD(ISolver):
         """Return the index values returned from this simulation's design index monitors."""
         index_prev = self.fdtd.getresult(indexmonitor_name, 'index preview')
         return index_prev[f'index_{component}']     # might need np.squeeze()
-    
+
     @classmethod
     def get_env_vars(cls, cfg:Config, nsims:int=1) -> dict:
         env_vars = {
@@ -736,7 +774,7 @@ class LumericalFDTD(ISolver):
                 'solver_exe': cfg.get('solver_exe', ''),
                 'nsims': nsims,
             }
-        
+
         # Check if mpi_exe or solver_exe exist.
         if Path(env_vars['mpi_exe']).exists():
             vipdopt.logger.debug('Verified: MPI path exists.')
@@ -746,7 +784,7 @@ class LumericalFDTD(ISolver):
             vipdopt.logger.debug('Verified: Solver path exists.')
         else:
             vipdopt.logger.warning('Warning! Solver path does not exist.')
-        
+
         return env_vars
 
 
@@ -774,7 +812,7 @@ if __name__ == '__main__':
     # Creating the FDTD hook
 
     fdtd = LumericalFDTD()
-    sim = LumericalSimulation('docs\\notebooks\\simulation_example.json')
+    sim = Simulation('docs\\notebooks\\simulation_example.json')
     sim_file = 'sim.fsp'  # Where Lumerical will save simulation data
 
     fdtd.connect(hide=False)  # This starts a Lumerical session

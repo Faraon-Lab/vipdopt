@@ -29,7 +29,7 @@ POLARIZATIONS = ['TE', 'TM', 'TE+TM']
 
 
 class FoM:
-    """Generic class for computing a figure of merit (FoM).
+    """Generic class for computing a figure of merit (FoM) that may have dependence on some wavelength.
 
     Attributes:
         fom_func (Callable[..., npt.ArrayLike]): The function to compute the FoM.
@@ -40,7 +40,7 @@ class FoM:
         adj_srcs (list[Source]): The sources needed for computing the adjoint; used to
             create the adjoint simulation
         adj_monitors (list[Monitor]): The monitors to track in the adjoint simulation.
-        
+
         polarization (str): Polarization to use, can be "TE", "TM", or "TE+TM".
         pos_max_freqs (list[int]): List of **indices** specifying which frequency bands are
             being maximized in the optimization.
@@ -48,21 +48,21 @@ class FoM:
             being minimized in the optimization.
         all_freqs (list[float]): List of frequencies (absolute values) across the entire
             simulation.
-    
+
     If self.foms is not an empty list, then this class is instead a representation of a
     weighted sum of FoMs that take the same arguments.
-    
+
     self.foms stores a list of tuples of FoMs. When computing the overall FoM, the
     SuperFoM returns the weighted sum of all its parts. Tuples containing multiple
     FoMs represent the product of each element. For example, if you have FoMs (X, Y) and
     (Z,) with weights k and j respectively, the output would be kXY + jZ.
-    
+
     Attributes:
         foms (list[tuple[FoM, ...]]): The (groups of) FoMs contained in the overall FoM
         weights (list[float]): The weights to apply to each FoM
     """
-    
-    
+
+
 
     def __init__(self,
             fom_func: Callable[Concatenate[FoM, P], npt.NDArray],
@@ -77,7 +77,7 @@ class FoM:
             pos_max_freqs: Sequence[int] = [],      # wrap this somehow into the Optimization?
             neg_min_freqs: Sequence[int] = [],      # as max/minimization should be chosen external of the FoM
             all_freqs: Sequence[float] = [],
-            # spectral_weights: npt.NDArray = np.array(1),
+            spectral_weights: npt.NDArray = np.array(1),
             reduce_func = lambda x: x,              # condenses result of fom_func into a single number if called
             *args, **kwargs,
         ) -> None:
@@ -101,7 +101,7 @@ class FoM:
         self.pos_max_freqs = list(pos_max_freqs)
         self.neg_min_freqs = list(neg_min_freqs)
         self.all_freqs = list(all_freqs)
-        # self.spectral_weights = spectral_weights
+        self.spectral_weights = spectral_weights
         self.reduce_func = reduce_func
 
     def __eq__(self, other: Any) -> bool:
@@ -120,7 +120,7 @@ class FoM:
                 and self.pos_max_freqs == other.pos_max_freqs
                 and self.neg_min_freqs == other.neg_min_freqs
                 and self.all_freqs == other.all_freqs
-                # and self.spectral_weights == other.spectral_weights
+                and self.spectral_weights == other.spectral_weights
                 and self.reduce_func == other.reduce_func
             )
         return super().__eq__(other)
@@ -140,7 +140,7 @@ class FoM:
             self.pos_max_freqs,
             self.neg_min_freqs,
             self.all_freqs,
-            # self.spectral_weights,
+            self.spectral_weights,
             self.reduce_func,
         )
 
@@ -159,7 +159,7 @@ class FoM:
         self.pos_max_freqs,
         self.neg_min_freqs,
         self.all_freqs,
-        # self.spectral_weights,
+        self.spectral_weights,
         self.reduce_func,
 
         data: dict[str, Any] = {}
@@ -188,6 +188,193 @@ class FoM:
         data = copy(input_dict)
         fom_cls: type[FoM] = getattr(sys.modules[__name__], data.pop('type'))
         return fom_cls(**data)
+
+    @classmethod
+    def _load_from_config(cls, cfg, base_sim=None):
+        """Load figures of merit from a config."""
+        foms = []
+        weights = []
+
+        # Setup FoMs. #! A lot of hardcoded processing is done here, prime candidate for errors of some kind.
+        # But essentially this just consists of changing it from a dictionary of strings/lists/floats
+        # to a dictionary of objects
+        for name, fom_dict in cfg.pop('figures_of_merit').items():
+            # [DEPRECATED, removed from config] Overwrite 'opt_ids' key for now with the entire wavelength vector, by
+            # commenting out in config. Spectral sorting comes from spectral weighting
+
+            # Config contains source/monitor names; replace these with the actual Source and Monitor objects contained in self.base_sim
+            # doesn't need to be the same source / monitor object - just needs to have the same name.
+            def match_cfg_objnames_to_objects(list_names, list_objs):
+                return list(
+                    flatten([[x for x in list_objs if x.name == y] for y in list_names])
+                )
+
+            fom_dict['fwd_srcs'] = match_cfg_objnames_to_objects(
+                fom_dict['fwd_srcs'], base_sim.sources()
+            )
+            fom_dict['adj_srcs'] = match_cfg_objnames_to_objects(
+                fom_dict['adj_srcs'], base_sim.sources()
+            )
+            fom_dict['fom_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['fom_monitors'], base_sim.monitors()
+            )
+            fom_dict['grad_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['grad_monitors'], base_sim.monitors()
+            )
+
+            # if pos_max_freqs is blank, make it the whole wavelength vector; if neg_min_freqs is blank, keep blank.
+            if fom_dict['pos_max_freqs'] == []:
+                #! WAVELENGTH VALUES - INDICES OR ACTUAL VALUES?
+                # fom_dict['pos_max_freqs'] = cfg['lambda_values_um']
+                fom_dict['pos_max_freqs'] = np.array(
+                    range(len(cfg['lambda_values_um']))
+                )
+
+            fom_dict['all_freqs'] = 3e8 / np.array(cfg['lambda_values_um'])
+
+            weights.append(fom_dict.pop('weight'))
+            foms.append(FoM.from_dict(fom_dict))
+        weights = np.array(weights)
+        
+        return foms, weights
+
+    @classmethod
+    def _setup_spectral_weights(cls, foms, cfg):
+        """Setup the spectral weights for each FoM, and assigns according to config order.
+        At present this processes spectral weights as a factor to the original weights -
+        i.e. the wavelength-dependent behaviour of each FoM
+        """
+        
+                
+        # TODO: Better docstring
+        def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
+            """Assign spectral bands."""
+            # Reminder that wl_band_bounds is a dictionary {'left': [], 'peak': [], 'right': []}
+
+            # Naive method: Split lambda_values_um into num_bands and return lefts, centers,
+            # and rights accordingly. i.e. assume all bands are equally spread across all of
+            # lambda_values_um without missing any values.
+
+            # TODO: CODE IN MORE SELECTIONS AND OPTIONS FOR THE ALGORITHM OF SPECTRAL BAND ASSIGNMENT
+
+            for key in wl_band_bounds:  # Reassign empty lists to be numpy arrays
+                wl_band_bounds[key] = np.zeros(num_bands)
+
+            wl_bands = np.array_split(lambda_values_um, num_bands)
+            # wl_bands = np.array_split(lambda_values_um, [3,7,12,14])  # https://stackoverflow.com/a/67294512
+            # e.g. would give a list of arrays with length 3, 4, 5, 2, and N-(3+4+5+2)
+
+            for band_idx, band in enumerate(wl_bands):
+                wl_band_bounds['left'][band_idx] = band[0]
+                wl_band_bounds['right'][band_idx] = band[-1]
+                wl_band_bounds['peak'][band_idx] = band[(len(band) - 1) // 2]
+
+            return wl_band_bounds
+
+
+        # TODO: Better docstring
+        def determine_spectral_weights(
+            spectral_weights_by_fom, wl_band_bound_idxs, mode='identity', *args, **kwargs
+        ):
+            """Determine spectral weights."""
+            # Right now we have it set up to send specific wavelength bands to specific FoMs
+            # This can be thought of as creating a desired transmission spectra for each FoM
+            # The bounds of each band are controlled by wl_band_bound_idxs
+
+            for fom_idx, fom in enumerate(spectral_weights_by_fom):
+                # We can choose different modes here
+                if mode == 'identity':  # 1 everywhere
+                    fom[:] = 1
+
+                elif mode == 'hat':  # 1 everywhere, 0 otherwise
+                    fom[
+                        wl_band_bound_idxs['left'][fom_idx] : wl_band_bound_idxs['right'][
+                            fom_idx
+                        ]
+                        + 1
+                    ] = 1
+
+                elif mode == 'gaussian':  # gaussians centered on peaks
+                    # TODO: Add a dial for these gaussian widths to config
+                    # For now:
+                    if kwargs.get('dimension','')=='3D':
+                        # scaling_exp = -(4 / 7) / np.log(0.5)      # 3D Bayer
+                        scaling_exp = -(1.5 / 7) / np.log(0.5)      # 3D Bayer
+                    else:
+                        scaling_exp = -(1.5 / 7) / np.log(0.5)    # 2D Bayer
+                    band_peak = wl_band_bound_idxs['peak'][fom_idx]
+                    band_width = (
+                        wl_band_bound_idxs['left'][fom_idx]
+                        - wl_band_bound_idxs['right'][fom_idx]
+                    )
+                    wl_idxs = range(spectral_weights_by_fom.shape[-1])
+                    fom[:] = np.exp(
+                        -((wl_idxs - band_peak) ** 2) / (scaling_exp * band_width) ** 2
+                    )
+
+            # Plotting code to check weighting shapes
+            # import matplotlib.pyplot as plt
+            # plt.vlines(wl_band_bound_idxs['left'], 0,1, 'b','--')
+            # plt.vlines(wl_band_bound_idxs['right'], 0,1, 'r','--')
+            # plt.vlines(wl_band_bound_idxs['peak'], 0,1, 'k','-')
+            # for fom in spectral_weights_by_fom:
+            #     plt.plot(fom)
+            # plt.show()
+            # print(3)
+
+            return spectral_weights_by_fom
+
+        
+        
+        # Overall Weights for each FoM
+        # self.weights = np.array(self.weights)           # Just ensure that it's a numpy
+
+        # Set up SPECTRAL weights - Wavelength-dependent behaviour of each FoM
+        # (e.g. spectral sorting)
+        spectral_weights_by_fom = np.zeros((
+            cfg['num_bands'],
+            cfg['num_design_frequency_points'],
+        ))
+        # Each wavelength band needs a left, right, and peak (usually center).
+        wl_band_bounds: dict[str, npt.NDArray | list] = {
+            'left': [],
+            'peak': [],
+            'right': [],
+        }
+
+        wl_band_bounds = assign_bands(
+            wl_band_bounds, cfg['lambda_values_um'], cfg['num_bands']
+        )
+        vipdopt.logger.info(
+            f'Desired peak locations per band are: {wl_band_bounds["peak"]}'
+        )
+        # TODO: Assign wl_band_bounds to either project.py or optimization.py.
+        # Need to keep track of it for plotting
+
+        # Convert to the nearest matching indices of lambda_values_um
+        wl_band_bound_idxs = wl_band_bounds.copy()
+        for key, val in wl_band_bounds.items():
+            wl_band_bound_idxs[key] = np.searchsorted(cfg['lambda_values_um'], val)
+
+        spectral_weights_by_fom = determine_spectral_weights(
+            spectral_weights_by_fom, wl_band_bound_idxs,
+            mode='gaussian', dimension=cfg['simulator_dimension']
+        )
+
+        # Repeat green weighting for other FoM such that green weighting applies to
+        # FoMs 1,3
+        if cfg['simulator_dimension'] == '3D':  # Bayer Filter Functionality
+            spectral_weights_by_fom = np.insert(
+                spectral_weights_by_fom, 3, spectral_weights_by_fom[1, :], axis=0
+            )
+        vipdopt.logger.info('Spectral weights assigned.')
+
+        # self.spectral_weights = self.weights[..., np.newaxis] * spectral_weights_by_fom
+        spectral_weights = spectral_weights_by_fom
+
+        # Assign each spectral weight vector to each FoM. Order matters!
+        for i,f in enumerate(foms):
+            f.spectral_weights = spectral_weights[i]
 
     def partition(self):
         # todo
@@ -359,9 +546,9 @@ class FoM:
                     for fom_tup in self.foms
                 ])
                 self.performance_weighting(fom_results)
-                # fom_results = np.dot(fom_results, spectral_weights).dot(performance_weights)
+                # fom_results = np.dot(fom_results, self.spectral_weights).dot(performance_weights)
                 return np.einsum('i,i...->...', self.weights, fom_results)
-            
+
             else:
                 return self.fom_func(self.foms, self.weights, *args, **kwargs)
 
@@ -369,8 +556,8 @@ class FoM:
             # Compute the figure of merit.
             total_fom = self.fom_func(*args, **kwargs)
             self.reset_monitors()
-            f = total_fom
-            # f = np.dot(total_fom, self.spectral_weights)      # TODO: Put this inside the definition of fom_func
+            # f = total_fom
+            f = np.dot(total_fom, self.spectral_weights)    # todo: might need to put this in the definition of fom_func
             if reduce:
                 return self.reduce_func(f)
             return f
@@ -392,19 +579,22 @@ class FoM:
                 )
                 for fom_tup in self.foms
             ])
-            # grad_results = np.dot(grad_results, spectral_weights).dot(performance_weights)
+            # grad_results = np.dot(grad_results, self.spectral_weights).dot(performance_weights)
             if apply_performance_weights:
                 assert len(self.weights)==len(self.performance_weights)
-                return np.einsum('i,i...->...', self.weights*self.performance_weights, grad_results)
+                try:
+                    return np.einsum('i,i...->...', self.weights*self.performance_weights, grad_results)
+                except Exception as ex:
+                    return np.einsum('i,i...->...', self.weights, self.performance_weights*grad_results)
             return np.einsum('i,i...->...', self.weights, grad_results)
 
         else:
             # Compute the gradient of the figure of merit.
             total_grad = self.grad_func(*args, **kwargs)
             self.reset_monitors()
-            # return np.dot(total_grad, self.spectral_weights)      # TODO: Put this inside the definition of fom_func
+            return np.dot(total_grad, self.spectral_weights)      # TODO: Might be a need to put this inside the definition of fom_func
             ## return self._subtract_neg(total_grad)
-            return total_grad
+            # return total_grad
 
 
 
@@ -463,6 +653,230 @@ class UniformMSEFoM(FoM):
     def _uniform_mse_gradient(cls, x: npt.NDArray, constant=1):
         xi = np.real(x)
         return (2/xi.size)*(xi-constant)
+
+
+class MSEFoM(FoM):
+    """A figure of merit for a target density distribution using mean squared error."""
+    # We could inherit UniformMSEFoM from here; but have left it as boilerplate for instructional purposes
+
+    def __init__(
+        self,
+        fom_func=None, grad_func=None,
+        target:npt.NDArray = np.array(1),
+        # spectral_weights: npt.NDArray = np.array(1),
+    ) -> None:
+        """Initialize a UniformFoM."""
+
+        super().__init__(
+            fom_func, grad_func, foms=[],
+        )
+        self.target = target
+        self.recalibrate_fom_grad_funcs()
+
+    def recalibrate_fom_grad_funcs(self):
+        self.fom_func = partial(self.mse_fom, target=self.target)
+        self.grad_func = partial(self.mse_gradient, target=self.target)
+
+    def set_target_2d_gaussian(self, arr_shape, peak=1, N=7, std=1, center_point=(5,9)):
+        # N: kernel size
+
+        from scipy import signal
+        import matplotlib.pyplot as plt
+        k1d = signal.gaussian(N, std).reshape(N, 1)
+        kernel = np.outer(k1d, k1d)
+
+        A = np.zeros(arr_shape)
+        A[center_point] = 1    # random
+        row, col, lyr = np.where(A == 1)
+        A[row[0]-(N//2):row[0]+(N//2)+1, col[0]-(N//2):col[0]+(N//2)+1, :] =\
+                        np.repeat(kernel[:, :, np.newaxis], len(lyr), axis=2)
+        A = A * peak
+
+        self.target = A
+        self.recalibrate_fom_grad_funcs()
+
+    @classmethod
+    def mse_fom(cls, x: npt.NDArray, target=np.array(1)):
+        assert x.shape==target.shape, "Device shape does not match target shape."
+        xi = np.real(x)
+        return np.mean(np.square(xi - target))
+
+    @classmethod
+    def mse_gradient(cls, x: npt.NDArray, target=np.array(1)):
+        assert x.shape==target.shape, "Device shape does not match target shape."
+        xi = np.real(x)
+        return (2/xi.size)*(xi-target)
+
+
+
+class BayerFilterFoM(FoM):
+    """FoM implementing the particular figure of merit for the SonyBayerFilter.
+
+    Must have the following monitor configuration:
+        fwd_monitors: [focal_monitor, transmission_monitor, design_efield]
+        adj_monitors: [design_efield]
+
+    """
+
+    def __init__(
+        self,
+        polarization: str,
+        fwd_srcs: list[Source],
+        adj_srcs: list[Source],
+        fom_monitors: list[Monitor],
+        grad_monitors: list[Monitor],
+        pos_max_freqs: list[int],
+        neg_min_freqs: list[int],
+        all_freqs: list[float],
+        spectral_weights: npt.NDArray = np.array(1),
+    ) -> None:
+        """Initialize a BayerFilterFoM."""
+        
+        super().__init__(
+            fom_func=self._bayer_fom,
+            grad_func=self._bayer_gradient,
+            foms=[],  # weights=(1.0,),
+            fwd_srcs=fwd_srcs,
+            fwd_monitors=fom_monitors,
+            adj_srcs=adj_srcs,
+            adj_monitors=grad_monitors,
+            polarization=polarization,
+            pos_max_freqs=pos_max_freqs,
+            neg_min_freqs=neg_min_freqs,
+            all_freqs=all_freqs,
+            spectral_weights=spectral_weights
+        )
+        
+
+    def _bayer_fom(self, *args, **kwargs):
+        """Compute bayer filter figure of merit.
+        More specifically, this function is customized for the Bayer Filter FoM, which requires both the transmission and intensity.
+        """
+        # for mon in self.fwd_monitors:
+        #     vipdopt.logger.debug(vars(mon))
+        # TODO: Add functionality for neg_min_freqs
+
+        # FoM for transmission monitor
+        total_tfom = np.zeros(self.fwd_monitors[1].tshape)[..., self.pos_max_freqs]
+        # FoM for focal monitor - take [1:] because intensity sums over first axis
+        total_ffom = np.zeros(self.fwd_monitors[0].fshape[1:])[..., self.pos_max_freqs]
+        # Source weight calculation.
+        source_weight = np.zeros(self.fwd_monitors[0].fshape, dtype=np.complex128)
+
+        transmission = self.fwd_monitors[1].trans_mag
+
+        total_tfom += transmission[..., self.pos_max_freqs]
+        efield = self.fwd_monitors[0].e
+        total_ffom += np.sum(np.square(np.abs(efield[..., self.pos_max_freqs])), axis=0)
+        # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
+        try:
+            total_ffom /= np.array(
+                kwargs.get('max_intensity_by_wavelength', None)
+                )[..., self.pos_max_freqs]
+        except Exception as e:
+            pass
+        # TODO: CHECK THAT THIS IS THE RIGHT PLACE TO PUT IT. CHECK GREG CODE
+
+
+        # Recall that E_adj = source_weight * what we call E_adj i.e. the Green's
+        # function[design_efield from adj_src simulation]. Reshape source weight (nλ)
+        # to (1, 1, 1, nλ) so it can be multiplied with (E_fwd * E_adj) https://stackoverflow.com/a/30032182
+        source_weight += np.expand_dims(np.conj(efield[:, 0, 0, 0, :]), axis=(1, 2, 3))
+        # We'll apply opt_ids slice when gradient is fully calculated.
+
+        # NOTE: 20240305 Ian - I don't want to mess with the return types for _bayer_fom so I assigned source_weight to the fom object itself
+        self.source_weight = source_weight
+        # self.source_weight = (
+        #     source_weight  # np.expand_dims(source_weight, axis=(1,2,3))
+        # )
+
+        #! TODO: REDO - direction of source_weight vector potential error.
+        # # Conjugate of E_{old}(x_0) -field at the adjoint source of interest, with
+        # # direction along the polarization. This is going to be the amplitude of the
+        # # dipole-adjoint source driven at the focal plane. Reminder that this is only
+        # # applicable for dipole-based adjoint sources
+
+        # pol_xy_idx = 0 if adj_src.src_dict['phi'] == 0 else 1     # x-polarized if phi = 0, y-polarized if phi = 90.
+
+        # self.source_weight = np.squeeze(
+        #     np.conj(
+        #         focal_data[pol_xy_idx, 0, 0, 0, :]  # shape: (3, nx, ny, nz, nλ)
+        # 		get_focal_data[adj_src_idx][
+        #             xy_idx,
+        #             0,
+        #             0,
+        #             0,
+        #             spectral_indices[0]:spectral_indices[1]:1,
+        #         ]
+        #     )
+        # )
+        # self.source_weight += np.squeeze( np.conj( focal_data[:,0,0,0,:] ) )
+
+        # NOTE: Ultimately because of the way SuperFoM is set up, there can only be one return value.
+        match kwargs.get('type', None):
+            case 'transmission':
+                return total_tfom
+            case 'intensity':
+                return total_ffom
+            case _:
+                return total_ffom
+
+    def _bayer_gradient(self, *args, **kwargs):
+        """Compute the gradient of the bayer filter figure of merit."""
+        # e_fwd = self.design_fwd_fields
+        e_fwd = self.fwd_monitors[2].e
+        e_adj = self.adj_monitors[0].e
+
+        # #! DEBUG: Check orthogonality and direction of E-fields in the design monitor
+        vipdopt.logger.info(
+            f'Forward design fields have average absolute xyz-components: '
+            f'{np.mean(np.abs(e_fwd[0]))}, {np.mean(np.abs(e_fwd[1]))}, '
+            f'{np.mean(np.abs(e_fwd[2]))}.'
+        )
+        vipdopt.logger.info(
+            f'Adjoint design fields have average absolute xyz-components: '
+            f'{np.mean(np.abs(e_adj[0]))}, {np.mean(np.abs(e_adj[1]))}, '
+            f'{np.mean(np.abs(e_adj[2]))}.'
+        )
+        vipdopt.logger.info(
+            f'Source weight has average absolute xyz-components: '
+            f'{np.mean(np.abs(self.source_weight[0]))}, '
+            f'{np.mean(np.abs(self.source_weight[1]))}, '
+            f'{np.mean(np.abs(self.source_weight[2]))}.'
+        )
+
+        # df_dev = np.real(np.sum(e_fwd * e_adj, axis=0))
+        e_adj = e_adj * self.source_weight
+        df_dev = 1 * (e_fwd[0] * e_adj[0] + e_fwd[1] * e_adj[1] + e_fwd[2] * e_adj[2])
+        # Taking real part comes when multiplying by Δε0 i.e. change in permittivity.
+
+        vipdopt.logger.info('Computing Gradient')
+
+        # NOTE: [DEPRECATED in v4 - no longer assigning gradient variable to FoMs.] ============================================
+        # self.gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+        # # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+
+        # self.gradient[..., self.pos_max_freqs] = df_dev[
+        #     ..., self.pos_max_freqs
+        # ]  # * self.enabled
+        # # self.restricted_gradient[..., self.freq_index_restricted_opt] = \
+        # #     df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
+
+        # # self.gradient = df_dev[..., pos_gradient_indices] * self.enabled
+        # # self.restricted_gradient = df_dev[..., neg_gradient_indices] * \
+        # #       self.enabled_restricted
+        # ======================================================================================================================
+
+        try:
+            df_dev[..., self.pos_max_freqs] /= np.array(
+                kwargs.get('max_intensity_by_wavelength', None)
+                )[..., self.pos_max_freqs]
+        except Exception as e:
+            pass
+
+        # return df_dev
+        return df_dev[..., self.pos_max_freqs]
+
 
 
 

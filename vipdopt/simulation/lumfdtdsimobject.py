@@ -141,7 +141,7 @@ class LumericalSimObject:
         """Return a LumericalSimObject from the fdtd equivalent."""
         otype = obj['type']
         if otype == 'DFTMonitor':
-            if obj['spatiazl interpolation'] == 'specified position':
+            if obj['spatial interpolation'] == 'specified position':
                 obj_type = LumericalSimObjectType.PROFILE
             else:
                 obj_type = LumericalSimObjectType.POWER

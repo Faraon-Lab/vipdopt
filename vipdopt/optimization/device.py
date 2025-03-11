@@ -16,7 +16,7 @@ from scipy import interpolate
 import vipdopt
 # from vipdopt import STL, GDS
 from vipdopt.configuration import Config
-# from vipdopt.optimization.filter import Filter, Scale, Sigmoid, Layering
+from vipdopt.optimization.filter import Filter, Scale, Sigmoid, Layering
 from vipdopt.simulation import Import
 from vipdopt.utils import Coordinates, PathLike, ensure_path
 
@@ -233,20 +233,20 @@ class Device:
                 region_coordinates,
                 randomize=True,#False,
                 init_seed=0,
-                # todo: add filters to config
-                filters=[], # [
-                #     Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
-                #             cfg['num_vertical_layers'] , 
-                #             cfg['num_vertical_spacers'], (0,1),
-                #             layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
-                #             spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
-                #             # layer_height_voxels=4, spacer_height_voxels=2,
-                #             spacer_voxels_value=cfg['spacer_density'],
-                #             ),
-                #     Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
-                #     Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], )),
-                #     # Bridging is performed in the STL export and has minimal performance reduction.
-                # ],
+                filters= [
+                    # todo: put back the Layering filter when it's time
+                    # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
+                    #         cfg['num_vertical_layers'] , 
+                    #         cfg['num_vertical_spacers'], (0,1),
+                    #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+                    #         spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+                    #         # layer_height_voxels=4, spacer_height_voxels=2,
+                    #         spacer_voxels_value=cfg['spacer_density'],
+                    #         ),
+                    Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
+                    Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], )),
+                    # Bridging is performed in the STL export and has minimal performance reduction.
+                ],
             )
         
         # TODO: 20240930 - Testing =========================
@@ -510,6 +510,11 @@ class Device:
 
         return grad
 
+    def set_field_shape(self, _field_shape:tuple|None):
+        if _field_shape is not None:
+            self.field_shape = _field_shape
+            
+
     def import_cur_index(
         self,
         import_primitive: Import,
@@ -535,7 +540,7 @@ class Device:
 
         # Perform repetition of density values across each axis for shrinking during reinterpolation process
         if reinterpolation_factors != (1,1,1):
-            cur_density_import = repeat(cur_density, reinterpolation_factors)
+            cur_density_import = np.repeat(cur_density, reinterpolation_factors)
             # cur_density_import = np.repeat(
             #     np.repeat(
             #         np.repeat(
@@ -671,6 +676,8 @@ class Device:
         w_num=-2 images density,
         w_num=-1 images permittivity'''
         import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('TkAgg')
         d = np.real(self.w[..., layer_num, w_num])
         if w_num==-1 and plot_index:
             d = self.index_from_permittivity(d)

@@ -1,6 +1,6 @@
 """Subpackage providing optimization functionality for inverse design."""
 
-from vipdopt.optimization.adam import AdamOptimizer
+# from vipdopt.optimization.adam import AdamOptimizer
 from vipdopt.optimization.device import Device
 # from vipdopt.optimization.filter import Filter, Scale, Sigmoid
 from vipdopt.optimization.fom import (
@@ -10,9 +10,10 @@ from vipdopt.optimization.fom import (
 #     SuperFoM,
 #     UniformMAEFoM,
     UniformMSEFoM,
+    MSEFoM,
 )
 from vipdopt.optimization.optimization import Optimization #, LumericalOptimization
-from vipdopt.optimization.optimizer import GradientAscentOptimizer, GradientOptimizer
+from vipdopt.optimization.optimizer import NLOptOptimizer, GradientAscentOptimizer, GradientOptimizer, AdamOptimizer
 
 __all__ = [
     'AdamOptimizer',

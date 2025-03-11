@@ -142,7 +142,7 @@ class SimObject:
         """Return a SimObject from the Lumerical equivalent."""
         otype = obj['type']
         if otype == 'DFTMonitor':
-            if obj['spatiazl interpolation'] == 'specified position':
+            if obj['spatial interpolation'] == 'specified position':
                 obj_type = SimObjectType.PROFILE
             else:
                 obj_type = SimObjectType.POWER
@@ -182,6 +182,12 @@ class Import(SimObject):
         """Get the relevant data from in order to use `LumericalFDTD.importnk2`."""
         assert self.n is not None
         return (self.n, self.x, self.y, self.z)
+
+class IndexMonitor(SimObject):
+    """Class representing an index monitor in Lumerical."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name, SimObjectType.INDEX)
 
 
 

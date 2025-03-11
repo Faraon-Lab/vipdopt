@@ -1,5 +1,5 @@
 import logging
 from typing import Any
 
-simulator: Any = None
+solver: Any = None
 logger: logging.Logger = logging.getLogger()
