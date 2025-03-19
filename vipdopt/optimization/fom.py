@@ -168,7 +168,15 @@ class FoM:
         if data['type'] == 'FoM':  # Generic FoM needs to copy functions
             data['fom_func'] = self.fom_func
             data['grad_func'] = self.grad_func
-        data['foms'] = self.foms
+        
+        data['foms'] = {}
+        _foms = []
+        for i, fom in enumerate(self.foms):
+            data = fom[0].as_dict()
+            data['weight'] = self.weights[i]
+            _foms.append(data)
+        data['foms'].update({f'fom_{i}': _foms[i] for i, _ in enumerate(self.foms)})
+
         data['weights'] = self.weights
         data['fwd_srcs'] = [f['name'] for f in self.fwd_srcs]
         data['fom_monitors'] = [f['name'] for f in self.fwd_monitors]
@@ -235,7 +243,7 @@ class FoM:
             weights.append(fom_dict.pop('weight'))
             foms.append(FoM.from_dict(fom_dict))
         weights = np.array(weights)
-        
+
         return foms, weights
 
     @classmethod
@@ -244,8 +252,8 @@ class FoM:
         At present this processes spectral weights as a factor to the original weights -
         i.e. the wavelength-dependent behaviour of each FoM
         """
-        
-                
+
+
         # TODO: Better docstring
         def assign_bands(wl_band_bounds, lambda_values_um, num_bands):
             """Assign spectral bands."""
@@ -324,8 +332,8 @@ class FoM:
 
             return spectral_weights_by_fom
 
-        
-        
+
+
         # Overall Weights for each FoM
         # self.weights = np.array(self.weights)           # Just ensure that it's a numpy
 
@@ -731,7 +739,7 @@ class BayerFilterFoM(FoM):
         spectral_weights: npt.NDArray = np.array(1),
     ) -> None:
         """Initialize a BayerFilterFoM."""
-        
+
         super().__init__(
             fom_func=self._bayer_fom,
             grad_func=self._bayer_gradient,
@@ -746,7 +754,7 @@ class BayerFilterFoM(FoM):
             all_freqs=all_freqs,
             spectral_weights=spectral_weights
         )
-        
+
 
     def _bayer_fom(self, *args, **kwargs):
         """Compute bayer filter figure of merit.

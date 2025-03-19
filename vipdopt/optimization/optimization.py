@@ -110,12 +110,10 @@ class Optimization:
         self.param_hist: dict[
             str, list[npt.NDArray]
         ] = {}  # History of all other parameters with each iteration
-        #! These will be fed directly into plotter.py so this is the place to be changing labels / variable names and somesuch.
-        for metric in ['transmission', 'intensity']:
+        for metric in ['fom']:
             self.fom_hist.update({f'{metric}_overall': []})
             for i, f in enumerate(self.fom.foms):
                 self.fom_hist.update( {f'{metric}_{i}': []} )
-        self.fom_hist.update( {'intensity_overall_xyzwl': []} )
         # self.param_hist.update({'design': []})
 
         # Set up parent project
@@ -289,6 +287,8 @@ class Optimization:
         def f(x:npt.NDArray, grad:npt.NDArray):
             self.iteration += 1
             print(self.iteration)
+            
+            # x = np.maximum(np.minimum(x,1),0)
 
             self.device.set_design_variable(x.reshape(shape))
             # Each epoch the device filters are changed (usually getting stronger).
@@ -304,11 +304,24 @@ class Optimization:
             grad[:] = np.ravel( self.device.backpropagate(
                                                 gradient(x=self.device.get_permittivity())
                                             ) )
-            return func(self.device.get_permittivity())
+            # grad[:] = np.maximum(np.minimum(grad, 0.05), -0.05)
+            # grad[:] = -0.05 + 0.10*(grad - np.min(grad))/(np.max(grad)-np.min(grad))
+            fom = func(x=self.device.get_permittivity())
 
-            x_orig = np.real(self.device.get_permittivity())
+            # Store away histories
+            self.fom_hist['fom_overall'].append(fom)
+            for i in range(len(self.fom.foms)):
+                self.fom_hist[f'fom_{i}'].append(self.fom.foms[i][0].compute_fom(x=self.device.get_permittivity()))
+                self.fom_hist[f'fom_{i}'].append(self.fom.foms[i][0].compute_fom(x=self.device.get_permittivity()))
+            # # Don't know why but enumerate doesn't work here
+            # for i, fom in enumerate(self.fom.foms):
+            #     self.fom_hist[f'fom_{i}'].append(fom[0].compute_fom(x=self.device.get_permittivity()))
+            
+            return fom
+
+            # x_orig = np.real(self.device.get_permittivity())
             # # Remember to set grad in-place, i.e. grad[:] = ...
-            # grad[:] = np.ravel( gradient(x=x_orig) )
+            grad[:] = np.ravel( gradient(x=x_orig) )
             return func(x=x_orig)
             # return func(x=self.device.get_permittivity())
 
@@ -320,7 +333,9 @@ class Optimization:
             opt.set_min_objective(f)
 
         # opt.set_xtol_abs(1e-4)
-        opt.set_maxeval(300)
+        # opt.set_xtol_rel(1e-4)
+        # opt.set_maxeval(300)
+        opt.set_maxeval(60)
 
         xopt:npt.NDArray = opt.optimize(x)
         self.device.set_design_variable(xopt.reshape(shape))
@@ -420,6 +435,7 @@ class Optimization:
 
                     # Compute intensity FoM and apply spectral and performance weights.
                     f = self.fom.compute_fom(*self.fom_args, **self.fom_kwargs)
+                    self.fom_hist.get('fom_overall').append(f)
                     self.fom_hist.get('intensity_overall').append(f)
                     vipdopt.logger.debug(f'FoM: {f}')
 
@@ -429,6 +445,7 @@ class Optimization:
                     t = np.array([ fom[0].fom_func(*self.fom_args, **fom_kwargs_trans)
                         for fom in self.fom.foms
                     ])
+                    [ self.fom_hist.get(f'fom_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
                     [ self.fom_hist.get(f'transmission_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
                     self.fom_hist.get('transmission_overall').append( np.squeeze(np.sum(t, 0)) )
                     # [plt.plot(np.squeeze(t_i)) for t_i in t]
@@ -540,8 +557,8 @@ class Optimization:
 
                 self.iteration += 1
                 # Save Project
-                ##! TODO:
-                #self.project.save_as(self.project.subdirectories['checkpoints'])
+                #! TODO:
+                self.project.save_as(self.project.subdirectories['checkpoints'])
 
             if not self.loop:
                 break
@@ -762,3 +779,6 @@ class Optimization:
     #     # TODO: rest of the plots
 
         plotter.close_all()
+    
+    def update_histories():
+        pass

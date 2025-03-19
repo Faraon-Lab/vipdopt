@@ -12,7 +12,8 @@ from typing import Any
 
 sys.path.append(Path.cwd())
 import vipdopt
-from vipdopt.configuration import Config
+from vipdopt.configuration import Config, ProjectConfig
+from vipdopt.eval import Evaluation
 from vipdopt.optimization import (
     Device,
     # FoM,
@@ -21,7 +22,7 @@ from vipdopt.optimization import (
     # LumericalOptimization,
     # SuperFoM,
 )
-from vipdopt.simulation import Simulation
+from vipdopt.simulation import SimEncoder, Simulation
 from vipdopt.simulation.lumfdtd import LumericalFDTD
 from vipdopt.utils import PathLike, ensure_path, glob_first, read_config_file
 
@@ -60,7 +61,7 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
     # should be re-run to compare to anything new.
 
     with contextlib.suppress(Exception):
-        for file in list(glob.glob('*.sh')):  
+        for file in list(glob.glob('*.sh')):
             shutil.copy2(root_dir/file, saved_scripts_folder/file)
 
     # shutil.copy2(
@@ -112,7 +113,7 @@ class Project:
 
     def __init__(self, config_type:type[Config] = Config) -> None:
         """Initialize a Project."""
-        
+
         """Initialize a Project."""
         self.dir = Path('.')  # Project directory; defaults to root
         self.config = config_type()
@@ -124,9 +125,10 @@ class Project:
         # self.foms: list[FoM] = []
         # self.weights: npt.NDArray | list = []
         self.subdirectories: dict[str, Path] = {}
-        
+
         self.optimizations: list[Optimization] = []
-    
+        self.evaluations: list[Evaluation] = []
+
     @classmethod
     def from_dir(
         cls: type[Project],
@@ -146,7 +148,7 @@ class Project:
 
         MUST have a config file in the project directory.
         """
-        
+
         self.dir = project_dir
 
         project_save_file = project_dir / project_name
@@ -168,18 +170,18 @@ class Project:
         if not project_save_file.exists():      # Initializing
             cfg_sim = Config.from_file(self.dir / 'sim.json')
             cfg.data['base_simulation'] = cfg_sim.data
-        
+
         self._load_config(cfg)
-    
+
     def _load_config(self, config: Config | dict):
         """Load and setup optimization from an appropriate config file."""
-        
+
         # Load config file
         cfg = copy.copy(config)
         if not isinstance(config, Config):
             cfg = self.config_type(cfg)
         assert isinstance(cfg, Config)
-        
+
         # Setup Folder Structure
         self.manager = 'LOCAL'
         slurm_job_env_variable = os.getenv('SLURM_JOB_NODELIST')
@@ -191,22 +193,22 @@ class Project:
             pull_files_debug_mode=cfg.get('pull_sim_files_from_debug_folder')
         )
         vipdopt.logger.info('Internal folder substructure created.')
-        
+
         # Load Base Simulation
-        self.base_sim, self.src_to_sim_map = Simulation._load_from_config(cfg, self.dir, 
+        self.base_sim, self.src_to_sim_map = Simulation._load_from_config(cfg, self.dir,
                                                                          solver=cfg.get('solver_name', 'LumericalFDTD'))
         sims = list(self.src_to_sim_map.values())
-        
+
         ### Some stuff
-        
+
         # Load Device
         self.device = Device.load_config(cfg)
-        
+
         # General (Other) Settings
         iteration = cfg.get('current_iteration', 0)
-        
+
         self.config = cfg
-    
+
     @classmethod
     def load_optimizer(cls, cfg: Config):
         """Load the optimizer from a config."""
@@ -221,13 +223,91 @@ class Project:
             raise NotImplementedError(
                 f'Optimizer {optimizer} not currently supported'
             ) from None
-        
+
         return optimizer_type(**optimizer_settings)
-    
+
+    def save(self):
+        """Save this project to it's pre-assigned directory."""
+        self.save_as(self.dir)
+
+    #! TODO:
+    @ensure_path
+    def save_as(self, project_dir: Path):
+        """Save this project to a specified directory, creating it if necessary."""
+        # NOTE: Created this according to vars(project) after creating a fresh project.
+
+        # This dictionary will be saved as a YAML/JSON and stores all the variables that aren't class objects.
+        # Coding each key-value pair manually so as to be careful.
+        proj_cfg = ProjectConfig()
+
+        # Dir
+        proj_cfg.update({'dir': self.dir})
+
+        # Optimization:
+
+        # Optimizer: Handled below in generate_config()
+
+        # Device: Handled below in _generate_config()
+        # assert self.device is not None
+        # self.device.save(self.subdirectories['device'])
+
+        # Base Sim: Handled below in _generate_config()
+        # src_to_sim_map: Handled in _load_config()
+        # FoMs: Handled below in _generate_config()
+        # Weights: Handled in _load_config()
+        # Subdirectories: Handled in _load_config()
+        # Spectral weights: Handled in _load_config()
+
+        # Config
+        cfg = self._generate_config()
+        cfg.save(project_dir / 'config.json', cls=SimEncoder)
+        # Config Type:
+        proj_cfg.update({'config_type': self.config_type.__name__})
+
+        proj_cfg.save(project_dir / 'project.json', cls=SimEncoder)
+
+    def _generate_config(self) -> Config:
+        """Create a JSON config for this project's settings."""
+        cfg = copy.copy(self.config)
+
+        for i, opt in enumerate(self.optimizations):
+            opt_dict = {}
+
+            assert opt is not None
+            assert opt.optimizer is not None
+            assert opt.base_sim is not None
+
+            # Miscellaneous Settings
+            opt_dict['current_iteration'] = opt.iteration
+
+            # Optimizer
+            opt_dict['optimizer'] = type(opt.optimizer).__name__
+            opt_dict['optimizer_settings'] = vars(opt.optimizer)
+
+            # FoMs
+            opt_dict['figures_of_merit'] = {}
+
+            foms = []
+            for j, fom in enumerate(opt.fom.foms):
+                data = fom[0].as_dict()
+                data['weight'] = opt.fom.weights[j]
+                foms.append(data)
+            opt_dict['figures_of_merit'].update({f'fom_{k}': foms[k] for k, _ in enumerate(opt.fom.foms)})
+
+            # Device
+            opt_dict['device'] = opt.current_device_path()
+
+            # Base Simulation
+            opt_dict['base_simulation'] = opt.base_sim.as_dict()
+
+            cfg[f'opt_{i}'] = opt_dict
+
+        return cfg
+
     def start_all_optimizations(self):
         for opt in self.optimizations:
             self.start_optimization(opt)
-    
+
     def start_optimization(self, opt):
         """Start this project's optimization."""
         opt.loop = True
@@ -238,7 +318,7 @@ class Project:
         idx = self.optimizations.index(opt)
         vipdopt.logger.info('stopping optimization early')
         self.optimization.loop = False
-    
+
     def stop_all_optimizations(self):
         for opt in self.optimizations:
             self.stop_optimization(opt)

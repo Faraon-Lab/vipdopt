@@ -243,8 +243,8 @@ class Device:
                     #         # layer_height_voxels=4, spacer_height_voxels=2,
                     #         spacer_voxels_value=cfg['spacer_density'],
                     #         ),
-                    Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
-                    Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], )),
+                    # Sigmoid( 0.5, 1.0),    # todo: Add N-level sigmoid for different numbers of indices.
+                    Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], ))
                     # Bridging is performed in the STL export and has minimal performance reduction.
                 ],
             )

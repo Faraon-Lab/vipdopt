@@ -1,10 +1,15 @@
 """Module for handling configuration parameters."""
 
 from __future__ import annotations
+from collections import UserDict
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, overload
+if TYPE_CHECKING:
+    from _typeshed import SupportsKeysAndGetItem
 
 import json
-from collections import UserDict
 from pathlib import Path
+from overrides import override
 
 import yaml
 
@@ -61,3 +66,35 @@ class Config(UserDict):
             case _:
                 msg = f'{cfg_format} file saving not yet supported.'
                 raise NotImplementedError(msg)
+
+class ProjectConfig(Config):
+    """Config object used to save and load Project classes (see vipdopt/project.py)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @override
+    def __setitem__(self, name: str, value: Any) -> None:
+        super().__setitem__(name, value)
+
+    @ensure_path
+    @override
+    def read_file(self, fname: Path, cfg_format: str = 'auto') -> None:
+        super().read_file(fname, cfg_format=cfg_format)
+
+    @overload
+    def update(self, __m: SupportsKeysAndGetItem, **kwargs: Any) -> None: ...
+
+    @overload
+    def update(self, __m: Iterable[tuple[Any, Any]], **kwargs) -> None: ...
+
+    @overload
+    def update(self, **kwargs: Any) -> None: ...
+
+    def update(self, *args, **kwargs: Any) -> None:
+        """Update self with values from another dictionary-like object."""
+        self._do_validation = False
+        if len(args) == 0:
+            super().update(**kwargs)
+        else:
+            super().update(args[0], **kwargs)
