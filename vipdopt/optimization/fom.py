@@ -13,7 +13,8 @@ import numpy as np
 import numpy.typing as npt
 
 import vipdopt
-from vipdopt.simulation import Simulation
+from vipdopt.configuration import Config
+from vipdopt.simulation import Simulation, SimEncoder
 from vipdopt.simulation.monitor import Monitor, Power, Profile
 from vipdopt.simulation.source import Source, DipoleSource, GaussianSource
 from vipdopt.utils import (
@@ -65,8 +66,8 @@ class FoM:
 
 
     def __init__(self,
-            fom_func: Callable[Concatenate[FoM, P], npt.NDArray],
-            grad_func: Callable[Concatenate[FoM, P], npt.NDArray],
+            fom_func: str | None | Callable[Concatenate[FoM, P], npt.NDArray],
+            grad_func: str | None | Callable[Concatenate[FoM, P], npt.NDArray],
             foms: Sequence[Iterable[FoM]],
             weights: Sequence[float] = (1.0,),      # NOTE: normalized so their sum is 1.0!!!
             fwd_srcs:list[Source] = [],
@@ -86,6 +87,18 @@ class FoM:
         self.foms: list[tuple[FoM,...]] = [tuple(f) for f in foms]
         self.fom_func = fom_func
         self.grad_func = grad_func
+        
+        if isinstance(self.fom_func, str):
+            try:
+                self.fom_func = getattr(sys.modules[__name__], self.fom_func)
+            except Exception as ex:
+                print('fom_func: Could not find function in sys.modules[__name__] with name given.')
+        if isinstance(self.grad_func, str):
+            try:
+                self.grad_func = getattr(sys.modules[__name__], self.grad_func)
+            except Exception as ex:
+                print('grad_func: Could not find function in sys.modules[__name__] with name given.')
+        
         self.weights: list[float] = list(weights)
         self.performance_weights = np.ones(len(self.foms))
         self.fwd_srcs = fwd_srcs
@@ -146,36 +159,53 @@ class FoM:
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this FoM."""
-
-        self.fom_func,
-        self.grad_func,
-        self.foms,
-        self.weights,
-        self.fwd_srcs,
-        self.fwd_monitors,
-        self.adj_srcs,
-        self.adj_monitors,
-        self.polarization,
-        self.pos_max_freqs,
-        self.neg_min_freqs,
-        self.all_freqs,
-        self.spectral_weights,
-        self.reduce_func,
+        # self.fom_func,
+        # self.grad_func,
+        # self.foms,
+        # self.weights,
+        # self.fwd_srcs,
+        # self.fwd_monitors,
+        # self.adj_srcs,
+        # self.adj_monitors,
+        # self.polarization,
+        # self.pos_max_freqs,
+        # self.neg_min_freqs,
+        # self.all_freqs,
+        # self.spectral_weights,
+        # self.reduce_func,
 
         data: dict[str, Any] = {}
         data['type'] = type(self).__name__
 
-        if data['type'] == 'FoM':  # Generic FoM needs to copy functions
-            data['fom_func'] = self.fom_func
-            data['grad_func'] = self.grad_func
+        try:
+            data['fom_func'] = self.fom_func.__name__ \
+                                if self.fom_func is not None else None
+        except Exception as ex:
+            data['fom_func'] = None
+        try:
+            data['grad_func'] = self.grad_func.__name__ \
+                                if self.grad_func is not None else None
+        except Exception as ex:
+            data['grad_func'] = None
+        #! We can't actually store functions in yaml format.
+        #! Typically we must get around this by declaring a class that inherits FoM, 
+        #! with its own compute_fom() and compute_grad() predeclared.
         
-        data['foms'] = {}
-        _foms = []
-        for i, fom in enumerate(self.foms):
-            data = fom[0].as_dict()
-            data['weight'] = self.weights[i]
-            _foms.append(data)
-        data['foms'].update({f'fom_{i}': _foms[i] for i, _ in enumerate(self.foms)})
+        # data['foms'] = {f'fom_{i}': fom.as_dict()
+        #             for i, fom in enumerate(self.foms)
+        #             }
+        
+        #! What about nested FoMs?
+        # Remember that for a FoM containing multiple FoMs,
+        # AB + C is written as self.foms = [(A,B),(C,)] and so forth.
+        # with self.weights having the same length as self.foms.
+        # So we store each sub-FoM as a value in a dictionary,
+        # with the keys in the following format
+        # 'fom_0_0': A
+        # 'fom_0_1': B
+        # 'fom_1_0': C
+        data['foms'] = FoM.fom_list_to_dict(self.foms)
+        
 
         data['weights'] = self.weights
         data['fwd_srcs'] = [f['name'] for f in self.fwd_srcs]
@@ -190,23 +220,64 @@ class FoM:
 
         return data
 
+    def save(self, fname):
+        Config.save_new(fname, {'figures_of_merit': self.as_dict()}, cls=SimEncoder)
+
+    @staticmethod
+    def fom_list_to_dict(fom_list):
+        output = {}
+        for i, add_fom in enumerate(fom_list):
+            for j, multiply_fom in enumerate(add_fom):
+                output.update({f'fom_{i}_{j}': multiply_fom.as_dict()})
+        return output
+
+    @staticmethod
+    def fom_dict_to_list(fom_dicts):
+        output = []
+        for i in range(len(fom_dicts)):
+            add_fom = []
+            multiply_fom_keys = [fk for fk in fom_dicts.keys() \
+                                    if fk.split('_')[1] == str(i)]
+            
+            for j in range(len(multiply_fom_keys)):
+                fom = fom_dicts[f'fom_{i}_{j}']
+                if not isinstance(fom, FoM):
+                    fom = FoM.from_dict(fom)
+                add_fom.append(fom)
+            
+            if len(add_fom) > 0:
+                output.append(tuple(add_fom))
+        return output
+
     @staticmethod
     def from_dict(input_dict: dict) -> FoM:
         """Create a FoM from a dictionary representation."""
         data = copy(input_dict)
+        # Get class to initiate
         fom_cls: type[FoM] = getattr(sys.modules[__name__], data.pop('type'))
+        # First initiate the sub-FoMs if they're not already initiated
+        if isinstance(data['foms'], dict):
+            data['foms'] = FoM.fom_dict_to_list(data['foms'])
+        # Then initiate the whole thing
         return fom_cls(**data)
 
     @classmethod
-    def _load_from_config(cls, cfg, base_sim=None):
+    def _load_from_config(cls, cfg, base_sim=None) -> FoM | list:
         """Load figures of merit from a config."""
-        foms = []
-        weights = []
 
         # Setup FoMs. #! A lot of hardcoded processing is done here, prime candidate for errors of some kind.
         # But essentially this just consists of changing it from a dictionary of strings/lists/floats
         # to a dictionary of objects
-        for name, fom_dict in cfg.pop('figures_of_merit').items():
+        main_fom = cfg.pop('figures_of_merit')
+        fom_dicts = main_fom.pop('foms')            # Keep all other key-value pairs.
+        
+        
+        #! TODO: N-LEVEL NESTING. =================================================
+        # for name, fom_dict in fom_dicts.items():
+            # fom_dicts['name'] = cls._load_from_config(fom_dict, base_sim)
+        #* This should replace the below block. ==============================
+        # We now convert every value in fom_dicts to a FoM instance.
+        for name, fom_dict in fom_dicts.items():
             # [DEPRECATED, removed from config] Overwrite 'opt_ids' key for now with the entire wavelength vector, by
             # commenting out in config. Spectral sorting comes from spectral weighting
 
@@ -216,19 +287,20 @@ class FoM:
                 return list(
                     flatten([[x for x in list_objs if x.name == y] for y in list_names])
                 )
-
-            fom_dict['fwd_srcs'] = match_cfg_objnames_to_objects(
-                fom_dict['fwd_srcs'], base_sim.sources()
-            )
-            fom_dict['adj_srcs'] = match_cfg_objnames_to_objects(
-                fom_dict['adj_srcs'], base_sim.sources()
-            )
-            fom_dict['fom_monitors'] = match_cfg_objnames_to_objects(
-                fom_dict['fom_monitors'], base_sim.monitors()
-            )
-            fom_dict['grad_monitors'] = match_cfg_objnames_to_objects(
-                fom_dict['grad_monitors'], base_sim.monitors()
-            )
+            if base_sim is not None:
+                fom_dict['fwd_srcs'] = match_cfg_objnames_to_objects(
+                    fom_dict['fwd_srcs'], base_sim.sources()
+                )
+                fom_dict['adj_srcs'] = match_cfg_objnames_to_objects(
+                    fom_dict['adj_srcs'], base_sim.sources()
+                )
+                fom_dict['fom_monitors'] = match_cfg_objnames_to_objects(
+                    fom_dict['fom_monitors'], base_sim.monitors()
+                )
+                fom_dict['grad_monitors'] = match_cfg_objnames_to_objects(
+                    fom_dict['grad_monitors'], base_sim.monitors()
+                )
+                
 
             # if pos_max_freqs is blank, make it the whole wavelength vector; if neg_min_freqs is blank, keep blank.
             if fom_dict['pos_max_freqs'] == []:
@@ -238,13 +310,19 @@ class FoM:
                     range(len(cfg['lambda_values_um']))
                 )
 
-            fom_dict['all_freqs'] = 3e8 / np.array(cfg['lambda_values_um'])
+            try:
+                fom_dict['all_freqs'] = 3e8 / np.array(cfg['lambda_values_um'])
+            except Exception as ex:
+                print("Key 'lambda_values_um' not found in input config.")
 
-            weights.append(fom_dict.pop('weight'))
-            foms.append(FoM.from_dict(fom_dict))
-        weights = np.array(weights)
+            # weights.append(fom_dict.pop('weights'))
+            fom_dicts[name] = cls.from_dict(fom_dict)
+            # foms.update({'cls.from_dict(fom_dict))
+        #* ================================================================================
 
-        return foms, weights
+        main_fom['foms'] = FoM.fom_dict_to_list(fom_dicts)
+
+        return cls.from_dict(main_fom)
 
     @classmethod
     def _setup_spectral_weights(cls, foms, cfg):
@@ -492,17 +570,30 @@ class FoM:
                 )
             )
         )
-        term2 = np.sum(
-            np.divide(
-                grad_vals,
-                fom_vals.reshape(grad_vals.shape),
-                out=np.zeros(grad_vals.shape),
-                where=fom_vals != 0,  # Return zeros where division by zero occur
-                dtype=float,
-            ),
-            axis=0,
-        )
-        return np.prod(fom_vals, axis=0) * term2
+        
+        assert fom_vals.shape[0] == grad_vals.shape[0], "Array mismatch between the length of fom_vals and of grad_vals."
+        
+        output = grad_vals[0] * np.prod(fom_vals[1:], axis=0)
+        for i in range(1, fom_vals.shape[0]):
+            if fom_vals[i] == 0:
+                output += ( grad_vals[i] * np.prod(fom_vals[fom_vals!=0], axis=0))
+                output = np.add(output, ( grad_vals[i] * np.prod(fom_vals[fom_vals!=0], axis=0) ))
+            else:
+                output = np.add(output, ( grad_vals[i] * np.prod(fom_vals, axis=0) / fom_vals[i] ))
+        
+        return output
+        
+        # term2 = np.sum(
+        #     np.divide(
+        #         grad_vals,
+        #         fom_vals.reshape(grad_vals.shape),
+        #         out=np.zeros(grad_vals.shape),
+        #         where=fom_vals != 0,  # Return zeros where division by zero occur
+        #         dtype=float,
+        #     ),
+        #     axis=0,
+        # )
+        # return np.prod(fom_vals, axis=0) * term2
 
     def performance_weighting(self, fom_values: npt.NDArray):
         """Recompute the weights based on the performance of the optimization.
@@ -629,6 +720,56 @@ def unique_adj_sim_map(foms: Iterable[FoM]) -> dict[frozenset[Source], list[FoM]
     return sim_map
 
 
+# Make sure the below match test_foms.py
+def _test_unit_func(n) -> npt.ArrayLike:
+    return 1
+def _test_unit_gradient_func(n) -> npt.ArrayLike:
+    return np.zeros(n.shape)
+def _test_fom_func(n) -> npt.ArrayLike:
+    return np.sum(np.square(n))
+def _test_gradient_func(n) -> npt.ArrayLike:
+    return 2 * n
+class TestFoM(FoM):
+    """A test figure of merit for saving and loading."""
+    def __init__(self, _fom_func=None, _grad_func=None, *args, **kwargs) -> None:
+        """Initialize a TestFoM."""
+        if _fom_func is None:
+            _fom_func = _test_fom_func
+        if _grad_func is None:
+            _grad_func = _test_gradient_func
+        kwargs.update({'fom_func': _fom_func, 'grad_func': _grad_func})
+        super().__init__(*args, **kwargs)
+
+
+
+class UniformMAEFoM(FoM):
+    """A figure of merit for a uniform density using mean absolute error."""
+
+    def __init__(
+        self,
+        fom_func=None, grad_func=None,
+        constant: float = 1,
+        # spectral_weights: npt.NDArray = np.array(1),
+        *args, **kwargs
+    ) -> None:
+        """Initialize a UniformMAEFoM."""
+
+        self.constant = constant
+        if fom_func is None:
+            fom_func = partial(self._uniform_mae_fom, constant=self.constant)
+        if grad_func is None:
+            grad_func = partial(self._uniform_mae_gradient, constant=self.constant)
+
+        super().__init__(
+            fom_func, grad_func, foms=[], reduce_func=np.mean, 
+            *args, **kwargs
+        )
+
+    def _uniform_mae_fom(self, x: npt.NDArray, constant=1):
+        return np.abs(x - constant)
+
+    def _uniform_mae_gradient(self, x: npt.NDArray, constant=1):
+        return np.sign(x - constant)
 
 
 class UniformMSEFoM(FoM):
@@ -639,8 +780,9 @@ class UniformMSEFoM(FoM):
         fom_func=None, grad_func=None,
         constant: float = 1,
         # spectral_weights: npt.NDArray = np.array(1),
+        *args, **kwargs
     ) -> None:
-        """Initialize a UniformFoM."""
+        """Initialize a UniformMSEFoM."""
 
         self.constant = constant
         if fom_func is None:
@@ -649,7 +791,8 @@ class UniformMSEFoM(FoM):
             grad_func = partial(self._uniform_mse_gradient, constant=self.constant)
 
         super().__init__(
-            fom_func, grad_func, foms=[],
+            fom_func, grad_func, foms=[], reduce_func=np.mean,
+            *args, **kwargs
         )
 
     @classmethod
@@ -661,6 +804,52 @@ class UniformMSEFoM(FoM):
     def _uniform_mse_gradient(cls, x: npt.NDArray, constant=1):
         xi = np.real(x)
         return (2/xi.size)*(xi-constant)
+
+def gaussian_kernel(length=5, sigma=1.0) -> npt.NDArray:
+    """Creates a 2D gaussian kernel."""
+    ax = np.linspace(-(length - 1) / 2.0, (length - 1) / 2.0, length)
+    gauss = np.exp(-0.5 * np.square(ax) / np.square(sigma))
+    kernel = np.outer(gauss, gauss)
+    return kernel / np.sum(kernel)
+
+
+class GaussianFoM(FoM):
+    """A figure of merit for a device to match a 2D Gaussian."""
+
+    def __init__(
+        self,
+        fom_func=None, grad_func=None,
+        # spectral_weights: npt.NDArray = np.array(1),
+        length=5,
+        sigma=1.0,
+        *args, **kwargs
+    ) -> None:
+        """Initialize a GaussianFoM."""
+
+        if fom_func is None:
+            fom_func = self._gaussian_fom
+        if grad_func is None:
+            grad_func = self._gaussian_gradient
+
+        super().__init__(
+            fom_func, grad_func, foms=[], *args, **kwargs
+        )
+        self.kernel = gaussian_kernel(length, sigma)
+
+    def gaussian_kernel(length=5, sigma=1.0) -> npt.NDArray:
+        """Creates a 2D gaussian kernel."""
+        ax = np.linspace(-(length - 1) / 2.0, (length - 1) / 2.0, length)
+        gauss = np.exp(-0.5 * np.square(ax) / np.square(sigma))
+        kernel = np.outer(gauss, gauss)
+        return kernel / np.sum(kernel)
+
+    def _gaussian_fom(self, x: npt.NDArray):
+        return 1 - np.square(x - self.kernel[..., np.newaxis])
+
+    def _gaussian_gradient(self, x: npt.NDArray):
+        return 2 * (self.kernel[..., np.newaxis] - x)
+
+
 
 
 class MSEFoM(FoM):
@@ -714,8 +903,6 @@ class MSEFoM(FoM):
         assert x.shape==target.shape, "Device shape does not match target shape."
         xi = np.real(x)
         return (2/xi.size)*(xi-target)
-
-
 
 class BayerFilterFoM(FoM):
     """FoM implementing the particular figure of merit for the SonyBayerFilter.

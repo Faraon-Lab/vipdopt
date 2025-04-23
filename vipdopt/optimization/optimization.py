@@ -24,8 +24,8 @@ from vipdopt.configuration import Config
 from vipdopt.eval import plotter # plotter_v2, plotter_v3
 from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import FoM #, # BayerFilterFoM,
-from vipdopt.optimization.optimizer import GradientOptimizer, NLOptOptimizer
-from vipdopt.simulation import ISimulation, LumericalFDTD #, LumericalSimulation
+from vipdopt.optimization.optimizer import GradientOptimizer, NLOptOptimizer, _load_optimizer
+from vipdopt.simulation import ISimulation, Simulation, LumericalFDTD #, LumericalSimulation
 from vipdopt.utils import glob_first, rmtree, real_part_complex_product #, replace_border
 
 DEFAULT_OPT_FOLDERS = {
@@ -214,6 +214,43 @@ class Optimization:
             d.mkdir(exist_ok=True, mode=0o777, parents=True)
         return directories
 
+    def as_dict(self):
+        assert self.optimizer is not None
+        assert self.base_sim is not None
+        
+        opt_dict = {}
+
+        # Miscellaneous Settings
+        opt_dict['current_iteration'] = self.iteration
+
+        # Optimizer
+        opt_dict.update(self.optimizer.as_dict())
+
+        # FoMs
+        opt_dict['figures_of_merit'] = self.fom.as_dict()
+
+        # Device
+        self.device.save(self.current_device_path())
+        opt_dict['device'] = self.current_device_path()
+
+        # Base Simulation
+        opt_dict['base_simulation'] = self.base_sim.as_dict()
+        
+        return opt_dict
+    
+    @classmethod
+    def from_dict(cls, opt_dict, *args, **kwargs):
+        device = Device.from_source(opt_dict['device'])
+        base_sim = Simulation.load(opt_dict['base_simulation'])
+        optimizer = _load_optimizer(opt_dict)
+        fom = FoM.from_dict(opt_dict['figures_of_merit'])
+        
+        return Optimization(
+                    base_sim, device, optimizer, fom, true_iteration=opt_dict['current_iteration'],
+                    # fom_args, fom_kwargs, grad_args, grad_kwargs,
+                    # cfg, epoch_list, dirs, project will be assigned in Project.load_project()
+                    *args, **kwargs
+        )
 
     def run(self):
         """Run the optimization"""
@@ -377,11 +414,12 @@ class Optimization:
                     # Pass the permittivity through the new filters
                     self.device.update_density()
 
-                    cur_density, cur_permittivity = self.import_device_to_sim(
-                        self.device, self.base_sim,
-                        reinterpolation_factors=(1,1,1),
-                        reset_field_shape=(i==0), # Just grab field shape from solver once per epoch
-                    )
+                    if self.base_sim.solver is not None:
+                        cur_density, cur_permittivity = self.import_device_to_sim(
+                            self.device, self.base_sim,
+                            reinterpolation_factors=(1,1,1),
+                            reset_field_shape=(i==0), # Just grab field shape from solver once per epoch
+                        )
 
                     # Sync up with solver to properly import device.
                     vipdopt.solver.save(self.base_sim.get_path(), self.base_sim)
@@ -782,3 +820,8 @@ class Optimization:
     
     def update_histories():
         pass
+
+# TODO: If ever this is needed, have a multi-objective Optimization class.
+# class MultiOptimization(Optimization):
+#     def __init__(self, *args, **kwargs):
+#         # instead of self.fom we have self.foms

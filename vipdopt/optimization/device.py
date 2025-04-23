@@ -13,6 +13,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy import interpolate
 
+sys.path.append(Path.cwd())
 import vipdopt
 # from vipdopt import STL, GDS
 from vipdopt.configuration import Config
@@ -55,7 +56,8 @@ class Device:
         randomize: bool = False,
         init_seed: None | int = None,
         symmetric: bool = False,
-        filters: list[Filter] | None = None,
+        filters: list[Filter] = [],
+        # filters: list[Filter] | None = None,
         **kwargs,
     ):
         """Initialize Device object."""
@@ -144,6 +146,8 @@ class Device:
         else:
             w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w
+        
+        self.velocity = np.zeros(self.size)
 
     def as_dict(self) -> dict:
         """Return a dictionary representation of this device, sans `self.w`."""
@@ -171,7 +175,7 @@ class Device:
     @classmethod
     def load_config(cls, cfg: Config):
         """Load device from a config, or create a new one if it doesn't exist yet."""
-        
+
         if 'device' in cfg:
             device_source = cfg.pop('device')
             return Device.from_source(device_source)
@@ -236,9 +240,9 @@ class Device:
                 filters= [
                     # todo: put back the Layering filter when it's time
                     # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
-                    #         cfg['num_vertical_layers'] , 
+                    #         cfg['num_vertical_layers'] ,
                     #         cfg['num_vertical_spacers'], (0,1),
-                    #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+                    #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']),
                     #         spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
                     #         # layer_height_voxels=4, spacer_height_voxels=2,
                     #         spacer_voxels_value=cfg['spacer_density'],
@@ -248,18 +252,18 @@ class Device:
                     # Bridging is performed in the STL export and has minimal performance reduction.
                 ],
             )
-        
+
         # TODO: 20240930 - Testing =========================
         # f = Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
-        #              cfg['num_vertical_layers'], 
+        #              cfg['num_vertical_layers'],
         #              cfg['num_vertical_spacers'], (0,1),
-        #              layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+        #              layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']),
         #              spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
         #             # layer_height_voxels=4, spacer_height_voxels=2,
         #             spacer_voxels_value=cfg['spacer_density'],
         #             )
         # g = f.get_layer_spacer_idxs(voxel_array_size, layer_type_nums=[3,2], spacer_first=True, start_from='top')
-        
+
         # import matplotlib.pyplot as plt
         # test = np.zeros((voxel_array_size[1],voxel_array_size[1]))
         # region_n = [1, 0.5]
@@ -268,15 +272,15 @@ class Device:
         #         test[np.arange(*_range), :] = region_n[ik]
         # plt.imshow(test)
         # plt.colorbar()
-        
+
         # f.layer_start_idxs = g
         # x = self.device.get_design_variable()
         # h = f.forward(x)
         # # h = f.layer_averaging(self.device.get_design_variable(), 0.1, g)
-        # # ==================================================    
+        # # ==================================================
         # import matplotlib.pyplot as plt
         # plt.imshow(np.real(h[...,0]))
-        
+
         vipdopt.logger.info('Device loaded.')
         return device
 
@@ -361,7 +365,7 @@ class Device:
     def num_filters(self):
         """Return the number of filters in this device."""
         return len(self.filters)
-    
+
     def set_filters(self, f:list[Filter]):
         """Overwrite the filters in this device."""
         self.filters = f
@@ -369,12 +373,12 @@ class Device:
     def update_filters(self, epoch=0, epoch_list=[0], num_layers_per_epoch=[10]):
         """Update the filters of the device."""
         # Filters are coded so that they can be re-initialized without problems.
-        
+
         # We may actually need to regenerate the filters explicitly at each iteration
         # for everything to work correctly.
         # TODO: Test
         self.filters = [type(f)(**f.init_vars) for f in self.filters]
-        
+
         for i, f in enumerate(self.filters):
             if isinstance(f, Sigmoid):
                 self.filters[i] = Sigmoid( eta=0.5, beta=0.0625*(2**epoch) )
@@ -391,33 +395,33 @@ class Device:
             #     # At epoch 3 num_layers is 1 -> LSL
             #     # TODO: 20241002: OR just straight up implement the layering projection filter. [Update 62]
             #     # See vipdopt.optimization.multilevelsigmoid
-                
-                
+
+
             #     #! 20241002: Updated Layering class.
             #     # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
-            #     #         cfg['num_vertical_layers'] , 
+            #     #         cfg['num_vertical_layers'] ,
             #     #         cfg['num_vertical_spacers'], (0,1),
-            #     #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']), 
+            #     #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']),
             #     #         spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
             #     #         # layer_height_voxels=4, spacer_height_voxels=2,
             #     #         spacer_voxels_value=cfg['spacer_density'],
             #     #         ),
-        
+
         # self.filters = [
         #     Layering( **filter_vars[0] ),
-        #     Sigmoid( eta=0.5, beta=0.0625*(2**epoch) ),         
+        #     Sigmoid( eta=0.5, beta=0.0625*(2**epoch) ),
         #     ## if use_smooth_blur...
         #     # Max_Blur_XY(),
         #     # Sigmoid( eta=0.5, beta=0.0625*(2**epoch) ),
         #     Scale( self.permittivity_constraints ),
         # ]
-        
+
         # TODO: Change layering so that it works with masks.
         # TODO: Blurring
         # self.max_blur_xy_2 = square_blur_smooth.SquareBlurSmooth(
         #     [ gp.blur_half_width_voxels, gp.blur_half_width_voxels, 0 ] )
         # TODO: Erosion-Dilation
-        # TODO: Conical/Pillars: Top layer must have bottom layer below. 
+        # TODO: Conical/Pillars: Top layer must have bottom layer below.
         # https://arxiv.org/abs/2404.07104
         # TODO: Perlin Noise Islands / Posts
 
@@ -513,7 +517,7 @@ class Device:
     def set_field_shape(self, _field_shape:tuple|None):
         if _field_shape is not None:
             self.field_shape = _field_shape
-            
+
 
     def import_cur_index(
         self,
@@ -745,3 +749,11 @@ class Device:
         # TODO: And the same with devices
         # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
         return [self]
+
+if __name__ == '__main__':
+    cfg_file = Path.cwd() / 'tests/test_device_config.yml'
+    cfg = cfg = Config.from_file(cfg_file)
+
+    device = Device.load_config(cfg)
+    
+    print('End of code reached.')

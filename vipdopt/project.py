@@ -12,7 +12,7 @@ from typing import Any
 
 sys.path.append(Path.cwd())
 import vipdopt
-from vipdopt.configuration import Config, ProjectConfig
+from vipdopt.configuration import Config, ProjectConfig, SonyBayerConfig
 from vipdopt.eval import Evaluation
 from vipdopt.optimization import (
     Device,
@@ -111,7 +111,9 @@ def create_internal_folder_structure(root_dir: Path, pull_files_debug_mode=False
 class Project:
     """Class for managing the loading and saving of projects."""
 
-    def __init__(self, config_type:type[Config] = Config) -> None:
+    def __init__(self,
+                 config_type:type[Config] = Config # SonyBayerConfig
+                ) -> None:
         """Initialize a Project."""
 
         """Initialize a Project."""
@@ -133,7 +135,7 @@ class Project:
     def from_dir(
         cls: type[Project],
         project_dir: PathLike,
-        config_type: type[Config] = Config,
+        config_type: type[Config] = Config, # SonyBayerConfig,
     ) -> Project:
         """Create a new Project from an existing project directory."""
         proj = Project(config_type=config_type)
@@ -203,28 +205,25 @@ class Project:
 
         # Load Device
         self.device = Device.load_config(cfg)
+        
+        # Load Optimizations
+        opt_dicts = cfg.pop('optimizations', {})
+        for opt_name, opt_dict in opt_dicts:
+            opt = Optimization.from_dict(opt_dict,
+                                        cfg=cfg,
+                                        epoch_list=cfg.get('epoch_list'),
+                                        dirs=Optimization.create_opt_folder_structure(
+                                                            Path(project.dir)/f'optimizations/{opt_name}',
+                                                            pull_files_debug_mode=cfg.get('pull_sim_files_from_debug_folder')
+                                                        ),
+                                        project=self,
+                                    )
+            self.optimizations.append(opt)
+        
 
         # General (Other) Settings
-        iteration = cfg.get('current_iteration', 0)
 
         self.config = cfg
-
-    @classmethod
-    def load_optimizer(cls, cfg: Config):
-        """Load the optimizer from a config."""
-        optimizer: str = cfg.pop('optimizer', None)
-        if optimizer is None:
-            vipdopt.logging.warning('No optimizer declared in config.')
-            optimizer = 'NLOptOptimizer'
-        optimizer_settings: dict = cfg.pop('optimizer_settings', {})
-        try:
-            optimizer_type = getattr(sys.modules['vipdopt.optimization'], optimizer)
-        except AttributeError:
-            raise NotImplementedError(
-                f'Optimizer {optimizer} not currently supported'
-            ) from None
-
-        return optimizer_type(**optimizer_settings)
 
     def save(self):
         """Save this project to it's pre-assigned directory."""
@@ -242,21 +241,13 @@ class Project:
 
         # Dir
         proj_cfg.update({'dir': self.dir})
+        project_dir.mkdir(parents=True, exist_ok=True)
 
         # Optimization:
-
-        # Optimizer: Handled below in generate_config()
-
-        # Device: Handled below in _generate_config()
-        # assert self.device is not None
-        # self.device.save(self.subdirectories['device'])
-
-        # Base Sim: Handled below in _generate_config()
+        # Handled below in generate_config()        
+        
         # src_to_sim_map: Handled in _load_config()
-        # FoMs: Handled below in _generate_config()
-        # Weights: Handled in _load_config()
         # Subdirectories: Handled in _load_config()
-        # Spectral weights: Handled in _load_config()
 
         # Config
         cfg = self._generate_config()
@@ -269,38 +260,22 @@ class Project:
     def _generate_config(self) -> Config:
         """Create a JSON config for this project's settings."""
         cfg = copy.copy(self.config)
+        
+        # The following are supersets of the optimizations' device and base_sim
+        
+        # Device:
+        assert self.device is not None
+        self.device.save(self.subdirectories['device'] / 'device.npy')
+        cfg['device'] = self.subdirectories['device'] / 'device.npy'
 
+        # Base Simulation:
+        cfg['base_simulation'] = self.base_sim.as_dict()
+
+        # All optimizations:
+        cfg['optimizations'] = {}
         for i, opt in enumerate(self.optimizations):
-            opt_dict = {}
-
             assert opt is not None
-            assert opt.optimizer is not None
-            assert opt.base_sim is not None
-
-            # Miscellaneous Settings
-            opt_dict['current_iteration'] = opt.iteration
-
-            # Optimizer
-            opt_dict['optimizer'] = type(opt.optimizer).__name__
-            opt_dict['optimizer_settings'] = vars(opt.optimizer)
-
-            # FoMs
-            opt_dict['figures_of_merit'] = {}
-
-            foms = []
-            for j, fom in enumerate(opt.fom.foms):
-                data = fom[0].as_dict()
-                data['weight'] = opt.fom.weights[j]
-                foms.append(data)
-            opt_dict['figures_of_merit'].update({f'fom_{k}': foms[k] for k, _ in enumerate(opt.fom.foms)})
-
-            # Device
-            opt_dict['device'] = opt.current_device_path()
-
-            # Base Simulation
-            opt_dict['base_simulation'] = opt.base_sim.as_dict()
-
-            cfg[f'opt_{i}'] = opt_dict
+            cfg['optimizations'][f'opt_{i}'] = opt.as_dict()
 
         return cfg
 
@@ -322,3 +297,14 @@ class Project:
     def stop_all_optimizations(self):
         for opt in self.optimizations:
             self.stop_optimization(opt)
+
+if __name__ == '__main__':
+    project_dir = Path('./test_project/')
+    output_dir = Path('./test_output_optimization/')
+
+    project = Project()
+    project.load_project(project_dir, config_name='test_config.yml')
+    #output_dir = project.subdirectories['checkpoints']
+    project.save_as(output_dir)
+    # Test that the saved format is loadable
+    project2 = Project.from_dir(output_dir)

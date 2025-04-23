@@ -66,6 +66,30 @@ class Config(UserDict):
             case _:
                 msg = f'{cfg_format} file saving not yet supported.'
                 raise NotImplementedError(msg)
+    
+    @classmethod
+    @ensure_path
+    def save_new(self, fname: Path, data, cfg_format: str = 'auto', **kwargs) -> None:
+        """Save a configuration file."""
+        path_filename = convert_path(fname)
+        if cfg_format.lower() == 'auto':
+            cfg_format = path_filename.suffix
+
+        config_data = data
+
+        match cfg_format.lower():
+            case '.yaml' | '.yml':
+                with path_filename.open('w') as f:
+                    try:
+                        yaml.dump(config_data, f, **kwargs)
+                    except Exception as err:    # yaml dump function can't take unexpected kwargs
+                        yaml.dump(config_data, f)
+            case '.json':
+                with path_filename.open('w') as f:
+                    json.dump(config_data, f, indent=4, ensure_ascii=True, **kwargs)
+            case _:
+                msg = f'{cfg_format} file saving not yet supported.'
+                raise NotImplementedError(msg)
 
 class ProjectConfig(Config):
     """Config object used to save and load Project classes (see vipdopt/project.py)."""

@@ -98,6 +98,7 @@ class Simulation(ISimulation):
     @ensure_path
     @override
     def save(self, fname: Path):
+        self.set_path(str(fname))
         content = self.as_json()
         with open(fname.with_suffix('.json'), 'w', encoding='utf-8') as f:
             f.write(content)
@@ -211,7 +212,7 @@ class Simulation(ISimulation):
     @ensure_path
     def set_path(self, path: Path):
         """Set the save path of the simulation."""
-        self.info['path'] = path.absolute()
+        self.info['path'] = str(path.absolute())
 
     def get_path(self) -> Path | None:
         """Get the save path of the simulation."""

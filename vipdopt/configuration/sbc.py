@@ -313,6 +313,6 @@ class SonyBayerConfig(Config):
         ):
             raise ValueError(
                 "Expected 'reinterpolate_permittivity_factor' to be 1 if not"
-                'reinterpolating permittivity,'
+                ' reinterpolating permittivity,'
                 f" got '{self.get('reinterpolate_permittivity_factor')}'."
             )

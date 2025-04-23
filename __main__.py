@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from argparse import SUPPRESS, ArgumentParser
 import logging
+from functools import partial
 
 import vipdopt.optimization
 
@@ -24,6 +25,64 @@ from vipdopt.utils import setup_logger
 f = sys.modules[__name__].__file__
 if not f:
     raise ModuleNotFoundError('SHOULD NEVER REACH HERE')
+
+# Example of how to pass custom functions into the pre-existing / pre-written class instances
+def update_histories_em_filter(self):
+    # Manually adjust metrics stored and calculated 
+    #! These will be fed directly into plotter.py so this is the place to be changing labels / variable names and somesuch.
+    for metric in ['transmission', 'intensity']:
+        self.fom_hist.update({f'{metric}_overall': []})
+        for i, f in enumerate(self.fom.foms):
+            self.fom_hist.update( {f'{metric}_{i}': []} )
+    self.fom_hist.update( {'intensity_overall_xyzwl': []} )
+
+def generate_plots_simple_mse(self):
+    """Generate the plots and save to file."""
+    import pickle
+    from vipdopt.eval import plotter
+    
+    folder = self.dirs['eval_info']
+    iteration = self.iteration #  if self.iteration==self.epoch_list[-1] else self.iteration+1
+    # vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
+
+    # TODO: Copy all to summary folder as well.
+    # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
+
+    fom_fig = plotter.plot_fom_trace(
+        np.array(self.fom_hist['fom_overall']),
+        folder)
+
+    quads_to_plot = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
+    quad_trans_fig = plotter.plot_bayer_quadrant_transmission_trace(
+        np.array([self.fom_hist[f'fom_{x}'] for x in quads_to_plot]).swapaxes(0,1),
+        folder,
+    )
+    cur_index = self.device.index_from_permittivity(self.device.get_permittivity())
+    final_device_layer_fig, _ = plotter.visualize_device(
+                                        self.device.coords['x'], self.device.coords['y'], cur_index,
+                                        # self.device.coords['x'], self.device.coords['z'],
+                                        # np.rot90(cur_index),         # 20241003: Want to see the side view for layering.
+                                        folder,
+                                        filename=f'_{iteration}'
+                                    )
+
+    # Evaluation Plots
+
+
+    # Create plot pickle files for GUI visualization
+    with (folder / 'fom.pkl').open('wb') as f:
+        pickle.dump(fom_fig, f)
+    with (folder / 'quad_trans.pkl').open('wb') as f:
+        pickle.dump(quad_trans_fig, f)
+    # with (folder / 'enorm.pkl').open('wb') as f:
+    #     pickle.dump(intensity_fig, f)
+    with (folder / 'final_device_layer.pkl').open('wb') as f:
+        pickle.dump(final_device_layer_fig, f)
+#     # TODO: rest of the plots
+
+    plotter.close_all()
+
+#* ==============================================================================
 
 if __name__ == '__main__':
 
@@ -88,8 +147,10 @@ if __name__ == '__main__':
     # Also any other necessary editing of the Lumerical environment and objects.
     vipdopt.logger.info('Beginning Step 0: Project Setup...')
 
-    project = Project()
-    project.load_project(args.directory, config_name=args.config)
+    from vipdopt.configuration import SonyBayerConfig
+    project = Project(config_type=SonyBayerConfig)
+    # project.load_project(args.directory, config_name=args.config)
+    project.load_project(args.directory)
     # What does the Project class contain?
     # 'dir': directory where it's stored; 'config': SonyBayerConfig object; 'optimization': Optimization object;
     # 'device': Device object; 'base_sim': Simulation object;
@@ -107,19 +168,21 @@ if __name__ == '__main__':
     # FoM_1 = MSEFoM()
     # from PIL import Image
     # im = Image.open('example.jpg').resize(project.device.size[:2], Image.Resampling.LANCZOS)
-    # im = np.repeat(np.array(im)[:, :, np.newaxis], project.device.size[2], axis=2)
+    # im = np.repeat(np.array(im).transpose()[:, :, np.newaxis], project.device.size[2], axis=2)
     # FoM_1 = MSEFoM(target=im)
     # FoM_2 = MSEFoM(target=im)
 
-    # FoM_1 = MSEFoM(target=2*np.ones(project.device.size))
-    # FoM_1.set_target_2d_gaussian(arr_shape=project.device.size, peak=7.5, N=9, std=2, center_point=(6,6))
-    # FoM_2 = MSEFoM(target=-5*np.ones(project.device.size))
-    # FoM_2.set_target_2d_gaussian(arr_shape=project.device.size, peak=7.5, N=9, std=2, center_point=(18,18))
-    # project.fom = FoM(None, None, [(FoM_1,), (FoM_2,)], (1.0,2.0))
+    FoM_1 = MSEFoM(target=3*np.ones(project.device.size))
+    FoM_1.set_target_2d_gaussian(arr_shape=project.device.size, peak=5.5-2.25, N=9, std=2, center_point=(6,6))
+    FoM_1.target += 2.25
+    FoM_2 = MSEFoM(target=4*np.ones(project.device.size))
+    FoM_2.set_target_2d_gaussian(arr_shape=project.device.size, peak=5.5-2.25, N=9, std=2, center_point=(24,12))
+    FoM_2.target += 2.25
+    project.fom = FoM(None, None, [(FoM_1,), (FoM_2,)], (1.0,1.0))
     
-    foms, weights = FoM._load_from_config(project.config, project.base_sim)
-    FoM._setup_spectral_weights(foms, project.config)  #! TODO:
-    project.fom = FoM(None, None, [(f,) for f in foms], tuple(weights))
+    # foms, weights = FoM._load_from_config(project.config, project.base_sim)
+    # FoM._setup_spectral_weights(foms, project.config)  #! TODO:
+    # project.fom = FoM(None, None, [(f,) for f in foms], tuple(weights))
     
 
     # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
@@ -138,12 +201,12 @@ if __name__ == '__main__':
 
         cfg = project.config
         # NOTE: The optimizer is explicitly only a property of the Optimization, not the containing Project.
-        # optimizer = NLOptOptimizer()
-        # base_sim = base_sim.set_solver(None)
+        optimizer = NLOptOptimizer()
+        base_sim = base_sim.set_solver(None)
         # optimizer = GradientAscentOptimizer()
-        base_sim = base_sim.set_solver('LumericalFDTD')
+        # base_sim = base_sim.set_solver('LumericalFDTD')
         # optimizer = AdamOptimizer()
-        optimizer = vipdopt.optimization.optimizer._load_optimizer(project.config)
+        # optimizer = vipdopt.optimization.optimizer._load_optimizer(project.config)
 
         optimization = Optimization(
             base_sim,
@@ -165,7 +228,29 @@ if __name__ == '__main__':
             project=project,
         )
         vipdopt.logger.info(f'Optimization {opt_idx} initialized.')
+        
+        # Example of how to pass custom functions into the Optimization instance
+        optimization.update_histories = update_histories_em_filter
+        optimization.update_histories(optimization)
+        optimization.generate_plots = partial(generate_plots_simple_mse, self=optimization)
+        
         project.optimizations.append(optimization)
+        
+        # evaluation = Evaluation(
+            
+        # )
+        # vipdopt.logger.info(f'Evaluation {opt_idx} initialized.')
+        # project.evaluations.append(evaluation)
+        
+        # todo: What does the Evaluation even need to do?
+        # conduct a sweep
+        # perturb the base sim
+        # run sims (it's a method of self.base_sim)
+        # spit out plots
+        # so it needs to read in the sweep variables and the corresponding ways of perturbing
+        # those ways of perturbing need to be written in!
+        # perturb base sim and then run sims with create_forward_sims() and run_sims()
+        # grab info and feed into the sweep variable lists
 
     vipdopt.logger.info('Completed Step 0: Project Setup')
 
@@ -184,14 +269,17 @@ if __name__ == '__main__':
     # # GDS Export final design
     # project.device.export_density_as_gds( project.subdirectories['data'] / 'gds' )
 
-    import matplotlib.pyplot as plt
-    import matplotlib
-    matplotlib.use('TkAgg')
-    project.device.visualize_layer()
-    plt.show()
-
+    # import matplotlib.pyplot as plt
+    # import matplotlib
+    # matplotlib.use('TkAgg')
+    # project.device.visualize_layer()
+    # plt.show()
+    
+    
+    project.save_as(project.subdirectories['checkpoints'])
+    p2 = Project(config_type=SonyBayerConfig)
+    p2.load_project(args.directory)
     print('End of code reached.')
-
 # TO SAVE:
 # project
 # - base sim / partitioned sims

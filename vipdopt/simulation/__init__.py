@@ -1,7 +1,7 @@
 """Package for abstracting interactions with the simulations."""
 
 from vipdopt.simulation.lumfdtd import ISolver, LumericalFDTD
-# from vipdopt.simulation.monitor import Monitor, Power, Profile
+from vipdopt.simulation.monitor import Monitor, Power, Profile
 # from vipdopt.simulation.lumfdtdsimobject import (
 #     Import,
 #     LumericalEncoder,

@@ -6,9 +6,9 @@ from vipdopt.optimization.device import Device
 from vipdopt.optimization.fom import (
 #     BayerFilterFoM,
     FoM,
-#     GaussianFoM,
+    GaussianFoM,
 #     SuperFoM,
-#     UniformMAEFoM,
+    UniformMAEFoM,
     UniformMSEFoM,
     MSEFoM,
 )

@@ -24,6 +24,11 @@ def _load_optimizer(cfg):
         
         return optimizer_type(**optimizer_settings)
 
+def _save_optimizer(optimizer):
+    opt_dict = {}
+    opt_dict['optimizer'] = type(optimizer).__name__
+    opt_dict['optimizer_settings'] = vars(optimizer)
+    return opt_dict
 
 
 # TODO: Add support for other types of optimizers
@@ -37,6 +42,12 @@ class GradientOptimizer(abc.ABC):
     @abc.abstractmethod
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
+    
+    def as_dict(self):
+        return _save_optimizer(self)
+
+    def from_dict(cfg):
+        return _load_optimizer(cfg)
 
 
 class GradientAscentOptimizer(GradientOptimizer):
@@ -180,11 +191,25 @@ class NonGradientOptimizer(abc.ABC):
     @abc.abstractmethod
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
+    
+    def as_dict(self):
+        return _save_optimizer(self)
 
-class NLOptOptimizer():
+    def from_dict(cfg):
+        return _load_optimizer(cfg)
+
+
+class NLOptOptimizer(abc.ABC):
     def __init__(self, **kwargs):
         """Initialize an Optimizer class interfacing with NLOpt package."""
         vars(self).update(kwargs)
 
     def step(self, device: Device, gradient: npt.ArrayLike, iteration: int):
         """Step forward one iteration in the optimization process."""
+    
+    def as_dict(self):
+        return _save_optimizer(self)
+
+    def from_dict(cfg):
+        return _load_optimizer(cfg)
+

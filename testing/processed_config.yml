@@ -1,0 +1,233 @@
+#* Original Properties
+
+start_from_step: 0
+shelf_fn: save_state
+restart_epoch: 0
+restart_iter: 0
+pull_sim_files_from_debug_folder: False
+simulator_name: LumericalFDTD
+simulator_dimension: 2D
+simulator_max_wait_time: 3600
+use_autograd: False
+use_GUI_license: True
+convert_existing: False
+mesh_spacing_um: 0.034
+geometry_spacing_lateral_um: 0.102
+device_scale_um: 0.102
+use_smooth_blur: False
+min_feature_size_um: 0.085
+background_index: 1.5
+min_device_index: 1.5
+max_device_index: 2.4
+init_permittivity_0_1_scale: 0.5
+binarize_3_levels: False
+focal_plane_center_lateral_um: 0
+num_vertical_layers: 10
+vertical_layer_height_um: 0.204
+device_size_lateral_um: 3.96
+device_vertical_minimum_um: 0
+num_vertical_spacers: 0
+vertical_spacer_height_um: 0.51
+spacer_density: 0
+substrates_above_device: [{'name': 'glass_substrate', 'thickness_um': 0.4, 'material': 'SiO2 (Glass) - Palik'}]
+substrate_thickness_um: 0.4
+num_sidewalls: 0
+sidewall_material: etch
+sidewall_extend_pml: False
+sidewall_extend_focalplane: True
+sidewall_thickness_um: 0.085
+sidewall_vertical_minimum_um: -0.765
+add_infrared: False
+lambda_min_um: 0.4
+lambda_max_um: 0.7
+lambda_min_eval_um: 0.4
+lambda_max_eval_um: 0.7
+num_bands: 2
+num_points_per_band: 15
+num_dispersive_ranges: 1
+add_pdaf: False
+pdaf_angle_phi_degrees: 45
+pdaf_angle_theta_degrees: -8
+pdaf_adj_src_idx: 0
+fdtd_simulation_time_fs: 600
+weight_by_individual_wavelength: True
+use_gaussian_sources: True
+use_airy_approximation: True
+f_number: 2.2
+airy_correction_factor: 0.84
+beam_size_multiplier: 1
+source_angle_theta_vacuum_deg: 0
+source_angle_phi_deg: 0
+xy_phi_rotations: [0, 90]
+xy_adjtheta_rotations: [90, 0]
+xy_pol_rotations: [0, 90]
+xy_names: ['x', 'y']
+use_source_aperture: True
+num_focal_spots: 2
+dispersive_range_to_adjoint_src_map: [[0, 1, 2, 3]]
+adjoint_src_to_dispersive_range_map: [0, 0, 0, 0]
+enforce_xy_gradient_symmetry: False
+weight_by_quadrant_transmission: True
+total_num_iterations: 80
+epoch_list: [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80]
+epoch_start_design_change_max: 0.15
+epoch_end_design_change_max: 0.05
+epoch_start_design_change_min: 0.05
+epoch_end_design_change_min: 0
+num_layers_per_epoch: False
+fom_types: ['transmission', 'overall_transmission', 'intensity']
+optimization_fom: intensity
+reinterpolate_permittivity: True
+reinterpolate_permittivity_factor: 2
+reinterpolate_type: nearest
+border_optimization: False
+border_constant_width: 2
+border_constant_density: 0
+layer_gradient: False
+flip_gradient: False
+polarizations_focal_plane_map: [['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']]
+weight_focal_plane_map_performance_weighting: [1.0, 1.0, 1.0, 1.0]
+weight_focal_plane_map: [1.0, 1.0, 1.0, 1.0]
+do_green_balance: False
+polarization_name_to_idx: {'x': 0, 'y': 1, 'z': 2}
+desired_peaks_per_band_um: [0.475, 0.625]
+explicit_band_centering: True
+shuffle_green: False
+infrared_center_um: 0.94
+do_rejection: False
+softplus_kappa: 2
+boundary_conditions: pml
+evaluate_bordered_extended: False
+do_normalize: False
+mpi_exe: C:\Program Files (x86)\IntelSWToolsMPI\compilers_and_libraries_2020.4.321\windows\mpi\intel64\bin\mpiexec.exe
+solver_exe: C:\Program Files\Lumerical\v222\bin\fdtd-engine-impi.exe
+nprocs: 8
+optimizer: AdamOptimizer
+optimizer_settings: {'step_size': 0.01, 'betas': [0.9, 0.999], 'eps': '1e-8', 'moments': [0.0, 0.0]}
+figures_of_merit: {'fom_0': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_0x'], 'fom_monitors': ['focal_monitor_0', 'transmission_monitor_0', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}, 'fom_1': {'type': 'BayerFilterFoM', 'fwd_srcs': ['forward_src_x'], 'adj_srcs': ['adj_src_1x'], 'fom_monitors': ['focal_monitor_1', 'transmission_monitor_1', 'design_efield_monitor'], 'grad_monitors': ['design_efield_monitor'], 'polarization': 'TE', 'pos_max_freqs': [], 'neg_min_freqs': [], 'weight': 1.0}}
+eval_source: periodic_plane
+eval_boundary_conditions: auto
+eval_normalize_against: input_power
+eval_change_wavelength_range: True
+eval_device_array_shape: [1, 1]
+
+
+#
+# Derived Properties - The below will overwrite any vars with the same name above.
+#
+
+#* Mesh Properties
+
+min_feature_size_voxels: 0.8333333333333335
+blur_half_width_voxels: 0
+
+#* Optical Properties
+min_device_permittivity: 2.25
+max_device_permittivity: 5.76
+focal_length_um: 3.0599999999999996
+focal_plane_center_vertical_um: -3.0599999999999996
+
+#* Device Properties
+
+num_vertical_spacers: 0
+
+vertical_layer_height_voxels: 2
+device_size_vertical_um: 2.04
+device_voxels_lateral: 39
+device_voxels_vertical: 20
+device_voxels_simulation_mesh_lateral: 117
+
+device_voxels_simulation_mesh_vertical: 62
+
+device_vertical_maximum_um: 2.04
+device_size_lateral_bordered_um: 3.96
+device_voxels_simulation_mesh_lateral_bordered: 117
+border_size_um: 0.51
+border_size_voxels: 5
+device_voxels_lateral_bordered: 39
+
+#* FDTD Properties
+
+vertical_gap_size_um: 2.55
+lateral_gap_size_um: 1.02
+fdtd_region_size_vertical_um: 12.119999999999997
+
+fdtd_region_size_lateral_um: 6.0
+
+fdtd_region_maximum_vertical_um: 4.59
+
+fdtd_region_minimum_vertical_um: -4.08
+
+#* Surrounding Properties
+pec_aperture_thickness_um: 0.10200000000000001
+substrate_thickness_um: 0.4
+sidewall_x_positions_um: [2.0225, 0, -2.0225, 0]
+sidewall_y_positions_um: [0, 2.0225, 0, -2.0225]
+sidewall_xspan_positions_um: [0.085, 4.13, 0.085, 4.13]
+sidewall_yspan_positions_um: [4.13, 0.085, 4.13, 0.085]
+
+#* Spectral Properties
+bandwidth_um: 0.29999999999999993
+num_design_frequency_points: 30
+num_eval_frequency_points: 180
+lambda_values_um: [0.4, 0.41034482758620694, 0.4206896551724138, 0.4310344827586207, 0.4413793103448276, 0.4517241379310345, 0.4620689655172414, 0.4724137931034483, 0.4827586206896552, 0.49310344827586206, 0.503448275862069, 0.5137931034482759, 0.5241379310344827, 0.5344827586206896, 0.5448275862068965, 0.5551724137931034, 0.5655172413793104, 0.5758620689655172, 0.5862068965517241, 0.596551724137931, 0.6068965517241379, 0.6172413793103448, 0.6275862068965516, 0.6379310344827586, 0.6482758620689655, 0.6586206896551724, 0.6689655172413793, 0.6793103448275861, 0.6896551724137931, 0.7]
+max_intensity_by_wavelength: [164.14131487889273, 155.96960193562464, 148.39327687519355, 141.35587411266437, 134.80746661440313, 128.70377792729914, 123.00543177825688, 117.6773154142672, 112.68803739848882, 108.00946417968512, 103.61632262199197, 99.48585797983787, 95.59753865176512, 91.93280054153513, 88.4748250685139, 85.20834585897074, 82.1194799602313, 79.19558008571055, 76.42510494845611, 73.79750519597653, 71.30312283737025, 68.9331023691639, 66.67931207011175, 64.5342741566218, 62.49110267684419, 60.543448178788445, 58.68544832103255, 56.91168370765496, 55.21713832525952, 53.59716404208744]
+dispersive_range_size_um: 0.29999999999999993
+dispersive_ranges_um: [[0.4, 0.7]]
+
+#* PDAF Functionality Properties
+pdaf_focal_spot_x_um: 0.99
+pdaf_focal_spot_y_um: 0.99
+pdaf_lambda_min_um: 0.4
+pdaf_lambda_max_um: 0.5
+pdaf_lambda_values_um: [0.4, 0.403448275862069, 0.40689655172413797, 0.41034482758620694, 0.41379310344827586, 0.41724137931034483, 0.4206896551724138, 0.4241379310344828, 0.42758620689655175, 0.4310344827586207, 0.4344827586206897, 0.4379310344827586, 0.4413793103448276, 0.44482758620689655, 0.4482758620689655, 0.4517241379310345, 0.45517241379310347, 0.45862068965517244, 0.4620689655172414, 0.46551724137931033, 0.4689655172413793, 0.4724137931034483, 0.47586206896551725, 0.4793103448275862, 0.48275862068965514, 0.4862068965517241, 0.4896551724137931, 0.49310344827586206, 0.496551724137931, 0.5]
+pdaf_max_intensity_by_wavelength: [164.14131487889273, 161.34747118199874, 158.62435600476735, 155.96960193562464, 153.38093979238758, 150.85619377162632, 148.39327687519355, 145.99018659596675, 143.6450008461486, 141.35587411266437, 139.1210338252948, 136.93877692419747, 134.80746661440313, 132.72552929573828, 130.69145165741898, 128.70377792729914, 126.761107266436, 124.86209130026461, 123.00543177825688, 121.18987835447906, 119.41422648196263, 117.6773154142672, 115.97802630804351, 114.3152804208054, 112.68803739848883, 111.09529364772301, 109.53608078805699, 108.00946417968512, 106.51454152249137, 105.05044152249137]
+
+#* Forward (Input) Source Properties
+lateral_aperture_um: 4.356
+src_maximum_vertical_um: 4.165
+src_minimum_vertical_um: -3.8249999999999993
+mid_lambda_um: 0.55
+gaussian_waist_radius_um: 1
+source_angle_theta_rad: 0.0
+source_angle_theta_deg: 0.0
+
+#* Adjoint Source Properties
+adjoint_vertical_um: -3.0599999999999996
+num_adjoint_sources: 2
+adjoint_x_positions_um: [0.99, -0.99, -0.99, 0.99]
+adjoint_y_positions_um: [0.99, 0.99, -0.99, -0.99]
+
+#* Optimization Properties
+total_iters: 80 
+epoch_range_design_change_max: 0.09999999999999999
+epoch_range_design_change_min: 0.05
+
+num_layers_per_epoch: [10]
+
+spectral_focal_plane_map: [[0, 15], [15, 30], [30, 45], [15, 30]]
+desired_peak_location_per_band: [7, 22]
+
+#* Evaluation Properties
+
+
+
+
+
+eval_boundary_conditions: periodic
+
+
+
+
+      
+
+eval_lambda_min_um: 0.34
+eval_lambda_max_um: 0.7599999999999999
+
+
+
+eval_fdtd_region_size_lateral_um: 3.96
+eval_fdtd_region_size_vertical_um: 8.67
+eval_monitorbox_size_lateral_um: 4.3
+eval_monitorbox_vertical_maximum_um: 2.21
+eval_monitorbox_vertical_minimum_um: -0.17
