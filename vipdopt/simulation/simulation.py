@@ -351,7 +351,7 @@ class Simulation(ISimulation):
 
         Requires self.info['path'] to have been set already!!
         """
-        sim_path: Path = self.info['path']
+        sim_path: Path = Path(self.info['path'])
         if monitors is None:
             monitors = self.monitors()
         for mon in monitors:

@@ -137,6 +137,7 @@ def _yaml_loader(fname: PathLike) -> dict:
     SafeConstructor.add_constructor(  # type: ignore
         'tag:yaml.org,2002:python/tuple', new_constructor
     )
+    
     with open(fname, 'rb') as stream:
         return yaml.safe_load(stream)
 

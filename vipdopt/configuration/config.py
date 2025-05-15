@@ -24,6 +24,11 @@ class Config(UserDict):
         """Return shorter string version of the Config object."""
         return f'Config with parameters {super().__str__()}'
 
+    # def __getitem__(self, key):
+    #     # Simple logging to see how many times a key is accessed. Doesn't account for jinja
+    #     self.counts[key] += 1
+    #     return super().__getitem__(key)
+
     @ensure_path
     def read_file(self, fname: Path, cfg_format: str = 'auto') -> None:
         """Read a config file and update the dictionary."""
@@ -42,6 +47,15 @@ class Config(UserDict):
         """Create config object from a file."""
         cfg = cls()
         cfg.read_file(fname)
+
+        # Simple logging to see how many times a key is accessed. Doesn't account for jinja
+        # cfg.counts = dict(zip(copy.deepcopy(list(cfg.data.keys())), [0]*len(cfg.data.keys())))
+        # sim_props_jinja_filename = r"C:\Users\Ian\Dropbox\Caltech\Faraon Group\Simulations\Exploratory Quick Sims\vipdopt_v212_template\jinja_templates\derived_simulation_properties.j2"
+        # with open(sim_props_jinja_filename, 'r', encoding='utf-8') as f:
+        #     jinja_text = f.read()
+        # for k,v in cfg.counts.items():
+        #     cfg.counts[k] += jinja_text.count("data."+k)\
+
         return cfg
 
     @ensure_path
@@ -66,7 +80,7 @@ class Config(UserDict):
             case _:
                 msg = f'{cfg_format} file saving not yet supported.'
                 raise NotImplementedError(msg)
-    
+
     @classmethod
     @ensure_path
     def save_new(self, fname: Path, data, cfg_format: str = 'auto', **kwargs) -> None:

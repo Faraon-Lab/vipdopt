@@ -308,3 +308,15 @@ if __name__ == '__main__':
     project.save_as(output_dir)
     # Test that the saved format is loadable
     project2 = Project.from_dir(output_dir)
+    
+    
+# TO SAVE:
+# project
+# - base sim / partitioned sims
+# - device / partitioned devices
+# optimization
+# - optimizer
+# NO NEED TO SAVE:
+# FoM (shouldn't change)
+# config
+# args

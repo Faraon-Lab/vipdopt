@@ -102,10 +102,10 @@ def test_save_load_config(tmp_path, filetype: str, expectation):
         ('focal_length_um', 0.051 * 30),
         ('focal_plane_center_vertical_um', -0.051 * 30),
         # Device Properties
-        ('vertical_layer_height_voxels', round(0.408 / 0.051)),
+        ('layer_height_voxels', round(0.408 / 0.051)),
         ('device_size_vertical_um', 0.408 * 5),
         ('device_voxels_lateral', round(2.04 / 0.085)),
-        ('device_voxels_vertical', round(0.408 * 5 / 0.051)),
+        ('device_voxels_z', round(0.408 * 5 / 0.051)),
         (
             'device_voxels_simulation_mesh_lateral',
             1 + int(2.04 / 0.017),
@@ -124,16 +124,16 @@ def test_save_load_config(tmp_path, filetype: str, expectation):
         ('border_size_voxels', int(round((5 * 0.051) / 0.085))),
         ('device_voxels_lateral_bordered', int(round(2.04 / 0.085))),
         # FDTD Properties
-        ('vertical_gap_size_um', 0.085 * 25),
-        ('lateral_gap_size_um', 0.051 * 10),
+        ('sim_edge_gap_z_um', 0.085 * 25),
+        ('sim_edge_gap_x_um', 0.051 * 10),
         (
-            'fdtd_region_size_vertical_um',
+            'fdtd_size_z_um',
             2 * (0.085 * 25) + (0.408 * 5) + (0.051 * 30),
         ),
-        ('fdtd_region_size_lateral_um', 2 * (0.051 * 10) + 2.04),
-        ('fdtd_region_maximum_vertical_um', 2.04 + (0.085 * 25)),
+        ('fdtd_size_x_um', 2 * (0.051 * 10) + 2.04),
+        ('fdtd_region_maximum_z_um', 2.04 + (0.085 * 25)),
         (
-            'fdtd_region_minimum_vertical_um',
+            'fdtd_region_minimum_z_um',
             -1 * 0.051 * 30 - (0.085 * 25),
         ),
         # Surrounding Properties

@@ -77,7 +77,7 @@ mesh_spacing_um: 0.017
 geometry_spacing_lateral_um: 0.085
 device_scale_um: 0.051    # Controls vertical dimensions e.g. focal length, device vertical layer voxels, and FDTD gap sizes.
 num_vertical_layers: 10
-vertical_layer_height_um: 0.204
+layer_height_um: 0.204
 device_size_lateral_um: 2.04
 sidewall_thickness_um: 0.24
 sidewall_material: 'air'

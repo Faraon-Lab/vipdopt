@@ -149,8 +149,7 @@ if __name__ == '__main__':
 
     from vipdopt.configuration import SonyBayerConfig
     project = Project(config_type=SonyBayerConfig)
-    # project.load_project(args.directory, config_name=args.config)
-    project.load_project(args.directory)
+    project.load_project(args.directory, config_name=args.config)
     # What does the Project class contain?
     # 'dir': directory where it's stored; 'config': SonyBayerConfig object; 'optimization': Optimization object;
     # 'device': Device object; 'base_sim': Simulation object;
@@ -172,16 +171,16 @@ if __name__ == '__main__':
     # FoM_1 = MSEFoM(target=im)
     # FoM_2 = MSEFoM(target=im)
 
-    FoM_1 = MSEFoM(target=3*np.ones(project.device.size))
-    FoM_1.set_target_2d_gaussian(arr_shape=project.device.size, peak=5.5-2.25, N=9, std=2, center_point=(6,6))
-    FoM_1.target += 2.25
-    FoM_2 = MSEFoM(target=4*np.ones(project.device.size))
-    FoM_2.set_target_2d_gaussian(arr_shape=project.device.size, peak=5.5-2.25, N=9, std=2, center_point=(24,12))
-    FoM_2.target += 2.25
-    project.fom = FoM(None, None, [(FoM_1,), (FoM_2,)], (1.0,1.0))
+    # FoM_1 = MSEFoM(target=3*np.ones(project.device.size))
+    # FoM_1.set_target_2d_gaussian(arr_shape=project.device.size, peak=5.5-2.25, N=9, std=2, center_point=(6,6))
+    # FoM_1.target += 2.25
+    # FoM_2 = MSEFoM(target=4*np.ones(project.device.size))
+    # FoM_2.set_target_2d_gaussian(arr_shape=project.device.size, peak=5.5-2.25, N=9, std=2, center_point=(24,12))
+    # FoM_2.target += 2.25
+    # project.fom = FoM(None, None, [(FoM_1,), (FoM_2,)], (1.0,1.0))
     
-    # foms, weights = FoM._load_from_config(project.config, project.base_sim)
-    # FoM._setup_spectral_weights(foms, project.config)  #! TODO:
+    project.fom = FoM._load_from_config(project.config, project.base_sim)
+    project.fom._setup_spectral_weights(project.fom.foms, project.config)  #! TODO:
     # project.fom = FoM(None, None, [(f,) for f in foms], tuple(weights))
     
 
@@ -201,12 +200,12 @@ if __name__ == '__main__':
 
         cfg = project.config
         # NOTE: The optimizer is explicitly only a property of the Optimization, not the containing Project.
-        optimizer = NLOptOptimizer()
-        base_sim = base_sim.set_solver(None)
+        # optimizer = NLOptOptimizer()
+        # base_sim = base_sim.set_solver(None)
         # optimizer = GradientAscentOptimizer()
-        # base_sim = base_sim.set_solver('LumericalFDTD')
+        base_sim = base_sim.set_solver('LumericalFDTD')
         # optimizer = AdamOptimizer()
-        # optimizer = vipdopt.optimization.optimizer._load_optimizer(project.config)
+        optimizer = vipdopt.optimization.optimizer._load_optimizer(project.config)
 
         optimization = Optimization(
             base_sim,
@@ -280,13 +279,3 @@ if __name__ == '__main__':
     p2 = Project(config_type=SonyBayerConfig)
     p2.load_project(args.directory)
     print('End of code reached.')
-# TO SAVE:
-# project
-# - base sim / partitioned sims
-# - device / partitioned devices
-# optimization
-# - optimizer
-# NO NEED TO SAVE:
-# FoM (shouldn't change)
-# config
-# args

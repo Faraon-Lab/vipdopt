@@ -186,24 +186,24 @@ class Device:
             # corresponding E-field monitor regions
             region_coordinates = Coordinates({
                 'x': np.linspace(
-                    -0.5 * cfg['device_size_lateral_bordered_um'],
-                    0.5 * cfg['device_size_lateral_bordered_um'],
-                    cfg['device_voxels_lateral_bordered'],
+                    -0.5 * cfg['device_size_x_bordered_um'],
+                    0.5 * cfg['device_size_x_bordered_um'],
+                    cfg['device_voxels_x_bordered'],
                 ),
                 'y': np.array([]),
                 'z': np.array([]),
             })
             if cfg['simulator_dimension'] == '2D':
                 voxel_array_size = (
-                    cfg['device_voxels_lateral_bordered'],
-                    cfg['device_voxels_vertical'],
+                    cfg['device_voxels_x_bordered'],
+                    cfg['device_voxels_z'],
                     3,
                 )
                 region_coordinates.update({
                     'y': np.linspace(
                         cfg['device_vertical_minimum_um'],
                         cfg['device_vertical_maximum_um'],
-                        cfg['device_voxels_vertical'],
+                        cfg['device_voxels_z'],
                     ),
                     'z': np.linspace(
                         -1.5 * cfg['mesh_spacing_um'],
@@ -214,20 +214,20 @@ class Device:
 
             elif cfg['simulator_dimension'] == '3D':
                 voxel_array_size = (
-                    cfg['device_voxels_lateral_bordered'],
-                    cfg['device_voxels_lateral_bordered'],
-                    cfg['device_voxels_vertical'],
+                    cfg['device_voxels_x_bordered'],
+                    cfg['device_voxels_y_bordered'],
+                    cfg['device_voxels_z'],
                 )
                 region_coordinates.update({
                     'y': np.linspace(
-                        -0.5 * cfg['device_size_lateral_bordered_um'],
-                        0.5 * cfg['device_size_lateral_bordered_um'],
-                        cfg['device_voxels_lateral_bordered'],
+                        -0.5 * cfg['device_size_y_bordered_um'],
+                        0.5 * cfg['device_size_y_bordered_um'],
+                        cfg['device_voxels_y_bordered'],
                     ),
                     'z': np.linspace(
                         cfg['device_vertical_minimum_um'],
                         cfg['device_vertical_maximum_um'],
-                        cfg['device_voxels_vertical'],
+                        cfg['device_voxels_z'],
                     ),
                 })
 
@@ -241,9 +241,9 @@ class Device:
                     # todo: put back the Layering filter when it's time
                     # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
                     #         cfg['num_vertical_layers'] ,
-                    #         cfg['num_vertical_spacers'], (0,1),
-                    #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']),
-                    #         spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+                    #         cfg['num_spacers'], (0,1),
+                    #         layer_height_voxels = round(cfg['layer_height_um']//cfg['device_scale_um']),
+                    #         spacer_height_voxels = 0 if not cfg['num_spacers'] else round(cfg['spacer_height_um']//cfg['device_scale_um']),
                     #         # layer_height_voxels=4, spacer_height_voxels=2,
                     #         spacer_voxels_value=cfg['spacer_density'],
                     #         ),
@@ -256,9 +256,9 @@ class Device:
         # TODO: 20240930 - Testing =========================
         # f = Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
         #              cfg['num_vertical_layers'],
-        #              cfg['num_vertical_spacers'], (0,1),
-        #              layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']),
-        #              spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+        #              cfg['num_spacers'], (0,1),
+        #              layer_height_voxels = round(cfg['layer_height_um']//cfg['device_scale_um']),
+        #              spacer_height_voxels = 0 if not cfg['num_spacers'] else round(cfg['spacer_height_um']//cfg['device_scale_um']),
         #             # layer_height_voxels=4, spacer_height_voxels=2,
         #             spacer_voxels_value=cfg['spacer_density'],
         #             )
@@ -400,9 +400,9 @@ class Device:
             #     #! 20241002: Updated Layering class.
             #     # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
             #     #         cfg['num_vertical_layers'] ,
-            #     #         cfg['num_vertical_spacers'], (0,1),
-            #     #         layer_height_voxels = round(cfg['vertical_layer_height_um']//cfg['device_scale_um']),
-            #     #         spacer_height_voxels = 0 if not cfg['num_vertical_spacers'] else round(cfg['vertical_spacer_height_um']//cfg['device_scale_um']),
+            #     #         cfg['num_spacers'], (0,1),
+            #     #         layer_height_voxels = round(cfg['layer_height_um']//cfg['device_scale_um']),
+            #     #         spacer_height_voxels = 0 if not cfg['num_spacers'] else round(cfg['spacer_height_um']//cfg['device_scale_um']),
             #     #         # layer_height_voxels=4, spacer_height_voxels=2,
             #     #         spacer_voxels_value=cfg['spacer_density'],
             #     #         ),

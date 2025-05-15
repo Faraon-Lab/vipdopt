@@ -100,10 +100,10 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
     'focal_length_um': 0.102 * 30,
     'focal_plane_center_vertical_um': -0.102 * 30,
     # Device Properties
-    'vertical_layer_height_voxels': round(0.204 / 0.102),
+    'layer_height_voxels': round(0.204 / 0.102),
     'device_size_vertical_um': 0.408 * 5,
     'device_voxels_lateral': round(3.96 / 0.102),
-    'device_voxels_vertical': round(0.408 * 5 / 0.102),
+    'device_voxels_z': round(0.408 * 5 / 0.102),
     # todo: the rest
     # todo: or honestly just set something to match the derived_simulation_properties.j2
     # 'device_voxels_simulation_mesh_lateral': 1 + int(3.96 / 0.034),
@@ -115,12 +115,12 @@ EXAMPLE_CONFIG_DERIVED_PROPERTIES = {
     # 'border_size_voxels': int(round((5 * 0.051) / 0.085)),
     # 'device_voxels_lateral_bordered': int(round(2.04 / 0.085)),
     # # FDTD Properties
-    # 'vertical_gap_size_um': 0.085 * 25,
-    # 'lateral_gap_size_um': 0.051 * 10,
-    # 'fdtd_region_size_vertical_um': 2 * (0.085 * 25) + (0.408 * 5) + (0.051 * 30),
-    # 'fdtd_region_size_lateral_um': 2 * (0.051 * 10) + 2.04,
-    # 'fdtd_region_maximum_vertical_um': 2.04 + (0.085 * 25),
-    # 'fdtd_region_minimum_vertical_um': -1 * 0.051 * 30 - (0.085 * 25),
+    # 'sim_edge_gap_z_um': 0.085 * 25,
+    # 'sim_edge_gap_x_um': 0.051 * 10,
+    # 'fdtd_size_z_um': 2 * (0.085 * 25) + (0.408 * 5) + (0.051 * 30),
+    # 'fdtd_size_x_um': 2 * (0.051 * 10) + 2.04,
+    # 'fdtd_region_maximum_z_um': 2.04 + (0.085 * 25),
+    # 'fdtd_region_minimum_z_um': -1 * 0.051 * 30 - (0.085 * 25),
     # # Surrounding Properties
     # 'pec_aperture_thickness_um': 3 * 0.017,
     # 'sidewall_x_positions_um': [(2.04 + 0.085) / 2, 0, -(2.04 + 0.085) / 2, 0],

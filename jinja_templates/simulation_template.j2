@@ -11,14 +11,14 @@
             "obj_type": "fdtd",
             "properties": {
                 "dimension": "{{ data.simulator_dimension }}",
-                "x span": {{ data.fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
-                "y max": {{ data.fdtd_region_maximum_vertical_um * 1e-6 }},
-                "y min": {{ data.fdtd_region_minimum_vertical_um * 1e-6 }},
+                "y max": {{ data.fdtd_region_maximum_z_um * 1e-6 }},
+                "y min": {{ data.fdtd_region_minimum_z_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
-                "y span": {{data.fdtd_region_size_lateral_um * 1e-6 }},
-                "z max": {{ data.fdtd_region_maximum_vertical_um * 1e-6 }},
-                "z min": {{ data.fdtd_region_minimum_vertical_um * 1e-6 }},
+                "y span": {{data.fdtd_size_x_um * 1e-6 }},
+                "z max": {{ data.fdtd_region_maximum_z_um * 1e-6 }},
+                "z min": {{ data.fdtd_region_minimum_z_um * 1e-6 }},
                 "simulation time": {{ data.fdtd_simulation_time_fs * 1e-15 }},
                 {%- endif %}
                 {% if data.boundary_conditions == 'periodic' -%}
@@ -38,13 +38,13 @@
             {# Add a Gaussian wave forward source at angled incidence #}
             "obj_type": "gaussian",
             "properties": {
-                "x span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "injection axis": "y-axis",
                 "y": {{ data.src_maximum_vertical_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "injection axis": "z-axis",
-                "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 "z": {{ data.src_maximum_vertical_um * 1e-6 }},
                 {%- endif %}
                 "direction": "Backward",
@@ -66,12 +66,12 @@
                 "angle phi": {{ data.source_angle_phi_deg }},
                 "polarization angle": {{ data.xy_phi_rotations[i] }},
                 "direction": "Backward",
-                "x span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "y max": {{ data.src_maximum_vertical_um * 1e-6 }},
                 "y min": {{ data.src_minimum_vertical_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
-                "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 "z max": {{ data.src_maximum_vertical_um * 1e-6 }},
                 "z min": {{ data.src_minimum_vertical_um * 1e-6 }},
                 {%- endif %}
@@ -146,11 +146,11 @@
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "2D Z-normal",
                 "y": {{ data.adjoint_y_positions_um[adj_src] * 1e-6 }},
-                "y span": {{ 0.5 * data.device_size_lateral_um * 1e-6 }},
+                "y span": {{ 0.5 * data.device_size_y_um * 1e-6 }},
                 "z": {{ data.adjoint_vertical_um * 1e-6 }},
                 {%- endif %}
                 "x": {{ data.adjoint_x_positions_um[adj_src] * 1e-6 }},
-                "x span": {{ 0.5 * data.device_size_lateral_um * 1e-6 }},
+                "x span": {{ 0.5 * data.device_size_x_um * 1e-6 }},
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -168,11 +168,11 @@
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "2D Z-normal",
                 "y": 0,
-                "y span": {{ data.device_size_lateral_um * 1e-6 }},
+                "y span": {{ data.device_size_y_um * 1e-6 }},
                 "z": {{ data.adjoint_vertical_um * 1e-6 }},
                 {%- endif %}
                 "x": 0,
-                "x span": {{ data.device_size_lateral_um * 1e-6 }},
+                "x span": {{ data.device_size_x_um * 1e-6 }},
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -186,20 +186,20 @@
             "obj_type": "rect",
             "properties": {
                 "x": 0,
-                "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
+                "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "y min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 "y max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "y": 0,
-                "y span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
+                "y span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_y_um * 1e-6 }},
                 "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {%- endif %}
                 {%- if data.boundary_conditions == 'periodic' %}
                 "enabled": false,
-                "x span": {{data.fdtd_region_size_lateral_um * 1e-6}},
-                "y span": {{data.fdtd_region_size_lateral_um * 1e-6}},
+                "x span": {{data.fdtd_size_x_um * 1e-6}},
+                "y span": {{data.fdtd_size_x_um * 1e-6}},
                 {% endif -%}
                 "material": "PEC (Perfect Electrical Conductor)"
             }
@@ -209,13 +209,13 @@
             "obj_type": "rect",
             "properties": {
                 "x": 0,
-                "x span": {{ data.device_size_lateral_um * 1e-6 }},
+                "x span": {{ data.device_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "y min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 "y max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "y": 0,
-                "y span": {{ data.device_size_lateral_um * 1e-6 }},
+                "y span": {{ data.device_size_y_um * 1e-6 }},
                 "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {%- endif %}
@@ -234,14 +234,14 @@
             "properties": {
                 "x": 0,
                 {%- if data.boundary_conditions == 'periodic' %}
-                "x span": {{data.fdtd_region_size_lateral_um * 1e-6}},
+                "x span": {{data.fdtd_size_x_um * 1e-6}},
                 {% if data.simulator_dimension == '3D'-%}
-                "y span": {{data.fdtd_region_size_lateral_um * 1e-6}},
+                "y span": {{data.fdtd_size_y_um * 1e-6}},
                 {%- endif %}
                 {%- else -%}
-                "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
+                "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '3D'-%}
-                "y span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_lateral_um * 1e-6 }},
+                "y span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_y_um * 1e-6 }},
                 {% endif -%}
                 {% endif -%}
 
@@ -311,13 +311,13 @@
             "obj_type": "import",
             "dev_id": 0,                {# ID keeps track of which device this belongs to. #}
             "properties": {
-                "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
+                "x span": {{ data.device_size_x_bordered_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "y min": {{ data.device_vertical_minimum_um * 1e-6 }},
                 "y max": {{ data.device_vertical_maximum_um * 1e-6 }},
                 "z span": {{ 3 * data.mesh_spacing_um * 1e-6 }}
                 {% elif data.simulator_dimension == '3D'-%}
-                "y span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
+                "y span": {{ data.device_size_y_bordered_um * 1e-6 }},
                 "z min": {{ data.device_vertical_minimum_um * 1e-6 }},
                 "z max": {{ data.device_vertical_maximum_um * 1e-6 }}
                 {%- endif %}
@@ -329,14 +329,14 @@
             "dev_id": 0,
             "properties": {
                 "x": 0,
-                "x span": {{ data.fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "y min": {{ (data.device_vertical_minimum_um - 0.5) * 1e-6 }},
                 "y max": {{ (data.device_vertical_maximum_um + 0.5) * 1e-6 }},
                 "z span": {{ 3 * data.mesh_spacing_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "y": 0,
-                "y span": {{ data.fdtd_region_size_lateral_um * 1e-6 }},
+                "y span": {{ data.fdtd_size_y_um * 1e-6 }},
                 "z min": {{ (data.device_vertical_minimum_um - 0.5) * 1e-6 }},
                 "z max": {{ (data.device_vertical_maximum_um + 0.5) * 1e-6 }},
                 {%- endif %}
@@ -350,14 +350,14 @@
             "obj_type": "index",
             "dev_id": 0,
             "properties": {
-                "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
+                "x span": {{ data.device_size_x_bordered_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "monitor type": "2D Z-Normal",
                 "y min": {{ data.device_vertical_minimum_um * 1e-6 }},
                 "y max": {{ data.device_vertical_maximum_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "3D",
-                "y span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
+                "y span": {{ data.device_size_y_bordered_um * 1e-6 }},
                 "z min": {{ data.device_vertical_minimum_um * 1e-6 }},
                 "z max": {{ data.device_vertical_maximum_um * 1e-6 }},
                 {%- endif %}
@@ -369,7 +369,7 @@
             "obj_type": "profile",
             "dev_id": 0,
             "properties": {
-                "x span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
+                "x span": {{ data.device_size_x_bordered_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "monitor type": "2D Z-Normal",
                 "y min": {{ data.device_vertical_minimum_um * 1e-6 }},
@@ -377,7 +377,7 @@
                 "z span": {{ 3 * data.mesh_spacing_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "3D",
-                "y span": {{ data.device_size_lateral_bordered_um * 1e-6 }},
+                "y span": {{ data.device_size_y_bordered_um * 1e-6 }},
                 "z min": {{ data.device_vertical_minimum_um * 1e-6 }},
                 "z max": {{ data.device_vertical_maximum_um * 1e-6 }},
                 {%- endif %}
@@ -401,15 +401,15 @@
             "properties": {
                 {% if data.simulator_dimension == '2D'-%}
                 "monitor type": "Linear X",
-                "y": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},
+                "y": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "2D Z-normal",
                 "y": 0,
-                "y span": {{ data.eval_monitorbox_size_lateral_um*1.1 * 1e-6 }},
-                "z": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},         {#! Shouldn't this be right below the source? #}
+                "y span": {{ data.eval_monitorbox_size_x_um*1.1 * 1e-6 }},
+                "z": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},         {#! Shouldn't this be right below the source? #}
                 {%- endif %}
                 "x": 0,
-                "x span": {{ data.eval_monitorbox_size_lateral_um*1.1 * 1e-6 }},
+                "x span": {{ data.eval_monitorbox_size_x_um*1.1 * 1e-6 }},
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -424,15 +424,15 @@
             "properties": {
                 {% if data.simulator_dimension == '2D'-%}
                 "monitor type": "Linear X",
-                "y": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},
+                "y": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "2D Z-normal",
                 "y": 0,
-                "y span": {{ data.eval_fdtd_region_size_lateral_um*1.1 * 1e-6 }},
-                "z": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},
+                "y span": {{ data.eval_fdtd_size_x_um*1.1 * 1e-6 }},
+                "z": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},
                 {%- endif %}
                 "x": 0,
-                "x span": {{ data.eval_fdtd_region_size_lateral_um*1.1 * 1e-6 }},
+                "x span": {{ data.eval_fdtd_size_x_um*1.1 * 1e-6 }},
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -447,17 +447,17 @@
             "properties": {
                 {% if data.simulator_dimension == '2D'-%}
                 "monitor type": "Linear X",
-                "y": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},
+                "y": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "2D Z-normal",
                 "y": 0,
-                {# "y span": {{ data.eval_monitorbox_size_lateral_um*1.1 * 1e-6 }}, #}
-                "y span": {{ data.eval_monitorbox_size_lateral_um * 1e-6 }},
-                "z": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},
+                {# "y span": {{ data.eval_monitorbox_size_x_um*1.1 * 1e-6 }}, #}
+                "y span": {{ data.eval_monitorbox_size_x_um * 1e-6 }},
+                "z": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},
                 {%- endif %}
                 "x": 0,
-                {# "x span": {{ data.eval_monitorbox_size_lateral_um*1.1 * 1e-6 }}, #}
-                "x span": {{ data.eval_monitorbox_size_lateral_um * 1e-6 }},
+                {# "x span": {{ data.eval_monitorbox_size_x_um*1.1 * 1e-6 }}, #}
+                "x span": {{ data.eval_monitorbox_size_x_um * 1e-6 }},
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -472,17 +472,17 @@
             "properties": {
                 {% if data.simulator_dimension == '2D'-%}
                 "monitor type": "Linear X",
-                "y": {{ data.eval_monitorbox_vertical_minimum_um * 1e-6 }},
+                "y": {{ data.eval_monitorbox_minimum_z_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "2D Z-normal",
                 "y": 0,
-                {# "y span": {{ data.eval_monitorbox_size_lateral_um*1.1 * 1e-6 }}, #}
-                "y span": {{ data.eval_monitorbox_size_lateral_um * 1e-6 }},
-                "z": {{ data.eval_monitorbox_vertical_minimum_um * 1e-6 }},
+                {# "y span": {{ data.eval_monitorbox_size_x_um*1.1 * 1e-6 }}, #}
+                "y span": {{ data.eval_monitorbox_size_x_um * 1e-6 }},
+                "z": {{ data.eval_monitorbox_minimum_z_um * 1e-6 }},
                 {%- endif %}
                 "x": 0,
-                {# "x span": {{ data.eval_monitorbox_size_lateral_um*1.1 * 1e-6 }}, #}
-                "x span": {{ data.eval_monitorbox_size_lateral_um * 1e-6 }},
+                {# "x span": {{ data.eval_monitorbox_size_x_um*1.1 * 1e-6 }}, #}
+                "x span": {{ data.eval_monitorbox_size_x_um * 1e-6 }},
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
@@ -490,10 +490,10 @@
             }
         },
 
-        {% set sm_x_pos = [data.eval_monitorbox_size_lateral_um/2, 0, -data.eval_monitorbox_size_lateral_um/2, 0] %}
-        {% set sm_y_pos = [0, data.eval_monitorbox_size_lateral_um/2, 0, -data.eval_monitorbox_size_lateral_um/2] %}
-        {% set sm_xspan_pos = [0, data.eval_monitorbox_size_lateral_um, 0, data.eval_monitorbox_size_lateral_um] %}
-        {% set sm_yspan_pos = [data.eval_monitorbox_size_lateral_um, 0, data.eval_monitorbox_size_lateral_um, 0] %}
+        {% set sm_x_pos = [data.eval_monitorbox_size_x_um/2, 0, -data.eval_monitorbox_size_x_um/2, 0] %}
+        {% set sm_y_pos = [0, data.eval_monitorbox_size_x_um/2, 0, -data.eval_monitorbox_size_x_um/2] %}
+        {% set sm_xspan_pos = [0, data.eval_monitorbox_size_x_um, 0, data.eval_monitorbox_size_x_um] %}
+        {% set sm_yspan_pos = [data.eval_monitorbox_size_x_um, 0, data.eval_monitorbox_size_x_um, 0] %}
         {% set sm_monitor_types = ['2D X-normal', '2D Y-normal', '2D X-normal', '2D Y-normal']%}
         {% set sm_indices = range(0,2) if data.simulator_dimension == '2D' else range(0,4)%}
 
@@ -507,16 +507,16 @@
                 {% if data.simulator_dimension == '2D'-%}
                 "monitor type": "Linear Y",
                 "x": {{ sm_x_pos[2*sm_idx] * 1e-6 }},   {# match [0,1] to [0,1,2,3]: 0->0, 1->2 #}
-                "y max": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},
-                "y min": {{ data.eval_monitorbox_vertical_minimum_um * 1e-6 }},
+                "y max": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},
+                "y min": {{ data.eval_monitorbox_minimum_z_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "{{sm_monitor_types[sm_idx]}}",
                 "x max": {{ (sm_x_pos[sm_idx] + sm_xspan_pos[sm_idx]/2) * 1e-6 }},
                 "x min": {{ (sm_x_pos[sm_idx] - sm_xspan_pos[sm_idx]/2) * 1e-6 }},
                 "y max": {{ (sm_y_pos[sm_idx] + sm_yspan_pos[sm_idx]/2) * 1e-6 }},
                 "y min": {{ (sm_y_pos[sm_idx] - sm_yspan_pos[sm_idx]/2) * 1e-6 }},
-                "z max": {{ data.eval_monitorbox_vertical_maximum_um * 1e-6 }},
-                "z min": {{ data.eval_monitorbox_vertical_minimum_um * 1e-6 }},
+                "z max": {{ data.eval_monitorbox_maximum_z_um * 1e-6 }},
+                "z min": {{ data.eval_monitorbox_minimum_z_um * 1e-6 }},
                 {%- endif %}
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
@@ -526,7 +526,8 @@
         },
         {%- endfor %}
 
-        {% set sm_to_vsm_factor = data.device_size_lateral_um/data.eval_monitorbox_size_lateral_um %}
+        {% set sm_to_vsm_factor = data.device_size_x_um/data.eval_monitorbox_size_x_um %}
+        {# !TODO: y instead of x? #}
 
         {# Side monitors enclosing the space between the device's exit aperture and the focal plane.
         # Purpose is to capture the sum power of oblique scattering. #}
@@ -574,15 +575,15 @@
             "properties": {
             {% if data.simulator_dimension == '2D'-%}
             "monitor type": "Linear X",
-            "y": {{ data.eval_monitorbox_vertical_minimum_um * 1e-6 }},
+            "y": {{ data.eval_monitorbox_minimum_z_um * 1e-6 }},
             {% elif data.simulator_dimension == '3D'-%}
             "monitor type": "2D Z-normal",
             "y": 0,
-            "y span": {{ (data.device_size_lateral_um/2*scatter_plane_width_factor) * 1e-6 }},
+            "y span": {{ (data.device_size_y_um/2*scatter_plane_width_factor) * 1e-6 }},
             "z": {{ data.adjoint_vertical_um * 1e-6 }},
             {%- endif %}
             "x": 0,
-            "x span": {{ (data.device_size_lateral_um/2*scatter_plane_width_factor) * 1e-6 }},
+            "x span": {{ (data.device_size_x_um/2*scatter_plane_width_factor) * 1e-6 }},
             "override global monitor settings": 1,
             "use wavelength spacing": 1,
             "use source limits": 1,
@@ -590,10 +591,10 @@
             }
         },
 
-        {% set dxm_pos = [-data.device_size_lateral_um/4, 0, data.device_size_lateral_um/4] %}
+        {% set dxm_pos = [-data.device_size_x_um/4, 0, data.device_size_x_um/4] %}
         {# # Device cross-section monitors that take the field inside the device, and extend all the way down to the focal plane.
         We have 6 slices, 2 sets of 3 for both x and y.
-        # Each direction-set has slices at x(y) = -device_size_lateral_um/4, 0, +device_size_lateral_um/4, i.e. intersecting
+        # Each direction-set has slices at x(y) = -device_size_x(y)_um/4, 0, +device_size_x(y)_um/4, i.e. intersecting
         where the focal spot is supposed to be.
         # We also take care to output plots for both E_norm and Re(E), the latter of which captures the wave-like behaviour much
         more accurately. #}
@@ -618,14 +619,14 @@
                 {% elif xy_idx == 'y' %}
                     {% if data.simulator_dimension == '2D' %}
                     "monitor type": "Linear X",
-                    "y": {{ ((device_hgt/data.device_size_lateral_um)*dxm_pos[xmon_idx] + 
+                    "y": {{ ((device_hgt/data.device_size_y_um)*dxm_pos[xmon_idx] + 
                                 device_center_vertical ) * 1e-6 }},
                     {% elif data.simulator_dimension == '3D' %}
                     "monitor type": "2D X-normal",
                     "y": {{ dxm_pos[xmon_idx] * 1e-6 }},
                     {% endif %}
-                    "x max": {{ -data.device_size_lateral_um/2 * 1e-6 }},
-                    "x min": {{ data.device_size_lateral_um/2 * 1e-6 }},
+                    "x max": {{ -data.device_size_x_um/2 * 1e-6 }},
+                    "x min": {{ data.device_size_x_um/2 * 1e-6 }},
                 {% endif %}
                 
                 {% if data.simulator_dimension == '3D' %}
@@ -650,13 +651,13 @@
             {# Add a Gaussian wave forward source at angled incidence #}
             "obj_type": "gaussian",
             "properties": {
-                "x span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "injection axis": "y-axis",
                 "y": {{ data.src_maximum_vertical_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "injection axis": "z-axis",
-                "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 "z": {{ data.src_maximum_vertical_um * 1e-6 }},
                 {%- endif %}
                 "direction": "Backward",
@@ -679,12 +680,12 @@
                 "angle phi": {{ data.source_angle_phi_deg }},
                 "polarization angle": {{ data.xy_phi_rotations[i] }},
                 "direction": "Backward",
-                "x span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "y max": {{ data.src_maximum_vertical_um * 1e-6 }},
                 "y min": {{ data.src_minimum_vertical_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
-                "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 "z max": {{ data.src_maximum_vertical_um * 1e-6 }},
                 "z min": {{ data.src_minimum_vertical_um * 1e-6 }},
                 {%- endif %}
@@ -695,13 +696,13 @@
             "obj_type": "plane",
             {# Add a Plane wave forward source at normal incidence #}
             "properties": {
-                "x span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "injection axis": "y-axis",
                 "y": {{ data.src_maximum_vertical_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "injection axis": "z-axis",
-                "y span": {{ 2 * data.fdtd_region_size_lateral_um * 1e-6 }},
+                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 "z": {{ data.src_maximum_vertical_um * 1e-6 }},
                 {%- endif %}
                 "direction": "Backward",
@@ -732,14 +733,14 @@
             "obj_type": "fdtd",
             "properties": {
                 "dimension": "{{ data.simulator_dimension }}",
-                "x span": {{ data.eval_fdtd_region_size_lateral_um * 1e-6 }},
+                "x span": {{ data.eval_fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
-                "y max": {{ data.fdtd_region_maximum_vertical_um * 1e-6 }},
-                "y min": {{ data.fdtd_region_minimum_vertical_um * 1e-6 }},
+                "y max": {{ data.fdtd_region_maximum_z_um * 1e-6 }},
+                "y min": {{ data.fdtd_region_minimum_z_um * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
-                "y span": {{data.eval_fdtd_region_size_lateral_um * 1e-6 }},
-                "z max": {{ data.fdtd_region_maximum_vertical_um * 1e-6 }},
-                "z min": {{ data.fdtd_region_minimum_vertical_um * 1e-6 }},
+                "y span": {{data.eval_fdtd_size_x_um * 1e-6 }},
+                "z max": {{ data.fdtd_region_maximum_z_um * 1e-6 }},
+                "z min": {{ data.fdtd_region_minimum_z_um * 1e-6 }},
                 "simulation time": {{ data.fdtd_simulation_time_fs * 1e-15 }},
                 {%- endif %}
                 {% if data.eval_boundary_conditions == 'periodic' -%}

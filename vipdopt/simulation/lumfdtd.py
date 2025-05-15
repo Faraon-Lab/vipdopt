@@ -769,9 +769,9 @@ class LumericalFDTD(ISolver):
     @classmethod
     def get_env_vars(cls, cfg:Config, nsims:int=1) -> dict:
         env_vars = {
-                'mpi_exe': cfg.get('mpi_exe', ''),
-                'nprocs': cfg.get('nprocs', 0),
-                'solver_exe': cfg.get('solver_exe', ''),
+                'mpi_exe': cfg.get('lum_mpi_exe', ''),
+                'nprocs': cfg.get('lum_nprocs', 0),
+                'solver_exe': cfg.get('lum_solver_exe', ''),
                 'nsims': nsims,
             }
 

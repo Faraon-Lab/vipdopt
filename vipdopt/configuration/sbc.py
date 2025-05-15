@@ -172,7 +172,7 @@ class SonyBayerConfig(Config):
 
     def _layer_gradient(self):
         voxels_per_layer = np.array([1, 2, 4, 4, 4, 4, 5, 5, 5, 6])
-        assert np.sum(voxels_per_layer) == self.device_voxels_vertical
+        assert np.sum(voxels_per_layer) == self.device_voxels_z
 
         if self.flip_gradient:
             voxels_per_layer = np.flip(voxels_per_layer)
@@ -259,7 +259,7 @@ class SonyBayerConfig(Config):
 
         if self.get('sidewall_extend_pml'):
             self.sidewall_thickness_um = (
-                self.fdtd_region_size_lateral_um - self.device_size_lateral_um
+                self.fdtd_size_x_um - self.device_size_lateral_um
             ) / 2
 
         if self.get('add_infrared'):

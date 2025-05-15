@@ -6,6 +6,7 @@ import sys
 from argparse import ArgumentParser
 from collections.abc import Callable, Iterable
 from pathlib import Path
+import yaml
 
 import numpy as np
 import numpy.typing as npt
@@ -25,6 +26,7 @@ class TemplateRenderer:
     @ensure_path
     def __init__(self, src_directory: Path) -> None:
         """Initialize and TemplateRenderer."""
+        
         self.env = Environment(loader=FileSystemLoader(str(src_directory)))
 
     def render(self, **kwargs) -> str:
@@ -126,8 +128,10 @@ if __name__ == '__main__':
     data = read_config_file(args.data_file)
     output = rndr.render(data=data, pi=np.pi)
     logger.info(f'Rendered Output:\n{output}')
-
+    
+    if args.output.suffix in ['.yml','.yaml']:
+        output = output.replace('None', 'null')
     with open(args.output, 'w') as f:
-        f.write(output)
+            f.write(output)
 
     logger.info(f'Successfully saved output to {args.output}')

@@ -88,16 +88,16 @@ class FoM:
         self.fom_func = fom_func
         self.grad_func = grad_func
         
-        if isinstance(self.fom_func, str):
+        if self.fom_func is not None and isinstance(self.fom_func, str):
             try:
                 self.fom_func = getattr(sys.modules[__name__], self.fom_func)
             except Exception as ex:
-                print('fom_func: Could not find function in sys.modules[__name__] with name given.')
-        if isinstance(self.grad_func, str):
+                print(f'fom_func: Could not find function in sys.modules[__name__] with name {self.fom_func} given.')
+        if self.grad_func is not None and isinstance(self.grad_func, str):
             try:
                 self.grad_func = getattr(sys.modules[__name__], self.grad_func)
             except Exception as ex:
-                print('grad_func: Could not find function in sys.modules[__name__] with name given.')
+                print(f'grad_func: Could not find function in sys.modules[__name__] with name {self.grad_func} given.')
         
         self.weights: list[float] = list(weights)
         self.performance_weights = np.ones(len(self.foms))
@@ -258,6 +258,15 @@ class FoM:
         # First initiate the sub-FoMs if they're not already initiated
         if isinstance(data['foms'], dict):
             data['foms'] = FoM.fom_dict_to_list(data['foms'])
+            
+        # Check for 'None' strings and convert to None. Sometimes can't count on the yaml serializer
+        # This is only a first-level filter!
+        for func_name in ['fom_func', 'grad_func']:
+            check_func_name = data.get(func_name, 'a')
+            if isinstance(check_func_name, str):
+                if check_func_name.lower() in ['null', 'none']:
+                    data[func_name] = None
+        
         # Then initiate the whole thing
         return fom_cls(**data)
 
@@ -294,10 +303,10 @@ class FoM:
                 fom_dict['adj_srcs'] = match_cfg_objnames_to_objects(
                     fom_dict['adj_srcs'], base_sim.sources()
                 )
-                fom_dict['fom_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['fwd_monitors'] = match_cfg_objnames_to_objects(
                     fom_dict['fom_monitors'], base_sim.monitors()
                 )
-                fom_dict['grad_monitors'] = match_cfg_objnames_to_objects(
+                fom_dict['adj_monitors'] = match_cfg_objnames_to_objects(
                     fom_dict['grad_monitors'], base_sim.monitors()
                 )
                 
@@ -460,7 +469,8 @@ class FoM:
 
         # Assign each spectral weight vector to each FoM. Order matters!
         for i,f in enumerate(foms):
-            f.spectral_weights = spectral_weights[i]
+            # f is a tuple, so grab f[0]
+            f[0].spectral_weights = spectral_weights[i]
 
     def partition(self):
         # todo
@@ -915,31 +925,38 @@ class BayerFilterFoM(FoM):
 
     def __init__(
         self,
-        polarization: str,
-        fwd_srcs: list[Source],
-        adj_srcs: list[Source],
-        fom_monitors: list[Monitor],
-        grad_monitors: list[Monitor],
-        pos_max_freqs: list[int],
-        neg_min_freqs: list[int],
-        all_freqs: list[float],
+        fom_func: str | None | Callable[Concatenate[FoM, P], npt.NDArray],
+        grad_func: str | None | Callable[Concatenate[FoM, P], npt.NDArray],
+        foms: Sequence[Iterable[FoM]],
+        weights: Sequence[float] = (1.0,),      # NOTE: normalized so their sum is 1.0!!!
+        fwd_srcs:list[Source] = [],
+        fwd_monitors:list[Monitor] = [],
+        adj_srcs:list[Source] = [],
+        adj_monitors:list[Monitor] = [],
+        polarization:str='TE',
+        pos_max_freqs: Sequence[int] = [],      # wrap this somehow into the Optimization?
+        neg_min_freqs: Sequence[int] = [],      # as max/minimization should be chosen external of the FoM
+        all_freqs: Sequence[float] = [],
         spectral_weights: npt.NDArray = np.array(1),
+        reduce_func = lambda x: x,              # condenses result of fom_func into a single number if called
+        *args, **kwargs,
     ) -> None:
         """Initialize a BayerFilterFoM."""
 
         super().__init__(
-            fom_func=self._bayer_fom,
-            grad_func=self._bayer_gradient,
+            fom_func=self._bayer_fom if fom_func is None else fom_func,
+            grad_func=self._bayer_gradient if grad_func is None else grad_func,
             foms=[],  # weights=(1.0,),
             fwd_srcs=fwd_srcs,
-            fwd_monitors=fom_monitors,
+            fwd_monitors=fwd_monitors,
             adj_srcs=adj_srcs,
-            adj_monitors=grad_monitors,
+            adj_monitors=adj_monitors,
             polarization=polarization,
             pos_max_freqs=pos_max_freqs,
             neg_min_freqs=neg_min_freqs,
             all_freqs=all_freqs,
-            spectral_weights=spectral_weights
+            spectral_weights=spectral_weights,
+            # args, **kwargs
         )
 
 

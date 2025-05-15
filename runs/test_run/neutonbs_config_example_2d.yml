@@ -61,7 +61,7 @@ focal_plane_center_lateral_um: 0
 #* Device
 
 num_vertical_layers: 10 # 10
-vertical_layer_height_um: 3 #0.051 * 4 #0.017 * 8
+layer_height_um: 3 #0.051 * 4 #0.017 * 8
 
 device_size_lateral_um: 120 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
 device_vertical_minimum_um: 0
@@ -71,8 +71,8 @@ device_vertical_minimum_um: 0
 # self.get_layer_idxs() of the Layering filter returns a dictionary with region names as keys and [start, end) indices as values.
 # Customize as needed. e.g. 3 layers, height 4, 2 layers, height 2
 # ->
-num_vertical_spacers: 0 #9      #! 20241004: By default right now the derived_simulation_properties.j2 sets it to (num_layers - 1)
-vertical_spacer_height_um: 0.510
+num_spacers: 0 #9      #! 20241004: By default right now the derived_simulation_properties.j2 sets it to (num_layers - 1)
+spacer_height_um: 0.510
 spacer_density: 0
 
 #* Surroundings

@@ -21,15 +21,15 @@ focal_length_um: {{ focal_length_um }}
 focal_plane_center_vertical_um: {{ -1 * focal_length_um }}
 
 #* Device Properties
-{% set num_vertical_spacers = data.num_vertical_spacers -%}
-{# {% set num_vertical_spacers = data.num_vertical_layers-1 | int -%} #}
-num_vertical_spacers: {{ num_vertical_spacers }}
+{% set num_spacers = data.num_spacers -%}
+{# {% set num_spacers = data.num_vertical_layers-1 | int -%} #}
+num_spacers: {{ num_spacers }}
 
-vertical_layer_height_voxels: {{ (data.vertical_layer_height_um / data.device_scale_um ) | int }}
-{% set device_size_vertical_um = data.vertical_layer_height_um * data.num_vertical_layers + data.vertical_spacer_height_um * num_vertical_spacers -%}
+layer_height_voxels: {{ (data.layer_height_um / data.device_scale_um ) | int }}
+{% set device_size_vertical_um = data.layer_height_um * data.num_vertical_layers + data.spacer_height_um * num_spacers -%}
 device_size_vertical_um: {{ device_size_vertical_um }}
 device_voxels_lateral: {{ (data.device_size_lateral_um / data.geometry_spacing_lateral_um) | round | int }}
-device_voxels_vertical: {{ (device_size_vertical_um / data.device_scale_um) | round | int }}
+device_voxels_z: {{ (device_size_vertical_um / data.device_scale_um) | round | int }}
 {% set device_voxels_simulation_mesh_lateral =  1 + (data.device_size_lateral_um / data.mesh_spacing_um) | int -%}
 device_voxels_simulation_mesh_lateral: {{ device_voxels_simulation_mesh_lateral }}
 {% set LOOKUP_MESH_CELLS = {1:3, 2:3, 3:2, 4:3, 5:2, 6:2, 8:3, 9:2, 10:2, 12:0,
@@ -47,21 +47,21 @@ border_size_voxels: {{ (border_size_um / data.geometry_spacing_lateral_um) | rou
 device_voxels_lateral_bordered: {{ (device_size_lateral_bordered_um / data.geometry_spacing_lateral_um) | round | int }}
 
 #* FDTD Properties
-{% set vertical_gap_size_um = data.geometry_spacing_lateral_um * 25 %}
-vertical_gap_size_um: {{ vertical_gap_size_um }}
-{% set lateral_gap_size_um = data.device_scale_um * 10 -%}
-lateral_gap_size_um: {{ lateral_gap_size_um }}
-fdtd_region_size_vertical_um: {{ 2 * vertical_gap_size_um + data.device_size_lateral_um + focal_length_um }}
+{% set sim_edge_gap_z_um = data.geometry_spacing_lateral_um * 25 %}
+sim_edge_gap_z_um: {{ sim_edge_gap_z_um }}
+{% set sim_edge_gap_x_um = data.device_scale_um * 10 -%}
+sim_edge_gap_x_um: {{ sim_edge_gap_x_um }}
+fdtd_size_z_um: {{ 2 * sim_edge_gap_z_um + data.device_size_lateral_um + focal_length_um }}
 {% if data.boundary_conditions == 'periodic' -%}
-{% set fdtd_region_size_lateral_um = data.device_size_lateral_um %}
+{% set fdtd_size_x_um = data.device_size_lateral_um %}
 {%- else -%}
-{% set fdtd_region_size_lateral_um = data.device_size_lateral_um + 2 * lateral_gap_size_um %}
+{% set fdtd_size_x_um = data.device_size_lateral_um + 2 * sim_edge_gap_x_um %}
 {%- endif %}
-fdtd_region_size_lateral_um: {{ fdtd_region_size_lateral_um }}
-{% set fdtd_region_maximum_vertical_um = device_size_vertical_um + vertical_gap_size_um %}
-fdtd_region_maximum_vertical_um: {{ fdtd_region_maximum_vertical_um }}
-{% set fdtd_region_minimum_vertical_um = -1 * focal_length_um - 0.4*vertical_gap_size_um %}
-fdtd_region_minimum_vertical_um: {{ fdtd_region_minimum_vertical_um }}
+fdtd_size_x_um: {{ fdtd_size_x_um }}
+{% set fdtd_region_maximum_z_um = device_size_vertical_um + sim_edge_gap_z_um %}
+fdtd_region_maximum_z_um: {{ fdtd_region_maximum_z_um }}
+{% set fdtd_region_minimum_z_um = -1 * focal_length_um - 0.4*sim_edge_gap_z_um %}
+fdtd_region_minimum_z_um: {{ fdtd_region_minimum_z_um }}
 
 #* Surrounding Properties
 pec_aperture_thickness_um: {{ 3 * data.mesh_spacing_um }}
@@ -116,8 +116,8 @@ pdaf_max_intensity_by_wavelength: {{ ( (data.device_size_lateral_um ** 4) / ((fo
 
 #* Forward (Input) Source Properties
 lateral_aperture_um: {{ 1.1 * data.device_size_lateral_um }}
-src_maximum_vertical_um: {{ device_size_vertical_um + vertical_gap_size_um * 5 / 6 }}
-src_minimum_vertical_um: {{ -focal_length_um - 0.3 * vertical_gap_size_um }}
+src_maximum_vertical_um: {{ device_size_vertical_um + sim_edge_gap_z_um * 5 / 6 }}
+src_minimum_vertical_um: {{ -focal_length_um - 0.3 * sim_edge_gap_z_um }}
 mid_lambda_um: {{ (data.lambda_min_um + data.lambda_max_um) / 2 }}
 gaussian_waist_radius_um: {{ data.beam_size_multiplier }}
 {% set source_angle_theta_rad = (((data.source_angle_theta_vacuum_deg * pi / 180) | sin ) * 1 / data.background_index) | arcsin -%}
@@ -184,12 +184,12 @@ eval_lambda_max_um: {{ data.lambda_max_um + d_lambda }}
 
 {# New Calculations #}
 {% if eval_boundary_conditions == 'periodic' -%}
-{% set eval_fdtd_region_size_lateral_um = data.device_size_lateral_um %}
+{% set eval_fdtd_size_x_um = data.device_size_lateral_um %}
 {%- else -%}
-{% set eval_fdtd_region_size_lateral_um = data.device_size_lateral_um + 2 * lateral_gap_size_um %}
+{% set eval_fdtd_size_x_um = data.device_size_lateral_um + 2 * sim_edge_gap_x_um %}
 {%- endif %}
-eval_fdtd_region_size_lateral_um: {{ eval_fdtd_region_size_lateral_um }}
-eval_fdtd_region_size_vertical_um: {{ fdtd_region_maximum_vertical_um + fdtd_region_minimum_vertical_um|abs }}
-eval_monitorbox_size_lateral_um: {{ data.device_size_lateral_um + (data.mesh_spacing_um)*5 + 2 * data.sidewall_thickness_um }}
-eval_monitorbox_vertical_maximum_um: {{ device_vertical_maximum_um + (data.mesh_spacing_um*5) }}
-eval_monitorbox_vertical_minimum_um: {{ data.device_vertical_minimum_um - (data.mesh_spacing_um*5) }}
+eval_fdtd_size_x_um: {{ eval_fdtd_size_x_um }}
+eval_fdtd_size_z_um: {{ fdtd_region_maximum_z_um + fdtd_region_minimum_z_um|abs }}
+eval_monitorbox_size_x_um: {{ data.device_size_lateral_um + (data.mesh_spacing_um)*5 + 2 * data.sidewall_thickness_um }}
+eval_monitorbox_maximum_z_um: {{ device_vertical_maximum_um + (data.mesh_spacing_um*5) }}
+eval_monitorbox_minimum_z_um: {{ data.device_vertical_minimum_um - (data.mesh_spacing_um*5) }}
