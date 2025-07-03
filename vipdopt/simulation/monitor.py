@@ -70,6 +70,8 @@ class Monitor(SimObject):
         self._t = None  # Transmission
         self._sp = None  # Source Power
         self._power = None  # Power
+        self._ff = None # Farfield
+        self._ff_th = None  # Farfield Angle
 
         self._sync = self.src is not None  # Only set to sync if the source file exists
 
@@ -87,6 +89,8 @@ class Monitor(SimObject):
         self._power = data['power']
         self._tshape = self._t.shape
         self._fshape = self._e.shape
+        self._ff = data['ff']
+        self._ff_th = data['ff_th']
 
         self._sync = False  # Don't need to sync anymore
 
@@ -157,6 +161,13 @@ class Monitor(SimObject):
     def intensity(self) -> npt.NDArray:
         """Return the E-field intensity across this monitor."""
         return np.sum(np.square(np.abs(self.e)), axis=0)
+    
+    @property
+    def ff(self) -> npt.NDArray:
+        """Return the farfield measured by this monitor."""
+        if self._sync:
+            self.load_source()
+        return self._ff, self._ff_th
 
 
 class Profile(Monitor):

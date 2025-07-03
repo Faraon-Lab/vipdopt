@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import pickle
+import copy
 from collections.abc import Callable
 from functools import partial
 from itertools import chain
@@ -23,7 +24,7 @@ import vipdopt
 from vipdopt.configuration import Config
 from vipdopt.eval import plotter # plotter_v2, plotter_v3
 from vipdopt.optimization.device import Device
-from vipdopt.optimization.fom import FoM #, # BayerFilterFoM,
+from vipdopt.optimization.fom import FoM, get_mode_coefficient #, # BayerFilterFoM,
 from vipdopt.optimization.optimizer import GradientOptimizer, NLOptOptimizer, _load_optimizer
 from vipdopt.simulation import ISimulation, Simulation, LumericalFDTD #, LumericalSimulation
 from vipdopt.utils import glob_first, rmtree, real_part_complex_product #, replace_border
@@ -217,7 +218,7 @@ class Optimization:
     def as_dict(self):
         assert self.optimizer is not None
         assert self.base_sim is not None
-        
+
         opt_dict = {}
 
         # Miscellaneous Settings
@@ -235,16 +236,16 @@ class Optimization:
 
         # Base Simulation
         opt_dict['base_simulation'] = self.base_sim.as_dict()
-        
+
         return opt_dict
-    
+
     @classmethod
     def from_dict(cls, opt_dict, *args, **kwargs):
         device = Device.from_source(opt_dict['device'])
         base_sim = Simulation.load(opt_dict['base_simulation'])
         optimizer = _load_optimizer(opt_dict)
         fom = FoM.from_dict(opt_dict['figures_of_merit'])
-        
+
         return Optimization(
                     base_sim, device, optimizer, fom, true_iteration=opt_dict['current_iteration'],
                     # fom_args, fom_kwargs, grad_args, grad_kwargs,
@@ -324,7 +325,7 @@ class Optimization:
         def f(x:npt.NDArray, grad:npt.NDArray):
             self.iteration += 1
             print(self.iteration)
-            
+
             # x = np.maximum(np.minimum(x,1),0)
 
             self.device.set_design_variable(x.reshape(shape))
@@ -353,7 +354,7 @@ class Optimization:
             # # Don't know why but enumerate doesn't work here
             # for i, fom in enumerate(self.fom.foms):
             #     self.fom_hist[f'fom_{i}'].append(fom[0].compute_fom(x=self.device.get_permittivity()))
-            
+
             return fom
 
             # x_orig = np.real(self.device.get_permittivity())
@@ -377,14 +378,44 @@ class Optimization:
         xopt:npt.NDArray = opt.optimize(x)
         self.device.set_design_variable(xopt.reshape(shape))
 
+    def import_device(self, x, iteration_in_epoch):
+        '''Function to pack together the steps needed to update a device and save it to simulation.'''
+        self.device.set_design_variable(x.reshape(self.device.size))
+
+        # Each epoch the device filters are changed (usually getting stronger).
+        self.device.update_filters(
+                epoch = np.max( np.where( np.array(self.epoch_list)<=self.iteration ) ), # NOTE: separate from epoch
+                epoch_list = self.epoch_list,
+                num_layers_per_epoch = self.cfg['num_layers_per_epoch']     # Added to test layering changes during optimization
+            )
+        # Pass the permittivity through the new filters
+        self.device.update_density()
+
+        if self.base_sim.solver is not None:
+            cur_density, cur_permittivity = self.import_device_to_sim(
+                self.device, self.base_sim,
+                reinterpolation_factors=(1,1,1),
+                reset_field_shape=(iteration_in_epoch==0), # Just grab field shape from solver once per epoch
+            )
+
+        # Sync up with solver to properly import device.
+        vipdopt.solver.save(self.base_sim.get_path(), self.base_sim)
+
+        # Save device and design variable
+        self.device.save(self.current_device_path())
+
 
     def _inner_optimization_loop(self):
         """The core optimization loop."""
 
+        self.do_background = True
         for epoch, max_iter in enumerate(self.epoch_list):
+
+
             if max_iter < self.iteration:
                 vipdopt.logger.debug(f'Skipping Iteration {self.iteration}. Current epoch has max. iteration {max_iter}.')
                 continue
+
 
             vipdopt.logger.info(
                 f'=============== Starting Epoch {epoch} ===============\n'
@@ -399,33 +430,12 @@ class Optimization:
                     break
 
                 # Clean scratch directory to save storage space
-                rmtree(self.dirs['temp'], keep_dir=True)
+                if not self.cfg['pull_sim_files_from_debug_folder']:
+                    rmtree(self.dirs['temp'], keep_dir=True)
 
                 def calculate_device_fom(x:npt.NDArray, grad:npt.NDArray):
 
-                    self.device.set_design_variable(x.reshape(self.device.size))
-
-                    # Each epoch the device filters are changed (usually getting stronger).
-                    self.device.update_filters(
-                            epoch = np.max( np.where( np.array(self.epoch_list)<=self.iteration ) ), # NOTE: separate from epoch
-                            epoch_list = self.epoch_list,
-                            num_layers_per_epoch = self.cfg['num_layers_per_epoch']     # Added to test layering changes during optimization
-                        )
-                    # Pass the permittivity through the new filters
-                    self.device.update_density()
-
-                    if self.base_sim.solver is not None:
-                        cur_density, cur_permittivity = self.import_device_to_sim(
-                            self.device, self.base_sim,
-                            reinterpolation_factors=(1,1,1),
-                            reset_field_shape=(i==0), # Just grab field shape from solver once per epoch
-                        )
-
-                    # Sync up with solver to properly import device.
-                    vipdopt.solver.save(self.base_sim.get_path(), self.base_sim)
-
-                    # Save device and design variable
-                    self.device.save(self.current_device_path())
+                    self.import_device(x, i)
 
                     # Extract statistics about device and store before running simulations.
                         # # Calculate material % and binarization level, store away
@@ -445,8 +455,6 @@ class Optimization:
                     # Disable device index monitor(s) to save memory
                     self.base_sim.disable(self.base_sim.indexmonitor_names())
 
-
-
                     vipdopt.logger.info('Beginning Step 1: Setup All Evaluations and their Respective Simulations')
                     #
                     # Step 1: After importing the current epoch's permittivity value to the device;
@@ -461,8 +469,17 @@ class Optimization:
                     fwd_sims = self.fom.create_forward_sim(self.base_sim)
                     adj_sims = self.fom.create_adjoint_sim(self.base_sim)
 
+                    if self.do_background:
+                        # Perform background simulation for source intensity, but only once per running of code
+                        vipdopt.logger.info('Adding background simulations to this iteration.')
+                        fwd_sims.append(self.base_sim.with_enabled([self.base_sim.objects['bg_fwd_src']], 'bg_fwd'))
+                        adj_sims.append(self.base_sim.with_enabled([self.base_sim.objects['bg_adj_src']], 'bg_adj'))
+                        fwd_sims[-1].disable(['design_import'])
+                        adj_sims[-1].disable(['design_import'])
+
                     self.base_sim.run_sims(self,
-                                sim_list=chain(fwd_sims, adj_sims),
+                                # sim_list=chain(fwd_sims, adj_sims),
+                                sim_list=list(chain(fwd_sims, adj_sims)),
                                 file_dir=self.dirs['temp'],
                                 add_job_to_fdtd=True)
 
@@ -471,27 +488,106 @@ class Optimization:
                     # Reformat monitor data for easy use
                     self.solver.reformat_monitor_data(list(chain(fwd_sims, adj_sims)))
 
-                    # Compute intensity FoM and apply spectral and performance weights.
+                    self.fom_kwargs.update({'dimension': self.cfg['simulator_dimension'],
+                                            'dx': self.cfg['mesh_spacing_um'],
+                                            'dy': self.cfg['mesh_spacing_um'],
+                                        })
+                    if self.do_background:
+                        # Perform background simulation for source intensity, but only once per running of code
+                        # fwd_prop_fields_bg = {'E': propagation_monitor.e, 'H': propagation_monitor.h}
+                        # adj_prop_fields_bg = {'E': propagation_monitor.e, 'H': propagation_monitor.h}
+
+                        fwd_prop_E = fwd_sims[-1].monitors()[0].e       # See config - monitor 0 is propagation monitor
+                        fwd_prop_H = fwd_sims[-1].monitors()[0].h
+                        adj_prop_E = adj_sims[-1].monitors()[0].e
+                        adj_prop_H = adj_sims[-1].monitors()[0].h
+                        norm_coeff = get_mode_coefficient(fwd_prop_E, fwd_prop_H, adj_prop_E, adj_prop_H, **self.fom_kwargs)
+                        self.fom.norm_intensity = np.real(np.conj(norm_coeff)*norm_coeff)
+                        if np.any(self.fom.norm_intensity) == 0:
+                            vipdopt.logger.info('Background simulations did not converge correctly.')
+                            self.fom.norm_intensity = 1e-5*np.ones(self.fom.norm_intensity.shape)
+                        self.do_background = False
+
+                    # Compute mode overlap FoM and apply spectral and performance weights.
+                    self.fom_kwargs.update({'source_intensity': self.fom.norm_intensity})
                     f = self.fom.compute_fom(*self.fom_args, **self.fom_kwargs)
                     self.fom_hist.get('fom_overall').append(f)
                     self.fom_hist.get('intensity_overall').append(f)
                     vipdopt.logger.debug(f'FoM: {f}')
 
-                    # Compute transmission FoM and apply spectral and performance weights.
-                    fom_kwargs_trans = self.fom_kwargs.copy()
-                    fom_kwargs_trans.update({'type': 'transmission'})
-                    t = np.array([ fom[0].fom_func(*self.fom_args, **fom_kwargs_trans)
-                        for fom in self.fom.foms
-                    ])
-                    [ self.fom_hist.get(f'fom_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
-                    [ self.fom_hist.get(f'transmission_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
-                    self.fom_hist.get('transmission_overall').append( np.squeeze(np.sum(t, 0)) )
-                    # [plt.plot(np.squeeze(t_i)) for t_i in t]
-                    # todo: remove hardcode for the monitor.
-                    intensity = np.sum(np.square(np.abs(fwd_sims[0].monitors()[4].e)), axis=0)
-                    self.fom_hist['intensity_overall_xyzwl'] = intensity
-                    # # We need to save space for fom_history. Just save the most recent iteration's data.
-                    # self.fom_hist.get('intensity_overall_xyzwl').append(intensity)
+                    # #! TODO: 20250617 CONVERT THIS TO HEATMAP OF TRANSMISSION(ANGLE, WAVELENGTH) ============
+
+                    # ff_results = []
+                    # for sfom in self.fom.foms:
+                    #     for pfom in sfom:
+                    #         if pfom.fwd_srcs[0]['name'] == 'fwd_src_x':
+                    #             ff_results.append(pfom.fwd_monitors[0].ff[0])
+                    #             ff_angles = pfom.fwd_monitors[0].ff[1]
+                    # ff_results = np.hstack(tuple(ff_results))
+                    # def HeatMap(_ff_results,ff_angles,wl,FileName, k_space=True, ideal_grating_target_angle=None):
+                    #     import matplotlib.pyplot as plt
+                    #     ff_results = copy.deepcopy(_ff_results)
+
+                    #     plt.close()
+                    #     fig, ax = plt.subplots()
+                    #     if k_space:
+                    #         extent = (np.min(wl),np.max(wl),
+                    #                     np.min(np.sin(np.deg2rad(ff_angles))),
+                    #                     np.max(np.sin(np.deg2rad(ff_angles))))
+                    #         plt.imshow(np.flipud(ff_results),
+                    #                 extent=extent, cmap='plasma', aspect='auto')
+                    #         # plt.ylim([-1,1])
+                    #         plt.ylabel('$k_x/k_0$ ')
+                    #     else:
+                    #         X,Y = np.meshgrid(wl, ff_angles[:,0])
+                    #         # plt.pcolormesh(X,Y, ff_results[:-1,:-1],
+                    #         #                cmap='plasma', rasterized=True)
+                    #         from scipy.ndimage import gaussian_filter
+                    #         from vipdopt.utils import rescale
+                    #         plt.pcolormesh(X,Y,
+                    #                         rescale(gaussian_filter(ff_results[:-1,:-1], (5,1.5))),
+                    #                         cmap='plasma', rasterized=True)
+                    #         ax.set_aspect('auto')
+                    #         plt.ylabel('Deflection Angle (°)')
+                    #     plt.xlabel('Wavelength ($\mu$m)')
+                    #     plt.ylim((-40,40))
+                    #     plt.colorbar()
+
+                    #     fig.savefig("Figures/" + FileName + "SpecMap.pdf", format='pdf',  bbox_inches='tight')
+                    #     fig.savefig("Figures/" + FileName + "SpecMap.png", format='png',  bbox_inches='tight')
+
+                    #     if ideal_grating_target_angle is not None:
+                    #         # Calculate dispersion of ideal grating.
+                    #         d = 4.5/np.sin(np.deg2rad(ideal_grating_target_angle))
+                    #         deflected_theta = np.rad2deg(np.arcsin(wl/d))
+                    #         plt.plot(wl, deflected_theta, '--',color='white', alpha=0.5, label='Ideal Grating')
+                    #         plt.legend(fontsize="10",
+                    #                 loc = "upper right" if ideal_grating_target_angle < 0 else "lower right")
+
+
+                    #     fig.savefig("Figures/" + FileName + "SpecMap_wg.pdf", format='pdf',  bbox_inches='tight')
+                    #     fig.savefig("Figures/" + FileName + "SpecMap_wg.png", format='png',  bbox_inches='tight')
+
+                    #     return
+                    # HeatMap(ff_results,np.degrees(ff_angles),self.cfg['lambda_values_um'],'FileName', k_space=False, ideal_grating_target_angle=None)
+
+
+                    # # Compute transmission FoM and apply spectral and performance weights.
+                    # fom_kwargs_trans = self.fom_kwargs.copy()
+                    # fom_kwargs_trans.update({'type': 'transmission'})
+                    # t = np.array([ fom[0].fom_func(*self.fom_args, **fom_kwargs_trans)
+                    #     for fom in self.fom.foms
+                    # ])
+                    # [ self.fom_hist.get(f'fom_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
+                    # [ self.fom_hist.get(f'transmission_{idx}').append(t_i) for idx, t_i in enumerate(t) ]
+                    # self.fom_hist.get('transmission_overall').append( np.squeeze(np.sum(t, 0)) )
+                    # # [plt.plot(np.squeeze(t_i)) for t_i in t]
+                    # # todo: remove hardcode for the monitor.
+                    # intensity = np.sum(np.square(np.abs(fwd_sims[0].monitors()[4].e)), axis=0)
+                    # self.fom_hist['intensity_overall_xyzwl'] = intensity
+                    # # # We need to save space for fom_history. Just save the most recent iteration's data.
+                    # # self.fom_hist.get('intensity_overall_xyzwl').append(intensity)
+                    # #! ========================================================================================
 
                     # # Here is where we would start plotting the loss landscape. Probably should be accessed by a separate class...
                     # # Or we could move it to the device step part
@@ -504,7 +600,8 @@ class Optimization:
                         **self.grad_kwargs,
                     )
                     vipdopt.logger.info(f'Design_gradient has average {np.mean(g)}, max {np.max(g)}')
-                    
+
+
                     #* Process gradient accordingly for application to device through optimizer.
 
                     # Permittivity factor in amplitude of electric dipole at x_0:
@@ -556,8 +653,8 @@ class Optimization:
                     # Each device needs to remember its gradient! # todo: refine this
                     # self.device.gradient = design_gradient_interpolated.copy()	# This is BEFORE backpropagation
 
-                    
-                    
+
+
                     # grad[:] = np.ravel( self.device.backpropagate(g) )
                     grad[:] = np.ravel( design_gradient_interpolated )
                     return f
@@ -567,7 +664,7 @@ class Optimization:
                 grad = np.zeros(np.prod(self.device.size))                   # Create grad
                 f = calculate_device_fom(x, grad)
 
-                
+
 
                 # Step the device with the gradient
                 vipdopt.logger.debug('Stepping device along gradient.')
@@ -716,7 +813,7 @@ class Optimization:
         #! EM solver values after reinterpolation.
 
         return cur_density, cur_permittivity
-    
+
     def generate_plots(self):
         """Generate the plots and save to file."""
         folder = self.dirs['eval_info']
@@ -779,7 +876,7 @@ class Optimization:
                                 self.cfg['lambda_values_um'],
                                 np.array([self.fom_hist[f'transmission_{x}'][-1] for x in trans_quadrants]),
                                 folder,
-                                # filename='trans_spec', 
+                                # filename='trans_spec',
                                 f'trans_i{iteration}',
                                 line_labels=['Q0', 'Q1', 'Q2', 'Q3'],
                                 plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'],
@@ -817,7 +914,7 @@ class Optimization:
     #     # TODO: rest of the plots
 
         plotter.close_all()
-    
+
     def update_histories():
         pass
 

@@ -66,7 +66,7 @@ layer_height_voxels: {{ (layer_height_um / voxel_sizes[data.layering_axis] ) | r
 {# {% set num_spacers = data.num_layers-1 | int -%} #}
 num_spacers: {{ num_spacers }}
 
-{% set focal_length_um = data.device_size_z_um * 0.75 -%}
+{% set focal_length_um = data.device_size_z_um * 0.5 -%}
 focal_length_um: {{ focal_length_um }}
 focal_plane_center_vertical_um: {{ -1 * focal_length_um }}
 
@@ -125,7 +125,7 @@ sidewall_yspan_positions_um: {{ [
 #* Spectral Properties
 {% set bandwidth_um = data.lambda_max_um - data.lambda_min_um -%}
 bandwidth_um: {{ bandwidth_um }}
-{% set num_design_frequency_points = data.num_bands * data.num_points_per_band -%}
+{% set num_design_frequency_points = data.num_opt_dispersion_freqs -%}
 num_design_frequency_points: {{ num_design_frequency_points }}
 num_eval_frequency_points: {{ 6 * num_design_frequency_points }}
 {% set lambda_values_um = data.lambda_min_um | linspace(data.lambda_max_um, num_design_frequency_points) -%}
@@ -156,9 +156,15 @@ src_maximum_vertical_um: {{ device_size_z_um + sim_edge_gap_z_um * 5 / 6 }}
 src_minimum_vertical_um: {{ -focal_length_um - 0.3 * sim_edge_gap_z_um }}
 mid_lambda_um: {{ (data.lambda_min_um + data.lambda_max_um) / 2 }}
 gaussian_waist_radius_um: {{ data.beam_size_multiplier }}
+
 {% set source_angle_theta_rad = (((data.source_angle_theta_vacuum_deg * pi / 180) | sin ) * 1 / data.background_index) | arcsin -%}
 source_angle_theta_rad: {{ source_angle_theta_rad }}
 source_angle_theta_deg: {{ source_angle_theta_rad * 180 / pi}}
+
+{% set adj_angles_theta_deg = (data.adj_angles_theta_deg | nparray ) * -1 -%}
+# Inversion here from the adjoints' POV
+adj_angles_theta_deg: {{adj_angles_theta_deg | list}}
+adj_angles_theta_rad: {{(adj_angles_theta_deg * pi / 180) | list}}
 
 #* Adjoint Source Properties
 #! For arbitrary focal-point locations, this must be manually rewritten. ===========

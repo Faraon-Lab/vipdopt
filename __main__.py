@@ -4,6 +4,11 @@ from argparse import SUPPRESS, ArgumentParser
 import logging
 from functools import partial
 
+import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+
 import vipdopt.optimization
 
 # Import main package and add program folder to PATH.
@@ -19,6 +24,7 @@ from vipdopt.optimization import (
     # LumericalOptimization,
     # SuperFoM,
 )
+from vipdopt.configuration.template import reload_template
 from vipdopt.optimization.optimizer import NLOptOptimizer, GradientAscentOptimizer, AdamOptimizer
 from vipdopt.utils import setup_logger
 
@@ -26,9 +32,9 @@ f = sys.modules[__name__].__file__
 if not f:
     raise ModuleNotFoundError('SHOULD NEVER REACH HERE')
 
-# Example of how to pass custom functions into the pre-existing / pre-written class instances
+# Example of how to pass custom functions into the pre-existing / pre-written class instances =====================
 def update_histories_em_filter(self):
-    # Manually adjust metrics stored and calculated 
+    # Manually adjust metrics stored and calculated
     #! These will be fed directly into plotter.py so this is the place to be changing labels / variable names and somesuch.
     for metric in ['transmission', 'intensity']:
         self.fom_hist.update({f'{metric}_overall': []})
@@ -40,7 +46,7 @@ def generate_plots_simple_mse(self):
     """Generate the plots and save to file."""
     import pickle
     from vipdopt.eval import plotter
-    
+
     folder = self.dirs['eval_info']
     iteration = self.iteration #  if self.iteration==self.epoch_list[-1] else self.iteration+1
     # vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
@@ -81,12 +87,10 @@ def generate_plots_simple_mse(self):
 #     # TODO: rest of the plots
 
     plotter.close_all()
+# =================================================================================================================
 
-#* ==============================================================================
-
-if __name__ == '__main__':
-
-    # Set up argument parser
+def default_parser():
+    '''Set up argument parser'''
     parser = ArgumentParser(
         prog='vipdopt',
         description='Volumetric Inverse Photonic Design Optimizer',
@@ -133,6 +137,28 @@ if __name__ == '__main__':
         help='Configuration file to use in the optimization; defaults to config.yaml',
     )
 
+    return parser
+#* ==============================================================================
+
+if __name__ == '__main__':
+    
+    # Update processed_config.yml
+    reload_template(*[
+                    Path('runs/test_run_neuton_bs'),
+                    Path("derived_simulation_properties.j2"),
+                    Path(f"runs/test_run_neuton_bs/config_example_2d.yml"),
+                    Path("runs/test_run_neuton_bs/processed_config.yml")
+                ])
+    # Update sim.json
+    reload_template(*[
+                    Path('runs/test_run_neuton_bs'),
+                    Path("simulation_template.j2"),
+                    Path("runs/test_run_neuton_bs/processed_config.yml"),
+                    Path("runs/test_run_neuton_bs/sim.json")
+                ])
+
+    # Set up argument parser
+    parser = default_parser()
     args = parser.parse_args()
 
     # Set up logging
@@ -147,8 +173,8 @@ if __name__ == '__main__':
     # Also any other necessary editing of the Lumerical environment and objects.
     vipdopt.logger.info('Beginning Step 0: Project Setup...')
 
-    from vipdopt.configuration import SonyBayerConfig
-    project = Project(config_type=SonyBayerConfig)
+    from vipdopt.configuration import SonyBayerConfig, DispBSConfig
+    project = Project(config_type=DispBSConfig)
     project.load_project(args.directory, config_name=args.config)
     # What does the Project class contain?
     # 'dir': directory where it's stored; 'config': SonyBayerConfig object; 'optimization': Optimization object;
@@ -157,12 +183,6 @@ if __name__ == '__main__':
     # 'foms': list of FoM objects, 'weights': array of shape (#FoMs, nλ)
     #! Each Project should correspond only to one Device optimized for a certain functionality and situation.
     #! Optimization parameter sweeps necessitate multiple Projects.
-
-    import numpy.typing as npt
-    import numpy as np
-    import matplotlib
-    matplotlib.use('TkAgg')
-    import matplotlib.pyplot as plt
 
     # FoM_1 = MSEFoM()
     # from PIL import Image
@@ -178,11 +198,12 @@ if __name__ == '__main__':
     # FoM_2.set_target_2d_gaussian(arr_shape=project.device.size, peak=5.5-2.25, N=9, std=2, center_point=(24,12))
     # FoM_2.target += 2.25
     # project.fom = FoM(None, None, [(FoM_1,), (FoM_2,)], (1.0,1.0))
-    
+
+
     project.fom = FoM._load_from_config(project.config, project.base_sim)
-    project.fom._setup_spectral_weights(project.fom.foms, project.config)  #! TODO:
+    # project.fom._setup_spectral_weights(project.fom.foms, project.config)  #! TODO: Only for SonyBayerConfig - move there!!!
     # project.fom = FoM(None, None, [(f,) for f in foms], tuple(weights))
-    
+
 
     # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
     assert project.base_sim is not None
@@ -227,20 +248,23 @@ if __name__ == '__main__':
             project=project,
         )
         vipdopt.logger.info(f'Optimization {opt_idx} initialized.')
-        
-        # Example of how to pass custom functions into the Optimization instance
+
+        # Example of how to pass custom functions into the Optimization instance =======================
+        # optimization._inner_optimization_loop = custom_func
         optimization.update_histories = update_histories_em_filter
         optimization.update_histories(optimization)
-        optimization.generate_plots = partial(generate_plots_simple_mse, self=optimization)
-        
+        # optimization.generate_plots = partial(generate_plots_simple_mse, self=optimization)
+        optimization.generate_plots = lambda : None
+        # ==============================================================================================
+
         project.optimizations.append(optimization)
-        
+
         # evaluation = Evaluation(
-            
+
         # )
         # vipdopt.logger.info(f'Evaluation {opt_idx} initialized.')
         # project.evaluations.append(evaluation)
-        
+
         # todo: What does the Evaluation even need to do?
         # conduct a sweep
         # perturb the base sim
@@ -273,9 +297,12 @@ if __name__ == '__main__':
     # matplotlib.use('TkAgg')
     # project.device.visualize_layer()
     # plt.show()
-    
-    
+
+
     project.save_as(project.subdirectories['checkpoints'])
+    # Testing: Save and Load ==========================
     p2 = Project(config_type=SonyBayerConfig)
     p2.load_project(args.directory)
+    # =================================================
+
     print('End of code reached.')

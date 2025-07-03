@@ -9,7 +9,7 @@ import numpy as np
 # Import main package and add program folder to PATH.
 sys.path.append(Path.cwd()) # 20240219 Ian: Only added this so I could debug some things from my local VSCode
 import vipdopt
-from vipdopt.configuration.template import SonyBayerRenderer
+from vipdopt.configuration.template import MetasurfaceRenderer, reload_template
 from vipdopt.project import Project, create_internal_folder_structure
 from vipdopt.optimization import (
     Device,
@@ -84,11 +84,9 @@ def generate_plots_simple_mse(self):
 
     plotter.close_all()
 
-#* ==============================================================================
-
-if __name__ == '__main__':
-
-    # Set up argument parser
+def default_parser():
+    '''Set up argument parser'''
+    
     parser = ArgumentParser(
         prog='vipdopt',
         description='Volumetric Inverse Photonic Design Optimizer',
@@ -134,7 +132,14 @@ if __name__ == '__main__':
         default='config.yaml',
         help='Configuration file to use in the optimization; defaults to config.yaml',
     )
+    
+    return parser
 
+#* ==============================================================================
+
+if __name__ == '__main__':
+
+    parser = default_parser()
     args = parser.parse_args()
 
     # Set up logging
@@ -157,64 +162,48 @@ if __name__ == '__main__':
     #                                 ))
     vipdopt.solver = solver
 
-    def reload_template(template, data_file, output_file):
-        rndr = SonyBayerRenderer(Path('jinja_templates'))
-
-        rndr.set_template(template)
-
-        data = read_config_file(data_file)
-        output = rndr.render(data=data, pi=np.pi)
-        vipdopt.logger.info(f'Rendered Output:\n{output}')
-
-        with open(output_file, 'w') as f:
-            f.write(output)
-
-        vipdopt.logger.info(f'Successfully saved output to {output_file}')
-
-    def update_simulation():
-        reload_template(*[
-                        "simulation_template.j2",
-                        "runs/test_run/processed_config.yml",
-                        "runs/test_run/sim.json"
-                    ])
 
     def reload_config(dim=2):
         config_file = '2d' if dim == 2 else '3d'
         reload_template(*[
-                        "derived_simulation_properties.j2",
-                        f"runs/test_run/config_example_{config_file}.yml",
-                        "runs/test_run/processed_config.yml"
+                        Path('runs/test_run_neuton_bs'),
+                        Path("derived_simulation_properties.j2"),
+                        Path(f"runs/test_run_neuton_bs/config_example_{config_file}.yml"),
+                        Path("runs/test_run_neuton_bs/processed_config.yml")
+                    ])
+
+    def update_simulation():
+        reload_template(*[
+                        Path('runs/test_run_neuton_bs'),
+                        Path("simulation_template.j2"),
+                        Path("runs/test_run_neuton_bs/processed_config.yml"),
+                        Path("runs/test_run_neuton_bs/sim.json")
                     ])
 
     def reload_base_sim(dim=3):
+        # Regenerate templates
         reload_config(dim=dim)
         update_simulation()
+        
+        # Use reloaded templates to reload project and update values
         project.load_project(args.directory, config_name=args.config)
-        # What does the Project class contain?
-        # 'dir': directory where it's stored; 'config': SonyBayerConfig object; 'optimization': Optimization object;
-        # 'device': Device object; 'base_sim': Simulation object;
-        # 'src_to_sim_map': dict with source names as keys, Simulation objects as values
-        # 'foms': list of FoM objects, 'weights': array of shape (#FoMs, nλ)
-        #! Each Project should correspond only to one Device optimized for a certain functionality and situation.
-        #! Optimization parameter sweeps necessitate multiple Projects.
 
-        # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
         assert project.base_sim is not None
         base_sim = project.base_sim.set_solver('LumericalFDTD')
         solver.connect(hide=False)
+        # Sync up new JSON values of Simulation with solver
         solver.save(base_sim.get_path(), base_sim)
-        
-        print(3)
+        solver.set_view()
 
     def derive_sim_properties(dim=3):
         config_file=f'{dim}d'
         data = read_config_file(f"runs/test_run/config_example_{config_file}.yml")
-        
+
         # min_feature_size_voxels = data['min_feature_size_um'] / data['voxel_size_x_um']
         # blur_half_width_voxels: {{ ((min_feature_size_voxels - 1) / 2) | round(method='ceil') | int }}
-        
+
         print(3)
 
-    reload_base_sim(2)
+    reload_base_sim(dim=2)
 
     print(3)

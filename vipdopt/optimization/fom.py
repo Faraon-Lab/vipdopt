@@ -24,9 +24,41 @@ from vipdopt.utils import (
     # import_lumapi,
     setup_logger,
     starmap_with_kwargs,
+    cross_product, dot_product
 )
 
 POLARIZATIONS = ['TE', 'TM', 'TE+TM']
+
+def get_mode_coefficient(forward_E , forward_H, adjoint_E, adjoint_H,
+                        dimension='2D', dx=0.01, dy=0.01 ):
+    '''
+    Calculates the mode overlap between the forward field and the backward mode
+    (*at the propagation monitor).
+    Uses the formula \int n . (Eb x Hf - Ef x Hb) dS
+    Normal vector is usually in the z direction
+    Fields are in the form Ef(x,y,z,lambda,E)
+    dx, dy are the mesh spacing
+    '''
+
+    Ef = forward_E
+    Hf = forward_H
+
+    Eb = adjoint_E
+    Hb = adjoint_H
+
+    # take only the y component for 2D
+    if dimension == '2D':
+        integrand = np.squeeze(cross_product(Eb,Hf)['y'] - cross_product(Ef,Hb)['y'])
+
+    # take only the z component for 3D
+    elif dimension == '3D':
+        integrand = np.squeeze(cross_product(Eb,Hf)['z'] - cross_product(Ef,Hb)['z'])
+
+    # Complex amplitude is integral of all elements
+    # Sum over only spatial components, other degrees of freedom are untouched
+    complex_a = np.sum(integrand,0)*dx*dy
+
+    return complex_a
 
 
 class FoM:
@@ -63,6 +95,7 @@ class FoM:
         weights (list[float]): The weights to apply to each FoM
     """
 
+    #! TODO: 20250618 REPLACE POS_MAX_FREQS AND NEG_MIN_FREQS ENTIRELY with spectral weighting.
 
 
     def __init__(self,
@@ -87,7 +120,7 @@ class FoM:
         self.foms: list[tuple[FoM,...]] = [tuple(f) for f in foms]
         self.fom_func = fom_func
         self.grad_func = grad_func
-        
+
         if self.fom_func is not None and isinstance(self.fom_func, str):
             try:
                 self.fom_func = getattr(sys.modules[__name__], self.fom_func)
@@ -98,7 +131,7 @@ class FoM:
                 self.grad_func = getattr(sys.modules[__name__], self.grad_func)
             except Exception as ex:
                 print(f'grad_func: Could not find function in sys.modules[__name__] with name {self.grad_func} given.')
-        
+
         self.weights: list[float] = list(weights)
         self.performance_weights = np.ones(len(self.foms))
         self.fwd_srcs = fwd_srcs
@@ -188,13 +221,13 @@ class FoM:
         except Exception as ex:
             data['grad_func'] = None
         #! We can't actually store functions in yaml format.
-        #! Typically we must get around this by declaring a class that inherits FoM, 
+        #! Typically we must get around this by declaring a class that inherits FoM,
         #! with its own compute_fom() and compute_grad() predeclared.
-        
+
         # data['foms'] = {f'fom_{i}': fom.as_dict()
         #             for i, fom in enumerate(self.foms)
         #             }
-        
+
         #! What about nested FoMs?
         # Remember that for a FoM containing multiple FoMs,
         # AB + C is written as self.foms = [(A,B),(C,)] and so forth.
@@ -205,7 +238,7 @@ class FoM:
         # 'fom_0_1': B
         # 'fom_1_0': C
         data['foms'] = FoM.fom_list_to_dict(self.foms)
-        
+
 
         data['weights'] = self.weights
         data['fwd_srcs'] = [f['name'] for f in self.fwd_srcs]
@@ -238,13 +271,13 @@ class FoM:
             add_fom = []
             multiply_fom_keys = [fk for fk in fom_dicts.keys() \
                                     if fk.split('_')[1] == str(i)]
-            
+
             for j in range(len(multiply_fom_keys)):
                 fom = fom_dicts[f'fom_{i}_{j}']
                 if not isinstance(fom, FoM):
                     fom = FoM.from_dict(fom)
                 add_fom.append(fom)
-            
+
             if len(add_fom) > 0:
                 output.append(tuple(add_fom))
         return output
@@ -254,11 +287,12 @@ class FoM:
         """Create a FoM from a dictionary representation."""
         data = copy(input_dict)
         # Get class to initiate
+        #! This line may fail if the FoM is a custom one and not properly loaded in
         fom_cls: type[FoM] = getattr(sys.modules[__name__], data.pop('type'))
         # First initiate the sub-FoMs if they're not already initiated
         if isinstance(data['foms'], dict):
             data['foms'] = FoM.fom_dict_to_list(data['foms'])
-            
+
         # Check for 'None' strings and convert to None. Sometimes can't count on the yaml serializer
         # This is only a first-level filter!
         for func_name in ['fom_func', 'grad_func']:
@@ -266,7 +300,7 @@ class FoM:
             if isinstance(check_func_name, str):
                 if check_func_name.lower() in ['null', 'none']:
                     data[func_name] = None
-        
+
         # Then initiate the whole thing
         return fom_cls(**data)
 
@@ -279,8 +313,8 @@ class FoM:
         # to a dictionary of objects
         main_fom = cfg.pop('figures_of_merit')
         fom_dicts = main_fom.pop('foms')            # Keep all other key-value pairs.
-        
-        
+
+
         #! TODO: N-LEVEL NESTING. =================================================
         # for name, fom_dict in fom_dicts.items():
             # fom_dicts['name'] = cls._load_from_config(fom_dict, base_sim)
@@ -309,7 +343,7 @@ class FoM:
                 fom_dict['adj_monitors'] = match_cfg_objnames_to_objects(
                     fom_dict['grad_monitors'], base_sim.monitors()
                 )
-                
+
 
             # if pos_max_freqs is blank, make it the whole wavelength vector; if neg_min_freqs is blank, keep blank.
             if fom_dict['pos_max_freqs'] == []:
@@ -339,6 +373,7 @@ class FoM:
         At present this processes spectral weights as a factor to the original weights -
         i.e. the wavelength-dependent behaviour of each FoM
         """
+        #! TODO: MOVE TO SONYBAYERCONFIG
 
 
         # TODO: Better docstring
@@ -580,9 +615,9 @@ class FoM:
                 )
             )
         )
-        
+
         assert fom_vals.shape[0] == grad_vals.shape[0], "Array mismatch between the length of fom_vals and of grad_vals."
-        
+
         output = grad_vals[0] * np.prod(fom_vals[1:], axis=0)
         for i in range(1, fom_vals.shape[0]):
             if fom_vals[i] == 0:
@@ -590,9 +625,9 @@ class FoM:
                 output = np.add(output, ( grad_vals[i] * np.prod(fom_vals[fom_vals!=0], axis=0) ))
             else:
                 output = np.add(output, ( grad_vals[i] * np.prod(fom_vals, axis=0) / fom_vals[i] ))
-        
+
         return output
-        
+
         # term2 = np.sum(
         #     np.divide(
         #         grad_vals,
@@ -654,9 +689,12 @@ class FoM:
                     )
                     for fom_tup in self.foms
                 ])
+                # weighted_fom_results = np.einsum('...i,...i->...', self.weights, fom_results)
+                # self.performance_weighting(weighted_fom_results)
+                # return weighted_fom_results
+                ## fom_results = np.dot(fom_results, self.spectral_weights).dot(performance_weights)
                 self.performance_weighting(fom_results)
-                # fom_results = np.dot(fom_results, self.spectral_weights).dot(performance_weights)
-                return np.einsum('i,i...->...', self.weights, fom_results)
+                return np.einsum('i...,i...->...', self.weights, fom_results)
 
             else:
                 return self.fom_func(self.foms, self.weights, *args, **kwargs)
@@ -690,10 +728,16 @@ class FoM:
             ])
             # grad_results = np.dot(grad_results, self.spectral_weights).dot(performance_weights)
             if apply_performance_weights:
+                self.weights = np.array(self.weights)   #! Turning it into an array here might cause problems later
                 assert len(self.weights)==len(self.performance_weights)
+                
+                # w = arb_broadcast(self.weights, self.performance_weights)
+                # w = arb_broadcast(w*self.performance_weights, grad_results)
+                
                 try:
                     return np.einsum('i,i...->...', self.weights*self.performance_weights, grad_results)
                 except Exception as ex:
+                    
                     return np.einsum('i,i...->...', self.weights, self.performance_weights*grad_results)
             return np.einsum('i,i...->...', self.weights, grad_results)
 
@@ -771,7 +815,7 @@ class UniformMAEFoM(FoM):
             grad_func = partial(self._uniform_mae_gradient, constant=self.constant)
 
         super().__init__(
-            fom_func, grad_func, foms=[], reduce_func=np.mean, 
+            fom_func, grad_func, foms=[], reduce_func=np.mean,
             *args, **kwargs
         )
 
@@ -914,6 +958,7 @@ class MSEFoM(FoM):
         xi = np.real(x)
         return (2/xi.size)*(xi-target)
 
+
 class BayerFilterFoM(FoM):
     """FoM implementing the particular figure of merit for the SonyBayerFilter.
 
@@ -942,6 +987,9 @@ class BayerFilterFoM(FoM):
         *args, **kwargs,
     ) -> None:
         """Initialize a BayerFilterFoM."""
+
+        if spectral_weights == np.array(1):
+            spectral_weights = np.ones(len(all_freqs))
 
         super().__init__(
             fom_func=self._bayer_fom if fom_func is None else fom_func,
@@ -1089,9 +1137,161 @@ class BayerFilterFoM(FoM):
         # return df_dev
         return df_dev[..., self.pos_max_freqs]
 
+class DispBSFoM(FoM):
+    """FoM implementing the particular figure of merit for the Dispersion Control Polarization Beam Splitter.
 
+    Must have the following monitor configuration:
+        fwd_monitors: [focal_monitor, transmission_monitor, design_efield]
+        adj_monitors: [design_efield]
 
+    """
 
+    def __init__(
+        self,
+        fom_func: str | None | Callable[Concatenate[FoM, P], npt.NDArray],
+        grad_func: str | None | Callable[Concatenate[FoM, P], npt.NDArray],
+        foms: Sequence[Iterable[FoM]],
+        weights: Sequence[float] = (1.0,),      # NOTE: normalized so their sum is 1.0!!!
+        fwd_srcs:list[Source] = [],
+        fwd_monitors:list[Monitor] = [],
+        adj_srcs:list[Source] = [],
+        adj_monitors:list[Monitor] = [],
+        polarization:str='TE',
+        pos_max_freqs: Sequence[int] = [],      # wrap this somehow into the Optimization?
+        neg_min_freqs: Sequence[int] = [],      # as max/minimization should be chosen external of the FoM
+        all_freqs: Sequence[float] = [],
+        spectral_weights: npt.NDArray = np.array(1),
+        reduce_func = lambda x: x,              # condenses result of fom_func into a single number if called
+        *args, **kwargs,
+    ) -> None:
+        """Initialize a DispBSFoM."""
+
+        super().__init__(
+            fom_func=self._dispbs_fom if fom_func is None else fom_func,
+            grad_func=self._dispbs_gradient if grad_func is None else grad_func,
+            foms=[],  # weights=(1.0,),
+            fwd_srcs=fwd_srcs,
+            fwd_monitors=fwd_monitors,
+            adj_srcs=adj_srcs,
+            adj_monitors=adj_monitors,
+            polarization=polarization,
+            pos_max_freqs=pos_max_freqs,
+            neg_min_freqs=neg_min_freqs,
+            all_freqs=all_freqs,
+            spectral_weights=spectral_weights,
+            # args, **kwargs
+        )
+
+    def _dispbs_fom(self, *args, **kwargs):
+        """Compute dispersion BS figure of merit AND gradient.
+        More specifically, this function is customized for the Dispersion BS FoM,
+        i.e. a mode overlap which requires the intensity over an area
+        Returns FOM, stores gradient to be accessed from another function.
+        """
+        # NOTE: RECALL that field shapes from Lumerical come as [3, nx, ny, nz, nλ] where 3 is Ex, Ey, Ez
+
+        # for mon in self.fwd_monitors:
+        #     vipdopt.logger.debug(vars(mon))
+        # TODO: Add functionality for neg_min_freqs
+
+        ## Gradient is 2*Re{-i * conj(amp) * E_fwd . E_adj}
+
+        # Sign factor for normal of surface
+        sign = -1 if self.fwd_srcs[0].properties['direction'] == 'Forward' else 1
+        # loop through all fields, and get their corresponding mode coefficients
+
+        # forward_prop_fields         ->      all_forward_fields      ->      forward_E, forward_H
+        # adjoint_prop_fields         ->      all_adjoint_fields      ->      adjoint_E, adjoint_H
+        # forward_design_E_fields     ->      all_forward_E_fields    ->      forward_fields_mat
+        # adjoint_design_E_fields     ->      all_adjoint_E_fields    ->      adjoint_fields_mat
+
+        forward_prop_E = self.fwd_monitors[0].e
+        forward_prop_H = self.fwd_monitors[0].h
+        adjoint_prop_E = self.adj_monitors[0].e
+        adjoint_prop_H = self.adj_monitors[0].h
+        forward_fields_mat = self.fwd_monitors[1].e
+        adjoint_fields_mat = self.adj_monitors[1].e
+
+        # Calculate individual mode coefficients
+        mode_coeff_kwargs = {}
+        for kwarg_key in ['dimension','dx','dy']:
+            if kwargs.get(kwarg_key, None) is not None:
+                mode_coeff_kwargs.update({kwarg_key:kwargs.get(kwarg_key)})
+        complex_a = get_mode_coefficient(forward_prop_E, forward_prop_H, adjoint_prop_E, adjoint_prop_H,
+                                              **mode_coeff_kwargs)
+
+        # transmission of power derivative, and store them
+        total_mfom = np.real(np.conj(complex_a)*complex_a)/kwargs.get('source_intensity')
+        
+        vipdopt.logger.info('Computing Gradient')
+        self.gradient = sign*np.squeeze(2*np.real(-1j*np.conj(complex_a)*dot_product(forward_fields_mat, adjoint_fields_mat)))
+
+        # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
+        try:
+            total_mfom /= np.array(
+                kwargs.get('max_intensity_by_wavelength', None)
+                )#[..., self.pos_max_freqs]
+        except Exception as e:
+            pass
+        # TODO: CHECK THAT THIS IS THE RIGHT PLACE TO PUT IT. CHECK GREG CODE
+
+        #! DEBUG ===============================================================
+        e_fwd = self.fwd_monitors[1].e
+        e_adj = self.adj_monitors[1].e
+        vipdopt.logger.info(
+            f'Forward design fields have average absolute xyz-components: '
+            f'{np.mean(np.abs(e_fwd[0]))}, {np.mean(np.abs(e_fwd[1]))}, '
+            f'{np.mean(np.abs(e_fwd[2]))}.'
+        )
+        vipdopt.logger.info(
+            f'Adjoint design fields have average absolute xyz-components: '
+            f'{np.mean(np.abs(e_adj[0]))}, {np.mean(np.abs(e_adj[1]))}, '
+            f'{np.mean(np.abs(e_adj[2]))}.'
+        )
+        # vipdopt.logger.info(
+        #     f'Source weight has average absolute xyz-components: '
+        #     f'{np.mean(np.abs(self.source_weight[0]))}, '
+        #     f'{np.mean(np.abs(self.source_weight[1]))}, '
+        #     f'{np.mean(np.abs(self.source_weight[2]))}.'
+        # )
+        #! ======================================================================
+
+        # NOTE: Ultimately because of the way SuperFoM is set up, there can only be one return value.
+        match kwargs.get('type', None):
+            # case 'transmission':
+            #     return total_tfom
+            # case 'intensity':
+            #     return total_ffom
+            case _:
+                return total_mfom
+
+    def _dispbs_gradient(self, *args, **kwargs):
+        """Compute the gradient of the dispersion beam-splitter figure of merit."""
+
+        # NOTE: [DEPRECATED in v4 - no longer assigning gradient variable to FoMs.] ============================================
+        # self.gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+        # # self.restricted_gradient = np.zeros(df_dev.shape, dtype=np.complex128)
+
+        # self.gradient[..., self.pos_max_freqs] = df_dev[
+        #     ..., self.pos_max_freqs
+        # ]  # * self.enabled
+        # # self.restricted_gradient[..., self.freq_index_restricted_opt] = \
+        # #     df_dev[..., self.freq_index_restricted_opt] * self.enabled_restricted
+
+        # # self.gradient = df_dev[..., pos_gradient_indices] * self.enabled
+        # # self.restricted_gradient = df_dev[..., neg_gradient_indices] * \
+        # #       self.enabled_restricted
+        # ======================================================================================================================
+
+        try:
+            # self.gradient[..., self.pos_max_freqs] /= np.array(
+            #     kwargs.get('max_intensity_by_wavelength', None)
+            #     )[..., self.pos_max_freqs]
+            self.gradient /= np.array(kwargs.get('max_intensity_by_wavelength', None))
+        except Exception as e:
+            pass
+
+        return self.gradient
 
 
 

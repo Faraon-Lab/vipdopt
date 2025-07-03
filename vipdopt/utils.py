@@ -229,6 +229,14 @@ def flatten(data: Nested[T]) -> Iterable[T]:
     else:
         yield data
 
+def arb_broadcast(x,y):
+    '''Broadcasts x to new axes depending on the shape of y so that we can get element-wise xy.'''
+    # https://stackoverflow.com/a/69419989
+    a = x.shape
+    b = y.shape
+    broadcast_idxs = [idx for idx in range(len(b)) if b[idx] not in a]
+    return np.broadcast_to(np.expand_dims(x, broadcast_idxs), b)
+
 #* Function Tools
 
 def starmap_with_kwargs(
@@ -254,3 +262,99 @@ def sech(z: npt.ArrayLike | Number) -> npt.ArrayLike | Number:
 def real_part_complex_product(z1, z2):
     """Explanation: For two complex numbers, Re(z1*z2) = Re(z1)*Re(z2) + [-Im(z1)]*Im(z2)"""
     return np.real(z1)*np.real(z2) + np.imag(z1) * (-1*np.imag(z2))
+
+def cross_product(A,B, axis=0):
+    # Simple function for the cross product of two vector fields in one plane
+
+    def gs(component_idx):
+        _axis = axis % len(A.shape)
+        '''Gets the component of the vector at axis given above.
+        Also handles negative indices for axis.'''
+        return (slice(None),) * _axis + (slice(component_idx, component_idx+1),)
+
+    result = dict()
+    result['x'] = np.multiply(A[gs(1)],B[gs(2)]) - np.multiply(A[gs(2)],B[gs(1)])
+    result['y'] = -(np.multiply(A[gs(0)],B[gs(2)]) - np.multiply(A[gs(2)],B[gs(0)]))
+    result['z'] = np.multiply(A[gs(0)],B[gs(1)]) - np.multiply(A[gs(1)],B[gs(0)])
+
+    # result['x'] = np.multiply(A[1,...],B[2,...]) - np.multiply(A[2,...],B[1,...])
+    # result['y'] = -(np.multiply(A[0,...],B[2,...]) - np.multiply(A[2,...],B[0,...]))
+    # result['z'] = np.multiply(A[0,...],B[1,...]) - np.multiply(A[1,...],B[0,...])
+
+    return result
+
+def dot_product(A,B, axis=0):
+    # Simple function for the dot product of two vector fields
+    # Ef = np.squeeze(A)
+    # Eb = np.squeeze(B)
+    
+    def einsum_string(_axis):
+        _axis += 1
+        from string import ascii_lowercase
+        pre_string = ascii_lowercase[:_axis]+'...,'+ascii_lowercase[:_axis]+'...'
+        post_string = ascii_lowercase[:_axis-1] +'...'
+        return pre_string + '->' + post_string
+    
+    result = np.einsum(einsum_string(axis), A, B)
+    #result = np.multiply(A[0,...], B[0,...]) + np.multiply(A[1,...], B[1,...]) + np.multiply(A[2,...], B[2,...])
+
+    return result
+
+def rescale(input, min_output=0, max_output=1):
+    '''Rescales image values to 0 and 1.'''
+    output = (input-np.min(input))/(np.max(input)-np.min(input))
+    return (max_output - min_output)*(min_output + output)
+
+#* Plotting
+
+WL_TO_COLOR_MAP = [[6, 1, 31],[12, 0, 40],[14, 0, 51], [16, 1, 60],
+ [17, 1, 76], [23, 0, 90], [26, 1, 105], [28, 0, 119], [28, 0, 136], 
+[34, 0, 151],[36, 1, 165], [37, 0, 176], [37, 1, 187], [36, 0, 194],
+[37, 0, 202], [34, 0, 209], [31, 0, 217], [28, 1, 220], [25, 0, 224],
+[18, 1, 227], [16, 0, 229], [14, 0, 233], [10, 0, 237], [9, 0, 237],
+[7, 0, 240], [3, 0, 242], [0, 0, 244], [0, 0, 244], [2, 5, 244], 
+[1, 8, 244], [0, 13, 242], [0, 18, 242], [2, 22, 239],
+[0, 28, 236], [0, 33, 236], [0, 37, 232], [0, 44, 229], [2, 49, 227],
+[0, 55, 220], [0, 60, 218], [0, 66, 214], [1, 73, 209], [0, 77, 205],
+[0, 84, 200], [0, 91, 194], [0, 96, 193], [0, 101, 189], [0, 106, 182],
+[0, 111, 177], [1, 118, 172], [0, 120, 165], [0, 122, 159], 
+[0, 128, 153], [1, 131, 147], [1, 132, 140], [1, 135, 134], 
+[0, 140, 131], [0, 145, 126], [0, 148, 124], [0, 152, 122], 
+[0, 158, 118], [1, 162, 118], [1, 168, 116], [0, 172, 114],
+[0, 178, 113],[0, 182, 112], [0, 186, 111], [1, 188, 109], 
+[2, 191, 107], [0, 194, 107], [1, 195, 108], [0, 198, 101], 
+[1, 200, 99], [0, 204, 96], [1, 209, 97], [2, 211, 94], [1, 217, 90],
+[0, 220, 88], [0, 225, 81], [1, 228, 77], [1, 231, 71], [1, 232, 68], 
+[0, 230, 60], [0, 230, 52], [0, 230, 43], [0, 230, 33], [0, 228, 21],
+[0, 228, 11], [2, 229, 0], [16, 229, 0], [28, 229, 0], [40, 230, 0], 
+[56, 232, 0], [72, 232, 2], [84, 230, 1],
+[98, 231, 0],[111, 230, 0],[124, 230, 0], [137, 230, 1], [151, 228, 0],
+[162, 227, 0], [173, 229, 0], [186, 227, 0], [198, 224, 1], 
+[211, 226, 0], [221, 221, 0], [227, 216, 0], [230, 210, 1], 
+[237, 201, 1], [240, 193, 1],[242, 184, 0], [245, 173, 0], 
+[248, 165, 1], [250, 155, 0], [251, 145, 0], [252, 136, 1], 
+[254, 126, 1], [255, 115, 0], [255, 104, 3], [254, 95, 1], [255, 83, 1],
+[255, 72, 2], [255, 61, 0], [253, 49, 0], [255, 39, 2],
+[253, 28, 0], [255, 17, 4], [255, 8, 1], [254, 2, 1], [254, 0, 10],
+[255, 0, 14], [255, 0, 18], [251, 0, 24], [250, 0, 30], [250, 0, 30], 
+[248, 0, 35], [246, 0, 41], [246, 0, 41], [242, 0, 40], [242, 0, 40],
+[240, 0, 45], [237, 0, 46], [233, 0, 45], [230, 1, 44], [226, 0, 42], 
+[222, 0, 41], [218, 0, 39], [214, 0, 38], [206, 0, 36], [200, 1, 34], 
+[195, 0, 32], [189, 0, 30], [185, 0, 31], [177, 0, 28], [169, 0, 26],
+[162, 0, 24], [152, 0, 23],[144, 1, 21], [136, 1, 18], [128, 1, 20], 
+[121, 0, 19], [111, 0, 16], [104, 0, 14], [96, 0, 12], [88, 1, 10], 
+[83, 0, 12], [73, 0, 9], [67, 0, 9], [62, 1, 9], [57, 0, 7], [51, 0, 7],
+[46, 0, 5], [42, 0, 4], [39, 0, 5], [33, 1, 4], [30, 0, 4],[25, 0, 3], 
+[25, 0, 3], [22, 0, 2],[21, 0, 1], [16, 0, 0], [15, 1, 1], [14, 0, 0], 
+[12, 0, 0], [9, 0, 1], [9, 0, 1], [8, 0, 0]]
+
+
+def wl_to_rgb(wl:float) -> npt.NDArray:
+    """Input : a float describing a wavelength in nanometers
+    Output : a numpy array giving the rgb values (between 0 and 1) 
+    associated with the colour percieved at this wavelength
+    We just use hardcoded values."""
+    a = np.linspace(400, 700, len(WL_TO_COLOR_MAP))
+    colorindex = min(range(len(a)), key=lambda i: abs(a[i]-wl))
+    col = WL_TO_COLOR_MAP[colorindex]
+    return np.asarray(col)/255

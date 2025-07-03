@@ -166,7 +166,7 @@ class Project:
         if not cfg_file.exists():
             # Search the directory for a configuration file
             cfg_file = glob_first(project_dir, '**/*config*.{yaml,yml,json}')
-        cfg = Config.from_file(cfg_file)
+        cfg = self.config_type.from_file(cfg_file)
 
         # Append simulation data from sim.json to the config from config.json
         if not project_save_file.exists():      # Initializing
@@ -195,6 +195,10 @@ class Project:
             pull_files_debug_mode=cfg.get('pull_sim_files_from_debug_folder')
         )
         vipdopt.logger.info('Internal folder substructure created.')
+        
+        # Do final processing of parameters via Python (any functions too complex for Jinja)
+        # before turning into Simulation, Device, FoM, etc.
+        cfg.derive_params()
 
         # Load Base Simulation
         self.base_sim, self.src_to_sim_map = Simulation._load_from_config(cfg, self.dir,

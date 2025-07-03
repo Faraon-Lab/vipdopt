@@ -6,7 +6,7 @@ from copy import copy
 import numpy as np
 
 sys.path.append(Path.cwd())
-from vipdopt.configuration import Config, SonyBayerRenderer
+from vipdopt.configuration import Config, MetasurfaceRenderer
 from vipdopt.optimization.device import Device
 
 TEST_YAML_PATH = Path('testing/processed_config.yml')
@@ -186,8 +186,8 @@ def fom_dict() -> dict:
 
 
 @pytest.fixture(scope='session')
-def template_renderer() -> SonyBayerRenderer:
-    rndr = SonyBayerRenderer('jinja_templates/')
+def template_renderer() -> MetasurfaceRenderer:
+    rndr = MetasurfaceRenderer('jinja_templates/')
 
     rndr.set_template('derived_simulation_properties.j2')
 

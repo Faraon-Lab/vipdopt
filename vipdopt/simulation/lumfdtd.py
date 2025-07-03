@@ -589,6 +589,13 @@ class LumericalFDTD(ISolver):
         return submission_script
 
     @_check_lum_fdtd
+    def set_view(self):
+        # Set the view
+        self.fdtd.select('FDTD')
+        for k,v in {'zoom':2.5, 'theta':35, 'phi': 437}.items():
+            self.fdtd.setview(k,v)
+
+    @_check_lum_fdtd
     @typing.no_type_check
     def getresult(
         self,
@@ -716,9 +723,21 @@ class LumericalFDTD(ISolver):
                 except vipdopt.lumapi.LumApiError:
                     sp = None
                 power = self.fdtd.getdata(mname, 'power') if 'power' in data else None
+                
+                try:
+                    wl = 299792458/self.fdtd.getdata(mname,'f')*1e6
+                    ff = self.fdtd.farfield2d(mname, np.arange(1,np.size(wl)+1), 1000)
+                    ff_th = self.fdtd.farfieldangle(mname, np.arange(1,np.size(wl)+1), 1000)
+                except vipdopt.lumapi.LumApiError:
+                    ff = None
+                    ff_th = None
+                try:
+                    ff = ff/sp
+                except Exception as ex:
+                    pass
 
                 with monitor.src.open('wb') as f:
-                    np.savez(f, e=e, h=h, p=p, t=t, sp=sp, power=power)
+                    np.savez(f, e=e, h=h, p=p, t=t, sp=sp, power=power, ff=ff, ff_th=ff_th)
                 monitor.reset()
 
                 # vipdopt.logger.debug(f'E field: {monitor.e}')

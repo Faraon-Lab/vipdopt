@@ -17,8 +17,7 @@ sys.path.append(os.getcwd())
 
 import vipdopt
 from vipdopt.configuration.config import read_config_file
-from vipdopt.utils import ensure_path, setup_logger
-
+from vipdopt.utils import ensure_path, convert_path, setup_logger
 
 class TemplateRenderer:
     """Class for rendering Jinja Templates."""
@@ -26,7 +25,7 @@ class TemplateRenderer:
     @ensure_path
     def __init__(self, src_directory: Path) -> None:
         """Initialize and TemplateRenderer."""
-        
+
         self.env = Environment(loader=FileSystemLoader(str(src_directory)))
 
     def render(self, **kwargs) -> str:
@@ -52,8 +51,7 @@ class TemplateRenderer:
         """Add or reassign a filter to use in the environment."""
         self.env.filters[name] = func
 
-
-class SonyBayerRenderer(TemplateRenderer):
+class MetasurfaceRenderer(TemplateRenderer):
     """TemplateRenderer including various filters for ease of writing templates."""
 
     @ensure_path
@@ -61,12 +59,13 @@ class SonyBayerRenderer(TemplateRenderer):
     def __init__(self, src_directory: Path) -> None:
         """Initialize a SonyBayerRenderer."""
         super().__init__(src_directory)
+        self.register_filter('nparray', np.array)
         self.register_filter('linspace', np.linspace)
         self.register_filter('sin', np.sin)
         self.register_filter('tan', np.tan)
         self.register_filter('arcsin', np.arcsin)
         self.register_filter('argmin', np.argmin)
-        self.register_filter('newaxis', SonyBayerRenderer._newaxis)
+        self.register_filter('newaxis', MetasurfaceRenderer._newaxis)
 
     @staticmethod
     def _newaxis(iterable: Iterable | Undefined) -> npt.ArrayLike:
@@ -75,41 +74,54 @@ class SonyBayerRenderer(TemplateRenderer):
             return iterable
         return np.array(iterable)[:, np.newaxis]
 
-
-if __name__ == '__main__':
+def default_template_parser():
     parser = ArgumentParser('Create a simulation YAML file from a template.')
     parser.add_argument('template', type=Path, help='Jinja2 template file to use')
     parser.add_argument(
-        'data_file',
-        type=Path,
+        'data_file', type=Path,
         help='File containing values to substitute into template',
     )
     parser.add_argument(
-        'output',
-        type=Path,
+        'output', type=Path,
         help='File to output rendered template to.',
     )
     parser.add_argument(
-        '-s',
-        '--src-directory',
-        type=Path,
-        default='jinja_templates/',
+        '-s', '--src-directory', type=Path,
+        default='runs/test_run/',
         help='Directory to search for the jinja template.'
-        ' Defaults to "jinja_templates/"',
+        ' Defaults to "runs/test_run/"',
     )
     parser.add_argument(
-        '-v',
-        '--verbose',
-        action='store_true',
+        '-v', '--verbose', action='store_true',
         help='Enable verbose output. Takes priority over quiet.',
     )
     parser.add_argument(
-        '-q',
-        '--quiet',
-        action='store_true',
+        '-q', '--quiet', action='store_true',
         help='Enable quiet output. Will only show critical logs.',
     )
+    
+    return parser
 
+def reload_template(template_dir, template, data_file, output_file):
+    template_dir = convert_path(template_dir)
+    output_file = convert_path(output_file)
+
+    rndr = MetasurfaceRenderer(template_dir)
+    rndr.set_template(template)
+
+    data = read_config_file(data_file)
+    output = rndr.render(data=data, pi=np.pi)
+    vipdopt.logger.info(f'Rendered Output:\n{output}')
+
+    if output_file.suffix in ['.yml','.yaml']:
+        output = output.replace('None', 'null')
+    with open(output_file, 'w') as f:
+        f.write(output)
+
+    vipdopt.logger.info(f'Successfully saved output to {output_file}')
+
+if __name__ == '__main__':
+    parser = default_template_parser()
     args = parser.parse_args()
 
     log_level = (
@@ -121,17 +133,4 @@ if __name__ == '__main__':
     )
     logger = setup_logger('template_logger', log_level)
 
-    rndr = SonyBayerRenderer(args.src_directory)
-
-    rndr.set_template(args.template)
-
-    data = read_config_file(args.data_file)
-    output = rndr.render(data=data, pi=np.pi)
-    logger.info(f'Rendered Output:\n{output}')
-    
-    if args.output.suffix in ['.yml','.yaml']:
-        output = output.replace('None', 'null')
-    with open(args.output, 'w') as f:
-            f.write(output)
-
-    logger.info(f'Successfully saved output to {args.output}')
+    reload_template(args.src_directory, args.template, args.data_file, args.output)

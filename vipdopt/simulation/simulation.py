@@ -53,7 +53,7 @@ class Simulation(ISimulation):
         objects (OrderedDict[str, SimObject]): The objects within
             the simulation
     """
-    
+
     def __init__(self, source: PathLike | dict | None = None, solver:str=None) -> None:
         """Create a Simulation.
 
@@ -69,7 +69,7 @@ class Simulation(ISimulation):
 
         if source:
             self.load(source)
-        
+
         self.solver = None
         self.encoder = None
         if solver:
@@ -88,13 +88,13 @@ class Simulation(ISimulation):
     @override
     def __str__(self) -> str:
         return self.as_json()
-    
+
     def __eq__(self, __value: object) -> bool:
         """Test equality of simulations."""
         if isinstance(__value, Simulation):
             return self.objects == __value.objects
         return super().__eq__(__value)
-    
+
     @ensure_path
     @override
     def save(self, fname: Path):
@@ -127,7 +127,7 @@ class Simulation(ISimulation):
     def clear_objects(self):
         """Clear all existing objects and create a new project."""
         self.objects: OrderedDict[str, SimObject] = OrderedDict()
-    
+
     @override
     def load(self, source: PathLike | dict, *args, **kwargs):
         if isinstance(source, Config):
@@ -136,7 +136,7 @@ class Simulation(ISimulation):
             self._load_dict(source)
         else:
             self._load_file(source)
-    
+
     @ensure_path
     def _load_file(self, fname: Path):
         """Load a simulation from a JSON file."""
@@ -151,45 +151,45 @@ class Simulation(ISimulation):
         self.info.update(d.get('info', {}))
 
         self.clear_objects()
-        
+
         for obj in d['objects'].values():
             self.new_object(
                 obj['name'],
                 SimObjectType(obj['obj_type']),
                 **obj['properties'],
             )
-    
+
     @classmethod
     def _load_from_config(cls, cfg, folder, solver='LumericalFDTD', *args, **kwargs):
         '''Create a simulation from config'''
-        
+
         try:
             # Initialize base simulation -
             # Are we running using Lumerical or ceviche or fdtd-z or SPINS or?
             vipdopt.logger.info('Loading base simulation from sim.json...')
-            
+
             base_sim_dict = cfg.pop('base_simulation')
-            
+
             base_sim = Simulation(base_sim_dict)
             vipdopt.logger.info('...successfully loaded base simulation!')
         except BaseException:  # noqa: BLE001
             base_sim = Simulation()
-        
+
         base_sim.set_solver(solver)
-        
+
         path = Path(folder) / 'base_sim'
         match base_sim.solver:
             case 'LumericalFDTD':
                 path = path.with_suffix('.fsp')
         base_sim.set_path(path)
-        
+
         # NOTE: (Not used here):
         # We can create new simulations from the foMs by using fom.create_forward_sim() and passing base sim as a template
         src_to_sim_map = {
             src: base_sim.with_enabled([src], name=src)
             for src in base_sim.source_names()
         }           # key, value types here are Dict( str : Simulation )
-        
+
         return base_sim, src_to_sim_map
 
     def copy(self) -> Simulation:
@@ -198,7 +198,7 @@ class Simulation(ISimulation):
         new_sim.info = self.info.copy()
         for obj_name, obj in self.objects.items():
             new_sim.new_object(obj_name, obj.obj_type, **obj.properties)
-        
+
         new_sim = new_sim.set_solver(self.solver)
 
         try:    # Copy-paste the device imports from the previous simulation into the new simulation.
@@ -226,7 +226,7 @@ class Simulation(ISimulation):
         # TODO: And the same with devices
         # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
         return [self]
-    
+
     def new_object(
         self,
         obj_name: str,
@@ -256,7 +256,7 @@ class Simulation(ISimulation):
         obj.update(**properties)
         self.add_object(obj)
         return obj
-    
+
     def add_object(self, obj: SimObject) -> None:
         """Add an existing object to the simulation."""
         # Add copy to the vipdopt.lumapi.FDTD
@@ -266,12 +266,12 @@ class Simulation(ISimulation):
         """Update object with new property values."""
         obj = self.objects[name]
         obj.update(**properties)
-    
+
     def enable(self, names: Iterable[str]):
         """Enable all objects in provided list."""
         for name in names:
             self.update_object(name, enabled=1)
-        
+
     def with_enabled(
         self,
         objs: Iterable[Source] | Iterable[str],
@@ -318,7 +318,7 @@ class Simulation(ISimulation):
     def sources(self) -> list[SimObject]:
         """Return a list of all source objects."""
         return [obj for _, obj in self.objects.items() if isinstance(obj, Source)]
-    
+
     def source_names(self) -> Iterator[str]:
         """Return a list of all source object names."""
         for obj in self.sources():
@@ -333,13 +333,13 @@ class Simulation(ISimulation):
         """Return a list of all monitor object names."""
         for obj in self.monitors():
             yield obj.name
-    
+
     def monitors_by_name(self, string_list) -> list[Monitor]:
         """Return a list of all monitor objects, with names filtered by a string."""
         if isinstance(string_list, str):
             string_list = [string_list]
         return [m for m in self.monitors() if any(substring in m.name for substring in string_list)]
-    
+
     @overload
     def link_monitors(self): ...
 
@@ -357,7 +357,7 @@ class Simulation(ISimulation):
         for mon in monitors:
             output_path = sim_path.parent / (sim_path.stem + f'_{mon.name}.npz')
             mon.set_source(output_path)
-    
+
     def imports(self) -> list[Import]:
         """Return a list of all import objects."""
         return [obj for _, obj in self.objects.items() if isinstance(obj, Import)]
@@ -375,19 +375,19 @@ class Simulation(ISimulation):
         """Return a list of all indexmonitor object names."""
         for obj in self.indexmonitors():
             yield obj.name
-    
+
     def crosssection_monitors(self) -> list[SimObject]:
         '''Return a list of all cross-section monitor objects.'''
         return self.monitors_by_name('cross_monitor')
-    
+
     def crosssection_monitor_names(self) -> Iterator[str]:
         """Return a list of all cross-section monitor object names."""
         for obj in self.crosssection_monitors():
             yield obj.name
-    
+
     def import_field_shape(self) -> tuple[int, ...]:
         """Return the shape of the fields returned from this simulation's design index monitors."""\
-        
+
         match self.solver:
             case 'LumericalFDTD':
                 # TODO: Revisit if/when adjusting interface with FDTD
@@ -397,28 +397,28 @@ class Simulation(ISimulation):
             case _:
                 return None
         return np.squeeze(index_prev['index_x']).shape
-    
+
     def misc_processes(self):
         # todo
         pass
-    
+
     def save_to_program_file(program, sim_list, file_dir, add_job_to_fdtd=True):
         """Made to be overloaded."""
         pass
-    
+
     def run_sims(self, program, sim_list, file_dir, add_job_to_fdtd=True):
         # program is either a LumericalOptimization or a LumericalEvaluation.
-        
+
         self.save_to_program_file(program, sim_list, file_dir, add_job_to_fdtd=add_job_to_fdtd)
         vipdopt.logger.info(
             'In-Progress Step 1: All Simulations Setup and Jobs Added.'
         )
         self.run_jobs_to_completion(program, sim_list)
-    
+
     @classmethod
     def run_jobs_to_completion(cls, program, sim_list):
         # program is either a LumericalOptimization or a LumericalEvaluation
-        
+
         # If true, we're in debugging mode and it means no simulations are run.
         # Data is instead pulled from finished simulation files in the debug folder.
         # If false, run jobs and check that they all ran to completion.
@@ -430,25 +430,34 @@ class Simulation(ISimulation):
                 )
                 sim.set_path(sim_file)
         else:
-            while program.solver.fdtd.listjobs(
-                'FDTD'
-            ):  # Existing job list still occupied
-                # Run simulations from existing job list
-                use_GUI_license = program.cfg['use_GUI_license'] if os.getenv('SLURM_JOB_NODELIST') is None else False
-                program.solver.runjobs( use_GUI_license )
 
-                # Check if there are any jobs that didn't run
-                for sim in sim_list:
-                    sim_file = sim.get_path()
-                    # program.solver.load(sim_file)
-                    # if program.solver.layoutmode():
-                    cond = [program.cfg['simulator_dimension'], sim_file.stat().st_size]
-                    if (cond[0]=='3D' and cond[1]<=2e7) or (cond[0]=='2D' and cond[1]<=5e5):
-                        # Arbitrary 500KB filesize for 2D sims, 20MB filesize for 3D sims. That didn't run completely
-                        program.solver.addjob(sim_file)
-                        vipdopt.logger.info(
-                            f'Failed to run: {sim_file.name}. Re-adding ...'
-                        )
+            job_list = [x.replace('"','') for x in program.solver.fdtd.listjobs('FDTD').split('\n"')][1:]
+            THREAD_LIMIT = int(np.floor(32 / 4))    # GUI license sharing only allows 32 threads, each job = 4 threads
+            if len(job_list) > THREAD_LIMIT:
+                job_sublists = [job_list[i:i+THREAD_LIMIT] for i in range(0, len(job_list), THREAD_LIMIT)]
+                program.solver.clearjobs()
+                for js in job_sublists:
+                    [program.solver.addjob(jb) for jb in js]
+
+                    while program.solver.fdtd.listjobs(
+                        'FDTD'
+                    ):  # Existing job list still occupied
+                        # Run simulations from existing job list
+                        use_GUI_license = program.cfg['use_GUI_license'] if os.getenv('SLURM_JOB_NODELIST') is None else False
+                        program.solver.runjobs( use_GUI_license )
+
+                        # Check if there are any jobs that didn't run
+                        for sim in sim_list:
+                            sim_file = sim.get_path()
+                            # program.solver.load(sim_file)
+                            # if program.solver.layoutmode():
+                            cond = [program.cfg['simulator_dimension'], sim_file.stat().st_size]
+                            if (cond[0]=='3D' and cond[1]<=2e7) or (cond[0]=='2D' and cond[1]<=5e5):
+                                # Arbitrary 500KB filesize for 2D sims, 20MB filesize for 3D sims. That didn't run completely
+                                program.solver.addjob(sim_file)
+                                vipdopt.logger.info(
+                                    f'Failed to run: {sim_file.name}. Re-adding ...'
+                                )
 
 
 
@@ -459,7 +468,7 @@ class LumericalSimulation(Simulation):
         objects (OrderedDict[str, SimObject]): The objects within
             the simulation
     """
-    
+
     def __init__(self, *args, **kwargs) -> None:
         """Create a LumericalSimulation.
 
@@ -467,19 +476,19 @@ class LumericalSimulation(Simulation):
             source (PathLike | dict | None): optional source to load the simulation from
         """
         super().__init__(*args, **kwargs)
-    
+
     @classmethod
     def from_parent(cls, parent):
         child = LumericalSimulation(source=None, solver=None)
         for attr, val in vars(parent).items():
             setattr(child, attr, val)
         return child
-    
+
     @classmethod
     def save_to_program_file(cls, program, sim_list, file_dir, add_job_to_fdtd=True):
         # program is either a LumericalOptimization or a LumericalEvaluation.
         cls.save_to_fsp(program, sim_list, file_dir, add_job_to_fdtd)
-    
+
     @classmethod
     def save_to_fsp(cls, program, sim_list, file_dir, add_job_to_fdtd=True):
         # program is either a LumericalOptimization or a LumericalEvaluation
@@ -490,7 +499,7 @@ class LumericalSimulation(Simulation):
             program.solver.save(sim_file, sim)  # Saving also sets the path
             if add_job_to_fdtd:
                 program.solver.addjob(sim_file)
-    
+
     @ensure_path
     def _load_fsp(self, fname: Path):
         """Load a simulation from a Lumerical .fsp file."""

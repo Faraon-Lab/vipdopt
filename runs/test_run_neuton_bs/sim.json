@@ -1,0 +1,669 @@
+{
+    "info": {
+        "name": "optimization",
+        "path": "",
+        "simulator_name": "LumericalFDTD",
+        "coordinates": {}
+    },
+    "objects": {
+        "FDTD": {
+            "name": "FDTD",
+            "obj_type": "fdtd",
+            "properties": {
+                "dimension": "2D",
+                "x span": 0.000102,
+                "y max": 3.25e-05,
+                "y min": -1.6e-05,
+                
+                
+                "index": 1
+            }
+        },
+        "fwd_src_x": {
+            "name": "fwd_src_x",
+            
+            "obj_type": "gaussian",
+            "properties": {
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": 3.208333333333333e-05,
+                
+                "direction": "Backward",
+                "x": 0.0,
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 0
+            }
+        },
+        "fwd_src_y": {
+            "name": "fwd_src_y",
+            
+            "obj_type": "gaussian",
+            "properties": {
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": 3.208333333333333e-05,
+                
+                "direction": "Backward",
+                "x": 0.0,
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 90
+            }
+        },
+        
+        "adj_src_0x": {
+            "name": "adj_src_0x",
+            "obj_type": "gaussian",
+            "properties": {
+                "x": 2.4999999999999998e-05,
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": -1.4999999999999999e-05,
+                "theta": 90,
+                "phi": 0,
+                
+                "direction": "Forward",
+                "x": 8.660254037844385e-06,
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": 30,
+                "angle phi": 0,
+                "polarization angle": 0
+                }
+            },
+        "adj_src_0y": {
+            "name": "adj_src_0y",
+            "obj_type": "gaussian",
+            "properties": {
+                "x": 2.4999999999999998e-05,
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": -1.4999999999999999e-05,
+                "theta": 0,
+                "phi": 0,
+                
+                "direction": "Forward",
+                "x": 8.660254037844385e-06,
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": 30,
+                "angle phi": 0,
+                "polarization angle": 90
+                }
+            },
+        "adj_src_1x": {
+            "name": "adj_src_1x",
+            "obj_type": "gaussian",
+            "properties": {
+                "x": -2.4999999999999998e-05,
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": -1.4999999999999999e-05,
+                "theta": 90,
+                "phi": 0,
+                
+                "direction": "Forward",
+                "x": -5.459553513993035e-06,
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": -20,
+                "angle phi": 0,
+                "polarization angle": 0
+                }
+            },
+        "adj_src_1y": {
+            "name": "adj_src_1y",
+            "obj_type": "gaussian",
+            "properties": {
+                "x": -2.4999999999999998e-05,
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": -1.4999999999999999e-05,
+                "theta": 0,
+                "phi": 0,
+                
+                "direction": "Forward",
+                "x": -5.459553513993035e-06,
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": -20,
+                "angle phi": 0,
+                "polarization angle": 90
+                }
+            },
+
+        
+        "bg_fwd_src": {
+            "name": "bg_fwd_src",
+            "obj_type": "gaussian",
+            "properties": {
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": 3.208333333333333e-05,
+                
+                "direction": "Backward",
+                "x": 0,
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 0
+                }
+            },
+
+        
+        "bg_adj_src": {
+            "name": "bg_adj_src",
+            "obj_type": "gaussian",
+            "properties": {
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": -1.4999999999999999e-05,
+                "theta": 0,
+                "phi": 0,
+                
+                "direction": "Forward",
+                "wavelength start": 4.2999999999999995e-06,
+                "wavelength stop": 4.7e-06,
+                "waist radius w0": 1e-06,
+                "distance from waist": -2.0833333333333356e-06,
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 0
+                }
+            },
+        "propagation_monitor": {
+            "name": "propagation_monitor",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "Linear X",
+                "y": -1.4999999999999999e-05,
+                
+                "x": 0,
+                "x span": 9.18e-05,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                
+                "frequency points": 1
+            }
+        },
+        "PEC_screen": {
+            "name": "PEC_screen",
+            "obj_type": "rect",
+            "properties": {
+                "override mesh order from material database": 1,     
+                "mesh order": 3,
+                "x": 0,
+                "x span": 0.000176,
+                "y min": 2.9699999999999997e-05,
+                "y max": 2.9999999999999997e-05,
+                "material": "PEC (Perfect Electrical Conductor)"
+            }
+        },
+        "source_aperture": {
+            "name": "source_aperture",
+            "obj_type": "rect",
+            "properties": {
+                "override mesh order from material database": 1,     
+                "mesh order": 2,
+                "x": 0,
+                "x span": 9.999999999999999e-05,
+                "y min": 2.9699999999999997e-05,
+                "y max": 2.9999999999999997e-05,
+                "index": 1
+            }
+        },
+        
+        "glass_substrate": {
+            "name": "glass_substrate",
+            "obj_type": "rect",
+            "properties": {
+                "x": 0,"x span": 0.000176,
+                "y min": 2.9999999999999997e-05,"y max": 3.25e-05,
+
+                
+
+                "material": "SiO2 (Glass) - Palik"
+            }
+        },
+        "design_import": {
+            "name": "design_import",
+            "obj_type": "import",
+            "dev_id": 0,                
+            "properties": {
+                "override mesh order from material database": 1,     
+                "mesh order": 1,
+                "x span": 9.999999999999999e-05,
+                "y min": 0.0,
+                "y max": 2.9999999999999997e-05,
+                "z span": 3.0000000000000004e-07
+                
+            }
+        },
+        "design_mesh": {
+            "name": "design_mesh",
+            "obj_type": "mesh",
+            "dev_id": 0,
+            "properties": {
+                "x": 0,
+                "x span": 0.000102,
+                "y min": -5e-07,
+                "y max": 3.05e-05,
+                "z span": 3.0000000000000004e-07,
+                
+                "dx": 1e-07,
+                "dy": 1e-07,
+                "dz": 1e-07
+            }
+        },
+        "design_index_monitor": {
+            "name": "design_index_monitor",
+            "obj_type": "index",
+            "dev_id": 0,
+            "properties": {
+                "x span": 9.999999999999999e-05,
+                "monitor type": "2D Z-Normal",
+                "y min": 0.0,
+                "y max": 2.9999999999999997e-05,
+                
+                "spatial interpolation": "nearest mesh cell"
+            }
+        },
+        "design_efield_monitor": {
+            "name": "design_efield_monitor",
+            "obj_type": "profile",
+            "dev_id": 0,
+            "properties": {
+                "x span": 9.999999999999999e-05,
+                "monitor type": "2D Z-Normal",
+                "y min": 0.0,
+                "y max": 2.9999999999999997e-05,
+                "z span": 3.0000000000000004e-07,
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                
+                "frequency points": 1,
+                "output Hx": 1,
+                "output Hy": 1,
+                "output Hz": 1
+            }
+        }
+    },
+
+    "eval_objects": {               
+
+        
+        "src_transmission_monitor": {
+            "name": "src_transmission_monitor",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "Linear X",
+                "y": 3.05e-05,
+                
+                "x": 0,
+                "x span": 0.00011073700000000001,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+
+        
+        "src_spill_monitor": {
+            "name": "src_spill_monitor",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "Linear X",
+                "y": 3.05e-05,
+                
+                "x": 0,
+                "x span": 0.00011,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+
+        
+        "incident_aperture_monitor": {
+            "name": "incident_aperture_monitor",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "Linear X",
+                "y": 3.05e-05,
+                
+                "x": 0,
+                
+                "x span": 0.00010067,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+
+        
+        "exit_aperture_monitor": {
+            "name": "exit_aperture_monitor",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "Linear X",
+                "y": -5e-07,
+                
+                "x": 0,
+                
+                "x span": 0.00010067,
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+
+        
+        
+        
+        
+        
+        
+
+        
+        "side_monitor_0": {
+            "name": "side_monitor_0",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "Linear Y",
+                "x": 5.0335e-05,   
+                "y max": 3.05e-05,
+                "y min": -5e-07,
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+        "side_monitor_1": {
+            "name": "side_monitor_1",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "Linear Y",
+                "x": -5.0335e-05,   
+                "y max": 3.05e-05,
+                "y min": -5e-07,
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+
+        
+        
+
+        
+        "vertical_scatter_monitor_0": {
+            "name": "vertical_scatter_monitor_0",
+            "obj_type": "power",
+            "properties": {
+            "monitor type": "Linear Y",
+            "x": 4.9999999999999996e-05, 
+            "y max": 0.0,
+            "y min": -1.4999999999999999e-05,
+            
+            "override global monitor settings": 1,
+            "use wavelength spacing": 1,
+            "use source limits": 1,
+            "frequency points": 5
+            }
+        },
+        "vertical_scatter_monitor_1": {
+            "name": "vertical_scatter_monitor_1",
+            "obj_type": "power",
+            "properties": {
+            "monitor type": "Linear Y",
+            "x": -4.9999999999999996e-05, 
+            "y max": 0.0,
+            "y min": -1.4999999999999999e-05,
+            
+            "override global monitor settings": 1,
+            "use wavelength spacing": 1,
+            "use source limits": 1,
+            "frequency points": 5
+            }
+        },
+
+
+        
+
+        
+        "scatter_plane_monitor": {
+            "name": "scatter_plane_monitor",
+            "obj_type": "power",
+            
+            "properties": {
+            "monitor type": "Linear X",
+            "y": -5e-07,
+            
+            "x": 0,
+            "x span": 0.0003,
+            "override global monitor settings": 1,
+            "use wavelength spacing": 1,
+            "use source limits": 1,
+            "frequency points": 5
+            }
+        },
+
+        
+        
+        "device_cross_monitor_src_x_0": {
+                "name": "device_cross_monitor_src_x_0",
+                "obj_type": "power",
+                "properties": {
+                
+                    
+                    "monitor type": "Linear Y",
+                    
+                    "x": -2.4999999999999998e-05,
+                    "y max": 2.9999999999999997e-05,
+                    "y min": -1.4999999999999999e-05,
+
+                
+
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+        "device_cross_monitor_src_x_1": {
+                "name": "device_cross_monitor_src_x_1",
+                "obj_type": "power",
+                "properties": {
+                
+                    
+                    "monitor type": "Linear Y",
+                    
+                    "x": 0.0,
+                    "y max": 2.9999999999999997e-05,
+                    "y min": -1.4999999999999999e-05,
+
+                
+
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+        "device_cross_monitor_src_x_2": {
+                "name": "device_cross_monitor_src_x_2",
+                "obj_type": "power",
+                "properties": {
+                
+                    
+                    "monitor type": "Linear Y",
+                    
+                    "x": 2.4999999999999998e-05,
+                    "y max": 2.9999999999999997e-05,
+                    "y min": -1.4999999999999999e-05,
+
+                
+
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+        "device_cross_monitor_src_y_0": {
+                "name": "device_cross_monitor_src_y_0",
+                "obj_type": "power",
+                "properties": {
+                
+                    
+                    "monitor type": "Linear X",
+                    "y": -0.000735,
+                    
+                    "x max": -4.9999999999999996e-05,
+                    "x min": 4.9999999999999996e-05,
+                
+
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+        "device_cross_monitor_src_y_1": {
+                "name": "device_cross_monitor_src_y_1",
+                "obj_type": "power",
+                "properties": {
+                
+                    
+                    "monitor type": "Linear X",
+                    "y": 1.4999999999999999e-05,
+                    
+                    "x max": -4.9999999999999996e-05,
+                    "x min": 4.9999999999999996e-05,
+                
+
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+        "device_cross_monitor_src_y_2": {
+                "name": "device_cross_monitor_src_y_2",
+                "obj_type": "power",
+                "properties": {
+                
+                    
+                    "monitor type": "Linear X",
+                    "y": 0.000765,
+                    
+                    "x max": -4.9999999999999996e-05,
+                    "x min": 4.9999999999999996e-05,
+                
+
+                
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": 5
+            }
+        },
+        "fwd_src_x": {
+            "name": "fwd_src_x",
+            "obj_type": "plane",
+            
+            "properties": {
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": 3.208333333333333e-05,
+                
+                "direction": "Backward",
+                
+                "source shape": "Plane wave",
+                
+                "plane wave type": "Bloch/periodic",
+                "wavelength start": 4.219999999999999e-06,
+                "wavelength stop": 4.78e-06,
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 0
+            }
+        },
+        "fwd_src_y": {
+            "name": "fwd_src_y",
+            "obj_type": "plane",
+            
+            "properties": {
+                "x span": 0.000204,
+                "injection axis": "y-axis",
+                "y": 3.208333333333333e-05,
+                
+                "direction": "Backward",
+                
+                "source shape": "Plane wave",
+                
+                "plane wave type": "Bloch/periodic",
+                "wavelength start": 4.219999999999999e-06,
+                "wavelength stop": 4.78e-06,
+                "angle theta": 0.0,
+                "angle phi": 0,
+                "polarization angle": 90
+            }
+        },
+        
+        
+        
+
+        
+        "FDTD": {
+            "name": "FDTD",
+            "obj_type": "fdtd",
+            "properties": {
+                "dimension": "2D",
+                "x span": 9.999999999999999e-05,
+                "y max": 3.25e-05,
+                "y min": -1.6e-05,
+                
+                "x min bc": "Periodic",
+                "y min bc": "Periodic",
+                "index": 1
+            }
+        }
+    }
+}
