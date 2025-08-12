@@ -23,7 +23,7 @@ pull_sim_files_from_debug_folder: False
 # Lumapi filepaths are found in lumerical.cfg
 
 simulator_name: 'LumericalFDTD'
-simulator_dimension: '2D'       # capital D please      #2.5D #3D
+simulator_dimension: '3D'       # capital D please     #2D #2.5D #3D
 simulator_max_wait_time: 3600   # seconds
 # use_autograd: False     #delete
 use_GUI_license: True
@@ -34,18 +34,17 @@ convert_existing: False     # Are we converting a previous file that didn't have
 
 #* Mesh
 
-mesh_spacing_um: 0.1 # 0.017          # NOTE: Same mesh spacing is used for ALL dimensions.
+mesh_spacing_um: 0.051 # 0.017          # NOTE: Same mesh spacing is used for ALL dimensions.
 
-#! TODO: Rewrite for blurring. ========================
+#! TODO: Rewrite for blurring.
 use_smooth_blur: False
-min_feature_size_um: 0.03  # used only for blurring
-#! ====================================================
+min_feature_size_um: 0.085  # used only for blurring
 
 #* Optical
 
-background_index: 1
-min_device_index: 1
-max_device_index: 1.52  # this may be overridden if dispersion data is available
+background_index: 1.5   # TiO2
+min_device_index: 1.5
+max_device_index: 2.4   # SiO2
 
 init_permittivity_0_1_scale: 0.5
 binarize_3_levels: False      #! new
@@ -57,20 +56,20 @@ do_normalize: False
 #* Device
 
 # geometry_spacing_minimum_um: 0.051    # NOTE: UNUSED
-# geometry_spacing_lateral_um: 0.102 # 0.085 # 0.051      #delete
+# geometry_spacing_lateral_um: 0.085 #0.051
 
-voxel_size_x_um: 0.1
-voxel_size_y_um: 0.1              # y ignored in 2D
-voxel_size_z_um: 0.1
+voxel_size_x_um: 0.085
+voxel_size_y_um: 0.085              # y ignored in 2D
+voxel_size_z_um: 0.051
 
-# device_scale_um: 0.102        #delete
+# device_scale_um: 0.051        #delete
 # This is only used to scale vertical dimensions: focal length, device vertical layer voxels, and FDTD gap sizes.
 # Edit: device_scale_um is just meant to arbitrarily scale a few things it's not necessarily ONLY used for vertical dimensions
 # TODO: At present this is used to determine the device voxels in the vertical. We should track down what else uses device_scale_um
 
-device_size_x_um: 100
-device_size_y_um: 1          # doesn't matter for 2d
-device_size_z_um: 30
+device_size_x_um: 3.06 #2.125#2.091#2.04#2.091#2.04#geometry_spacing_lateral_um * 40
+device_size_y_um: 2.04
+device_size_z_um: 2.04
 # origin (x,y) is assumed to be the center of the device.
 device_vertical_minimum_um: 0
 origin_displacement_um: [0, 0]  # x,y
@@ -78,7 +77,7 @@ origin_displacement_um: [0, 0]  # x,y
 # Layering
 layering_axis: 2        # [0,1,2] -> [x,y,z]
 # num. voxels will be merged into num_vertical_layers as necessary
-num_layers: 10
+num_layers: 20
 # num_vertical_layers: 20 # 10
 # layer_height_um: 0.102 # 0.204 #0.051 * 4 #0.017 * 8   #delete
 
@@ -95,10 +94,10 @@ spacer_density: 0
 #* Surroundings
 
 # Structure the following list such that the last entry is the last medium above the device.
-substrates_above_device: [{'name': 'glass_substrate', 'thickness_um': 2.5, 'material': "SiO2 (Glass) - Palik"},
-                # {'name': 'sapphire_substrate', 'thickness_um': 2.5, 'material': 1.6516}
-                ]
-# todo: edit to take custom refractive indices
+substrates_above_device: [{'name': 'glass_substrate', 'thickness_um': 0.4, 'material': "SiO2 (Glass) - Palik"}
+                ] #['permittivity_layer_substrate', #'silicon_substrate']
+# todo: substrates should use substrates_above_device instead.
+substrate_thickness_um: 0.4     # TODO: Set this variable to point to thickness_um above
 
 num_sidewalls: 0 #4
 sidewall_material: 'etch'
@@ -115,7 +114,7 @@ boundary_conditions: 'pml' # 'periodic'
 # NOTE: If this needs troubleshooting, open Lumerical in a GUI in the environment you intend to run this in, and check the resource config job launch presets.
 # #! do not include spaces in filepaths passed to linux
 lum_mpi_exe: 'C:\Program Files (x86)\IntelSWToolsMPI\compilers_and_libraries_2020.4.321\windows\mpi\intel64\bin\mpiexec.exe' #"/central/home/ifoo/lumerical/2022a_r24/mpich2/nemesis/bin/mpiexec" # "/central/software/mpich/4.0.0/bin/mpirun"
-lum_solver_exe: 'C:\Program Files\Lumerical\v212\bin\fdtd-engine-impi.exe' # "/central/home/ifoo/lumerical/2022a_r24/bin/fdtd-engine-mpich2nem" # "/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem"
+lum_solver_exe: 'C:\Program Files\Lumerical\v222\bin\fdtd-engine-impi.exe' # "/central/home/ifoo/lumerical/2022a_r24/bin/fdtd-engine-mpich2nem" # "/central/home/tmcnicho/lumerical/v232/bin/fdtd-engine-mpich2nem"
 lum_nprocs: 8
 
 #* Forward (Input) Source
@@ -127,7 +126,7 @@ use_airy_approximation: True
 f_number: 2.2
 airy_correction_factor: 0.84  # Approximation of central Airy lobe using a Gaussian profile
 # See https://en.wikipedia.org/wiki/Airy_disk#Approximation_using_a_Gaussian_profile:~:text=to%20the%20intensity.-,Approximation%20using%20a%20Gaussian%20profile,-%5Bedit%5D
-beam_size_multiplier: 30   #! new
+beam_size_multiplier: 1   #! new
 
 source_angle_theta_vacuum_deg: 0 #40
 source_angle_phi_deg: 0
@@ -135,7 +134,7 @@ source_angle_phi_deg: 0
 # General polarized source information
 xy_phi_rotations: [0, 90] #2D, apply this to polarization angle of the forward source.
 xy_adjtheta_rotations: [90, 0]  #2D settings. 3D is: [0, 90] applied to phi, and theta=90 for all
-# xy_pol_rotations: [0, 90]
+xy_pol_rotations: [0, 90]
 xy_names: ['x', 'y']
 
 use_source_aperture: True
@@ -143,8 +142,7 @@ use_source_aperture: True
 #* Adjoint Source
 #! TODO: Rewrite for arbitrary focal-point locations ======================
 
-num_focal_spots: 2              # only used to calculate num_adjoint_sources
-adj_angles_theta_deg: [-30, 20] # Angle of incidence of adjoint source, also sets the target deflection angle
+num_focal_spots: 4              # only used to calculate num_adjoint_sources
 
 # Determine which adjoint source goes to each dispersive range
 # Each dispersive range itself contains a map for how the wavelength buckets correspond to which specific adjoint sources on the focal plane.
@@ -161,55 +159,6 @@ adjoint_src_to_dispersive_range_map: [
 ]
 #! ==================================================================
 
-#* Spectral
-add_infrared: False
-lambda_min_um: 4.5 # 0.375
-lambda_max_um: 4.5 # 0.725
-lambda_min_eval_um: 4.2 # 0.375
-lambda_max_eval_um: 4.8 # 0.725
-
-#* Spectral dispersion and polarization selectivity information
-lambda_center_um: 4.5
-num_opt_dispersion_freqs: 1     # Number of frequencies / frequency bins for explicit optimization within the wavelength range
-                                # NOTE: if this value is 1, you must set lambda_min_um = lambda_max_um
-dispersion_factors: {'adj_src_0x': 0,
-                     'adj_src_1y': 0}
-# Dispersion parameter, >1 is hyperdispersive, =1 is regular, and =0 is zero-dispersion
-                            # Polarization 1(x), Polarization 2(y)
-
-
-
-# Determine the polarizations that will be directed to each focal area
-polarizations_focal_plane_map: [ ['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y'] ]
-weight_focal_plane_map_performance_weighting: [ 1.0, 1.0, 1.0, 1.0 ]
-weight_focal_plane_map: [ 1.0, 1.0, 1.0, 1.0 ]
-
-do_green_balance: False #True
-shuffle_green: False #True
-
-polarization_name_to_idx: { 'x':0, 'y':1, 'z':2 }
-
-
-num_bands: 2 # 3
-num_points_per_band: 15 #5 # 20 #15
-desired_peaks_per_band_um: [ 0.475, 0.625 ]
-# desired_peaks_per_band_um: [ 0.45, 0.55, 0.65 ]
-# desired_peaks_per_band_um: [ 0.48, 0.52, 0.59 ]
-# desired_peaks_per_band_um: [ 0.48, 0.53, 0.62 ]
-explicit_band_centering: True
-
-num_dispersive_ranges: 1
-
-infrared_center_um: 0.94
-do_rejection: False
-softplus_kappa:  2
-
-# Add PDAF Functionality
-add_pdaf: False
-pdaf_angle_phi_degrees: 45
-pdaf_angle_theta_degrees: -8
-pdaf_adj_src_idx: 0
-
 
 #* Optimization
 
@@ -219,8 +168,8 @@ enforce_xy_gradient_symmetry: False #True
 weight_by_quadrant_transmission: True
 
 #! 20230220 - Empirically, 300 iterations is usually the right number to get a stable optimization FoM.
-total_num_iterations:  150 #40 #20 # 1  #300
-epoch_list: [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150] # [0, 4, 8, 12, 16, 20] # [0,1]  # [0,30,60,90,120,150,180,210,240,270,300]
+total_num_iterations: 300 #80 #40 #20
+epoch_list: [0,30,60,90,120,150,180,210,240,270,300] # [0, 16, 32, 48, 64, 80] #[0, 30, 40] # [0,16,20]  #[0, 4, 8, 12, 16, 20]
 
 optimizer: "AdamOptimizer"
 optimizer_settings: {
@@ -268,6 +217,50 @@ layer_gradient: False
 flip_gradient: False
 
 
+#* Spectral
+add_infrared: False
+lambda_min_um: 0.4 # 0.375
+lambda_max_um: 0.7 # 0.725
+lambda_min_eval_um: 0.4 # 0.375
+lambda_max_eval_um: 0.7 # 0.725
+
+
+#* Spectral and polarization selectivity information
+
+# Determine the polarizations that will be directed to each focal area
+polarizations_focal_plane_map: [ ['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y'] ]
+weight_focal_plane_map_performance_weighting: [ 1.0, 1.0, 1.0, 1.0 ]
+weight_focal_plane_map: [ 1.0, 1.0, 1.0, 1.0 ]
+
+do_green_balance: False #True
+shuffle_green: False #True
+
+polarization_name_to_idx: { 'x':0, 'y':1, 'z':2 }
+
+
+num_bands: 3
+num_points_per_band: 20
+desired_peaks_per_band_um: [ 0.45, 0.55, 0.65 ]
+# desired_peaks_per_band_um: [ 1.2,1.3,1.4 ]
+# desired_peaks_per_band_um: [ 1.2, 1.35, 1.5 ]
+# desired_peaks_per_band_um: [ 0.48, 0.52, 0.59 ]
+# desired_peaks_per_band_um: [ 0.48, 0.53, 0.62 ]
+explicit_band_centering: True
+
+num_dispersive_ranges: 1
+
+infrared_center_um: 0.94
+do_rejection: False
+softplus_kappa:  2
+
+# Add PDAF Functionality
+add_pdaf: False
+pdaf_angle_phi_degrees: 45
+pdaf_angle_theta_degrees: -8
+pdaf_adj_src_idx: 0
+
+
+
 
 #!* NEW STUFF JULY 2023
 
@@ -286,32 +279,31 @@ evaluate_bordered_extended: False # True
 
 figures_of_merit: {
         "type": "FoM",
-        "fom_func": ~,
-        "grad_func": ~,
+        "fom_func": null,
+        "grad_func": null,
         "foms": {
                 "fom_0_0": {
-                        "type": "DispBSFoM",
+                        "type": "BayerFilterFoM",
                         "fom_func": null,
                         "grad_func": null,
                         "foms": {},
                         "weights": [ 1.0 ],
                         "fwd_srcs": [
-                                "fwd_src_x"
+                                "forward_src_x"
                         ],
-                        "fom_monitors": [
-                        # As defined in _bayer_fom() of the class, this list must be
-                        # 0: actual fom monitor,
-                        # 1: pseudo-fom (e.g. transmission) monitor,
+                        "fom_monitors": [ 
+                        # As defined in _bayer_fom() of the class, this list must be 
+                        # 0: actual fom monitor, 
+                        # 1: pseudo-fom (e.g. transmission) monitor, 
                         # 2: gradient (e.g. design e-field) monitor
-                                "propagation_monitor",
-                                #"transmission_monitor_0",
+                                "focal_monitor_0",
+                                "transmission_monitor_0",
                                 "design_efield_monitor"
                         ],
                         "adj_srcs": [
-                                "adj_src_0x"    # This later gets copied out to multiple adjoint sources depending on num_opt_dispersion_freqs
+                                "adj_src_0x"
                         ],
                         "grad_monitors": [
-                                "propagation_monitor",
                                 "design_efield_monitor"
                         ],
                         "polarization": "TE",
@@ -320,28 +312,85 @@ figures_of_merit: {
                         "all_freqs": []
                 },
                 "fom_1_0": {
-                        "type": "DispBSFoM",
+                        "type": "BayerFilterFoM",
                         "fom_func": null,
                         "grad_func": null,
                         "foms": {},
                         "weights": [ 1.0 ],
                         "fwd_srcs": [
-                                "fwd_src_y"
+                                "forward_src_x"
                         ],
-                        "fom_monitors": [
-                        # As defined in _bayer_fom() of the class, this list must be
-                        # 0: actual fom monitor,
-                        # 1: pseudo-fom (e.g. transmission) monitor,
+                        "fom_monitors": [ 
+                        # As defined in _bayer_fom() of the class, this list must be 
+                        # 0: actual fom monitor, 
+                        # 1: pseudo-fom (e.g. transmission) monitor, 
                         # 2: gradient (e.g. design e-field) monitor
-                                "propagation_monitor",
-                                #"transmission_monitor_0",
+                                "focal_monitor_1",
+                                "transmission_monitor_1",
                                 "design_efield_monitor"
                         ],
                         "adj_srcs": [
-                                "adj_src_1y" # This later gets copied out to multiple adjoint sources depending on num_opt_dispersion_freqs
+                                "adj_src_1x"
                         ],
                         "grad_monitors": [
-                                "propagation_monitor",
+                                "design_efield_monitor"
+                        ],
+                        "polarization": "TE",
+                        "pos_max_freqs": [],    #[0,1,2],
+                        "neg_min_freqs": [],
+                        "all_freqs": []
+                },
+                "fom_2_0": {
+                        "type": "BayerFilterFoM",
+                        "fom_func": null,
+                        "grad_func": null,
+                        "foms": {},
+                        "weights": [ 1.0 ],
+                        "fwd_srcs": [
+                                "forward_src_x"
+                        ],
+                        "fom_monitors": [ 
+                        # As defined in _bayer_fom() of the class, this list must be 
+                        # 0: actual fom monitor, 
+                        # 1: pseudo-fom (e.g. transmission) monitor, 
+                        # 2: gradient (e.g. design e-field) monitor
+                                "focal_monitor_2",
+                                "transmission_monitor_2",
+                                "design_efield_monitor"
+                        ],
+                        "adj_srcs": [
+                                "adj_src_2x"
+                        ],
+                        "grad_monitors": [
+                                "design_efield_monitor"
+                        ],
+                        "polarization": "TE",
+                        "pos_max_freqs": [],    #[0,1,2],
+                        "neg_min_freqs": [],
+                        "all_freqs": []
+                },
+                "fom_3_0": {
+                        "type": "BayerFilterFoM",
+                        "fom_func": null,
+                        "grad_func": null,
+                        "foms": {},
+                        "weights": [ 1.0 ],
+                        "fwd_srcs": [
+                                "forward_src_x"
+                        ],
+                        "fom_monitors": [ 
+                        # As defined in _bayer_fom() of the class, this list must be 
+                        # 0: actual fom monitor, 
+                        # 1: pseudo-fom (e.g. transmission) monitor, 
+                        # 2: gradient (e.g. design e-field) monitor
+                                "focal_monitor_3",
+                                "transmission_monitor_3",
+                                "design_efield_monitor"
+                        ],
+                        "adj_srcs": [
+                                "adj_src_3x"
+                        ],
+                        "grad_monitors": [
                                 "design_efield_monitor"
                         ],
                         "polarization": "TE",
@@ -350,7 +399,7 @@ figures_of_merit: {
                         "all_freqs": []
                 },
         },
-        "weights": [ 1.0, 1.0 ],
+        "weights": [ 1.0, 0.5, 1.5, 1.0 ],
         "fwd_srcs": [],
         "fom_monitors": [],
         "adj_srcs": [],
@@ -360,7 +409,6 @@ figures_of_merit: {
         "neg_min_freqs": [],
         "all_freqs": []
 }
-
 
 #* Evaluation Settings
 # What kind of source and boundary condition are we using to evaluate this situation?

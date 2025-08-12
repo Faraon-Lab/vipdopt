@@ -146,7 +146,7 @@ class Device:
         else:
             w[..., 0] = self.init_density * np.ones(self.size, dtype=np.complex128)
         self.w = w
-        
+
         self.velocity = np.zeros(self.size)
 
     def as_dict(self) -> dict:
@@ -239,6 +239,7 @@ class Device:
                 init_seed=0,
                 filters= [
                     # todo: put back the Layering filter when it's time
+
                     # Layering( 1 if cfg['simulator_dimension']=='2D' else 2,
                     #         cfg['num_vertical_layers'] ,
                     #         cfg['num_spacers'], (0,1),
@@ -247,7 +248,7 @@ class Device:
                     #         # layer_height_voxels=4, spacer_height_voxels=2,
                     #         spacer_voxels_value=cfg['spacer_density'],
                     #         ),
-                    # Sigmoid( 0.5, 1.0),    # todo: Add N-level sigmoid for different numbers of indices.
+                    Sigmoid( 0.5, 1.0 ),    # todo: Add N-level sigmoid for different numbers of indices.
                     Scale(( cfg['min_device_permittivity'], cfg['max_device_permittivity'], ))
                     # Bridging is performed in the STL export and has minimal performance reduction.
                 ],
@@ -313,11 +314,13 @@ class Device:
         """Save device to a .npz file."""
         fname.parent.mkdir(parents=True, exist_ok=True)
         with fname.open('wb') as f:
-            np.save(f, self.as_dict())  # type: ignore
+            as_dict = self.as_dict()
             if binarize:
-                np.save(f, self.binarize(self.pass_through_filters(self.get_design_variable(), True)))
+                as_dict.update({'design_variable': self.binarize(self.pass_through_filters(self.get_design_variable(), True))})
             else:
-                np.save(f, self.get_design_variable())
+                as_dict.update({'design_variable': self.get_design_variable()})
+
+            np.save(f, as_dict)  # type: ignore
 
     @classmethod
     def from_source(cls, source: dict | PathLike) -> Device:
@@ -341,7 +344,7 @@ class Device:
         """Create a new device by loading from a saved file."""
         with fname.open('rb') as f:
             attributes = np.load(f, allow_pickle=True).flat[0]
-            w = np.load(f)
+            w = attributes.pop('design_variable')
         d = Device._from_dict(attributes)
         d.set_design_variable(w)
         return d
@@ -755,5 +758,5 @@ if __name__ == '__main__':
     cfg = cfg = Config.from_file(cfg_file)
 
     device = Device.load_config(cfg)
-    
+
     print('End of code reached.')

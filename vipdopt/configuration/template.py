@@ -62,6 +62,7 @@ class MetasurfaceRenderer(TemplateRenderer):
         self.register_filter('nparray', np.array)
         self.register_filter('linspace', np.linspace)
         self.register_filter('sin', np.sin)
+        self.register_filter('cos', np.cos)
         self.register_filter('tan', np.tan)
         self.register_filter('arcsin', np.arcsin)
         self.register_filter('argmin', np.argmin)

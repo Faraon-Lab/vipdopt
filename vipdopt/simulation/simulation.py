@@ -66,6 +66,7 @@ class Simulation(ISimulation):
         ])
         self.clear_objects()
         self._env_vars: dict | None = None
+        self.eval_dict = {}
 
         if source:
             self.load(source)
@@ -158,9 +159,12 @@ class Simulation(ISimulation):
                 SimObjectType(obj['obj_type']),
                 **obj['properties'],
             )
+        
+        self.eval_dict.update(d['eval_objects'])
+            
 
     @classmethod
-    def _load_from_config(cls, cfg, folder, solver='LumericalFDTD', *args, **kwargs):
+    def _load_from_config(cls, cfg, folder, solver='LumericalFDTD', add_eval_objects=False, *args, **kwargs):
         '''Create a simulation from config'''
 
         try:
@@ -175,7 +179,10 @@ class Simulation(ISimulation):
         except BaseException:  # noqa: BLE001
             base_sim = Simulation()
 
+        if add_eval_objects:
+            base_sim.add_eval_objects()
         base_sim.set_solver(solver)
+        
 
         path = Path(folder) / 'base_sim'
         match base_sim.solver:
@@ -226,6 +233,22 @@ class Simulation(ISimulation):
         # TODO: And the same with devices
         # Multiple simulations may be created here due to the need for large-area simulation segmentation, or genetic optimizations
         return [self]
+
+    def new_objects_from_dict(self, d:dict):
+        '''Loads objects from a dictionary straight into the simulation.'''
+        for obj in d.values():
+            if obj['name'] in self.objects.keys():
+                self.update_object(obj['name'], **obj['properties'])
+            else:
+                self.new_object(
+                    obj['name'],
+                    SimObjectType(obj['obj_type']),
+                    **obj['properties'],
+            )
+    
+    def add_eval_objects(self):
+        self.new_objects_from_dict(self.eval_dict)
+        self.eval_dict = {}
 
     def new_object(
         self,
@@ -433,31 +456,35 @@ class Simulation(ISimulation):
 
             job_list = [x.replace('"','') for x in program.solver.fdtd.listjobs('FDTD').split('\n"')][1:]
             THREAD_LIMIT = int(np.floor(32 / 4))    # GUI license sharing only allows 32 threads, each job = 4 threads
+
             if len(job_list) > THREAD_LIMIT:
                 job_sublists = [job_list[i:i+THREAD_LIMIT] for i in range(0, len(job_list), THREAD_LIMIT)]
-                program.solver.clearjobs()
-                for js in job_sublists:
-                    [program.solver.addjob(jb) for jb in js]
+            else:
+                job_sublists = [job_list]
 
-                    while program.solver.fdtd.listjobs(
-                        'FDTD'
-                    ):  # Existing job list still occupied
-                        # Run simulations from existing job list
-                        use_GUI_license = program.cfg['use_GUI_license'] if os.getenv('SLURM_JOB_NODELIST') is None else False
-                        program.solver.runjobs( use_GUI_license )
+            program.solver.clearjobs()
+            for js in job_sublists:
+                [program.solver.addjob(jb) for jb in js]
 
-                        # Check if there are any jobs that didn't run
-                        for sim in sim_list:
-                            sim_file = sim.get_path()
-                            # program.solver.load(sim_file)
-                            # if program.solver.layoutmode():
-                            cond = [program.cfg['simulator_dimension'], sim_file.stat().st_size]
-                            if (cond[0]=='3D' and cond[1]<=2e7) or (cond[0]=='2D' and cond[1]<=5e5):
-                                # Arbitrary 500KB filesize for 2D sims, 20MB filesize for 3D sims. That didn't run completely
-                                program.solver.addjob(sim_file)
-                                vipdopt.logger.info(
-                                    f'Failed to run: {sim_file.name}. Re-adding ...'
-                                )
+                while program.solver.fdtd.listjobs(
+                    'FDTD'
+                ):  # Existing job list still occupied
+                    # Run simulations from existing job list
+                    use_GUI_license = program.cfg['use_GUI_license'] if os.getenv('SLURM_JOB_NODELIST') is None else False
+                    program.solver.runjobs( use_GUI_license )
+
+                    # Check if there are any jobs that didn't run
+                    for sim in sim_list:
+                        sim_file = sim.get_path()
+                        # program.solver.load(sim_file)
+                        # if program.solver.layoutmode():
+                        cond = [program.cfg['simulator_dimension'], sim_file.stat().st_size]
+                        if (cond[0]=='3D' and cond[1]<=2e7) or (cond[0]=='2D' and cond[1]<=9e6):
+                            # Arbitrary 9MB filesize for 2D sims, 20MB filesize for 3D sims. That didn't run completely
+                            program.solver.addjob(sim_file)
+                            vipdopt.logger.info(
+                                f'Failed to run: {sim_file.name}. Re-adding ...'
+                            )
 
 
 

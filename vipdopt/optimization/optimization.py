@@ -17,7 +17,7 @@ import glob
 
 import numpy as np
 import numpy.typing as npt
-import nlopt
+#import nlopt
 
 import vipdopt
 # from vipdopt import GDS, STL
@@ -503,17 +503,43 @@ class Optimization:
                         adj_prop_H = adj_sims[-1].monitors()[0].h
                         norm_coeff = get_mode_coefficient(fwd_prop_E, fwd_prop_H, adj_prop_E, adj_prop_H, **self.fom_kwargs)
                         self.fom.norm_intensity = np.real(np.conj(norm_coeff)*norm_coeff)
-                        if np.any(self.fom.norm_intensity) == 0:
+                        if np.any(self.fom.norm_intensity == 0):
                             vipdopt.logger.info('Background simulations did not converge correctly.')
                             self.fom.norm_intensity = 1e-5*np.ones(self.fom.norm_intensity.shape)
                         self.do_background = False
 
-                    # Compute mode overlap FoM and apply spectral and performance weights.
+
+                    # Compute various FoMs and apply spectral and performance weights to the joint ones.
                     self.fom_kwargs.update({'source_intensity': self.fom.norm_intensity})
+
+                    self.fom_kwargs.update({'type':'intensity'})
+                    self.fom_hist.get('intensity_overall').append(self.fom.compute_fom(*self.fom_args, **self.fom_kwargs))
+
+                    for fom_cnt in range(len(self.fom.foms)):
+                        self.fom_kwargs.update({'type':'mode_overlap'})
+                        self.fom_hist.get(f'fom_{fom_cnt}').append(self.fom.foms[fom_cnt][0].compute_fom(*self.fom_args, **self.fom_kwargs))
+                    for fom_cnt in range(len(self.fom.foms)):
+                        self.fom_kwargs.update({'type':'intensity'})
+                        self.fom_hist.get(f'intensity_{fom_cnt}').append(self.fom.foms[fom_cnt][0].compute_fom(*self.fom_args, **self.fom_kwargs))
+                    
+                    for fom_cnt in range(len(self.fom.foms)):
+                        if self.fom_hist.get(f'farfield_{fom_cnt}', None) is None:
+                            self.fom_hist.update({f'farfield_{fom_cnt}':[]})
+                        self.fom_kwargs.update({'type':'farfield'})
+                        self.fom_hist.get(f'farfield_{fom_cnt}').append(self.fom.foms[fom_cnt][0].compute_fom(*self.fom_args, **self.fom_kwargs))
+
+                    #! [IF THERE ARE BUGS, PUT THE MAIN FOM CODE BLOCK LAST]
+                    # since we made the FoMs store their own gradients
+                    self.fom_kwargs.update({'type':'mode_overlap'})
                     f = self.fom.compute_fom(*self.fom_args, **self.fom_kwargs)
                     self.fom_hist.get('fom_overall').append(f)
-                    self.fom_hist.get('intensity_overall').append(f)
                     vipdopt.logger.debug(f'FoM: {f}')
+                    
+                    for ij in range(2):
+                        if self.fom_hist.get(f'weights_{ij}', None) is None:
+                            self.fom_hist.update({f'weights_{ij}':[]})
+                        self.fom_hist.get(f'weights_{ij}').append(self.fom.performance_weights[ij])
+                            
 
                     # #! TODO: 20250617 CONVERT THIS TO HEATMAP OF TRANSMISSION(ANGLE, WAVELENGTH) ============
 
@@ -596,10 +622,20 @@ class Optimization:
                     # Compute gradient and apply spectral and performance weights.
                     g = self.fom.compute_grad(
                         *self.grad_args,
-                        apply_performance_weights=True,
+                        apply_performance_weights=False, #True,
                         **self.grad_kwargs,
                     )
                     vipdopt.logger.info(f'Design_gradient has average {np.mean(g)}, max {np.max(g)}')
+                    if self.fom_hist.get(f'grad_overall', None) is None:
+                        self.fom_hist.update({f'grad_overall':[]})
+                    self.fom_hist.get(f'grad_overall').append(np.mean(g))
+                    
+                    for ij in range(2):
+                        if self.fom_hist.get(f'grad_{ij}', None) is None:
+                            self.fom_hist.update({f'grad_{ij}':[]})
+                        self.fom_hist.get(f'grad_{ij}').append(np.mean(self.fom.foms[ij][0].gradient))
+                    # Todo: access each sub-FoM gradient and compare their relative ratios against the performance weights
+                    # vipdopt.logger.debug()
 
 
                     #* Process gradient accordingly for application to device through optimizer.
@@ -668,7 +704,8 @@ class Optimization:
 
                 # Step the device with the gradient
                 vipdopt.logger.debug('Stepping device along gradient.')
-                self.optimizer.step(self.device, grad.reshape(self.device.size), self.iteration)
+                # self.optimizer.step(self.device, grad.reshape(self.device.size), self.iteration)
+                self.optimizer.step(self.device, 1*grad.reshape(self.device.size), self.iteration)
 
                 # # Perturb design variable appropriately
                 # if self.cfg['border_constant_width']:
@@ -835,7 +872,7 @@ class Optimization:
         #!! TODO:  generate_plots() should also be a function that is passed in, btw
 
         fom_fig = plotter.plot_fom_trace(
-            np.array(self.fom_hist['intensity_overall']),
+            np.array(self.fom_hist['fom_overall']),
             folder)
 
         quads_to_plot = [0,1] if self.cfg['simulator_dimension']=='2D' else [0,1,2,3]
@@ -843,6 +880,7 @@ class Optimization:
             np.array([self.fom_hist[f'transmission_{x}'] for x in quads_to_plot]).swapaxes(0,1),
             folder,
         )
+
         overall_trans_fig = plotter.plot_bayer_quadrant_transmission_trace(
             np.expand_dims(np.array(self.fom_hist['transmission_overall']), axis=1),
             folder,

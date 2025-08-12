@@ -76,9 +76,10 @@ class SonyBayerConfig(Config):
 
     def derive_params(self, renderer: TemplateRenderer):
         """Derive the parameters that depend on the config files."""
-        new_yaml = renderer.render(data=self, pi=np.pi)
-        new_params = yaml.safe_load(new_yaml)
-        self.update(new_params)
+        # new_yaml = renderer.render(data=self, pi=np.pi)
+        # new_params = yaml.safe_load(new_yaml)
+        # self.update(new_params)
+        pass
 
     def _explicit_band_centering(self):
         # Determine the wavelengths that will be directed to each focal area

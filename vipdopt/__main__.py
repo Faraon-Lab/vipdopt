@@ -9,10 +9,10 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
-import vipdopt.optimization
-
 # Import main package and add program folder to PATH.
 sys.path.append(Path.cwd()) # 20240219 Ian: Only added this so I could debug some things from my local VSCode
+sys.path.append(Path.cwd().parent) # 20240219 Ian: Only added this so I could debug some things from my local VSCode
+print(Path.cwd())
 import vipdopt
 from vipdopt.project import Project, create_internal_folder_structure
 from vipdopt.optimization import (
@@ -25,7 +25,7 @@ from vipdopt.optimization import (
     # SuperFoM,
 )
 from vipdopt.configuration.template import reload_template
-from vipdopt.optimization.optimizer import NLOptOptimizer, GradientAscentOptimizer, AdamOptimizer
+from vipdopt.optimization.optimizer import NLOptOptimizer, GradientAscentOptimizer, AdamOptimizer, _load_optimizer
 from vipdopt.utils import setup_logger
 
 f = sys.modules[__name__].__file__
@@ -87,6 +87,68 @@ def generate_plots_simple_mse(self):
 #     # TODO: rest of the plots
 
     plotter.close_all()
+
+def generate_plots_bs(self):
+
+    """Generate the plots and save to file."""
+    folder = self.dirs['opt_info']
+    iteration = self.iteration #  if self.iteration==self.epoch_list[-1] else self.iteration+1
+    vipdopt.logger.debug(f'Plotter. Iteration {iteration}: Plot histories length {len(self.fom_hist["intensity_overall"])}')
+
+    # TODO: Copy all to summary folder as well.
+
+    # Placeholder indiv_quad_trans
+    from vipdopt.eval import plotter
+    import matplotlib.pyplot as plt
+    # getattr(self, f'generate_plots_{self.cfg["simulator_dimension"].lower()}_v2')()
+    # self.generate_plots_efield_focalplane_1d()
+
+
+    # ! 20240229 Ian - Best to be specifying functions for 2D and for 3D.
+
+    # TODO: Assert iteration == len(self.fom_hist['intensity_overall']); if unequal, make it equal.
+    # Plot key information such as Figure of Merit evolution for easy visualization and checking in the middle of optimizations
+
+    #!! TODO:  generate_plots() should also be a function that is passed in, btw
+
+    fom_fig = plotter.plot_fom_trace(
+        np.array(self.fom_hist['fom_overall']),
+        folder,
+        epoch_list=self.epoch_list,
+    )
+
+    foms_to_plot = range(len(self.fom.foms))
+    indiv_foms_fig = plotter.plot_multiple_foms_trace(
+        np.array([self.fom_hist[f'fom_{x}'] for x in foms_to_plot]).swapaxes(0,1),
+        folder,
+        epoch_list=self.epoch_list,
+        filename='disp_foms_trace',
+        line_labels=[f'0x_wl{i}' for i in range(len(self.fom.foms)//2)] + [f'1y_wl{i}' for i in range(len(self.fom.foms)//2)]
+    )
+
+    intensities_to_plot = np.array([self.fom_hist[f'intensity_{x}'] for x in range(len(self.fom.foms))])
+    intensities_fig = plotter.plot_intensity_x_wl(
+        {'wl': [4.5], 'x': range(intensities_to_plot.shape[2])},
+        np.array([self.fom_hist[f'intensity_{x}'][-1] for x in foms_to_plot]),
+        folder,
+        epoch_list=self.epoch_list,
+        filename=f'disp_intensities_i{self.iteration}',
+        line_labels=[f'0x_wl{i}' for i in range(len(self.fom.foms)//2)] + [f'1y_wl{i}' for i in range(len(self.fom.foms)//2)]
+    )
+    
+    farfields = np.array([self.fom_hist[f'farfield_{x}'] for x in range(len(self.fom.foms))])
+    # axes: 0 - nfoms, 1 - iterations, 2 - ff and ff_th, 3 - x, 4 - either y or wl, not sure which.
+    farfields_fig = plotter.plot_farfield(
+        {'wl': [4.5], 'x': farfields[0,0,1,...]},
+        farfields[:,-1,0,...],
+        folder,
+        epoch_list=self.epoch_list,
+        filename=f'disp_intensities_i{self.iteration}',
+        line_labels=[f'0x_wl{i}' for i in range(len(self.fom.foms)//2)] + [f'1y_wl{i}' for i in range(len(self.fom.foms)//2)]
+    )
+
+    return None
+
 # =================================================================================================================
 
 def default_parser():
@@ -142,24 +204,24 @@ def default_parser():
 
 if __name__ == '__main__':
     
-    # Update processed_config.yml
-    reload_template(*[
-                    Path('runs/test_run_neuton_bs'),
-                    Path("derived_simulation_properties.j2"),
-                    Path(f"runs/test_run_neuton_bs/config_example_2d.yml"),
-                    Path("runs/test_run_neuton_bs/processed_config.yml")
-                ])
-    # Update sim.json
-    reload_template(*[
-                    Path('runs/test_run_neuton_bs'),
-                    Path("simulation_template.j2"),
-                    Path("runs/test_run_neuton_bs/processed_config.yml"),
-                    Path("runs/test_run_neuton_bs/sim.json")
-                ])
-
     # Set up argument parser
     parser = default_parser()
     args = parser.parse_args()
+
+    # Update processed_config.yml
+    reload_template(*[
+                    args.directory,
+                    Path("derived_simulation_properties.j2"),
+                    args.directory / 'config_example_2d.yml',
+                    args.directory / 'processed_config.yml',
+                ])
+    # Update sim.json
+    reload_template(*[
+                    args.directory,
+                    Path("simulation_template.j2"),
+                    args.directory / 'processed_config.yml',
+                    args.directory / 'sim.json',
+                ])
 
     # Set up logging
     log_file = args.directory / args.log if args.command == 'optimize' else args.log
@@ -226,7 +288,7 @@ if __name__ == '__main__':
         # optimizer = GradientAscentOptimizer()
         base_sim = base_sim.set_solver('LumericalFDTD')
         # optimizer = AdamOptimizer()
-        optimizer = vipdopt.optimization.optimizer._load_optimizer(project.config)
+        optimizer = _load_optimizer(project.config)
 
         optimization = Optimization(
             base_sim,
@@ -254,11 +316,13 @@ if __name__ == '__main__':
         optimization.update_histories = update_histories_em_filter
         optimization.update_histories(optimization)
         # optimization.generate_plots = partial(generate_plots_simple_mse, self=optimization)
-        optimization.generate_plots = lambda : None
+        optimization.generate_plots = partial(generate_plots_bs, self=optimization) #lambda : None
         # ==============================================================================================
 
         project.optimizations.append(optimization)
 
+        # base_sim_eval = copy.deepcopy(base_sim)
+        # base_sim_eval.add_eval_objects()
         # evaluation = Evaluation(
 
         # )

@@ -358,13 +358,35 @@ def plot_bayer_quadrant_transmission_trace(
     trace = statistics_func(np.array(f).reshape(f.shape[0],f.shape[1],-1), axis=2)
     vipdopt.logger.info('Quadrant Transmissions Trace is:')
 
+    return plot_history_traces(trace, 
+                                plot_directory_location, filename,
+                                epoch_list=epoch_list,
+                                title_str = 'Quadrant Transmissions - Trace',
+                                plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'],
+                                y_label_str='Quad Trans.',
+                                f_labels=line_labels,
+                            )
+
+def plot_multiple_foms_trace(
+    f,      # axis 0: iterations, axis 1: num_adjoint_sources, axis 2: wavelength
+    plot_directory_location, epoch_list=None, filename='disp_foms_trace',
+    statistics_func = np.max, # np.mean, etc.
+    # display_greens='sum',# 'separate', 'both' <---
+    line_labels=[f'0x_wl{i}' for i in range(5)] + [f'1y_wl{i}' for i in range(5)]
+    
+):
+    """Plot evolution trace of individual FoMs."""
+
+    trace = statistics_func(np.array(f).reshape(f.shape[0],f.shape[1],-1), axis=2)
+    vipdopt.logger.info('Indiv. FoM Trace is:')
+
     return plot_history_traces(trace, plot_directory_location, filename,
-                    epoch_list=epoch_list,
-                    title_str = 'Quadrant Transmissions - Trace',
-                    plot_colors=['blue', 'green', 'red', 'xkcd:fuchsia'],
-                    y_label_str='Quad Trans.',
-                    f_labels=line_labels,
-                )
+                                epoch_list=epoch_list,
+                                title_str = 'Indiv. FoMs - Trace',
+                                plot_colors=None,
+                                y_label_str='Indiv. FoM',
+                                f_labels=line_labels,
+                            )
 
 
 def plot_Enorm_2d(r, f_vectors, wl,
@@ -438,7 +460,7 @@ def plot_spectrum(wl, f_vectors,
         fom_spectra[adj_src] = copy.deepcopy(fom_spectra)[adj_src]
         fom_spectra[adj_src].update({
             'var_name': line_labels[adj_src],
-            'var_values': f_vectors[adj_src, :],
+            'var_values': np.squeeze(f_vectors[adj_src, :]),
         })
         stat.append(statistics_func(f_vectors[adj_src, :]))
 
@@ -485,6 +507,54 @@ def plot_bayer_quadrant_transmission_spectra(
                             #   y_limits=[0.0,1.0],
                               plot_colors=plot_colors,
                               statistics_func=statistics_func,
+                            )
+
+    return fig, stat
+
+def plot_intensity_x_wl(
+    coords:dict[str:np.ndarray],
+    f,      # axis 0: num_adjoint_sources, axis 1: x, ..., axis -1: wl
+    plot_directory_location, epoch_list=None, filename='disp_foms_trace',
+    statistics_func = np.max, # np.mean, etc.
+    # display_greens='sum',# 'separate', 'both' <---
+    line_labels=[f'0x_wl{i}' for i in range(5)] + [f'1y_wl{i}' for i in range(5)],
+    ):
+
+    # # Keep the first and last axes - 0: quadrant, -1: wavelength
+    f = f.reshape(f.shape[0], f.shape[-1], -1)
+
+    fig, stat = plot_spectrum(coords['x'], f,
+                                plot_directory_location, filename, plot_subfolder='int_linecut',
+                                band_vals=None, title_str='Intensity at Focal Plane',
+                                x_label_string='x',
+                                line_labels=line_labels,
+                            #   y_limits=[0.0,1.0],
+                                plot_colors=None,
+                                statistics_func=statistics_func,
+                            )
+
+    return fig, stat
+
+def plot_farfield(
+    coords:dict[str:np.ndarray],
+    f,      # axis 0: num_adjoint_sources, axis 1: x, ..., axis -1: wl
+    plot_directory_location, epoch_list=None, filename='disp_foms_trace',
+    statistics_func = np.max, # np.mean, etc.
+    # display_greens='sum',# 'separate', 'both' <---
+    line_labels=[f'0x_wl{i}' for i in range(5)] + [f'1y_wl{i}' for i in range(5)],
+    ):
+
+    # # Keep the first and last axes - 0: quadrant, -1: wavelength
+    f = f.reshape(f.shape[0], f.shape[-1], -1)
+
+    fig, stat = plot_spectrum(coords['x'], f,
+                                plot_directory_location, filename, plot_subfolder='farfield',
+                                band_vals=None, title_str='Farfield 2D',
+                                x_label_string='theta',
+                                line_labels=line_labels,
+                            #   y_limits=[0.0,1.0],
+                                plot_colors=None,
+                                statistics_func=statistics_func,
                             )
 
     return fig, stat

@@ -145,8 +145,7 @@ class DispBSConfig(Config):
 
     def _derive_params(self, *args, **kwargs):
         """Derive the parameters that depend on the config files."""
-        
-        
+
         # NOTE: Initially, the config has two FoMs that correspond to two polarizations being split.
         # NOTE: This copy-pastes each of those FoMs with different wavelengths and angles pertaining to dispersion control.
         # =================================================================================================
@@ -176,9 +175,9 @@ class DispBSConfig(Config):
                 template_fom = copy.deepcopy(fom)
                 # For each angle:
                 for wl_idx, inc_th in enumerate(inc_angles[fom_adjsrc_idx]):
-                    
+
                     new_adj_src = copy.deepcopy(template_adjsrc)
-                    
+
                     # Change name
                     new_adj_src['name'] = new_adj_src['name'] + f'_wl{wl_idx}'
                     # Adjust theta
@@ -191,17 +190,18 @@ class DispBSConfig(Config):
                     new_adj_src['properties']['wavelength stop'] = wavelengths[wl_idx] * 1e-6
                     new_adj_src['properties']['wavelength span'] = 0
                     new_adj_src['properties']['center wavelength'] = wavelengths[wl_idx] * 1e-6
-                    
+
                     new_fom = copy.deepcopy(template_fom)
                     # Adjust FoM's corresponding adjoint source
-                    new_fom_name = f'fom_{fom_counter}_0'          # Adjust this according to how you want the FoMs to be put together
+                    # new_fom_name = f'fom_0_{fom_counter}'          #! FOM ADJUSTMENT: Adjust this according to how you want the FoMs to be put together
+                    new_fom_name = f'fom_{fom_counter}_0'
                     new_fom['adj_srcs'] = [new_adj_src['name']]
 
                     new_adj_srcs.update({new_adj_src['name']: new_adj_src})
                     new_foms['foms'].update({new_fom_name: new_fom})
-                    
+
                     new_foms['weights'].append(copy.deepcopy(foms['weights'][fom_idx]))
-                    
+
                     fom_counter += 1
 
         self.data['figures_of_merit'] = new_foms

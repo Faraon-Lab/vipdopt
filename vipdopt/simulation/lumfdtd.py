@@ -723,14 +723,20 @@ class LumericalFDTD(ISolver):
                 except vipdopt.lumapi.LumApiError:
                     sp = None
                 power = self.fdtd.getdata(mname, 'power') if 'power' in data else None
-                
+
                 try:
                     wl = 299792458/self.fdtd.getdata(mname,'f')*1e6
+                except vipdopt.lumapi.LumApiError:
+                    pass
+                try:
                     ff = self.fdtd.farfield2d(mname, np.arange(1,np.size(wl)+1), 1000)
-                    ff_th = self.fdtd.farfieldangle(mname, np.arange(1,np.size(wl)+1), 1000)
                 except vipdopt.lumapi.LumApiError:
                     ff = None
+                try:
+                    ff_th = self.fdtd.farfieldangle(mname, np.arange(1,np.size(wl)+1), 1000)
+                except vipdopt.lumapi.LumApiError:
                     ff_th = None
+
                 try:
                     ff = ff/sp
                 except Exception as ex:

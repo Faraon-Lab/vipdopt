@@ -153,8 +153,9 @@ if __name__ == '__main__':
     # i.e. current sources, boundary conditions, supporting structures, surrounding regions.
     # Also any other necessary editing of the Lumerical environment and objects.
     vipdopt.logger.info('Beginning Step 0: Project Setup...')
-    from vipdopt.configuration import SonyBayerConfig
-    project = Project(config_type=SonyBayerConfig)
+    from vipdopt.configuration import SonyBayerConfig, DispBSConfig
+    # project = Project(config_type=SonyBayerConfig)
+    project = Project(config_type=DispBSConfig)
 
     solver = LumericalFDTD()
     # solver.promise_env_setup(**LumericalFDTD.get_env_vars(cfg,

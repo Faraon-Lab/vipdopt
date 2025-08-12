@@ -33,11 +33,11 @@ def get_mode_coefficient(forward_E , forward_H, adjoint_E, adjoint_H,
                         dimension='2D', dx=0.01, dy=0.01 ):
     '''
     Calculates the mode overlap between the forward field and the backward mode
-    (*at the propagation monitor).
-    Uses the formula \int n . (Eb x Hf - Ef x Hb) dS
+    (at the propagation monitor).
+    Uses the formula \int n . (Ef x Hb† + Eb† x Hf) dS
     Normal vector is usually in the z direction
     Fields are in the form Ef(x,y,z,lambda,E)
-    dx, dy are the mesh spacing
+    dx, dy are the mesh spacing - !! ASSUMES UNIFORM MESH !!
     '''
 
     Ef = forward_E
@@ -48,15 +48,18 @@ def get_mode_coefficient(forward_E , forward_H, adjoint_E, adjoint_H,
 
     # take only the y component for 2D
     if dimension == '2D':
-        integrand = np.squeeze(cross_product(Eb,Hf)['y'] - cross_product(Ef,Hb)['y'])
+        integrand = np.squeeze(cross_product(Ef,np.conj(Hb))['y'] + cross_product(np.conj(Eb),Hf)['y'])
 
     # take only the z component for 3D
     elif dimension == '3D':
-        integrand = np.squeeze(cross_product(Eb,Hf)['z'] - cross_product(Ef,Hb)['z'])
+        integrand = np.squeeze(cross_product(Ef,np.conj(Hb))['z'] + cross_product(np.conj(Eb),Hf)['z'])
 
     # Complex amplitude is integral of all elements
     # Sum over only spatial components, other degrees of freedom are untouched
-    complex_a = np.sum(integrand,0)*dx*dy
+    if dimension == '2D':
+        complex_a = np.sum(integrand,0)*dx
+    elif dimension == '3D':
+        complex_a = np.sum(integrand,0)*dx*dy
 
     return complex_a
 
@@ -661,6 +664,8 @@ class FoM:
                 new weights from. Should have shape 1 x N where N is the number of
                 FoMs.
         """
+        #! TODO: 20250724 This only works for add-FoMs right now. Nothing for multiply-FoMs
+        #! NOTE: If the FoM is negative (i.e. -1 for mode overlap then what????)
         weights = (2.0 / len(fom_values)) - fom_values**2 / np.sum(fom_values**2)
 
         # # Zero-shift and renormalize
@@ -1194,7 +1199,7 @@ class DispBSFoM(FoM):
         #     vipdopt.logger.debug(vars(mon))
         # TODO: Add functionality for neg_min_freqs
 
-        ## Gradient is 2*Re{-i * conj(amp) * E_fwd . E_adj}
+        ## Gradient is 2*Re{E_adj.E_fwd}, E_adj has amplitude conj(complex_a)/denom
 
         # Sign factor for normal of surface
         sign = -1 if self.fwd_srcs[0].properties['direction'] == 'Forward' else 1
@@ -1211,29 +1216,55 @@ class DispBSFoM(FoM):
         adjoint_prop_H = self.adj_monitors[0].h
         forward_fields_mat = self.fwd_monitors[1].e
         adjoint_fields_mat = self.adj_monitors[1].e
+        zeros_prop = np.zeros(self.fwd_monitors[0].e.shape)
 
         # Calculate individual mode coefficients
+        # NOTE: The data we take for E,H at the target is acquired from the adjoint simulation,
+        # NOTE: which is the source firing backwards. 
+        # NOTE: For both the FoM and adjoint phase calculations, the overlap integral wants the 
+        # NOTE: target field going forwards instead (since this is the desired *output* field).
+        # NOTE: To reverse the wave vector k, E is unchanged and H acquires a -1 sign.
         mode_coeff_kwargs = {}
         for kwarg_key in ['dimension','dx','dy']:
             if kwargs.get(kwarg_key, None) is not None:
                 mode_coeff_kwargs.update({kwarg_key:kwargs.get(kwarg_key)})
-        complex_a = get_mode_coefficient(forward_prop_E, forward_prop_H, adjoint_prop_E, adjoint_prop_H,
+        complex_a = get_mode_coefficient(forward_prop_E, forward_prop_H, adjoint_prop_E, -1*adjoint_prop_H,
                                               **mode_coeff_kwargs)
+        # denom = get_mode_coefficient(adjoint_prop_E, zeros_prop, zeros_prop, -1*adjoint_prop_H,
+        #                                 **mode_coeff_kwargs)
+        # Make the denominator positive so that FoM can be negative
+        denom = get_mode_coefficient(adjoint_prop_E, zeros_prop, zeros_prop, -1*adjoint_prop_H,
+                                        **mode_coeff_kwargs)
 
         # transmission of power derivative, and store them
-        total_mfom = np.real(np.conj(complex_a)*complex_a)/kwargs.get('source_intensity')
+        # total_mfom = np.real(np.conj(complex_a)*complex_a)/kwargs.get('source_intensity') # source_intensity = |Em x Hm + Hm X Em|^2
+        # total_mfom = 1/8 * np.conj(complex_a)*complex_a / np.real(denom)
+        total_mfom = np.conj(complex_a)*complex_a / np.real(denom) * 1/8
+        # total_mfom = total_mfom / kwargs.get('source_intensity')
+        
+        # Ensure mode overlap is always positive: -1 just means there are complex phase factors between E, Em and H, Hm that don't affect the power
+        #! TODO: Might have to take this out and just take the absolute value when plotting the FoM (to avoid flip-flopping.)
+        total_mfom = np.abs(total_mfom)
         
         vipdopt.logger.info('Computing Gradient')
-        self.gradient = sign*np.squeeze(2*np.real(-1j*np.conj(complex_a)*dot_product(forward_fields_mat, adjoint_fields_mat)))
+        # self.gradient = sign*np.squeeze(1/4*np.conj(complex_a)/np.real(denom) * \
+        #                         dot_product(adjoint_fields_mat, forward_fields_mat))
+        self.gradient = sign*np.squeeze(np.conj(complex_a)/np.real(denom) * \
+                                dot_product(adjoint_fields_mat, forward_fields_mat))
 
-        # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
-        try:
-            total_mfom /= np.array(
-                kwargs.get('max_intensity_by_wavelength', None)
-                )#[..., self.pos_max_freqs]
-        except Exception as e:
-            pass
-        # TODO: CHECK THAT THIS IS THE RIGHT PLACE TO PUT IT. CHECK GREG CODE
+        # # Scale by max_intensity_by_wavelength weighting (any intensity FoM needs this)
+        # try:
+        #     total_mfom /= np.array(
+        #         kwargs.get('max_intensity_by_wavelength', None)
+        #         )#[..., self.pos_max_freqs]
+        # except Exception as e:
+        #     pass
+
+        # Intensity
+        total_ifom = np.sum(np.abs(forward_prop_E)**2, 0)
+        
+        # Farfield
+        total_ffom = self.fwd_monitors[0].ff
 
         #! DEBUG ===============================================================
         e_fwd = self.fwd_monitors[1].e
@@ -1258,10 +1289,12 @@ class DispBSFoM(FoM):
 
         # NOTE: Ultimately because of the way SuperFoM is set up, there can only be one return value.
         match kwargs.get('type', None):
-            # case 'transmission':
-            #     return total_tfom
-            # case 'intensity':
-            #     return total_ffom
+            case 'mode_overlap':
+                return total_mfom
+            case 'intensity':
+                return total_ifom
+            case 'farfield' :
+                return total_ffom
             case _:
                 return total_mfom
 
@@ -1283,13 +1316,13 @@ class DispBSFoM(FoM):
         # #       self.enabled_restricted
         # ======================================================================================================================
 
-        try:
-            # self.gradient[..., self.pos_max_freqs] /= np.array(
-            #     kwargs.get('max_intensity_by_wavelength', None)
-            #     )[..., self.pos_max_freqs]
-            self.gradient /= np.array(kwargs.get('max_intensity_by_wavelength', None))
-        except Exception as e:
-            pass
+        # try:
+        #     # self.gradient[..., self.pos_max_freqs] /= np.array(
+        #     #     kwargs.get('max_intensity_by_wavelength', None)
+        #     #     )[..., self.pos_max_freqs]
+        #     self.gradient /= np.array(kwargs.get('max_intensity_by_wavelength', None))
+        # except Exception as e:
+        #     pass
 
         return self.gradient
 

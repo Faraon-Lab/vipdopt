@@ -31,7 +31,7 @@
         {#- Forward Sources -#}
 
         {%- for i in range(0, 2) -%}
-        {%- set fwrd_name = "fwd_src_" + data.xy_names[i] %}
+        {%- set fwrd_name = "forward_src_" + data.xy_names[i] %}
         "{{ fwrd_name }}": {
             "name": "{{ fwrd_name}}",
             {% if data.use_gaussian_sources -%}
@@ -81,110 +81,85 @@
             {%- endif %}
         },
         {%- endfor -%}
-
         {#- Adjoint Sources -#}
         {# Place dipole adjoint sources at the focal plane that can ring in both x-axis and y-axis #}
-        {% set adj_angles_theta_rad = data.adj_angles_theta_rad | nparray -%}
-        {%- set src_focal_dist = ((data.device_vertical_minimum_um + data.adjoint_vertical_um )) - 5*data.mesh_spacing_um %}
-        {# data.adjoint_vertical_um is negative #}
         {%- for src_idx in range(0, data.num_adjoint_sources) -%}
             {%- for xy_idx in range(0, 2) -%}
         {%- set adj_name = ("adj_src_%d" | format(src_idx)) + data.xy_names[xy_idx] %}
         "{{ adj_name }}": {
             "name": "{{ adj_name }}",
-            "obj_type": "gaussian",
+            "obj_type": "dipole",
             "properties": {
                 "x": {{ data.adjoint_x_positions_um[src_idx] * 1e-6 }},
-                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
-                "injection axis": "y-axis",
-                "y": {{ src_focal_dist * 1e-6 }},
+                "y": {{ data.adjoint_vertical_um * 1e-6 }},
                 "theta": {{ data.xy_adjtheta_rotations[xy_idx] }},
                 "phi": 0,
                 {% elif data.simulator_dimension == '3D'-%}
-                "injection axis": "z-axis",
                 "y": {{ data.adjoint_y_positions_um[src_idx] * 1e-6 }},
-                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
-                "z": {{ src_focal_dist * 1e-6 }},
+                "z": {{ data.adjoint_vertical_um * 1e-6 }},
                 "theta": 90,
                 "phi": {{ data.xy_phi_rotations[xy_idx] }},
                 {%- endif %}
-                "direction": "Forward",
-                {%- set shift_x_center = ((src_focal_dist) | abs) * (adj_angles_theta_rad[src_idx] | tan) %}
-                "x": {{ shift_x_center * 1e-6 }},
                 "wavelength start": {{ data.lambda_min_um * 1e-6 }},
-                "wavelength stop": {{ data.lambda_max_um * 1e-6 }},
-                "waist radius w0": {{ data.gaussian_waist_radius_um * 1e-6 }},
-                "distance from waist": {{ ((src_focal_dist) | abs) * (adj_angles_theta_rad[src_idx] | cos) * 1e-6 }},
-                "angle theta": {{ data.adj_angles_theta_deg[src_idx] }},
-                "angle phi": {{ data.source_angle_phi_deg }},
-                "polarization angle": {{ data.xy_phi_rotations[xy_idx] }}
-                }
-            },
+                "wavelength stop": {{ data.lambda_max_um * 1e-6 }}
+            }
+        },
             {%- endfor -%}
         {%- endfor %}
 
-        {# Background Forward Source #}
-        "bg_fwd_src": {
-            "name": "bg_fwd_src",
-            "obj_type": "gaussian",
-            "properties": {
-                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
-                {% if data.simulator_dimension == '2D'-%}
-                "injection axis": "y-axis",
-                "y": {{ data.src_maximum_vertical_um * 1e-6 }},
-                {% elif data.simulator_dimension == '3D'-%}
-                "injection axis": "z-axis",
-                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
-                "z": {{ data.src_maximum_vertical_um * 1e-6 }},
-                {%- endif %}
-                "direction": "Backward",
-                "x": 0,
-                "wavelength start": {{ data.lambda_min_um * 1e-6 }},
-                "wavelength stop": {{ data.lambda_max_um * 1e-6 }},
-                "waist radius w0": {{ data.gaussian_waist_radius_um * 1e-6 }},
-                "distance from waist": {{ (data.device_vertical_maximum_um - data.src_maximum_vertical_um) * 1e-6 }},
-                "angle theta": {{ data.source_angle_theta_deg }},
-                "angle phi": {{ data.source_angle_phi_deg }},
-                "polarization angle": {{ data.xy_phi_rotations[0] }}
-                }
-            },
-
-        {# Background Adjoint Source #}
-        "bg_adj_src": {
-            "name": "bg_adj_src",
-            "obj_type": "gaussian",
-            "properties": {
-                "x span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
-                {% if data.simulator_dimension == '2D'-%}
-                "injection axis": "y-axis",
-                "y": {{ src_focal_dist * 1e-6 }},
-                "theta": 0,
-                "phi": 0,
-                {% elif data.simulator_dimension == '3D'-%}
-                "injection axis": "z-axis",
-                "y span": {{ 2 * data.fdtd_size_x_um * 1e-6 }},
-                "z": {{ src_focal_dist * 1e-6 }},
-                "theta": 0,
-                "phi": 0,
-                {%- endif %}
-                "direction": "Forward",
-                "wavelength start": {{ data.lambda_min_um * 1e-6 }},
-                "wavelength stop": {{ data.lambda_max_um * 1e-6 }},
-                "waist radius w0": {{ data.gaussian_waist_radius_um * 1e-6 }},
-                "distance from waist": {{ (data.device_vertical_maximum_um - data.src_maximum_vertical_um) * 1e-6 }},
-                "angle theta": {{ data.source_angle_theta_deg }},
-                "angle phi": {{ data.source_angle_phi_deg }},
-                "polarization angle": 0
-                }
-            },
-
         {#- Focal Monitors -#}
-        {# Set up a farfield adjoint monitor to get electric field strength at the farfield plane. This will allow us to
+        {# Set up adjoint point monitors to get electric field strength at focus spots.  This will allow us to
         # compute the figure of merit as well as weight the adjoint simulations properly in calculation of the
         # gradient. #}
-        "propagation_monitor": {
-            "name": "propagation_monitor",
+        {%- for adj_src in range(0, data.num_adjoint_sources) -%}
+        {%- set name = "focal_monitor_%d" | format(adj_src) %}
+        "{{ name }}": {
+            "name": "{{ name }}",
+            "obj_type": "power",
+            "properties": {
+                "monitor type": "point",
+                "x": {{ data.adjoint_x_positions_um[adj_src] * 1e-6 }},
+                {% if data.simulator_dimension == '2D'-%}
+                "y": {{ data.adjoint_vertical_um * 1e-6 }},
+                {% elif data.simulator_dimension == '3D'-%}
+                "y": {{ data.adjoint_y_positions_um[adj_src] * 1e-6 }},
+                "z": {{ data.adjoint_vertical_um * 1e-6 }},
+                {%- endif %}
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": {{ data.num_design_frequency_points }}
+            }
+        },
+        {%- endfor -%}
+        {#- Transmission Monitors -#}
+        {%- for adj_src in range(0, data.num_adjoint_sources) -%}
+        {%- set name = "transmission_monitor_%d" | format(adj_src) %}
+        "{{ name }}": {
+            "name": "{{ name }}",
+            "obj_type": "power",
+            "properties": {
+                {% if data.simulator_dimension == '2D'-%}
+                "monitor type": "Linear X",
+                "y": {{ data.adjoint_vertical_um * 1e-6 }},
+                {% elif data.simulator_dimension == '3D'-%}
+                "monitor type": "2D Z-normal",
+                "y": {{ data.adjoint_y_positions_um[adj_src] * 1e-6 }},
+                "y span": {{ 0.5 * data.device_size_y_um * 1e-6 }},
+                "z": {{ data.adjoint_vertical_um * 1e-6 }},
+                {%- endif %}
+                "x": {{ data.adjoint_x_positions_um[adj_src] * 1e-6 }},
+                "x span": {{ 0.5 * data.device_size_x_um * 1e-6 }},
+                "override global monitor settings": 1,
+                "use wavelength spacing": 1,
+                "use source limits": 1,
+                "frequency points": {{ data.num_design_frequency_points }}
+            }
+        },
+        {%- endfor %}
+        "transmission_focal_monitor_": {
+            "name": "transmission_focal_monitor_",
             "obj_type": "power",
             "properties": {
                 {% if data.simulator_dimension == '2D'-%}
@@ -193,39 +168,33 @@
                 {% elif data.simulator_dimension == '3D'-%}
                 "monitor type": "2D Z-normal",
                 "y": 0,
-                "y span": {{ 0.9*data.fdtd_size_y_um* 1e-6 }},
+                "y span": {{ data.device_size_y_um * 1e-6 }},
                 "z": {{ data.adjoint_vertical_um * 1e-6 }},
                 {%- endif %}
                 "x": 0,
-                "x span": {{ 0.9*data.fdtd_size_x_um * 1e-6 }},
+                "x span": {{ data.device_size_x_um * 1e-6 }},
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
-                {#"frequency points": {{ data.num_design_frequency_points }}#}
-                "frequency points": 1
+                "frequency points": {{ data.num_design_frequency_points }}
             }
         },
-
-        {%- set substrate_th = namespace(max=data.device_vertical_maximum_um)-%}
-
         {#- Install Aperture that blocks off source -#}
         {%- if data.use_source_aperture %}
         "PEC_screen": {
             "name": "PEC_screen",
             "obj_type": "rect",
             "properties": {
-                "override mesh order from material database": 1,     {# overlaps with device+etch #}
-                "mesh order": 3,
                 "x": 0,
                 "x span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
-                "y min": {{ (substrate_th.max - data.pec_aperture_thickness_um) * 1e-6 }},
-                "y max": {{ (substrate_th.max) * 1e-6 }},
+                "y min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
+                "y max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "y": 0,
                 "y span": {{ 1.1 * 4 / 3 * 1.2 * data.device_size_y_um * 1e-6 }},
-                "z min": {{ (substrate_th.max - data.pec_aperture_thickness_um) * 1e-6 }},
-                "z max": {{ (substrate_th.max) * 1e-6 }},
+                "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
+                "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {%- endif %}
                 {%- if data.boundary_conditions == 'periodic' %}
                 "enabled": false,
@@ -239,18 +208,16 @@
             "name": "source_aperture",
             "obj_type": "rect",
             "properties": {
-                "override mesh order from material database": 1,     {# overlaps with PEC screen #}
-                "mesh order": 2,
                 "x": 0,
                 "x span": {{ data.device_size_x_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
-                "y min": {{ (substrate_th.max - data.pec_aperture_thickness_um) * 1e-6 }},
-                "y max": {{ (substrate_th.max) * 1e-6 }},
+                "y min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
+                "y max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "y": 0,
                 "y span": {{ data.device_size_y_um * 1e-6 }},
-                "z min": {{ (substrate_th.max - data.pec_aperture_thickness_um) * 1e-6 }},
-                "z max": {{ (substrate_th.max) * 1e-6 }},
+                "z min": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
+                "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um + data.pec_aperture_thickness_um) * 1e-6 }},
                 {%- endif %}
                 {%- if data.boundary_conditions == 'periodic' %}
                 "enabled": false,
@@ -260,11 +227,9 @@
         },
         {% endif -%}
 
-        {#- Substrates -#}
-        {%- for substrate_idx in range(0, data.substrates_above_device|length) -%}
-        {%- set name = data.substrates_above_device[substrate_idx]['name'] %}
-        "{{ name }}": {
-            "name": "{{ name }}",
+        {# todo: Set up substrates to use data.substrates_above_device#}
+        "substrate": {
+            "name": "substrate",
             "obj_type": "rect",
             "properties": {
                 "x": 0,
@@ -281,21 +246,16 @@
                 {% endif -%}
 
                 {% if data.simulator_dimension == '2D'-%}
-                "y min": {{ (substrate_th.max) * 1e-6 }},
-                {%- set substrate_th.max = substrate_th.max + data.substrates_above_device[substrate_idx]['thickness_um'] -%}
-                "y max": {{ (substrate_th.max) * 1e-6 }},
-
+                "y min": {{ (data.device_vertical_maximum_um) * 1e-6 }},
+                "y max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 {% elif data.simulator_dimension == '3D'-%}
                 "y": 0,
-                "z min": {{ (substrate_th.max) * 1e-6 }},
-                {%- set substrate_th.max = substrate_th.max + data.substrates_above_device[substrate_idx]['thickness_um'] -%}
-                "z max": {{ (substrate_th.max) * 1e-6 }},
+                "z min": {{ (data.device_vertical_maximum_um) * 1e-6 }},
+                "z max": {{ (data.device_vertical_maximum_um + data.substrate_thickness_um) * 1e-6 }},
                 {%- endif %}
-
-                "material": "{{ data.substrates_above_device[substrate_idx]['material'] }}"
+                "material": "SiO2 (Glass) - Palik"
             }
         },
-        {%- endfor %}
 
         {#- Set up sidewalls on the side to try and attenuate crosstalk -#}
         {% for idx in range(0, data.num_sidewalls) -%}
@@ -351,8 +311,6 @@
             "obj_type": "import",
             "dev_id": 0,                {# ID keeps track of which device this belongs to. #}
             "properties": {
-                "override mesh order from material database": 1,     {# overlaps with PEC screen #}
-                "mesh order": 1,
                 "x span": {{ data.device_size_x_bordered_um * 1e-6 }},
                 {% if data.simulator_dimension == '2D'-%}
                 "y min": {{ data.device_vertical_minimum_um * 1e-6 }},
@@ -426,17 +384,16 @@
                 "override global monitor settings": 1,
                 "use wavelength spacing": 1,
                 "use source limits": 1,
-                {#"frequency points": {{ data.num_design_frequency_points }},#}
-                "frequency points": 1,
-                "output Hx": 1,
-                "output Hy": 1,
-                "output Hz": 1
+                "frequency points": {{ data.num_design_frequency_points }},
+                "output Hx": 0,
+                "output Hy": 0,
+                "output Hz": 0
             }
         }
     },
 
     "eval_objects": {               {# Will update the dictionary that is generated from the "objects" key above. #}
-
+        
         {# Monitor right below source to measure overall transmission / reflection #}
         "src_transmission_monitor": {
             "name": "src_transmission_monitor",
@@ -604,7 +561,7 @@
 
 
         {% set scatter_plane_width_factor = 2 if data.eval_boundary_conditions == 'periodic_plane' else 6 %}
-
+        
         {# Monitor at focal plane, larger than device size, to measure exit aperture power
         that scatters outside of detector area #}
         "scatter_plane_monitor": {
@@ -662,7 +619,7 @@
                 {% elif xy_idx == 'y' %}
                     {% if data.simulator_dimension == '2D' %}
                     "monitor type": "Linear X",
-                    "y": {{ ((device_hgt/data.device_size_y_um)*dxm_pos[xmon_idx] +
+                    "y": {{ ((device_hgt/data.device_size_y_um)*dxm_pos[xmon_idx] + 
                                 device_center_vertical ) * 1e-6 }},
                     {% elif data.simulator_dimension == '3D' %}
                     "monitor type": "2D X-normal",
@@ -671,7 +628,7 @@
                     "x max": {{ -data.device_size_x_um/2 * 1e-6 }},
                     "x min": {{ data.device_size_x_um/2 * 1e-6 }},
                 {% endif %}
-
+                
                 {% if data.simulator_dimension == '3D' %}
                     "z max": {{ data.device_vertical_maximum_um * 1e-6 }},
                     "z min": {{ data.adjoint_vertical_um * 1e-6 }},
@@ -684,12 +641,12 @@
         },
             {%- endfor -%}
         {%- endfor %}
-
+        
         {#- Forward Sources -#}
         {%- for i in range(0, 2) -%}
-        {%- set fwrd_name = "fwd_src_" + data.xy_names[i] %}
+        {%- set fwrd_name = "forward_src_" + data.xy_names[i] %}
         "{{ fwrd_name }}": {
-            "name": "{{ fwrd_name }}",
+            "name": "{{ fwrd_name}}",
             {% if data.eval_source == 'gaussian' -%}
             {# Add a Gaussian wave forward source at angled incidence #}
             "obj_type": "gaussian",
